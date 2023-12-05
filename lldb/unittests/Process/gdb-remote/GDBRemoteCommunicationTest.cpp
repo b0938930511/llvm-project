@@ -17,7 +17,8 @@ namespace {
 
 class TestClient : public GDBRemoteCommunication {
 public:
-  TestClient() : GDBRemoteCommunication() {}
+  TestClient()
+      : GDBRemoteCommunication("test.client", "test.client.listener") {}
 
   PacketResult ReadPacket(StringExtractorGDBRemote &response) {
     return GDBRemoteCommunication::ReadPacket(response, std::chrono::seconds(1),
@@ -38,15 +39,13 @@ protected:
 
   bool Write(llvm::StringRef packet) {
     ConnectionStatus status;
-    return server.WriteAll(packet.data(), packet.size(), status, nullptr) ==
+    return server.Write(packet.data(), packet.size(), status, nullptr) ==
            packet.size();
   }
 };
 } // end anonymous namespace
 
-// Test that we can decode packets correctly. In particular, verify that
-// checksum calculation works.
-TEST_F(GDBRemoteCommunicationTest, ReadPacket) {
+TEST_F(GDBRemoteCommunicationTest, ReadPacket_checksum) {
   struct TestCase {
     llvm::StringLiteral Packet;
     llvm::StringLiteral Payload;
@@ -54,10 +53,8 @@ TEST_F(GDBRemoteCommunicationTest, ReadPacket) {
   static constexpr TestCase Tests[] = {
       {{"$#00"}, {""}},
       {{"$foobar#79"}, {"foobar"}},
-      {{"$}]#da"}, {"}"}},          // Escaped }
-      {{"$x*%#c7"}, {"xxxxxxxxx"}}, // RLE
-      {{"+$#00"}, {""}},            // Spurious ACK
-      {{"-$#00"}, {""}},            // Spurious NAK
+      {{"$}}#fa"}, {"]"}},
+      {{"$x*%#c7"}, {"xxxxxxxxx"}},
   };
   for (const auto &Test : Tests) {
     SCOPED_TRACE(Test.Packet + " -> " + Test.Payload);

@@ -8,7 +8,7 @@
 
 // UNSUPPORTED: no-exceptions
 
-// bitset<N>& flip(size_t pos); // constexpr since C++23
+// test bitset<N>& flip(size_t pos);
 
 // Make sure we throw std::out_of_range when calling flip() on an OOB index.
 

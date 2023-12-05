@@ -27,6 +27,7 @@
 #include "Plugins/TypeSystem/Clang/TypeSystemClang.h"
 #include "lldb/Core/Debugger.h"
 #include "lldb/Core/Module.h"
+#include "lldb/Core/StreamFile.h"
 #include "lldb/Core/ValueObjectConstResult.h"
 #include "lldb/Expression/ExpressionSourceCode.h"
 #include "lldb/Expression/IRExecutionUnit.h"
@@ -48,7 +49,6 @@
 #include "lldb/Target/ThreadPlan.h"
 #include "lldb/Target/ThreadPlanCallUserExpression.h"
 #include "lldb/Utility/ConstString.h"
-#include "lldb/Utility/LLDBLog.h"
 #include "lldb/Utility/Log.h"
 #include "lldb/Utility/StreamString.h"
 
@@ -89,7 +89,7 @@ ClangUserExpression::ClangUserExpression(
 ClangUserExpression::~ClangUserExpression() = default;
 
 void ClangUserExpression::ScanContext(ExecutionContext &exe_ctx, Status &err) {
-  Log *log = GetLog(LLDBLog::Expressions);
+  Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_EXPRESSIONS));
 
   LLDB_LOGF(log, "ClangUserExpression::ScanContext()");
 
@@ -456,14 +456,14 @@ static bool SupportsCxxModuleImport(lldb::LanguageType language) {
 /// Utility method that puts a message into the expression log and
 /// returns an invalid module configuration.
 static CppModuleConfiguration LogConfigError(const std::string &msg) {
-  Log *log = GetLog(LLDBLog::Expressions);
+  Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_EXPRESSIONS));
   LLDB_LOG(log, "[C++ module config] {0}", msg);
   return CppModuleConfiguration();
 }
 
 CppModuleConfiguration GetModuleConfig(lldb::LanguageType language,
                                        ExecutionContext &exe_ctx) {
-  Log *log = GetLog(LLDBLog::Expressions);
+  Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_EXPRESSIONS));
 
   // Don't do anything if this is not a C++ module configuration.
   if (!SupportsCxxModuleImport(language))
@@ -516,7 +516,7 @@ CppModuleConfiguration GetModuleConfig(lldb::LanguageType language,
   // Try to create a configuration from the files. If there is no valid
   // configuration possible with the files, this just returns an invalid
   // configuration.
-  return CppModuleConfiguration(files, target->GetArchitecture().GetTriple());
+  return CppModuleConfiguration(files);
 }
 
 bool ClangUserExpression::PrepareForParsing(
@@ -621,7 +621,7 @@ bool ClangUserExpression::TryParse(
 }
 
 void ClangUserExpression::SetupCppModuleImports(ExecutionContext &exe_ctx) {
-  Log *log = GetLog(LLDBLog::Expressions);
+  Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_EXPRESSIONS));
 
   CppModuleConfiguration module_config = GetModuleConfig(m_language, exe_ctx);
   m_imported_cpp_modules = module_config.GetImportedModules();
@@ -647,7 +647,7 @@ bool ClangUserExpression::Parse(DiagnosticManager &diagnostic_manager,
                                 lldb_private::ExecutionPolicy execution_policy,
                                 bool keep_result_in_memory,
                                 bool generate_debug_info) {
-  Log *log = GetLog(LLDBLog::Expressions);
+  Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_EXPRESSIONS));
 
   if (!PrepareForParsing(diagnostic_manager, exe_ctx, /*for_completion*/ false))
     return false;
@@ -685,22 +685,15 @@ bool ClangUserExpression::Parse(DiagnosticManager &diagnostic_manager,
     SetupCppModuleImports(exe_ctx);
     // If we did load any modules, then retry parsing.
     if (!m_imported_cpp_modules.empty()) {
-      // Create a dedicated diagnostic manager for the second parse attempt.
-      // These diagnostics are only returned to the caller if using the fallback
-      // actually succeeded in getting the expression to parse. This prevents
-      // that module-specific issues regress diagnostic quality with the
-      // fallback mode.
-      DiagnosticManager retry_manager;
       // The module imports are injected into the source code wrapper,
       // so recreate those.
-      CreateSourceCode(retry_manager, exe_ctx, m_imported_cpp_modules,
+      CreateSourceCode(diagnostic_manager, exe_ctx, m_imported_cpp_modules,
                        /*for_completion*/ false);
-      parse_success = TryParse(retry_manager, exe_scope, exe_ctx,
+      // Clear the error diagnostics from the previous parse attempt.
+      diagnostic_manager.Clear();
+      parse_success = TryParse(diagnostic_manager, exe_scope, exe_ctx,
                                execution_policy, keep_result_in_memory,
                                generate_debug_info);
-      // Return the parse diagnostics if we were successful.
-      if (parse_success)
-        diagnostic_manager = std::move(retry_manager);
     }
   }
   if (!parse_success)
@@ -752,7 +745,7 @@ bool ClangUserExpression::Parse(DiagnosticManager &diagnostic_manager,
     if (jit_module_sp) {
       ConstString const_func_name(FunctionName());
       FileSpec jit_file;
-      jit_file.SetFilename(const_func_name);
+      jit_file.GetFilename() = const_func_name;
       jit_module_sp->SetFileSpecAndObjectName(jit_file, ConstString());
       m_jit_module_wp = jit_module_sp;
       target->GetImages().Append(jit_module_sp);
@@ -806,7 +799,7 @@ static void AbsPosToLineColumnPos(size_t abs_pos, llvm::StringRef code,
 bool ClangUserExpression::Complete(ExecutionContext &exe_ctx,
                                    CompletionRequest &request,
                                    unsigned complete_pos) {
-  Log *log = GetLog(LLDBLog::Expressions);
+  Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_EXPRESSIONS));
 
   // We don't want any visible feedback when completing an expression. Mostly
   // because the results we get from an incomplete invocation are probably not
@@ -857,7 +850,7 @@ bool ClangUserExpression::Complete(ExecutionContext &exe_ctx,
   // The line and column of the user expression inside the transformed source
   // code.
   unsigned user_expr_line, user_expr_column;
-  if (m_user_expression_start_pos)
+  if (m_user_expression_start_pos.hasValue())
     AbsPosToLineColumnPos(*m_user_expression_start_pos, m_transformed_text,
                           user_expr_line, user_expr_column);
   else
@@ -869,33 +862,6 @@ bool ClangUserExpression::Complete(ExecutionContext &exe_ctx,
   parser.Complete(request, user_expr_line, completion_column, complete_pos);
 
   return true;
-}
-
-lldb::addr_t ClangUserExpression::GetCppObjectPointer(
-    lldb::StackFrameSP frame_sp, llvm::StringRef object_name, Status &err) {
-  auto valobj_sp =
-      GetObjectPointerValueObject(std::move(frame_sp), object_name, err);
-
-  // We're inside a C++ class method. This could potentially be an unnamed
-  // lambda structure. If the lambda captured a "this", that should be
-  // the object pointer.
-  if (auto thisChildSP = valobj_sp->GetChildMemberWithName("this")) {
-    valobj_sp = thisChildSP;
-  }
-
-  if (!err.Success() || !valobj_sp.get())
-    return LLDB_INVALID_ADDRESS;
-
-  lldb::addr_t ret = valobj_sp->GetValueAsUnsigned(LLDB_INVALID_ADDRESS);
-
-  if (ret == LLDB_INVALID_ADDRESS) {
-    err.SetErrorStringWithFormatv(
-        "Couldn't load '{0}' because its value couldn't be evaluated",
-        object_name);
-    return LLDB_INVALID_ADDRESS;
-  }
-
-  return ret;
 }
 
 bool ClangUserExpression::AddArguments(ExecutionContext &exe_ctx,
@@ -910,17 +876,18 @@ bool ClangUserExpression::AddArguments(ExecutionContext &exe_ctx,
     if (!frame_sp)
       return true;
 
-    if (!m_in_cplusplus_method && !m_in_objectivec_method) {
+    ConstString object_name;
+
+    if (m_in_cplusplus_method) {
+      object_name.SetCString("this");
+    } else if (m_in_objectivec_method) {
+      object_name.SetCString("self");
+    } else {
       diagnostic_manager.PutString(
           eDiagnosticSeverityError,
           "need object pointer but don't know the language");
       return false;
     }
-
-    static constexpr llvm::StringLiteral g_cplusplus_object_name("this");
-    static constexpr llvm::StringLiteral g_objc_object_name("self");
-    llvm::StringRef object_name =
-        m_in_cplusplus_method ? g_cplusplus_object_name : g_objc_object_name;
 
     Status object_ptr_error;
 
@@ -931,24 +898,18 @@ bool ClangUserExpression::AddArguments(ExecutionContext &exe_ctx,
           address_type != eAddressTypeLoad)
         object_ptr_error.SetErrorString("Can't get context object's "
                                         "debuggee address");
-    } else {
-      if (m_in_cplusplus_method) {
-        object_ptr =
-            GetCppObjectPointer(frame_sp, object_name, object_ptr_error);
-      } else {
-        object_ptr = GetObjectPointer(frame_sp, object_name, object_ptr_error);
-      }
-    }
+    } else
+      object_ptr = GetObjectPointer(frame_sp, object_name, object_ptr_error);
 
     if (!object_ptr_error.Success()) {
-      exe_ctx.GetTargetRef().GetDebugger().GetAsyncOutputStream()->Format(
-          "warning: `{0}' is not accessible (substituting 0). {1}\n",
-          object_name, object_ptr_error.AsCString());
+      exe_ctx.GetTargetRef().GetDebugger().GetAsyncOutputStream()->Printf(
+          "warning: `%s' is not accessible (substituting 0)\n",
+          object_name.AsCString());
       object_ptr = 0;
     }
 
     if (m_in_objectivec_method) {
-      static constexpr llvm::StringLiteral cmd_name("_cmd");
+      ConstString cmd_name("_cmd");
 
       cmd_ptr = GetObjectPointer(frame_sp, cmd_name, object_ptr_error);
 
@@ -977,8 +938,6 @@ lldb::ExpressionVariableSP ClangUserExpression::GetResultAfterDematerialization(
     ExecutionContextScope *exe_scope) {
   return m_result_delegate.GetVariable();
 }
-
-char ClangUserExpression::ClangUserExpressionHelper::ID;
 
 void ClangUserExpression::ClangUserExpressionHelper::ResetDeclMap(
     ExecutionContext &exe_ctx,

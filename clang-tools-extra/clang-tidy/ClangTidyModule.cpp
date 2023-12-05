@@ -13,7 +13,8 @@
 #include "ClangTidyModule.h"
 #include "ClangTidyCheck.h"
 
-namespace clang::tidy {
+namespace clang {
+namespace tidy {
 
 void ClangTidyCheckFactories::registerCheckFactory(StringRef Name,
                                                    CheckFactory Factory) {
@@ -21,7 +22,7 @@ void ClangTidyCheckFactories::registerCheckFactory(StringRef Name,
 }
 
 std::vector<std::unique_ptr<ClangTidyCheck>>
-ClangTidyCheckFactories::createChecks(ClangTidyContext *Context) const {
+ClangTidyCheckFactories::createChecks(ClangTidyContext *Context) {
   std::vector<std::unique_ptr<ClangTidyCheck>> Checks;
   for (const auto &Factory : Factories) {
     if (Context->isCheckEnabled(Factory.getKey()))
@@ -30,22 +31,9 @@ ClangTidyCheckFactories::createChecks(ClangTidyContext *Context) const {
   return Checks;
 }
 
-std::vector<std::unique_ptr<ClangTidyCheck>>
-ClangTidyCheckFactories::createChecksForLanguage(
-    ClangTidyContext *Context) const {
-  std::vector<std::unique_ptr<ClangTidyCheck>> Checks;
-  const LangOptions &LO = Context->getLangOpts();
-  for (const auto &Factory : Factories) {
-    if (!Context->isCheckEnabled(Factory.getKey()))
-      continue;
-    std::unique_ptr<ClangTidyCheck> Check =
-        Factory.getValue()(Factory.getKey(), Context);
-    if (Check->isLanguageVersionSupported(LO))
-      Checks.push_back(std::move(Check));
-  }
-  return Checks;
+ClangTidyOptions ClangTidyModule::getModuleOptions() {
+  return ClangTidyOptions();
 }
 
-ClangTidyOptions ClangTidyModule::getModuleOptions() { return {}; }
-
-} // namespace clang::tidy
+} // namespace tidy
+} // namespace clang

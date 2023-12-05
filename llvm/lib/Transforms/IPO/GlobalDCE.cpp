@@ -21,6 +21,9 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/Operator.h"
+#include "llvm/InitializePasses.h"
+#include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/Utils/CtorUtils.h"
@@ -31,7 +34,7 @@ using namespace llvm;
 #define DEBUG_TYPE "globaldce"
 
 static cl::opt<bool>
-    ClEnableVFE("enable-vfe", cl::Hidden, cl::init(true),
+    ClEnableVFE("enable-vfe", cl::Hidden, cl::init(true), cl::ZeroOrMore,
                 cl::desc("Enable virtual function elimination"));
 
 STATISTIC(NumAliases  , "Number of global aliases removed");
@@ -40,14 +43,52 @@ STATISTIC(NumIFuncs,    "Number of indirect functions removed");
 STATISTIC(NumVariables, "Number of global variables removed");
 STATISTIC(NumVFuncs,    "Number of virtual functions removed");
 
+namespace {
+  class GlobalDCELegacyPass : public ModulePass {
+  public:
+    static char ID; // Pass identification, replacement for typeid
+    GlobalDCELegacyPass() : ModulePass(ID) {
+      initializeGlobalDCELegacyPassPass(*PassRegistry::getPassRegistry());
+    }
+
+    // run - Do the GlobalDCE pass on the specified module, optionally updating
+    // the specified callgraph to reflect the changes.
+    //
+    bool runOnModule(Module &M) override {
+      if (skipModule(M))
+        return false;
+
+      // We need a minimally functional dummy module analysis manager. It needs
+      // to at least know about the possibility of proxying a function analysis
+      // manager.
+      FunctionAnalysisManager DummyFAM;
+      ModuleAnalysisManager DummyMAM;
+      DummyMAM.registerPass(
+          [&] { return FunctionAnalysisManagerModuleProxy(DummyFAM); });
+
+      auto PA = Impl.run(M, DummyMAM);
+      return !PA.areAllPreserved();
+    }
+
+  private:
+    GlobalDCEPass Impl;
+  };
+}
+
+char GlobalDCELegacyPass::ID = 0;
+INITIALIZE_PASS(GlobalDCELegacyPass, "globaldce",
+                "Dead Global Elimination", false, false)
+
+// Public interface to the GlobalDCEPass.
+ModulePass *llvm::createGlobalDCEPass() {
+  return new GlobalDCELegacyPass();
+}
+
 /// Returns true if F is effectively empty.
 static bool isEmptyFunction(Function *F) {
-  // Skip external functions.
-  if (F->isDeclaration())
-    return false;
   BasicBlock &Entry = F->getEntryBlock();
   for (auto &I : Entry) {
-    if (I.isDebugOrPseudoInst())
+    if (isa<DbgInfoIntrinsic>(I))
       continue;
     if (auto *RI = dyn_cast<ReturnInst>(&I))
       return !RI->getReturnValue();
@@ -120,6 +161,12 @@ void GlobalDCEPass::ScanVTables(Module &M) {
   SmallVector<MDNode *, 2> Types;
   LLVM_DEBUG(dbgs() << "Building type info -> vtable map\n");
 
+  auto *LTOPostLinkMD =
+      cast_or_null<ConstantAsMetadata>(M.getModuleFlag("LTOPostLink"));
+  bool LTOPostLink =
+      LTOPostLinkMD &&
+      (cast<ConstantInt>(LTOPostLinkMD->getValue())->getZExtValue() != 0);
+
   for (GlobalVariable &GV : M.globals()) {
     Types.clear();
     GV.getMetadata(LLVMContext::MD_type, Types);
@@ -146,7 +193,7 @@ void GlobalDCEPass::ScanVTables(Module &M) {
     if (auto GO = dyn_cast<GlobalObject>(&GV)) {
       GlobalObject::VCallVisibility TypeVis = GO->getVCallVisibility();
       if (TypeVis == GlobalObject::VCallVisibilityTranslationUnit ||
-          (InLTOPostLink &&
+          (LTOPostLink &&
            TypeVis == GlobalObject::VCallVisibilityLinkageUnit)) {
         LLVM_DEBUG(dbgs() << GV.getName() << " is safe for VFE\n");
         VFESafeVTables.insert(&GV);
@@ -157,24 +204,24 @@ void GlobalDCEPass::ScanVTables(Module &M) {
 
 void GlobalDCEPass::ScanVTableLoad(Function *Caller, Metadata *TypeId,
                                    uint64_t CallOffset) {
-  for (const auto &VTableInfo : TypeIdMap[TypeId]) {
+  for (auto &VTableInfo : TypeIdMap[TypeId]) {
     GlobalVariable *VTable = VTableInfo.first;
     uint64_t VTableOffset = VTableInfo.second;
 
     Constant *Ptr =
         getPointerAtOffset(VTable->getInitializer(), VTableOffset + CallOffset,
-                           *Caller->getParent(), VTable);
+                           *Caller->getParent());
     if (!Ptr) {
       LLVM_DEBUG(dbgs() << "can't find pointer in vtable!\n");
       VFESafeVTables.erase(VTable);
-      continue;
+      return;
     }
 
     auto Callee = dyn_cast<Function>(Ptr->stripPointerCasts());
     if (!Callee) {
       LLVM_DEBUG(dbgs() << "vtable entry is not function pointer!\n");
       VFESafeVTables.erase(VTable);
-      continue;
+      return;
     }
 
     LLVM_DEBUG(dbgs() << "vfunc dep " << Caller->getName() << " -> "
@@ -187,36 +234,29 @@ void GlobalDCEPass::ScanTypeCheckedLoadIntrinsics(Module &M) {
   LLVM_DEBUG(dbgs() << "Scanning type.checked.load intrinsics\n");
   Function *TypeCheckedLoadFunc =
       M.getFunction(Intrinsic::getName(Intrinsic::type_checked_load));
-  Function *TypeCheckedLoadRelativeFunc =
-      M.getFunction(Intrinsic::getName(Intrinsic::type_checked_load_relative));
 
-  auto scan = [&](Function *CheckedLoadFunc) {
-    if (!CheckedLoadFunc)
-      return;
+  if (!TypeCheckedLoadFunc)
+    return;
 
-    for (auto *U : CheckedLoadFunc->users()) {
-      auto CI = dyn_cast<CallInst>(U);
-      if (!CI)
-        continue;
+  for (auto U : TypeCheckedLoadFunc->users()) {
+    auto CI = dyn_cast<CallInst>(U);
+    if (!CI)
+      continue;
 
-      auto *Offset = dyn_cast<ConstantInt>(CI->getArgOperand(1));
-      Value *TypeIdValue = CI->getArgOperand(2);
-      auto *TypeId = cast<MetadataAsValue>(TypeIdValue)->getMetadata();
+    auto *Offset = dyn_cast<ConstantInt>(CI->getArgOperand(1));
+    Value *TypeIdValue = CI->getArgOperand(2);
+    auto *TypeId = cast<MetadataAsValue>(TypeIdValue)->getMetadata();
 
-      if (Offset) {
-        ScanVTableLoad(CI->getFunction(), TypeId, Offset->getZExtValue());
-      } else {
-        // type.checked.load with a non-constant offset, so assume every entry
-        // in every matching vtable is used.
-        for (const auto &VTableInfo : TypeIdMap[TypeId]) {
-          VFESafeVTables.erase(VTableInfo.first);
-        }
+    if (Offset) {
+      ScanVTableLoad(CI->getFunction(), TypeId, Offset->getZExtValue());
+    } else {
+      // type.checked.load with a non-constant offset, so assume every entry in
+      // every matching vtable is used.
+      for (auto &VTableInfo : TypeIdMap[TypeId]) {
+        VFESafeVTables.erase(VTableInfo.first);
       }
     }
-  };
-
-  scan(TypeCheckedLoadFunc);
-  scan(TypeCheckedLoadRelativeFunc);
+  }
 }
 
 void GlobalDCEPass::AddVirtualFunctionDependencies(Module &M) {
@@ -229,7 +269,7 @@ void GlobalDCEPass::AddVirtualFunctionDependencies(Module &M) {
   // Don't attempt VFE in that case.
   auto *Val = mdconst::dyn_extract_or_null<ConstantInt>(
       M.getModuleFlag("Virtual Function Elim"));
-  if (!Val || Val->isZero())
+  if (!Val || Val->getZExtValue() == 0)
     return;
 
   ScanVTables(M);
@@ -258,8 +298,7 @@ PreservedAnalyses GlobalDCEPass::run(Module &M, ModuleAnalysisManager &MAM) {
   // marked as alive are discarded.
 
   // Remove empty functions from the global ctors list.
-  Changed |= optimizeGlobalCtorsList(
-      M, [](uint32_t, Function *F) { return isEmptyFunction(F); });
+  Changed |= optimizeGlobalCtorsList(M, isEmptyFunction);
 
   // Collect the set of members for each comdat.
   for (Function &F : M)
@@ -278,7 +317,7 @@ PreservedAnalyses GlobalDCEPass::run(Module &M, ModuleAnalysisManager &MAM) {
 
   // Loop over the module, adding globals which are obviously necessary.
   for (GlobalObject &GO : M.global_objects()) {
-    GO.removeDeadConstantUsers();
+    Changed |= RemoveUnusedGlobalValue(GO);
     // Functions with external linkage are needed if they have a body.
     // Externally visible & appending globals are needed, if they have an
     // initializer.
@@ -291,7 +330,7 @@ PreservedAnalyses GlobalDCEPass::run(Module &M, ModuleAnalysisManager &MAM) {
 
   // Compute direct dependencies of aliases.
   for (GlobalAlias &GA : M.aliases()) {
-    GA.removeDeadConstantUsers();
+    Changed |= RemoveUnusedGlobalValue(GA);
     // Externally visible aliases are needed.
     if (!GA.isDiscardableIfUnused())
       MarkLive(GA);
@@ -301,7 +340,7 @@ PreservedAnalyses GlobalDCEPass::run(Module &M, ModuleAnalysisManager &MAM) {
 
   // Compute direct dependencies of ifuncs.
   for (GlobalIFunc &GIF : M.ifuncs()) {
-    GIF.removeDeadConstantUsers();
+    Changed |= RemoveUnusedGlobalValue(GIF);
     // Externally visible ifuncs are needed.
     if (!GIF.isDiscardableIfUnused())
       MarkLive(GIF);
@@ -364,7 +403,7 @@ PreservedAnalyses GlobalDCEPass::run(Module &M, ModuleAnalysisManager &MAM) {
   // Now that all interferences have been dropped, delete the actual objects
   // themselves.
   auto EraseUnusedGlobalValue = [&](GlobalValue *GV) {
-    GV->removeDeadConstantUsers();
+    RemoveUnusedGlobalValue(*GV);
     GV->eraseFromParent();
     Changed = true;
   };
@@ -377,16 +416,6 @@ PreservedAnalyses GlobalDCEPass::run(Module &M, ModuleAnalysisManager &MAM) {
       // virtual function pointers with null, allowing us to remove the
       // function itself.
       ++NumVFuncs;
-
-      // Detect vfuncs that are referenced as "relative pointers" which are used
-      // in Swift vtables, i.e. entries in the form of:
-      //
-      //   i32 trunc (i64 sub (i64 ptrtoint @f, i64 ptrtoint ...)) to i32)
-      //
-      // In this case, replace the whole "sub" expression with constant 0 to
-      // avoid leaving a weird sub(0, symbol) expression behind.
-      replaceRelativePointerUsersWithZero(F);
-
       F->replaceNonMetadataUsesWith(ConstantPointerNull::get(F->getType()));
     }
     EraseUnusedGlobalValue(F);
@@ -417,10 +446,15 @@ PreservedAnalyses GlobalDCEPass::run(Module &M, ModuleAnalysisManager &MAM) {
   return PreservedAnalyses::all();
 }
 
-void GlobalDCEPass::printPipeline(
-    raw_ostream &OS, function_ref<StringRef(StringRef)> MapClassName2PassName) {
-  static_cast<PassInfoMixin<GlobalDCEPass> *>(this)->printPipeline(
-      OS, MapClassName2PassName);
-  if (InLTOPostLink)
-    OS << "<vfe-linkage-unit-visibility>";
+// RemoveUnusedGlobalValue - Loop over all of the uses of the specified
+// GlobalValue, looking for the constant pointer ref that may be pointing to it.
+// If found, check to see if the constant pointer ref is safe to destroy, and if
+// so, nuke it.  This will reduce the reference count on the global value, which
+// might make it deader.
+//
+bool GlobalDCEPass::RemoveUnusedGlobalValue(GlobalValue &GV) {
+  if (GV.use_empty())
+    return false;
+  GV.removeDeadConstantUsers();
+  return GV.use_empty();
 }

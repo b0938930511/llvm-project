@@ -46,7 +46,7 @@
 @end
 
 void abort(void);
-int main (void)
+int main ()
 {
 	Test *x = [[Test alloc] init];
 	/* 1. Test of a required property */

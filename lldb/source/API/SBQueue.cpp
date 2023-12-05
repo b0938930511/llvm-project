@@ -8,8 +8,8 @@
 
 #include <cinttypes>
 
+#include "SBReproducerPrivate.h"
 #include "lldb/API/SBQueue.h"
-#include "lldb/Utility/Instrumentation.h"
 
 #include "lldb/API/SBProcess.h"
 #include "lldb/API/SBQueueItem.h"
@@ -27,9 +27,13 @@ namespace lldb_private {
 
 class QueueImpl {
 public:
-  QueueImpl() = default;
+  QueueImpl() : m_queue_wp(), m_threads(), m_pending_items() {}
 
-  QueueImpl(const lldb::QueueSP &queue_sp) { m_queue_wp = queue_sp; }
+  QueueImpl(const lldb::QueueSP &queue_sp)
+      : m_queue_wp(), m_threads(), m_thread_list_fetched(false),
+        m_pending_items(), m_pending_items_fetched(false) {
+    m_queue_wp = queue_sp;
+  }
 
   QueueImpl(const QueueImpl &rhs) {
     if (&rhs == this)
@@ -77,10 +81,12 @@ public:
   }
 
   const char *GetName() const {
+    const char *name = nullptr;
     lldb::QueueSP queue_sp = m_queue_wp.lock();
-    if (!queue_sp)
-      return nullptr;
-    return ConstString(queue_sp->GetName()).GetCString();
+    if (queue_sp.get()) {
+      name = queue_sp->GetName();
+    }
+    return name;
   }
 
   void FetchThreads() {
@@ -210,15 +216,17 @@ private:
 };
 }
 
-SBQueue::SBQueue() : m_opaque_sp(new QueueImpl()) { LLDB_INSTRUMENT_VA(this); }
+SBQueue::SBQueue() : m_opaque_sp(new QueueImpl()) {
+  LLDB_RECORD_CONSTRUCTOR_NO_ARGS(SBQueue);
+}
 
 SBQueue::SBQueue(const QueueSP &queue_sp)
     : m_opaque_sp(new QueueImpl(queue_sp)) {
-  LLDB_INSTRUMENT_VA(this, queue_sp);
+  LLDB_RECORD_CONSTRUCTOR(SBQueue, (const lldb::QueueSP &), queue_sp);
 }
 
 SBQueue::SBQueue(const SBQueue &rhs) {
-  LLDB_INSTRUMENT_VA(this, rhs);
+  LLDB_RECORD_CONSTRUCTOR(SBQueue, (const lldb::SBQueue &), rhs);
 
   if (&rhs == this)
     return;
@@ -227,26 +235,27 @@ SBQueue::SBQueue(const SBQueue &rhs) {
 }
 
 const lldb::SBQueue &SBQueue::operator=(const lldb::SBQueue &rhs) {
-  LLDB_INSTRUMENT_VA(this, rhs);
+  LLDB_RECORD_METHOD(const lldb::SBQueue &,
+                     SBQueue, operator=,(const lldb::SBQueue &), rhs);
 
   m_opaque_sp = rhs.m_opaque_sp;
-  return *this;
+  return LLDB_RECORD_RESULT(*this);
 }
 
 SBQueue::~SBQueue() = default;
 
 bool SBQueue::IsValid() const {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_CONST_NO_ARGS(bool, SBQueue, IsValid);
   return this->operator bool();
 }
 SBQueue::operator bool() const {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_CONST_NO_ARGS(bool, SBQueue, operator bool);
 
   return m_opaque_sp->IsValid();
 }
 
 void SBQueue::Clear() {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_NO_ARGS(void, SBQueue, Clear);
 
   m_opaque_sp->Clear();
 }
@@ -256,63 +265,94 @@ void SBQueue::SetQueue(const QueueSP &queue_sp) {
 }
 
 lldb::queue_id_t SBQueue::GetQueueID() const {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_CONST_NO_ARGS(lldb::queue_id_t, SBQueue, GetQueueID);
 
   return m_opaque_sp->GetQueueID();
 }
 
 uint32_t SBQueue::GetIndexID() const {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_CONST_NO_ARGS(uint32_t, SBQueue, GetIndexID);
 
   uint32_t index_id = m_opaque_sp->GetIndexID();
   return index_id;
 }
 
 const char *SBQueue::GetName() const {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_CONST_NO_ARGS(const char *, SBQueue, GetName);
 
   return m_opaque_sp->GetName();
 }
 
 uint32_t SBQueue::GetNumThreads() {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_NO_ARGS(uint32_t, SBQueue, GetNumThreads);
 
   return m_opaque_sp->GetNumThreads();
 }
 
 SBThread SBQueue::GetThreadAtIndex(uint32_t idx) {
-  LLDB_INSTRUMENT_VA(this, idx);
+  LLDB_RECORD_METHOD(lldb::SBThread, SBQueue, GetThreadAtIndex, (uint32_t),
+                     idx);
 
   SBThread th = m_opaque_sp->GetThreadAtIndex(idx);
-  return th;
+  return LLDB_RECORD_RESULT(th);
 }
 
 uint32_t SBQueue::GetNumPendingItems() {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_NO_ARGS(uint32_t, SBQueue, GetNumPendingItems);
 
   return m_opaque_sp->GetNumPendingItems();
 }
 
 SBQueueItem SBQueue::GetPendingItemAtIndex(uint32_t idx) {
-  LLDB_INSTRUMENT_VA(this, idx);
+  LLDB_RECORD_METHOD(lldb::SBQueueItem, SBQueue, GetPendingItemAtIndex,
+                     (uint32_t), idx);
 
-  return m_opaque_sp->GetPendingItemAtIndex(idx);
+  return LLDB_RECORD_RESULT(m_opaque_sp->GetPendingItemAtIndex(idx));
 }
 
 uint32_t SBQueue::GetNumRunningItems() {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_NO_ARGS(uint32_t, SBQueue, GetNumRunningItems);
 
   return m_opaque_sp->GetNumRunningItems();
 }
 
 SBProcess SBQueue::GetProcess() {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_NO_ARGS(lldb::SBProcess, SBQueue, GetProcess);
 
-  return m_opaque_sp->GetProcess();
+  return LLDB_RECORD_RESULT(m_opaque_sp->GetProcess());
 }
 
 lldb::QueueKind SBQueue::GetKind() {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_NO_ARGS(lldb::QueueKind, SBQueue, GetKind);
 
   return m_opaque_sp->GetKind();
+}
+
+namespace lldb_private {
+namespace repro {
+
+template <>
+void RegisterMethods<SBQueue>(Registry &R) {
+  LLDB_REGISTER_CONSTRUCTOR(SBQueue, ());
+  LLDB_REGISTER_CONSTRUCTOR(SBQueue, (const lldb::QueueSP &));
+  LLDB_REGISTER_CONSTRUCTOR(SBQueue, (const lldb::SBQueue &));
+  LLDB_REGISTER_METHOD(const lldb::SBQueue &,
+                       SBQueue, operator=,(const lldb::SBQueue &));
+  LLDB_REGISTER_METHOD_CONST(bool, SBQueue, IsValid, ());
+  LLDB_REGISTER_METHOD_CONST(bool, SBQueue, operator bool, ());
+  LLDB_REGISTER_METHOD(void, SBQueue, Clear, ());
+  LLDB_REGISTER_METHOD_CONST(lldb::queue_id_t, SBQueue, GetQueueID, ());
+  LLDB_REGISTER_METHOD_CONST(uint32_t, SBQueue, GetIndexID, ());
+  LLDB_REGISTER_METHOD_CONST(const char *, SBQueue, GetName, ());
+  LLDB_REGISTER_METHOD(uint32_t, SBQueue, GetNumThreads, ());
+  LLDB_REGISTER_METHOD(lldb::SBThread, SBQueue, GetThreadAtIndex, (uint32_t));
+  LLDB_REGISTER_METHOD(uint32_t, SBQueue, GetNumPendingItems, ());
+  LLDB_REGISTER_METHOD(lldb::SBQueueItem, SBQueue, GetPendingItemAtIndex,
+                       (uint32_t));
+  LLDB_REGISTER_METHOD(uint32_t, SBQueue, GetNumRunningItems, ());
+  LLDB_REGISTER_METHOD(lldb::SBProcess, SBQueue, GetProcess, ());
+  LLDB_REGISTER_METHOD(lldb::QueueKind, SBQueue, GetKind, ());
+}
+
+}
 }

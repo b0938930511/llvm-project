@@ -20,9 +20,6 @@ void default_arg(int a = 42, string &b = my_string);
 template <class T>
 T *addressof(T &arg);
 
-template <class T>
-T *__addressof(T &arg);
-
 char *data(std::string &c);
 
 } // end namespace std
@@ -382,15 +379,7 @@ void func_addressof() {
   const char *c;
   std::string s;
   c = s.c_str();
-  (void)addressof(s);
-  consume(c); // no-warning
-}
-
-void func_AddressofFn_() {
-  const char *c;
-  std::string s;
-  c = s.c_str();
-  (void)std::__addressof(s);
+  addressof(s);
   consume(c); // no-warning
 }
 

@@ -10,4 +10,5 @@ class __declspec(dllexport) A {
   int field_;
 };
 
-// CHECK: %class.A = type { ptr, i32 }
+// CHECK: %class.A = type { void (%struct.Info*)*, i32 }
+// CHECK: %struct.Info = type { i32 (...)** }

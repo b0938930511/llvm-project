@@ -5,8 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+#include "AST.h"
 
-#include "ASTSignals.h"
+#include "ParsedAST.h"
 #include "TestIndex.h"
 #include "TestTU.h"
 #include "llvm/ADT/StringRef.h"
@@ -68,7 +69,6 @@ TEST(ASTSignals, Derive) {
           Pair(sym("Y", index::SymbolKind::Variable, "@N@tar@S@X@FI@\\0").ID,
                2),
           Pair(_ /*a*/, 3)));
-  EXPECT_EQ(Signals.InsertionDirective, Symbol::IncludeDirective::Include);
 }
 } // namespace
 } // namespace clangd

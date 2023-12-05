@@ -33,7 +33,7 @@ struct GenericConvertingDeleter {
   void operator()(void*) const {}
 };
 
-TEST_CONSTEXPR_CXX23 void test_sfinae() {
+void test_sfinae() {
   { // Disallow copying
     using U1 = std::unique_ptr<A[], GenericConvertingDeleter<0> >;
     using U2 = std::unique_ptr<A[], GenericConvertingDeleter<1> >;
@@ -77,17 +77,9 @@ TEST_CONSTEXPR_CXX23 void test_sfinae() {
   }
 }
 
-TEST_CONSTEXPR_CXX23 bool test() {
-  test_sfinae();
-
-  return true;
-}
 
 int main(int, char**) {
-  test();
-#if TEST_STD_VER >= 23
-  static_assert(test());
-#endif
+  test_sfinae();
 
   return 0;
 }

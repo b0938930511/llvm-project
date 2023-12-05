@@ -13,7 +13,6 @@
 
 #include "llvm/ProfileData/GCOV.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/Demangle/Demangle.h"
 #include "llvm/Support/Debug.h"
@@ -23,8 +22,8 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
-#include <optional>
 #include <system_error>
+#include <unordered_map>
 
 using namespace llvm;
 
@@ -140,7 +139,10 @@ bool GCOVFile::readGCNO(GCOVBuffer &buf) {
         if (version >= GCOV::V900)
           fn->endColumn = buf.getWord();
       }
-      fn->srcIdx = addNormalizedPathToMap(filename);
+      auto r = filenameToIdx.try_emplace(filename, filenameToIdx.size());
+      if (r.second)
+        filenames.emplace_back(filename);
+      fn->srcIdx = r.first->second;
       identToFunction[fn->ident] = fn;
     } else if (tag == GCOV_TAG_BLOCKS && fn) {
       if (version < GCOV::V800) {
@@ -237,14 +239,23 @@ bool GCOVFile::readGCDA(GCOVBuffer &buf) {
     if (tag == GCOV_TAG_OBJECT_SUMMARY) {
       buf.readInt(runCount);
       buf.readInt(dummy);
+      // clang<11 uses a fake 4.2 format which sets length to 9.
+      if (length == 9)
+        buf.readInt(runCount);
     } else if (tag == GCOV_TAG_PROGRAM_SUMMARY) {
-      buf.readInt(dummy);
-      buf.readInt(dummy);
-      buf.readInt(runCount);
+      // clang<11 uses a fake 4.2 format which sets length to 0.
+      if (length > 0) {
+        buf.readInt(dummy);
+        buf.readInt(dummy);
+        buf.readInt(runCount);
+      }
       ++programCount;
     } else if (tag == GCOV_TAG_FUNCTION) {
       if (length == 0) // Placeholder
         continue;
+      // As of GCC 10, GCOV_TAG_FUNCTION_LENGTH has never been larger than 3.
+      // However, clang<11 uses a fake 4.2 format which may set length larger
+      // than 3.
       if (length < 2 || !buf.readInt(ident))
         return false;
       auto It = identToFunction.find(ident);
@@ -314,19 +325,6 @@ void GCOVFile::print(raw_ostream &OS) const {
 LLVM_DUMP_METHOD void GCOVFile::dump() const { print(dbgs()); }
 #endif
 
-unsigned GCOVFile::addNormalizedPathToMap(StringRef filename) {
-  // unify filename, as the same path can have different form
-  SmallString<256> P(filename);
-  sys::path::remove_dots(P, true);
-  filename = P.str();
-
-  auto r = filenameToIdx.try_emplace(filename, filenameToIdx.size());
-  if (r.second)
-    filenames.emplace_back(filename);
-
-  return r.first->second;
-}
-
 bool GCOVArc::onTree() const { return flags & GCOV_ARC_ON_TREE; }
 
 //===----------------------------------------------------------------------===//
@@ -338,15 +336,17 @@ StringRef GCOVFunction::getName(bool demangle) const {
   if (demangled.empty()) {
     do {
       if (Name.startswith("_Z")) {
+        int status = 0;
         // Name is guaranteed to be NUL-terminated.
-        if (char *res = itaniumDemangle(Name.data())) {
+        char *res = itaniumDemangle(Name.data(), nullptr, nullptr, &status);
+        if (status == 0) {
           demangled = res;
           free(res);
           break;
         }
       }
       demangled = Name;
-    } while (false);
+    } while (0);
   }
   return demangled;
 }
@@ -365,60 +365,25 @@ GCOVBlock &GCOVFunction::getExitBlock() const {
 // For each basic block, the sum of incoming edge counts equals the sum of
 // outgoing edge counts by Kirchoff's circuit law. If the unmeasured arcs form a
 // spanning tree, the count for each unmeasured arc (GCOV_ARC_ON_TREE) can be
-// uniquely identified. Use an iterative algorithm to decrease stack usage for
-// library users in threads. See the edge propagation algorithm in Optimally
-// Profiling and Tracing Programs, ACM Transactions on Programming Languages and
-// Systems, 1994.
-void GCOVFunction::propagateCounts(const GCOVBlock &v, GCOVArc *pred) {
-  struct Elem {
-    const GCOVBlock &v;
-    GCOVArc *pred;
-    bool inDst;
-    size_t i = 0;
-    uint64_t excess = 0;
-  };
+// uniquely identified.
+uint64_t GCOVFunction::propagateCounts(const GCOVBlock &v, GCOVArc *pred) {
+  // If GCOV_ARC_ON_TREE edges do form a tree, visited is not needed; otherwise
+  // this prevents infinite recursion.
+  if (!visited.insert(&v).second)
+    return 0;
 
-  SmallVector<Elem, 0> stack;
-  stack.push_back({v, pred, false});
-  for (;;) {
-    Elem &u = stack.back();
-    // If GCOV_ARC_ON_TREE edges do form a tree, visited is not needed;
-    // otherwise, this prevents infinite recursion for bad input.
-    if (u.i == 0 && !visited.insert(&u.v).second) {
-      stack.pop_back();
-      if (stack.empty())
-        break;
-      continue;
-    }
-    if (u.i < u.v.pred.size()) {
-      GCOVArc *e = u.v.pred[u.i++];
-      if (e != u.pred) {
-        if (e->onTree())
-          stack.push_back({e->src, e, /*inDst=*/false});
-        else
-          u.excess += e->count;
-      }
-    } else if (u.i < u.v.pred.size() + u.v.succ.size()) {
-      GCOVArc *e = u.v.succ[u.i++ - u.v.pred.size()];
-      if (e != u.pred) {
-        if (e->onTree())
-          stack.push_back({e->dst, e, /*inDst=*/true});
-        else
-          u.excess -= e->count;
-      }
-    } else {
-      uint64_t excess = u.excess;
-      if (static_cast<int64_t>(excess) < 0)
-        excess = -excess;
-      if (u.pred)
-        u.pred->count = excess;
-      bool inDst = u.inDst;
-      stack.pop_back();
-      if (stack.empty())
-        break;
-      stack.back().excess += inDst ? -excess : excess;
-    }
-  }
+  uint64_t excess = 0;
+  for (GCOVArc *e : v.srcs())
+    if (e != pred)
+      excess += e->onTree() ? propagateCounts(e->src, e) : e->count;
+  for (GCOVArc *e : v.dsts())
+    if (e != pred)
+      excess -= e->onTree() ? propagateCounts(e->dst, e) : e->count;
+  if (int64_t(excess) < 0)
+    excess = -excess;
+  if (pred)
+    pred->count = excess;
+  return excess;
 }
 
 void GCOVFunction::print(raw_ostream &OS) const {
@@ -526,12 +491,12 @@ uint64_t GCOVBlock::getCyclesCount(const BlockVector &blocks) {
   uint64_t count = 0, d;
   for (;;) {
     // Make blocks on the line traversable and try finding a cycle.
-    for (const auto *b : blocks) {
+    for (auto b : blocks) {
       const_cast<GCOVBlock *>(b)->traversable = true;
       const_cast<GCOVBlock *>(b)->incoming = nullptr;
     }
     d = 0;
-    for (const auto *block : blocks) {
+    for (auto block : blocks) {
       auto *b = const_cast<GCOVBlock *>(block);
       if (b->traversable && (d = augmentOneCycle(b, stack)) > 0)
         break;
@@ -542,7 +507,7 @@ uint64_t GCOVBlock::getCyclesCount(const BlockVector &blocks) {
   }
   // If there is no more loop, all traversable bits should have been cleared.
   // This property is needed by subsequent calls.
-  for (const auto *b : blocks) {
+  for (auto b : blocks) {
     assert(!b->traversable);
     (void)b;
   }
@@ -698,8 +663,6 @@ void Context::collectFunction(GCOVFunction &f, Summary &summary) {
   if (f.startLine >= si.startLineToFunctions.size())
     si.startLineToFunctions.resize(f.startLine + 1);
   si.startLineToFunctions[f.startLine].push_back(&f);
-  SmallSet<uint32_t, 16> lines;
-  SmallSet<uint32_t, 16> linesExec;
   for (const GCOVBlock &b : f.blocksRange()) {
     if (b.lines.empty())
       continue;
@@ -708,9 +671,9 @@ void Context::collectFunction(GCOVFunction &f, Summary &summary) {
       si.lines.resize(maxLineNum + 1);
     for (uint32_t lineNum : b.lines) {
       LineInfo &line = si.lines[lineNum];
-      if (lines.insert(lineNum).second)
+      if (!line.exists)
         ++summary.lines;
-      if (b.count && linesExec.insert(lineNum).second)
+      if (line.count == 0 && b.count)
         ++summary.linesExec;
       line.exists = true;
       line.count += b.count;
@@ -913,7 +876,7 @@ void Context::print(StringRef filename, StringRef gcno, StringRef gcda,
 
     if (options.NoOutput || options.Intermediate)
       continue;
-    std::optional<raw_fd_ostream> os;
+    Optional<raw_fd_ostream> os;
     if (!options.UseStdout) {
       std::error_code ec;
       os.emplace(gcovName, ec, sys::fs::OF_TextWithCRLF);

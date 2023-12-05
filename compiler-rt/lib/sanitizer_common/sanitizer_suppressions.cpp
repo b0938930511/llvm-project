@@ -86,7 +86,6 @@ void SuppressionContext::ParseFromFile(const char *filename) {
   }
 
   Parse(file_contents);
-  UnmapOrDie(file_contents, contents_size);
 }
 
 bool SuppressionContext::Match(const char *str, const char *type,

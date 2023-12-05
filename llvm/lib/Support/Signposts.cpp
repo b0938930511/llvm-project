@@ -1,31 +1,27 @@
 //===-- Signposts.cpp - Interval debug annotations ------------------------===//
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//                     The LLVM Compiler Infrastructure
+//
+// This file is distributed under the University of Illinois Open Source
+// License. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Support/Signposts.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/Config/config.h"
+#include "llvm/Support/Timer.h"
 
 #if LLVM_SUPPORT_XCODE_SIGNPOSTS
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Mutex.h"
-#include <Availability.h>
-#include <os/signpost.h>
-#endif // if LLVM_SUPPORT_XCODE_SIGNPOSTS
+#endif
 
 using namespace llvm;
 
 #if LLVM_SUPPORT_XCODE_SIGNPOSTS
-#define SIGNPOSTS_AVAILABLE()                                                  \
-  __builtin_available(macos 10.14, iOS 12, tvOS 12, watchOS 5, *)
 namespace {
 os_log_t *LogCreator() {
   os_log_t *X = new os_log_t;
-  *X = os_log_create("org.llvm.signposts", "toolchain");
+  *X = os_log_create("org.llvm.signposts", OS_LOG_CATEGORY_POINTS_OF_INTEREST);
   return X;
 }
 struct LogDeleter {
@@ -39,13 +35,13 @@ struct LogDeleter {
 namespace llvm {
 class SignpostEmitterImpl {
   using LogPtrTy = std::unique_ptr<os_log_t, LogDeleter>;
-  using LogTy = LogPtrTy::element_type;
 
   LogPtrTy SignpostLog;
   DenseMap<const void *, os_signpost_id_t> Signposts;
   sys::SmartMutex<true> Mutex;
 
-  LogTy &getLogger() const { return *SignpostLog; }
+public:
+  os_log_t &getLogger() const { return *SignpostLog; }
   os_signpost_id_t getSignpostForObject(const void *O) {
     sys::SmartScopedLock<true> Lock(Mutex);
     const auto &I = Signposts.find(O);
@@ -59,7 +55,6 @@ class SignpostEmitterImpl {
     return Inserted.first->second;
   }
 
-public:
   SignpostEmitterImpl() : SignpostLog(LogCreator()) {}
 
   bool isEnabled() const {
@@ -78,7 +73,7 @@ public:
     }
   }
 
-  void endInterval(const void *O, llvm::StringRef Name) {
+  void endInterval(const void *O) {
     if (isEnabled()) {
       if (SIGNPOSTS_AVAILABLE()) {
         // Both strings used here are required to be constant literal strings.
@@ -124,10 +119,17 @@ void SignpostEmitter::startInterval(const void *O, StringRef Name) {
 #endif // if !HAVE_ANY_SIGNPOST_IMPL
 }
 
-void SignpostEmitter::endInterval(const void *O, StringRef Name) {
+#if HAVE_ANY_SIGNPOST_IMPL
+os_log_t &SignpostEmitter::getLogger() const { return Impl->getLogger(); }
+os_signpost_id_t SignpostEmitter::getSignpostForObject(const void *O) {
+  return Impl->getSignpostForObject(O);
+}
+#endif
+
+void SignpostEmitter::endInterval(const void *O) {
 #if HAVE_ANY_SIGNPOST_IMPL
   if (Impl == nullptr)
     return;
-  Impl->endInterval(O, Name);
+  Impl->endInterval(O);
 #endif // if !HAVE_ANY_SIGNPOST_IMPL
 }

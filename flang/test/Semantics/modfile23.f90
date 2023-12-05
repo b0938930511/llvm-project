@@ -1,4 +1,5 @@
-! RUN: %python %S/test_modfile.py %s %flang_fc1
+! RUN: %S/test_modfile.sh %s %t %flang_fc1
+! REQUIRES: shell
 ! Test that subprogram interfaces get all of the symbols that they need.
 
 module m1

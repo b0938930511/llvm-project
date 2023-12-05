@@ -17,17 +17,11 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/SourceMgr.h"
 #include "gtest/gtest.h"
-#include <optional>
 #include <sstream>
 
 using namespace llvm;
 
 namespace {
-
-static const char *ReductionIntOpcodes[] = {
-    "add", "mul", "and", "or", "xor", "smin", "smax", "umin", "umax"};
-
-static const char *ReductionFPOpcodes[] = {"fadd", "fmul", "fmin", "fmax"};
 
 class VPIntrinsicTest : public testing::Test {
 protected:
@@ -41,131 +35,25 @@ protected:
   std::unique_ptr<Module> createVPDeclarationModule() {
     const char *BinaryIntOpcodes[] = {"add",  "sub",  "mul", "sdiv", "srem",
                                       "udiv", "urem", "and", "xor",  "or",
-                                      "ashr", "lshr", "shl", "smin", "smax",
-                                      "umin", "umax"};
+                                      "ashr", "lshr", "shl"};
     std::stringstream Str;
     for (const char *BinaryIntOpcode : BinaryIntOpcodes)
       Str << " declare <8 x i32> @llvm.vp." << BinaryIntOpcode
           << ".v8i32(<8 x i32>, <8 x i32>, <8 x i1>, i32) ";
 
-    const char *BinaryFPOpcodes[] = {"fadd", "fsub",   "fmul",   "fdiv",
-                                     "frem", "minnum", "maxnum", "copysign"};
+    const char *BinaryFPOpcodes[] = {"fadd", "fsub", "fmul", "fdiv", "frem"};
     for (const char *BinaryFPOpcode : BinaryFPOpcodes)
       Str << " declare <8 x float> @llvm.vp." << BinaryFPOpcode
           << ".v8f32(<8 x float>, <8 x float>, <8 x i1>, i32) ";
 
-    Str << " declare <8 x float> @llvm.vp.floor.v8f32(<8 x float>, <8 x i1>, "
-           "i32)";
-    Str << " declare <8 x float> @llvm.vp.round.v8f32(<8 x float>, <8 x i1>, "
-           "i32)";
-    Str << " declare <8 x float> @llvm.vp.roundeven.v8f32(<8 x float>, <8 x "
-           "i1>, "
-           "i32)";
-    Str << " declare <8 x float> @llvm.vp.roundtozero.v8f32(<8 x float>, <8 x "
-           "i1>, "
-           "i32)";
-    Str << " declare <8 x float> @llvm.vp.rint.v8f32(<8 x float>, <8 x i1>, "
-           "i32)";
-    Str << " declare <8 x float> @llvm.vp.nearbyint.v8f32(<8 x float>, <8 x "
-           "i1>, "
-           "i32)";
-    Str << " declare <8 x float> @llvm.vp.ceil.v8f32(<8 x float>, <8 x i1>, "
-           "i32)";
-    Str << " declare <8 x float> @llvm.vp.fneg.v8f32(<8 x float>, <8 x i1>, "
-           "i32)";
-    Str << " declare <8 x float> @llvm.vp.fabs.v8f32(<8 x float>, <8 x i1>, "
-           "i32)";
-    Str << " declare <8 x float> @llvm.vp.sqrt.v8f32(<8 x float>, <8 x i1>, "
-           "i32)";
-    Str << " declare <8 x float> @llvm.vp.fma.v8f32(<8 x float>, <8 x float>, "
-           "<8 x float>, <8 x i1>, i32) ";
-    Str << " declare <8 x float> @llvm.vp.fmuladd.v8f32(<8 x float>, "
-           "<8 x float>, <8 x float>, <8 x i1>, i32) ";
-
     Str << " declare void @llvm.vp.store.v8i32.p0v8i32(<8 x i32>, <8 x i32>*, "
            "<8 x i1>, i32) ";
-    Str << "declare void "
-           "@llvm.experimental.vp.strided.store.v8i32.i32(<8 x i32>, "
-           "i32*, i32, <8 x i1>, i32) ";
-    Str << "declare void "
-           "@llvm.experimental.vp.strided.store.v8i32.p1i32.i32(<8 x i32>, "
-           "i32 addrspace(1)*, i32, <8 x i1>, i32) ";
     Str << " declare void @llvm.vp.scatter.v8i32.v8p0i32(<8 x i32>, <8 x "
            "i32*>, <8 x i1>, i32) ";
     Str << " declare <8 x i32> @llvm.vp.load.v8i32.p0v8i32(<8 x i32>*, <8 x "
            "i1>, i32) ";
-    Str << "declare <8 x i32> "
-           "@llvm.experimental.vp.strided.load.v8i32.i32(i32*, i32, <8 "
-           "x i1>, i32) ";
-    Str << "declare <8 x i32> "
-           "@llvm.experimental.vp.strided.load.v8i32.p1i32.i32(i32 "
-           "addrspace(1)*, i32, <8 x i1>, i32) ";
     Str << " declare <8 x i32> @llvm.vp.gather.v8i32.v8p0i32(<8 x i32*>, <8 x "
            "i1>, i32) ";
-
-    for (const char *ReductionOpcode : ReductionIntOpcodes)
-      Str << " declare i32 @llvm.vp.reduce." << ReductionOpcode
-          << ".v8i32(i32, <8 x i32>, <8 x i1>, i32) ";
-
-    for (const char *ReductionOpcode : ReductionFPOpcodes)
-      Str << " declare float @llvm.vp.reduce." << ReductionOpcode
-          << ".v8f32(float, <8 x float>, <8 x i1>, i32) ";
-
-    Str << " declare <8 x i32> @llvm.vp.merge.v8i32(<8 x i1>, <8 x i32>, <8 x "
-           "i32>, i32)";
-    Str << " declare <8 x i32> @llvm.vp.select.v8i32(<8 x i1>, <8 x i32>, <8 x "
-           "i32>, i32)";
-    Str << " declare <8 x i1> @llvm.vp.is.fpclass.v8f32(<8 x float>, i32, <8 x "
-           "i1>, i32)";
-    Str << " declare <8 x i32> @llvm.experimental.vp.splice.v8i32(<8 x "
-           "i32>, <8 x i32>, i32, <8 x i1>, i32, i32) ";
-
-    Str << " declare <8 x i32> @llvm.vp.fptoui.v8i32"
-        << ".v8f32(<8 x float>, <8 x i1>, i32) ";
-    Str << " declare <8 x i32> @llvm.vp.fptosi.v8i32"
-        << ".v8f32(<8 x float>, <8 x i1>, i32) ";
-    Str << " declare <8 x float> @llvm.vp.uitofp.v8f32"
-        << ".v8i32(<8 x i32>, <8 x i1>, i32) ";
-    Str << " declare <8 x float> @llvm.vp.sitofp.v8f32"
-        << ".v8i32(<8 x i32>, <8 x i1>, i32) ";
-    Str << " declare <8 x float> @llvm.vp.fptrunc.v8f32"
-        << ".v8f64(<8 x double>, <8 x i1>, i32) ";
-    Str << " declare <8 x double> @llvm.vp.fpext.v8f64"
-        << ".v8f32(<8 x float>, <8 x i1>, i32) ";
-    Str << " declare <8 x i32> @llvm.vp.trunc.v8i32"
-        << ".v8i64(<8 x i64>, <8 x i1>, i32) ";
-    Str << " declare <8 x i64> @llvm.vp.zext.v8i64"
-        << ".v8i32(<8 x i32>, <8 x i1>, i32) ";
-    Str << " declare <8 x i64> @llvm.vp.sext.v8i64"
-        << ".v8i32(<8 x i32>, <8 x i1>, i32) ";
-    Str << " declare <8 x i32> @llvm.vp.ptrtoint.v8i32"
-        << ".v8p0i32(<8 x i32*>, <8 x i1>, i32) ";
-    Str << " declare <8 x i32*> @llvm.vp.inttoptr.v8p0i32"
-        << ".v8i32(<8 x i32>, <8 x i1>, i32) ";
-
-    Str << " declare <8 x i1> @llvm.vp.fcmp.v8f32"
-        << "(<8 x float>, <8 x float>, metadata, <8 x i1>, i32) ";
-    Str << " declare <8 x i1> @llvm.vp.icmp.v8i16"
-        << "(<8 x i16>, <8 x i16>, metadata, <8 x i1>, i32) ";
-
-    Str << " declare <8 x i32> @llvm.experimental.vp.reverse.v8i32(<8 x i32>, "
-           "<8 x i1>, i32) ";
-    Str << " declare <8 x i16> @llvm.vp.abs.v8i16"
-        << "(<8 x i16>, i1 immarg, <8 x i1>, i32) ";
-    Str << " declare <8 x i16> @llvm.vp.bitreverse.v8i16"
-        << "(<8 x i16>, <8 x i1>, i32) ";
-    Str << " declare <8 x i16> @llvm.vp.bswap.v8i16"
-        << "(<8 x i16>, <8 x i1>, i32) ";
-    Str << " declare <8 x i16> @llvm.vp.ctpop.v8i16"
-        << "(<8 x i16>, <8 x i1>, i32) ";
-    Str << " declare <8 x i16> @llvm.vp.ctlz.v8i16"
-        << "(<8 x i16>, i1 immarg, <8 x i1>, i32) ";
-    Str << " declare <8 x i16> @llvm.vp.cttz.v8i16"
-        << "(<8 x i16>, i1 immarg, <8 x i1>, i32) ";
-    Str << " declare <8 x i16> @llvm.vp.fshl.v8i16"
-        << "(<8 x i16>, <8 x i16>, <8 x i16>, <8 x i1>, i32) ";
-    Str << " declare <8 x i16> @llvm.vp.fshr.v8i16"
-        << "(<8 x i16>, <8 x i16>, <8 x i16>, <8 x i1>, i32) ";
 
     return parseAssemblyString(Str.str(), Err, C);
   }
@@ -173,27 +61,27 @@ protected:
 
 /// Check that the property scopes include/llvm/IR/VPIntrinsics.def are closed.
 TEST_F(VPIntrinsicTest, VPIntrinsicsDefScopes) {
-  std::optional<Intrinsic::ID> ScopeVPID;
+  Optional<Intrinsic::ID> ScopeVPID;
 #define BEGIN_REGISTER_VP_INTRINSIC(VPID, ...)                                 \
-  ASSERT_FALSE(ScopeVPID.has_value());                                         \
+  ASSERT_FALSE(ScopeVPID.hasValue());                                          \
   ScopeVPID = Intrinsic::VPID;
 #define END_REGISTER_VP_INTRINSIC(VPID)                                        \
-  ASSERT_TRUE(ScopeVPID.has_value());                                          \
-  ASSERT_EQ(*ScopeVPID, Intrinsic::VPID);                                      \
-  ScopeVPID = std::nullopt;
+  ASSERT_TRUE(ScopeVPID.hasValue());                                           \
+  ASSERT_EQ(ScopeVPID.getValue(), Intrinsic::VPID);                            \
+  ScopeVPID = None;
 
-  std::optional<ISD::NodeType> ScopeOPC;
+  Optional<ISD::NodeType> ScopeOPC;
 #define BEGIN_REGISTER_VP_SDNODE(SDOPC, ...)                                   \
-  ASSERT_FALSE(ScopeOPC.has_value());                                          \
+  ASSERT_FALSE(ScopeOPC.hasValue());                                           \
   ScopeOPC = ISD::SDOPC;
 #define END_REGISTER_VP_SDNODE(SDOPC)                                          \
-  ASSERT_TRUE(ScopeOPC.has_value());                                           \
-  ASSERT_EQ(*ScopeOPC, ISD::SDOPC);                                            \
-  ScopeOPC = std::nullopt;
+  ASSERT_TRUE(ScopeOPC.hasValue());                                            \
+  ASSERT_EQ(ScopeOPC.getValue(), ISD::SDOPC);                                  \
+  ScopeOPC = None;
 #include "llvm/IR/VPIntrinsics.def"
 
-  ASSERT_FALSE(ScopeVPID.has_value());
-  ASSERT_FALSE(ScopeOPC.has_value());
+  ASSERT_FALSE(ScopeVPID.hasValue());
+  ASSERT_FALSE(ScopeOPC.hasValue());
 }
 
 /// Check that every VP intrinsic in the test module is recognized as a VP
@@ -278,19 +166,19 @@ TEST_F(VPIntrinsicTest, GetParamPos) {
 
   for (Function &F : *M) {
     ASSERT_TRUE(F.isIntrinsic());
-    std::optional<unsigned> MaskParamPos =
+    Optional<unsigned> MaskParamPos =
         VPIntrinsic::getMaskParamPos(F.getIntrinsicID());
-    if (MaskParamPos) {
-      Type *MaskParamType = F.getArg(*MaskParamPos)->getType();
+    if (MaskParamPos.hasValue()) {
+      Type *MaskParamType = F.getArg(MaskParamPos.getValue())->getType();
       ASSERT_TRUE(MaskParamType->isVectorTy());
       ASSERT_TRUE(
           cast<VectorType>(MaskParamType)->getElementType()->isIntegerTy(1));
     }
 
-    std::optional<unsigned> VecLenParamPos =
+    Optional<unsigned> VecLenParamPos =
         VPIntrinsic::getVectorLengthParamPos(F.getIntrinsicID());
-    if (VecLenParamPos) {
-      Type *VecLenParamType = F.getArg(*VecLenParamPos)->getType();
+    if (VecLenParamPos.hasValue()) {
+      Type *VecLenParamType = F.getArg(VecLenParamPos.getValue())->getType();
       ASSERT_TRUE(VecLenParamType->isIntegerTy(32));
     }
   }
@@ -314,7 +202,7 @@ TEST_F(VPIntrinsicTest, OpcodeRoundTrip) {
     if (VPID == Intrinsic::not_intrinsic)
       continue;
 
-    std::optional<unsigned> RoundTripOC =
+    Optional<unsigned> RoundTripOC =
         VPIntrinsic::getFunctionalOpcodeForVP(VPID);
     // No equivalent Opcode available.
     if (!RoundTripOC)
@@ -335,7 +223,7 @@ TEST_F(VPIntrinsicTest, IntrinsicIDRoundTrip) {
   unsigned FullTripCounts = 0;
   for (const auto &VPDecl : *M) {
     auto VPID = VPDecl.getIntrinsicID();
-    std::optional<unsigned> OC = VPIntrinsic::getFunctionalOpcodeForVP(VPID);
+    Optional<unsigned> OC = VPIntrinsic::getFunctionalOpcodeForVP(VPID);
 
     // no equivalent Opcode available
     if (!OC)
@@ -366,7 +254,7 @@ TEST_F(VPIntrinsicTest, VPIntrinsicDeclarationForParams) {
 
     ASSERT_NE(F.getIntrinsicID(), Intrinsic::not_intrinsic);
     auto *NewDecl = VPIntrinsic::getDeclarationForParams(
-        OutM.get(), F.getIntrinsicID(), FuncTy->getReturnType(), Values);
+        OutM.get(), F.getIntrinsicID(), Values);
     ASSERT_TRUE(NewDecl);
 
     // Check that 'old decl' == 'new decl'.
@@ -384,88 +272,18 @@ TEST_F(VPIntrinsicTest, VPIntrinsicDeclarationForParams) {
 }
 
 /// Check that the HANDLE_VP_TO_CONSTRAINEDFP maps to an existing intrinsic with
-/// the right amount of constrained-fp metadata args.
+/// the right amount of metadata args.
 TEST_F(VPIntrinsicTest, HandleToConstrainedFP) {
-#define VP_PROPERTY_CONSTRAINEDFP(HASROUND, HASEXCEPT, CFPID)                  \
+#define HANDLE_VP_TO_CONSTRAINEDFP(HASROUND, HASEXCEPT, CFPID)                 \
   {                                                                            \
     SmallVector<Intrinsic::IITDescriptor, 5> T;                                \
     Intrinsic::getIntrinsicInfoTableEntries(Intrinsic::CFPID, T);              \
     unsigned NumMetadataArgs = 0;                                              \
     for (auto TD : T)                                                          \
       NumMetadataArgs += (TD.Kind == Intrinsic::IITDescriptor::Metadata);      \
-    bool IsCmp = Intrinsic::CFPID == Intrinsic::experimental_constrained_fcmp; \
-    ASSERT_EQ(NumMetadataArgs, (unsigned)(IsCmp + HASROUND + HASEXCEPT));      \
+    ASSERT_EQ(NumMetadataArgs, (unsigned)(HASROUND + HASEXCEPT));              \
   }
 #include "llvm/IR/VPIntrinsics.def"
 }
 
 } // end anonymous namespace
-
-/// Check various properties of VPReductionIntrinsics
-TEST_F(VPIntrinsicTest, VPReductions) {
-  LLVMContext C;
-  SMDiagnostic Err;
-
-  std::stringstream Str;
-  Str << "declare <8 x i32> @llvm.vp.mul.v8i32(<8 x i32>, <8 x i32>, <8 x i1>, "
-         "i32)";
-  for (const char *ReductionOpcode : ReductionIntOpcodes)
-    Str << " declare i32 @llvm.vp.reduce." << ReductionOpcode
-        << ".v8i32(i32, <8 x i32>, <8 x i1>, i32) ";
-
-  for (const char *ReductionOpcode : ReductionFPOpcodes)
-    Str << " declare float @llvm.vp.reduce." << ReductionOpcode
-        << ".v8f32(float, <8 x float>, <8 x i1>, i32) ";
-
-  Str << "define void @test_reductions(i32 %start, <8 x i32> %val, float "
-         "%fpstart, <8 x float> %fpval, <8 x i1> %m, i32 %vl) {";
-
-  // Mix in a regular non-reduction intrinsic to check that the
-  // VPReductionIntrinsic subclass works as intended.
-  Str << "  %r0 = call <8 x i32> @llvm.vp.mul.v8i32(<8 x i32> %val, <8 x i32> "
-         "%val, <8 x i1> %m, i32 %vl)";
-
-  unsigned Idx = 1;
-  for (const char *ReductionOpcode : ReductionIntOpcodes)
-    Str << "  %r" << Idx++ << " = call i32 @llvm.vp.reduce." << ReductionOpcode
-        << ".v8i32(i32 %start, <8 x i32> %val, <8 x i1> %m, i32 %vl)";
-  for (const char *ReductionOpcode : ReductionFPOpcodes)
-    Str << "  %r" << Idx++ << " = call float @llvm.vp.reduce."
-        << ReductionOpcode
-        << ".v8f32(float %fpstart, <8 x float> %fpval, <8 x i1> %m, i32 %vl)";
-
-  Str << "  ret void"
-         "}";
-
-  std::unique_ptr<Module> M = parseAssemblyString(Str.str(), Err, C);
-  assert(M);
-
-  auto *F = M->getFunction("test_reductions");
-  assert(F);
-
-  for (const auto &I : F->getEntryBlock()) {
-    const VPIntrinsic *VPI = dyn_cast<VPIntrinsic>(&I);
-    if (!VPI)
-      continue;
-
-    Intrinsic::ID ID = VPI->getIntrinsicID();
-    const auto *VPRedI = dyn_cast<VPReductionIntrinsic>(&I);
-
-    if (!VPReductionIntrinsic::isVPReduction(ID)) {
-      EXPECT_EQ(VPRedI, nullptr);
-      EXPECT_EQ(VPReductionIntrinsic::getStartParamPos(ID).has_value(), false);
-      EXPECT_EQ(VPReductionIntrinsic::getVectorParamPos(ID).has_value(), false);
-      continue;
-    }
-
-    EXPECT_EQ(VPReductionIntrinsic::getStartParamPos(ID).has_value(), true);
-    EXPECT_EQ(VPReductionIntrinsic::getVectorParamPos(ID).has_value(), true);
-    ASSERT_NE(VPRedI, nullptr);
-    EXPECT_EQ(VPReductionIntrinsic::getStartParamPos(ID),
-              VPRedI->getStartParamPos());
-    EXPECT_EQ(VPReductionIntrinsic::getVectorParamPos(ID),
-              VPRedI->getVectorParamPos());
-    EXPECT_EQ(VPRedI->getStartParamPos(), 0u);
-    EXPECT_EQ(VPRedI->getVectorParamPos(), 1u);
-  }
-}

@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// UNSUPPORTED: no-threads
+// UNSUPPORTED: libcpp-has-no-threads
 // UNSUPPORTED: c++03, c++11
 
 // <barrier>
@@ -20,7 +20,7 @@
 int main(int, char**)
 {
   static_assert(std::barrier<>::max() > 0, "");
-  auto l = []() noexcept {};
+  auto l = [](){};
   static_assert(std::barrier<decltype(l)>::max() > 0, "");
   return 0;
 }

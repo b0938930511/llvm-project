@@ -1,6 +1,5 @@
 ; RUN: llc -mtriple=amdgcn-amd-amdhsa -mcpu=gfx900 < %s | FileCheck -check-prefixes=GCN,RW-FLAT %s
 ; RUN: llc -mtriple=amdgcn-amd-amdhsa -mcpu=gfx900 -mattr=+architected-flat-scratch < %s | FileCheck -check-prefixes=GCN,RO-FLAT %s
-; RUN: llc -mtriple=amdgcn-amd-amdhsa -mcpu=gfx940 < %s | FileCheck -check-prefixes=GCN,RO-FLAT %s
 
 ; Make sure flat_scratch_init is set
 
@@ -22,8 +21,8 @@
 ; RO-FLAT:     COMPUTE_PGM_RSRC2:USER_SGPR: 0
 define amdgpu_kernel void @stack_object_addrspacecast_in_kernel_no_calls() {
   %alloca = alloca i32, addrspace(5)
-  %cast = addrspacecast ptr addrspace(5) %alloca to ptr
-  store volatile i32 0, ptr %cast
+  %cast = addrspacecast i32 addrspace(5)* %alloca to i32*
+  store volatile i32 0, i32* %cast
   ret void
 }
 
@@ -47,7 +46,7 @@ define amdgpu_kernel void @stack_object_addrspacecast_in_kernel_no_calls() {
 ; RO-FLAT:     COMPUTE_PGM_RSRC2:USER_SGPR: 0
 define amdgpu_kernel void @stack_object_in_kernel_no_calls() {
   %alloca = alloca i32, addrspace(5)
-  store volatile i32 0, ptr addrspace(5) %alloca
+  store volatile i32 0, i32 addrspace(5)* %alloca
   ret void
 }
 

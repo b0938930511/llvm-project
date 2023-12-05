@@ -40,7 +40,11 @@ public:
     if (!Group.diagnostics().empty())
       return false;
 
-    return llvm::all_of(Group.subgroups(), unimplemented);
+    for (const GroupRecord &GR : Group.subgroups())
+      if (!unimplemented(GR))
+        return false;
+
+    return true;
   }
 
   static bool enabledByDefault(const GroupRecord &Group) {
@@ -127,9 +131,6 @@ public:
   void showKey() {
     out << '\n' << Colors::GREEN << "GREEN" << Colors::RESET
         << " = enabled by default";
-    out << '\n'
-        << Colors::YELLOW << "YELLOW" << Colors::RESET
-        << " = disabled by default";
     out << '\n' << Colors::RED << "RED" << Colors::RESET
         << " = unimplemented (accepted for GCC compatibility)\n\n";
   }

@@ -12,13 +12,9 @@
 // diagnostic is generated).
 //
 //===----------------------------------------------------------------------===//
-//
-// Coding style: https://mlir.llvm.org/getting_started/DeveloperGuide/
-//
-//===----------------------------------------------------------------------===//
 
-#ifndef FORTRAN_FRONTEND_TEXTDIAGNOSTICPRINTER_H
-#define FORTRAN_FRONTEND_TEXTDIAGNOSTICPRINTER_H
+#ifndef LLVM_FLANG_FRONTEND_TEXTDIAGNOSTICPRINTER_H
+#define LLVM_FLANG_FRONTEND_TEXTDIAGNOSTICPRINTER_H
 
 #include "clang/Basic/Diagnostic.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -36,11 +32,11 @@ namespace Fortran::frontend {
 class TextDiagnostic;
 
 class TextDiagnosticPrinter : public clang::DiagnosticConsumer {
-  raw_ostream &os;
-  llvm::IntrusiveRefCntPtr<clang::DiagnosticOptions> diagOpts;
+  raw_ostream &os_;
+  llvm::IntrusiveRefCntPtr<clang::DiagnosticOptions> diagOpts_;
 
   /// A string to prefix to error messages.
-  std::string prefix;
+  std::string prefix_;
 
 public:
   TextDiagnosticPrinter(raw_ostream &os, clang::DiagnosticOptions *diags);
@@ -48,13 +44,10 @@ public:
 
   /// Set the diagnostic printer prefix string, which will be printed at the
   /// start of any diagnostics. If empty, no prefix string is used.
-  void setPrefix(std::string value) { prefix = std::move(value); }
+  void set_prefix(std::string value) { prefix_ = std::move(value); }
 
   void HandleDiagnostic(clang::DiagnosticsEngine::Level level,
-                        const clang::Diagnostic &info) override;
-
-  void printLocForRemarks(llvm::raw_svector_ostream &diagMessageStream,
-                          llvm::StringRef &diagMsg);
+      const clang::Diagnostic &info) override;
 };
 
 } // namespace Fortran::frontend

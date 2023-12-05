@@ -36,15 +36,16 @@ void ImplSymbolMap::trackImpls(SymbolAliasMap ImplMaps, JITDylib *SrcJD) {
 // Trigger Speculative Compiles.
 void Speculator::speculateForEntryPoint(Speculator *Ptr, uint64_t StubId) {
   assert(Ptr && " Null Address Received in orc_speculate_for ");
-  Ptr->speculateFor(ExecutorAddr(StubId));
+  Ptr->speculateFor(StubId);
 }
 
 Error Speculator::addSpeculationRuntime(JITDylib &JD,
                                         MangleAndInterner &Mangle) {
-  ExecutorSymbolDef ThisPtr(ExecutorAddr::fromPtr(this),
-                            JITSymbolFlags::Exported);
-  ExecutorSymbolDef SpeculateForEntryPtr(
-      ExecutorAddr::fromPtr(&speculateForEntryPoint), JITSymbolFlags::Exported);
+  JITEvaluatedSymbol ThisPtr(pointerToJITTargetAddress(this),
+                             JITSymbolFlags::Exported);
+  JITEvaluatedSymbol SpeculateForEntryPtr(
+      pointerToJITTargetAddress(&speculateForEntryPoint),
+      JITSymbolFlags::Exported);
   return JD.define(absoluteSymbols({
       {Mangle("__orc_speculator"), ThisPtr},                // Data Symbol
       {Mangle("__orc_speculate_for"), SpeculateForEntryPtr} // Callable Symbol
@@ -67,7 +68,7 @@ void IRSpeculationLayer::emit(std::unique_ptr<MaterializationResponsibility> R,
     auto SpeculatorVTy = StructType::create(MContext, "Class.Speculator");
     auto RuntimeCallTy = FunctionType::get(
         Type::getVoidTy(MContext),
-        {PointerType::getUnqual(MContext), Type::getInt64Ty(MContext)}, false);
+        {SpeculatorVTy->getPointerTo(), Type::getInt64Ty(MContext)}, false);
     auto RuntimeCall =
         Function::Create(RuntimeCallTy, Function::LinkageTypes::ExternalLinkage,
                          "__orc_speculate_for", &M);
@@ -84,7 +85,7 @@ void IRSpeculationLayer::emit(std::unique_ptr<MaterializationResponsibility> R,
 
         auto IRNames = QueryAnalysis(Fn);
         // Instrument and register if Query has result
-        if (IRNames) {
+        if (IRNames.hasValue()) {
 
           // Emit globals for each function.
           auto LoadValueTy = Type::getInt8Ty(MContext);
@@ -125,7 +126,7 @@ void IRSpeculationLayer::emit(std::unique_ptr<MaterializationResponsibility> R,
 
           assert(Mutator.GetInsertBlock()->getParent() == &Fn &&
                  "IR builder association mismatch?");
-          S.registerSymbols(internToJITSymbols(*IRNames),
+          S.registerSymbols(internToJITSymbols(IRNames.getValue()),
                             &R->getTargetJITDylib());
         }
       }

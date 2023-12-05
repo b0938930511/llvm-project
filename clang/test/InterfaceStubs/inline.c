@@ -39,7 +39,7 @@
 // CHECK-STATIC-NOT: foo.var
 // CHECK-STD-NOT: foo
 #pragma clang diagnostic ignored "-Wstatic-local-in-inline"
-INLINE int foo(void) {
+INLINE int foo() {
   static int var = 42;
   return var;
 }

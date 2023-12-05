@@ -56,10 +56,7 @@ SANITIZER("hwaddress", HWAddress)
 SANITIZER("kernel-hwaddress", KernelHWAddress)
 
 // A variant of AddressSanitizer using AArch64 MTE extension.
-SANITIZER("memtag-stack", MemtagStack)
-SANITIZER("memtag-heap", MemtagHeap)
-SANITIZER("memtag-globals", MemtagGlobals)
-SANITIZER_GROUP("memtag", MemTag, MemtagStack | MemtagHeap | MemtagGlobals)
+SANITIZER("memtag", MemTag)
 
 // MemorySanitizer
 SANITIZER("memory", Memory)
@@ -126,9 +123,6 @@ SANITIZER("cfi-vcall", CFIVCall)
 SANITIZER_GROUP("cfi", CFI,
                 CFIDerivedCast | CFIICall | CFIMFCall | CFIUnrelatedCast |
                     CFINVCall | CFIVCall)
-
-// Kernel Control Flow Integrity
-SANITIZER("kcfi", KCFI)
 
 // Safe Stack
 SANITIZER("safe-stack", SafeStack)

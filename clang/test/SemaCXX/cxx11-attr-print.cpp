@@ -3,7 +3,8 @@
 // CHECK: int x __attribute__((aligned(4)));
 int x __attribute__((aligned(4)));
 
-// CHECK: __declspec(align(4)) int y;
+// FIXME: Print this at a valid location for a __declspec attr.
+// CHECK: int y __declspec(align(4));
 __declspec(align(4)) int y;
 
 // CHECK: int z {{\[}}[gnu::aligned(4)]];
@@ -27,7 +28,7 @@ int e __attribute__((deprecated("warning", "fixit")));
 // CHECK: int cxx11_alignas alignas(4);
 alignas(4) int cxx11_alignas;
 
-// CHECK: int c11_alignas _Alignas(int);
+// CHECK: int c11_alignas _Alignas(alignof(int));
 _Alignas(int) int c11_alignas;
 
 // CHECK: void foo() __attribute__((const));
@@ -64,13 +65,11 @@ void f8 (void *, const char *, ...) __attribute__ ((format (printf, 2, 3)));
 
 // CHECK: int m __attribute__((aligned(4
 // CHECK: int n alignas(4
-// CHECK: int p alignas(int
-// CHECK: __attribute__((pure)) static int f()
+// CHECK: static int f() __attribute__((pure))
 // CHECK: static int g() {{\[}}[gnu::pure]]
 template <typename T> struct S {
   __attribute__((aligned(4))) int m;
   alignas(4) int n;
-  alignas(int) int p;
   __attribute__((pure)) static int f() {
     return 0;
   }
@@ -81,7 +80,7 @@ template <typename T> struct S {
 
 // CHECK: int m __attribute__((aligned(4
 // CHECK: int n alignas(4
-// CHECK: __attribute__((pure)) static int f()
+// CHECK: static int f() __attribute__((pure))
 // CHECK: static int g() {{\[}}[gnu::pure]]
 template struct S<int>;
 

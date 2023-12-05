@@ -8,8 +8,8 @@
 #include "clang/Tooling/Syntax/Tree.h"
 #include "clang/Basic/TokenKinds.h"
 #include "clang/Tooling/Syntax/Nodes.h"
-#include "llvm/ADT/BitVector.h"
-#include "llvm/Support/raw_ostream.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
 #include <cassert>
 
@@ -32,7 +32,25 @@ static void traverse(syntax::Node *N,
 }
 } // namespace
 
-syntax::Leaf::Leaf(syntax::TokenManager::Key K) : Node(NodeKind::Leaf), K(K) {}
+syntax::Arena::Arena(SourceManager &SourceMgr, const LangOptions &LangOpts,
+                     const TokenBuffer &Tokens)
+    : SourceMgr(SourceMgr), LangOpts(LangOpts), Tokens(Tokens) {}
+
+const syntax::TokenBuffer &syntax::Arena::getTokenBuffer() const {
+  return Tokens;
+}
+
+std::pair<FileID, ArrayRef<syntax::Token>>
+syntax::Arena::lexBuffer(std::unique_ptr<llvm::MemoryBuffer> Input) {
+  auto FID = SourceMgr.createFileID(std::move(Input));
+  auto It = ExtraTokens.try_emplace(FID, tokenize(FID, SourceMgr, LangOpts));
+  assert(It.second && "duplicate FileID");
+  return {FID, It.first->second};
+}
+
+syntax::Leaf::Leaf(const syntax::Token *Tok) : Node(NodeKind::Leaf), Tok(Tok) {
+  assert(Tok != nullptr);
+}
 
 syntax::Node::Node(NodeKind Kind)
     : Parent(nullptr), NextSibling(nullptr), PreviousSibling(nullptr),
@@ -108,7 +126,7 @@ void syntax::Tree::replaceChildRangeLowLevel(Node *Begin, Node *End,
   for (auto *N = New; N; N = N->NextSibling) {
     assert(N->Parent == nullptr);
     assert(N->getRole() != NodeRole::Detached && "Roles must be set");
-    // FIXME: validate the role.
+    // FIXME: sanity-check the role.
   }
 
   auto Reachable = [](Node *From, Node *N) {
@@ -171,8 +189,20 @@ void syntax::Tree::replaceChildRangeLowLevel(Node *Begin, Node *End,
 }
 
 namespace {
+static void dumpLeaf(raw_ostream &OS, const syntax::Leaf *L,
+                     const SourceManager &SM) {
+  assert(L);
+  const auto *Token = L->getToken();
+  assert(Token);
+  // Handle 'eof' separately, calling text() on it produces an empty string.
+  if (Token->kind() == tok::eof)
+    OS << "<eof>";
+  else
+    OS << Token->text(SM);
+}
+
 static void dumpNode(raw_ostream &OS, const syntax::Node *N,
-                     const syntax::TokenManager &TM, llvm::BitVector IndentMask) {
+                     const SourceManager &SM, std::vector<bool> IndentMask) {
   auto DumpExtraInfo = [&OS](const syntax::Node *N) {
     if (N->getRole() != syntax::NodeRole::Unknown)
       OS << " " << N->getRole();
@@ -185,7 +215,7 @@ static void dumpNode(raw_ostream &OS, const syntax::Node *N,
   assert(N);
   if (const auto *L = dyn_cast<syntax::Leaf>(N)) {
     OS << "'";
-    OS << TM.getText(L->getTokenKey());
+    dumpLeaf(OS, L, SM);
     OS << "'";
     DumpExtraInfo(N);
     OS << "\n";
@@ -198,8 +228,8 @@ static void dumpNode(raw_ostream &OS, const syntax::Node *N,
   OS << "\n";
 
   for (const syntax::Node &It : T->getChildren()) {
-    for (unsigned Idx = 0; Idx < IndentMask.size(); ++Idx) {
-      if (IndentMask[Idx])
+    for (bool Filled : IndentMask) {
+      if (Filled)
         OS << "| ";
       else
         OS << "  ";
@@ -211,29 +241,29 @@ static void dumpNode(raw_ostream &OS, const syntax::Node *N,
       OS << "|-";
       IndentMask.push_back(true);
     }
-    dumpNode(OS, &It, TM, IndentMask);
+    dumpNode(OS, &It, SM, IndentMask);
     IndentMask.pop_back();
   }
 }
 } // namespace
 
-std::string syntax::Node::dump(const TokenManager &TM) const {
+std::string syntax::Node::dump(const SourceManager &SM) const {
   std::string Str;
   llvm::raw_string_ostream OS(Str);
-  dumpNode(OS, this, TM, /*IndentMask=*/{});
+  dumpNode(OS, this, SM, /*IndentMask=*/{});
   return std::move(OS.str());
 }
 
-std::string syntax::Node::dumpTokens(const TokenManager &TM) const {
+std::string syntax::Node::dumpTokens(const SourceManager &SM) const {
   std::string Storage;
   llvm::raw_string_ostream OS(Storage);
   traverse(this, [&](const syntax::Node *N) {
     if (const auto *L = dyn_cast<syntax::Leaf>(N)) {
-      OS << TM.getText(L->getTokenKey());
+      dumpLeaf(OS, L, SM);
       OS << " ";
     }
   });
-  return Storage;
+  return OS.str();
 }
 
 void syntax::Node::assertInvariants() const {
@@ -266,8 +296,7 @@ void syntax::Node::assertInvariants() const {
            C.getRole() == NodeRole::ListDelimiter);
     if (C.getRole() == NodeRole::ListDelimiter) {
       assert(isa<Leaf>(C));
-      // FIXME: re-enable it when there is way to retrieve token kind in Leaf.
-      // assert(cast<Leaf>(C).getToken()->kind() == L->getDelimiterTokenKind());
+      assert(cast<Leaf>(C).getToken()->kind() == L->getDelimiterTokenKind());
     }
   }
 

@@ -15,7 +15,6 @@
 #define SANITIZER_THREAD_REGISTRY_H
 
 #include "sanitizer_common.h"
-#include "sanitizer_dense_map.h"
 #include "sanitizer_list.h"
 #include "sanitizer_mutex.h"
 
@@ -86,7 +85,7 @@ class ThreadContextBase {
 
 typedef ThreadContextBase* (*ThreadContextFactory)(u32 tid);
 
-class SANITIZER_MUTEX ThreadRegistry {
+class MUTEX ThreadRegistry {
  public:
   ThreadRegistry(ThreadContextFactory factory);
   ThreadRegistry(ThreadContextFactory factory, u32 max_threads,
@@ -95,16 +94,14 @@ class SANITIZER_MUTEX ThreadRegistry {
                           uptr *alive = nullptr);
   uptr GetMaxAliveThreads();
 
-  void Lock() SANITIZER_ACQUIRE() { mtx_.Lock(); }
-  void CheckLocked() const SANITIZER_CHECK_LOCKED() { mtx_.CheckLocked(); }
-  void Unlock() SANITIZER_RELEASE() { mtx_.Unlock(); }
+  void Lock() ACQUIRE() { mtx_.Lock(); }
+  void CheckLocked() const CHECK_LOCKED() { mtx_.CheckLocked(); }
+  void Unlock() RELEASE() { mtx_.Unlock(); }
 
   // Should be guarded by ThreadRegistryLock.
   ThreadContextBase *GetThreadLocked(u32 tid) {
     return threads_.empty() ? nullptr : threads_[tid];
   }
-
-  u32 NumThreadsLocked() const { return threads_.size(); }
 
   u32 CreateThread(uptr user_id, bool detached, u32 parent_tid, void *arg);
 
@@ -130,13 +127,7 @@ class SANITIZER_MUTEX ThreadRegistry {
   // Finishes thread and returns previous status.
   ThreadStatus FinishThread(u32 tid);
   void StartThread(u32 tid, tid_t os_id, ThreadType thread_type, void *arg);
-  u32 ConsumeThreadUserId(uptr user_id);
   void SetThreadUserId(u32 tid, uptr user_id);
-
-  // OnFork must be called in the child process after fork to purge old
-  // threads that don't exist anymore (except for the current thread tid).
-  // Returns number of alive threads before fork.
-  u32 OnFork(u32 tid);
 
  private:
   const ThreadContextFactory context_factory_;
@@ -155,7 +146,6 @@ class SANITIZER_MUTEX ThreadRegistry {
   InternalMmapVector<ThreadContextBase *> threads_;
   IntrusiveList<ThreadContextBase> dead_threads_;
   IntrusiveList<ThreadContextBase> invalid_threads_;
-  DenseMap<uptr, Tid> live_;
 
   void QuarantinePush(ThreadContextBase *tctx);
   ThreadContextBase *QuarantinePop();

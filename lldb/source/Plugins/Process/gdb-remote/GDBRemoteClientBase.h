@@ -16,12 +16,8 @@
 namespace lldb_private {
 namespace process_gdb_remote {
 
-class GDBRemoteClientBase : public GDBRemoteCommunication, public Broadcaster {
+class GDBRemoteClientBase : public GDBRemoteCommunication {
 public:
-  enum {
-    eBroadcastBitRunPacketSent = (1u << 0),
-  };
-
   struct ContinueDelegate {
     virtual ~ContinueDelegate();
     virtual void HandleAsyncStdout(llvm::StringRef out) = 0;
@@ -35,7 +31,7 @@ public:
     virtual void HandleAsyncStructuredDataPacket(llvm::StringRef data) = 0;
   };
 
-  GDBRemoteClientBase(const char *comm_name);
+  GDBRemoteClientBase(const char *comm_name, const char *listener_name);
 
   bool SendAsyncSignal(int signo, std::chrono::seconds interrupt_timeout);
 
@@ -58,15 +54,14 @@ public:
       llvm::StringRef payload, StringExtractorGDBRemote &response,
       std::chrono::seconds interrupt_timeout = std::chrono::seconds(0));
 
-  PacketResult ReadPacketWithOutputSupport(
-      StringExtractorGDBRemote &response, Timeout<std::micro> timeout,
-      bool sync_on_timeout,
-      llvm::function_ref<void(llvm::StringRef)> output_callback);
-
   PacketResult SendPacketAndReceiveResponseWithOutputSupport(
       llvm::StringRef payload, StringExtractorGDBRemote &response,
       std::chrono::seconds interrupt_timeout,
       llvm::function_ref<void(llvm::StringRef)> output_callback);
+
+  bool SendvContPacket(llvm::StringRef payload,
+                       std::chrono::seconds interrupt_timeout,
+                       StringExtractorGDBRemote &response);
 
   class Lock {
   public:

@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// bitset<N>& reset(size_t pos); // constexpr since C++23
+// test bitset<N>& reset(size_t pos);
 
 #include <bitset>
 #include <cassert>
@@ -16,10 +16,12 @@
 #include "../bitset_test_cases.h"
 #include "test_macros.h"
 
-TEST_MSVC_DIAGNOSTIC_IGNORED(6294) // Ill-defined for-loop:  initial condition does not satisfy test.  Loop body not executed.
+#if defined(TEST_COMPILER_C1XX)
+#pragma warning(disable: 6294) // Ill-defined for-loop:  initial condition does not satisfy test.  Loop body not executed.
+#endif
 
 template <std::size_t N>
-TEST_CONSTEXPR_CXX23 void test_reset_one() {
+void test_reset_one() {
     std::vector<std::bitset<N> > const cases = get_test_cases<N>();
     for (std::size_t c = 0; c != cases.size(); ++c) {
         for (std::size_t i = 0; i != N; ++i) {
@@ -30,25 +32,16 @@ TEST_CONSTEXPR_CXX23 void test_reset_one() {
     }
 }
 
-TEST_CONSTEXPR_CXX23 bool test() {
-  test_reset_one<0>();
-  test_reset_one<1>();
-  test_reset_one<31>();
-  test_reset_one<32>();
-  test_reset_one<33>();
-  test_reset_one<63>();
-  test_reset_one<64>();
-  test_reset_one<65>();
-
-  return true;
-}
-
 int main(int, char**) {
-  test();
-  test_reset_one<1000>(); // not in constexpr because of constexpr evaluation step limits
-#if TEST_STD_VER > 20
-  static_assert(test());
-#endif
+    test_reset_one<0>();
+    test_reset_one<1>();
+    test_reset_one<31>();
+    test_reset_one<32>();
+    test_reset_one<33>();
+    test_reset_one<63>();
+    test_reset_one<64>();
+    test_reset_one<65>();
+    test_reset_one<1000>();
 
-  return 0;
+    return 0;
 }

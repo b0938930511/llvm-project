@@ -22,7 +22,6 @@
 #include "lldb/Target/Target.h"
 #include "lldb/Target/Thread.h"
 #include "lldb/Target/ThreadSpec.h"
-#include "lldb/Utility/LLDBLog.h"
 #include "lldb/Utility/Log.h"
 #include "lldb/Utility/StreamString.h"
 
@@ -34,7 +33,8 @@ BreakpointLocation::BreakpointLocation(break_id_t loc_id, Breakpoint &owner,
                                        bool hardware, bool check_for_resolver)
     : m_being_created(true), m_should_resolve_indirect_functions(false),
       m_is_reexported(false), m_is_indirect(false), m_address(addr),
-      m_owner(owner), m_condition_hash(0), m_loc_id(loc_id), m_hit_counter() {
+      m_owner(owner), m_options_up(), m_bp_site_sp(), m_condition_mutex(),
+      m_condition_hash(0), m_loc_id(loc_id), m_hit_counter() {
   if (check_for_resolver) {
     Symbol *symbol = m_address.CalculateSymbolContextSymbol();
     if (symbol && symbol->IsIndirect()) {
@@ -204,7 +204,7 @@ bool BreakpointLocation::IsCallbackSynchronous() {
 void BreakpointLocation::SetCallback(BreakpointHitCallback callback,
                                      void *baton, bool is_synchronous) {
   // The default "Baton" class will keep a copy of "baton" and won't free or
-  // delete it when it goes out of scope.
+  // delete it when it goes goes out of scope.
   GetLocationOptions().SetCallback(
       callback, std::make_shared<UntypedBaton>(baton), is_synchronous);
   SendBreakpointLocationChangedEvent(eBreakpointEventTypeCommandChanged);
@@ -233,7 +233,7 @@ const char *BreakpointLocation::GetConditionText(size_t *hash) const {
 
 bool BreakpointLocation::ConditionSaysStop(ExecutionContext &exe_ctx,
                                            Status &error) {
-  Log *log = GetLog(LLDBLog::Breakpoints);
+  Log *log = lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_BREAKPOINTS);
 
   std::lock_guard<std::mutex> guard(m_condition_mutex);
 
@@ -250,7 +250,6 @@ bool BreakpointLocation::ConditionSaysStop(ExecutionContext &exe_ctx,
   DiagnosticManager diagnostics;
 
   if (condition_hash != m_condition_hash || !m_user_expression_sp ||
-      !m_user_expression_sp->IsParseCacheable() ||
       !m_user_expression_sp->MatchesContext(exe_ctx)) {
     LanguageType language = eLanguageTypeUnknown;
     // See if we can figure out the language from the frame, otherwise use the
@@ -291,7 +290,7 @@ bool BreakpointLocation::ConditionSaysStop(ExecutionContext &exe_ctx,
   options.SetUnwindOnError(true);
   options.SetIgnoreBreakpoints(true);
   options.SetTryAllThreads(true);
-  options.SetSuppressPersistentResult(
+  options.SetResultIsInternal(
       true); // Don't generate a user variable for condition expressions.
 
   Status expr_error;
@@ -394,7 +393,7 @@ bool BreakpointLocation::ValidForThisThread(Thread &thread) {
 
 bool BreakpointLocation::ShouldStop(StoppointCallbackContext *context) {
   bool should_stop = true;
-  Log *log = GetLog(LLDBLog::Breakpoints);
+  Log *log = lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_BREAKPOINTS);
 
   // Do this first, if a location is disabled, it shouldn't increment its hit
   // count.
@@ -451,7 +450,7 @@ bool BreakpointLocation::ResolveBreakpointSite() {
       process->CreateBreakpointSite(shared_from_this(), m_owner.IsHardware());
 
   if (new_id == LLDB_INVALID_BREAK_ID) {
-    Log *log = GetLog(LLDBLog::Breakpoints);
+    Log *log = lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_BREAKPOINTS);
     if (log)
       log->Warning("Failed to add breakpoint site at 0x%" PRIx64,
                    m_address.GetOpcodeLoadAddress(&m_owner.GetTarget()));
@@ -473,10 +472,10 @@ bool BreakpointLocation::ClearBreakpointSite() {
     // physical implementation of the breakpoint as well if there are no more
     // owners.  Otherwise just remove this owner.
     if (process_sp)
-      process_sp->RemoveConstituentFromBreakpointSite(GetBreakpoint().GetID(),
-                                                      GetID(), m_bp_site_sp);
+      process_sp->RemoveOwnerFromBreakpointSite(GetBreakpoint().GetID(),
+                                                GetID(), m_bp_site_sp);
     else
-      m_bp_site_sp->RemoveConstituent(GetBreakpoint().GetID(), GetID());
+      m_bp_site_sp->RemoveOwner(GetBreakpoint().GetID(), GetID());
 
     m_bp_site_sp.reset();
     return true;
@@ -627,19 +626,22 @@ void BreakpointLocation::Dump(Stream *s) const {
 
   bool is_resolved = IsResolved();
   bool is_hardware = is_resolved && m_bp_site_sp->IsHardware();
+  auto hardware_index = is_resolved ?
+      m_bp_site_sp->GetHardwareIndex() : LLDB_INVALID_INDEX32;
 
   lldb::tid_t tid = GetOptionsSpecifyingKind(BreakpointOptions::eThreadSpec)
                         .GetThreadSpecNoCreate()
                         ->GetTID();
   s->Printf("BreakpointLocation %u: tid = %4.4" PRIx64
             "  load addr = 0x%8.8" PRIx64 "  state = %s  type = %s breakpoint  "
-            "hit_count = %-4u  ignore_count = %-4u",
+            "hw_index = %i  hit_count = %-4u  ignore_count = %-4u",
             GetID(), tid,
             (uint64_t)m_address.GetOpcodeLoadAddress(&m_owner.GetTarget()),
             (m_options_up ? m_options_up->IsEnabled() : m_owner.IsEnabled())
                 ? "enabled "
                 : "disabled",
-            is_hardware ? "hardware" : "software", GetHitCount(),
+            is_hardware ? "hardware" : "software", hardware_index,
+            GetHitCount(),
             GetOptionsSpecifyingKind(BreakpointOptions::eIgnoreCount)
                 .GetIgnoreCount());
 }

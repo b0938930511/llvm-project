@@ -102,12 +102,6 @@ struct S {
   int a;
 };
 extern const S extS = {.a = 4};
-extern S extNonConstS = {.a = 4};
-struct NonTrivialS {
-  int a;
-  ~NonTrivialS();
-};
-extern const NonTrivialS extNTS = {.a = 4};
 struct A {
   static const int a;
 };
@@ -115,18 +109,18 @@ const int A::a = 3;
 struct SC {
   const int a;
 };
-extern const SC extSC = {.a = 8};
+SC extSC = {.a = 8};
 struct ST {
-  static const struct SC sc;
+  static struct SC sc;
 };
-const struct SC ST::sc = {.a = 2};
+struct SC ST::sc = {.a = 2};
 struct SCNest {
   struct SCN {
     const int a;
   } scn;
 };
 SCNest extSCN = {.scn = {.a = 9}};
-extern SCNest::SCN const extSubSCN = {.a = 1};
+SCNest::SCN extSubSCN = {.a = 1};
 struct SCC {
   SCC(int c) : a(c) {}
   const int a;
@@ -136,7 +130,7 @@ union U {
   const int a;
   const unsigned int b;
 };
-extern const U extU = {.a = 4};
+U extU = {.a = 4};
 
 class TestAnonUnionUSR {
 public:

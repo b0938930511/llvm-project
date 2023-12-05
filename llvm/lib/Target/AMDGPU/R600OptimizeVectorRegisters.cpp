@@ -26,8 +26,8 @@
 /// to reduce MOV count.
 //===----------------------------------------------------------------------===//
 
-#include "MCTargetDesc/R600MCTargetDesc.h"
-#include "R600.h"
+#include "AMDGPU.h"
+#include "MCTargetDesc/AMDGPUMCTargetDesc.h"
 #include "R600Defines.h"
 #include "R600Subtarget.h"
 #include "llvm/CodeGen/MachineDominators.h"
@@ -150,18 +150,19 @@ bool R600VectorRegMerger::tryMergeVector(const RegSeqInfo *Untouched,
     RegSeqInfo *ToMerge, std::vector< std::pair<unsigned, unsigned>> &Remap)
     const {
   unsigned CurrentUndexIdx = 0;
-  for (auto &It : ToMerge->RegToChan) {
+  for (DenseMap<Register, unsigned>::iterator It = ToMerge->RegToChan.begin(),
+      E = ToMerge->RegToChan.end(); It != E; ++It) {
     DenseMap<Register, unsigned>::const_iterator PosInUntouched =
-        Untouched->RegToChan.find(It.first);
+        Untouched->RegToChan.find((*It).first);
     if (PosInUntouched != Untouched->RegToChan.end()) {
-      Remap.push_back(
-          std::pair<unsigned, unsigned>(It.second, (*PosInUntouched).second));
+      Remap.push_back(std::pair<unsigned, unsigned>
+          ((*It).second, (*PosInUntouched).second));
       continue;
     }
     if (CurrentUndexIdx >= Untouched->UndefReg.size())
       return false;
-    Remap.push_back(std::pair<unsigned, unsigned>(
-        It.second, Untouched->UndefReg[CurrentUndexIdx++]));
+    Remap.push_back(std::pair<unsigned, unsigned>
+        ((*It).second, Untouched->UndefReg[CurrentUndexIdx++]));
   }
 
   return true;
@@ -171,9 +172,9 @@ static
 unsigned getReassignedChan(
     const std::vector<std::pair<unsigned, unsigned>> &RemapChan,
     unsigned Chan) {
-  for (const auto &J : RemapChan) {
-    if (J.first == Chan)
-      return J.second;
+  for (unsigned j = 0, je = RemapChan.size(); j < je; j++) {
+    if (RemapChan[j].first == Chan)
+      return RemapChan[j].second;
   }
   llvm_unreachable("Chan wasn't reassigned");
 }
@@ -189,10 +190,11 @@ MachineInstr *R600VectorRegMerger::RebuildVector(
   Register SrcVec = BaseRSI->Instr->getOperand(0).getReg();
   DenseMap<Register, unsigned> UpdatedRegToChan = BaseRSI->RegToChan;
   std::vector<Register> UpdatedUndef = BaseRSI->UndefReg;
-  for (const auto &It : RSI->RegToChan) {
+  for (DenseMap<Register, unsigned>::iterator It = RSI->RegToChan.begin(),
+      E = RSI->RegToChan.end(); It != E; ++It) {
     Register DstReg = MRI->createVirtualRegister(&R600::R600_Reg128RegClass);
-    unsigned SubReg = It.first;
-    unsigned Swizzle = It.second;
+    unsigned SubReg = (*It).first;
+    unsigned Swizzle = (*It).second;
     unsigned Chan = getReassignedChan(RemapChan, Swizzle);
 
     MachineInstr *Tmp = BuildMI(MBB, Pos, DL, TII->get(R600::INSERT_SUBREG),
@@ -232,12 +234,14 @@ MachineInstr *R600VectorRegMerger::RebuildVector(
 }
 
 void R600VectorRegMerger::RemoveMI(MachineInstr *MI) {
-  for (auto &It : PreviousRegSeqByReg) {
-    std::vector<MachineInstr *> &MIs = It.second;
+  for (InstructionSetMap::iterator It = PreviousRegSeqByReg.begin(),
+      E = PreviousRegSeqByReg.end(); It != E; ++It) {
+    std::vector<MachineInstr *> &MIs = (*It).second;
     MIs.erase(llvm::find(MIs, MI), MIs.end());
   }
-  for (auto &It : PreviousRegSeqByUndefCount) {
-    std::vector<MachineInstr *> &MIs = It.second;
+  for (InstructionSetMap::iterator It = PreviousRegSeqByUndefCount.begin(),
+      E = PreviousRegSeqByUndefCount.end(); It != E; ++It) {
+    std::vector<MachineInstr *> &MIs = (*It).second;
     MIs.erase(llvm::find(MIs, MI), MIs.end());
   }
 }
@@ -251,9 +255,9 @@ void R600VectorRegMerger::SwizzleInput(MachineInstr &MI,
     Offset = 3;
   for (unsigned i = 0; i < 4; i++) {
     unsigned Swizzle = MI.getOperand(i + Offset).getImm() + 1;
-    for (const auto &J : RemapChan) {
-      if (J.first == Swizzle) {
-        MI.getOperand(i + Offset).setImm(J.second - 1);
+    for (unsigned j = 0, e = RemapChan.size(); j < e; j++) {
+      if (RemapChan[j].first == Swizzle) {
+        MI.getOperand(i + Offset).setImm(RemapChan[j].second - 1);
         break;
       }
     }
@@ -319,12 +323,14 @@ bool R600VectorRegMerger::runOnMachineFunction(MachineFunction &Fn) {
   TII = ST.getInstrInfo();
   MRI = &Fn.getRegInfo();
 
-  for (MachineBasicBlock &MB : Fn) {
+  for (MachineFunction::iterator MBB = Fn.begin(), MBBe = Fn.end();
+       MBB != MBBe; ++MBB) {
+    MachineBasicBlock *MB = &*MBB;
     PreviousRegSeq.clear();
     PreviousRegSeqByReg.clear();
     PreviousRegSeqByUndefCount.clear();
 
-    for (MachineBasicBlock::iterator MII = MB.begin(), MIIE = MB.end();
+    for (MachineBasicBlock::iterator MII = MB->begin(), MIIE = MB->end();
          MII != MIIE; ++MII) {
       MachineInstr &MI = *MII;
       if (MI.getOpcode() != R600::REG_SEQUENCE) {

@@ -84,7 +84,7 @@ int main(int, char**)
     test_is_integral<signed char>();
     test_is_integral<unsigned char>();
     test_is_integral<wchar_t>();
-#ifndef TEST_HAS_NO_CHAR8_T
+#if defined(__cpp_lib_char8_t) && __cpp_lib_char8_t >= 201811L
     test_is_integral<char8_t>();
 #endif
 

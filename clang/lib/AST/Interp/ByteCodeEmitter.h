@@ -13,7 +13,10 @@
 #ifndef LLVM_CLANG_AST_INTERP_LINKEMITTER_H
 #define LLVM_CLANG_AST_INTERP_LINKEMITTER_H
 
+#include "ByteCodeGenError.h"
 #include "Context.h"
+#include "InterpStack.h"
+#include "InterpState.h"
 #include "PrimType.h"
 #include "Program.h"
 #include "Source.h"
@@ -21,6 +24,8 @@
 
 namespace clang {
 namespace interp {
+class Context;
+class SourceInfo;
 enum Opcode : uint32_t;
 
 /// An emitter which links the program to bytecode for later use.
@@ -32,7 +37,7 @@ protected:
 
 public:
   /// Compiles the function into the module.
-  llvm::Expected<Function *> compileFunc(const FunctionDecl *FuncDecl);
+  llvm::Expected<Function *> compileFunc(const FunctionDecl *F);
 
 protected:
   ByteCodeEmitter(Context &Ctx, Program &P) : Ctx(Ctx), P(P) {}
@@ -64,11 +69,7 @@ protected:
   Local createLocal(Descriptor *D);
 
   /// Parameter indices.
-  llvm::DenseMap<const ParmVarDecl *, ParamOffset> Params;
-  /// Lambda captures.
-  llvm::DenseMap<const ValueDecl *, ParamOffset> LambdaCaptures;
-  /// Offset of the This parameter in a lambda record.
-  unsigned LambdaThisCapture = 0;
+  llvm::DenseMap<const ParmVarDecl *, unsigned> Params;
   /// Local descriptors.
   llvm::SmallVector<SmallVector<Local, 8>, 2> Descriptors;
 
@@ -82,13 +83,13 @@ private:
   /// Offset of the next local variable.
   unsigned NextLocalOffset = 0;
   /// Location of a failure.
-  std::optional<SourceLocation> BailLocation;
+  llvm::Optional<SourceLocation> BailLocation;
   /// Label information for linker.
   llvm::DenseMap<LabelTy, unsigned> LabelOffsets;
   /// Location of label relocations.
   llvm::DenseMap<LabelTy, llvm::SmallVector<unsigned, 5>> LabelRelocs;
   /// Program code.
-  std::vector<std::byte> Code;
+  std::vector<char> Code;
   /// Opcode to expression mapping.
   SourceMap SrcMap;
 

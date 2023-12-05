@@ -21,6 +21,7 @@ namespace clang {
 class ASTContext;
 class CXXConstructorDecl;
 class DeclaratorDecl;
+class Expr;
 class MangleContext;
 class MangleNumberingContext;
 class MemberPointerType;

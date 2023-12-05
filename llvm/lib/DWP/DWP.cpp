@@ -11,16 +11,11 @@
 //
 //===----------------------------------------------------------------------===//
 #include "llvm/DWP/DWP.h"
-#include "llvm/ADT/Twine.h"
 #include "llvm/DWP/DWPError.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCObjectFileInfo.h"
 #include "llvm/MC/MCTargetOptionsCommandFlags.h"
 #include "llvm/Object/Decompressor.h"
-#include "llvm/Object/ELFObjectFile.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/MemoryBuffer.h"
-#include <limits>
 
 using namespace llvm;
 using namespace llvm::object;
@@ -177,38 +172,16 @@ static StringRef getSubsection(StringRef Section,
   const auto *Off = Entry.getContribution(Kind);
   if (!Off)
     return StringRef();
-  return Section.substr(Off->getOffset(), Off->getLength());
+  return Section.substr(Off->Offset, Off->Length);
 }
 
-static Error sectionOverflowErrorOrWarning(uint32_t PrevOffset,
-                                           uint32_t OverflowedOffset,
-                                           StringRef SectionName,
-                                           OnCuIndexOverflow OverflowOptValue,
-                                           bool &AnySectionOverflow) {
-  std::string Msg =
-      (SectionName +
-       Twine(" Section Contribution Offset overflow 4G. Previous Offset ") +
-       Twine(PrevOffset) + Twine(", After overflow offset ") +
-       Twine(OverflowedOffset) + Twine("."))
-          .str();
-  if (OverflowOptValue == OnCuIndexOverflow::Continue) {
-    WithColor::defaultWarningHandler(make_error<DWPError>(Msg));
-    return Error::success();
-  } else if (OverflowOptValue == OnCuIndexOverflow::SoftStop) {
-    AnySectionOverflow = true;
-    WithColor::defaultWarningHandler(make_error<DWPError>(Msg));
-    return Error::success();
-  }
-  return make_error<DWPError>(Msg);
-}
-
-static Error addAllTypesFromDWP(
-    MCStreamer &Out, MapVector<uint64_t, UnitIndexEntry> &TypeIndexEntries,
-    const DWARFUnitIndex &TUIndex, MCSection *OutputTypes, StringRef Types,
-    const UnitIndexEntry &TUEntry, uint32_t &TypesOffset,
-    unsigned TypesContributionIndex, OnCuIndexOverflow OverflowOptValue,
-    bool &AnySectionOverflow) {
-  Out.switchSection(OutputTypes);
+static void
+addAllTypesFromDWP(MCStreamer &Out,
+                   MapVector<uint64_t, UnitIndexEntry> &TypeIndexEntries,
+                   const DWARFUnitIndex &TUIndex, MCSection *OutputTypes,
+                   StringRef Types, const UnitIndexEntry &TUEntry,
+                   uint32_t &TypesOffset, unsigned TypesContributionIndex) {
+  Out.SwitchSection(OutputTypes);
   for (const DWARFUnitIndex::Entry &E : TUIndex.getRows()) {
     auto *I = E.getContributions();
     if (!I)
@@ -224,40 +197,25 @@ static Error addAllTypesFromDWP(
         continue;
       auto &C =
           Entry.Contributions[getContributionIndex(Kind, TUIndex.getVersion())];
-      C.setOffset(C.getOffset() + I->getOffset());
-      C.setLength(I->getLength());
+      C.Offset += I->Offset;
+      C.Length = I->Length;
       ++I;
     }
     auto &C = Entry.Contributions[TypesContributionIndex];
     Out.emitBytes(Types.substr(
-        C.getOffset() -
-            TUEntry.Contributions[TypesContributionIndex].getOffset(),
-        C.getLength()));
-    C.setOffset(TypesOffset);
-    uint32_t OldOffset = TypesOffset;
-    static_assert(sizeof(OldOffset) == sizeof(TypesOffset));
-    TypesOffset += C.getLength();
-    if (OldOffset > TypesOffset) {
-      if (Error Err = sectionOverflowErrorOrWarning(OldOffset, TypesOffset,
-                                                    "Types", OverflowOptValue,
-                                                    AnySectionOverflow))
-        return Err;
-      if (AnySectionOverflow) {
-        TypesOffset = OldOffset;
-        return Error::success();
-      }
-    }
+        C.Offset - TUEntry.Contributions[TypesContributionIndex].Offset,
+        C.Length));
+    C.Offset = TypesOffset;
+    TypesOffset += C.Length;
   }
-  return Error::success();
 }
 
-static Error addAllTypesFromTypesSection(
+static void addAllTypesFromTypesSection(
     MCStreamer &Out, MapVector<uint64_t, UnitIndexEntry> &TypeIndexEntries,
     MCSection *OutputTypes, const std::vector<StringRef> &TypesSections,
-    const UnitIndexEntry &CUEntry, uint32_t &TypesOffset,
-    OnCuIndexOverflow OverflowOptValue, bool &AnySectionOverflow) {
+    const UnitIndexEntry &CUEntry, uint32_t &TypesOffset) {
   for (StringRef Types : TypesSections) {
-    Out.switchSection(OutputTypes);
+    Out.SwitchSection(OutputTypes);
     uint64_t Offset = 0;
     DataExtractor Data(Types, true, 0);
     while (Data.isValidOffset(Offset)) {
@@ -265,37 +223,25 @@ static Error addAllTypesFromTypesSection(
       // Zero out the debug_info contribution
       Entry.Contributions[0] = {};
       auto &C = Entry.Contributions[getContributionIndex(DW_SECT_EXT_TYPES, 2)];
-      C.setOffset(TypesOffset);
+      C.Offset = TypesOffset;
       auto PrevOffset = Offset;
       // Length of the unit, including the 4 byte length field.
-      C.setLength(Data.getU32(&Offset) + 4);
+      C.Length = Data.getU32(&Offset) + 4;
 
       Data.getU16(&Offset); // Version
       Data.getU32(&Offset); // Abbrev offset
       Data.getU8(&Offset);  // Address size
       auto Signature = Data.getU64(&Offset);
-      Offset = PrevOffset + C.getLength32();
+      Offset = PrevOffset + C.Length;
 
       auto P = TypeIndexEntries.insert(std::make_pair(Signature, Entry));
       if (!P.second)
         continue;
 
-      Out.emitBytes(Types.substr(PrevOffset, C.getLength32()));
-      uint32_t OldOffset = TypesOffset;
-      TypesOffset += C.getLength32();
-      if (OldOffset > TypesOffset) {
-        if (Error Err = sectionOverflowErrorOrWarning(OldOffset, TypesOffset,
-                                                      "Types", OverflowOptValue,
-                                                      AnySectionOverflow))
-          return Err;
-        if (AnySectionOverflow) {
-          TypesOffset = OldOffset;
-          return Error::success();
-        }
-      }
+      Out.emitBytes(Types.substr(PrevOffset, C.Length));
+      TypesOffset += C.Length;
     }
   }
-  return Error::success();
 }
 
 static std::string buildDWODescription(StringRef Name, StringRef DWPName,
@@ -303,23 +249,16 @@ static std::string buildDWODescription(StringRef Name, StringRef DWPName,
   std::string Text = "\'";
   Text += Name;
   Text += '\'';
-  bool HasDWO = !DWOName.empty();
-  bool HasDWP = !DWPName.empty();
-  if (HasDWO || HasDWP) {
+  if (!DWPName.empty()) {
     Text += " (from ";
-    if (HasDWO) {
+    if (!DWOName.empty()) {
       Text += '\'';
       Text += DWOName;
-      Text += '\'';
+      Text += "' in ";
     }
-    if (HasDWO && HasDWP)
-      Text += " in ";
-    if (!DWPName.empty()) {
-      Text += '\'';
-      Text += DWPName;
-      Text += '\'';
-    }
-    Text += ")";
+    Text += '\'';
+    Text += DWPName;
+    Text += "')";
   }
   return Text;
 }
@@ -333,16 +272,12 @@ static Error createError(StringRef Name, Error E) {
 
 static Error
 handleCompressedSection(std::deque<SmallString<32>> &UncompressedSections,
-                        SectionRef Sec, StringRef Name, StringRef &Contents) {
-  auto *Obj = dyn_cast<ELFObjectFileBase>(Sec.getObject());
-  if (!Obj ||
-      !(static_cast<ELFSectionRef>(Sec).getFlags() & ELF::SHF_COMPRESSED))
+                        StringRef &Name, StringRef &Contents) {
+  if (!Decompressor::isGnuStyle(Name))
     return Error::success();
-  bool IsLE = isa<object::ELF32LEObjectFile>(Obj) ||
-              isa<object::ELF64LEObjectFile>(Obj);
-  bool Is64 = isa<object::ELF64LEObjectFile>(Obj) ||
-              isa<object::ELF64BEObjectFile>(Obj);
-  Expected<Decompressor> Dec = Decompressor::create(Name, Contents, IsLE, Is64);
+
+  Expected<Decompressor> Dec =
+      Decompressor::create(Name, Contents, false /*IsLE*/, false /*Is64Bit*/);
   if (!Dec)
     return createError(Name, Dec.takeError());
 
@@ -350,6 +285,7 @@ handleCompressedSection(std::deque<SmallString<32>> &UncompressedSections,
   if (Error E = Dec->resizeAndDecompress(UncompressedSections.back()))
     return createError(Name, std::move(E));
 
+  Name = Name.substr(2); // Drop ".z"
   Contents = UncompressedSections.back();
   return Error::success();
 }
@@ -437,7 +373,7 @@ void writeStringsAndOffsets(MCStreamer &Out, DWPStringPool &Strings,
 
   Data = DataExtractor(CurStrOffsetSection, true, 0);
 
-  Out.switchSection(StrOffsetSection);
+  Out.SwitchSection(StrOffsetSection);
 
   uint64_t HeaderSize = debugStrOffsetsHeaderSize(Data, Version);
   uint64_t Offset = 0;
@@ -453,17 +389,14 @@ void writeStringsAndOffsets(MCStreamer &Out, DWPStringPool &Strings,
   }
 }
 
-enum AccessField { Offset, Length };
-void writeIndexTable(MCStreamer &Out, ArrayRef<unsigned> ContributionOffsets,
-                     const MapVector<uint64_t, UnitIndexEntry> &IndexEntries,
-                     const AccessField &Field) {
+void writeIndexTable(
+    MCStreamer &Out, ArrayRef<unsigned> ContributionOffsets,
+    const MapVector<uint64_t, UnitIndexEntry> &IndexEntries,
+    uint32_t DWARFUnitIndex::Entry::SectionContribution::*Field) {
   for (const auto &E : IndexEntries)
-    for (size_t I = 0; I != std::size(E.second.Contributions); ++I)
+    for (size_t I = 0; I != array_lengthof(E.second.Contributions); ++I)
       if (ContributionOffsets[I])
-        Out.emitIntValue((Field == AccessField::Offset
-                              ? E.second.Contributions[I].getOffset32()
-                              : E.second.Contributions[I].getLength32()),
-                         4);
+        Out.emitIntValue(E.second.Contributions[I].*Field, 4);
 }
 
 void writeIndex(MCStreamer &Out, MCSection *Section,
@@ -494,7 +427,7 @@ void writeIndex(MCStreamer &Out, MCSection *Section,
     ++I;
   }
 
-  Out.switchSection(Section);
+  Out.SwitchSection(Section);
   Out.emitIntValue(IndexVersion, 4);        // Version
   Out.emitIntValue(Columns, 4);             // Columns
   Out.emitIntValue(IndexEntries.size(), 4); // Num Units
@@ -514,10 +447,12 @@ void writeIndex(MCStreamer &Out, MCSection *Section,
       Out.emitIntValue(getOnDiskSectionId(I), 4);
 
   // Write the offsets.
-  writeIndexTable(Out, ContributionOffsets, IndexEntries, AccessField::Offset);
+  writeIndexTable(Out, ContributionOffsets, IndexEntries,
+                  &DWARFUnitIndex::Entry::SectionContribution::Offset);
 
   // Write the lengths.
-  writeIndexTable(Out, ContributionOffsets, IndexEntries, AccessField::Length);
+  writeIndexTable(Out, ContributionOffsets, IndexEntries,
+                  &DWARFUnitIndex::Entry::SectionContribution::Length);
 }
 
 Error buildDuplicateError(const std::pair<uint64_t, UnitIndexEntry> &PrevE,
@@ -558,8 +493,7 @@ Error handleSection(
     return ContentsOrErr.takeError();
   StringRef Contents = *ContentsOrErr;
 
-  if (auto Err = handleCompressedSection(UncompressedSections, Section, Name,
-                                         Contents))
+  if (auto Err = handleCompressedSection(UncompressedSections, Name, Contents))
     return Err;
 
   Name = Name.substr(Name.find_first_not_of("._"));
@@ -592,14 +526,13 @@ Error handleSection(
   else if (OutSection == InfoSection)
     CurInfoSection.push_back(Contents);
   else {
-    Out.switchSection(OutSection);
+    Out.SwitchSection(OutSection);
     Out.emitBytes(Contents);
   }
   return Error::success();
 }
 
-Error write(MCStreamer &Out, ArrayRef<std::string> Inputs,
-            OnCuIndexOverflow OverflowOptValue) {
+Error write(MCStreamer &Out, ArrayRef<std::string> Inputs) {
   const auto &MCOFI = *Out.getContext().getObjectFileInfo();
   MCSection *const StrSection = MCOFI.getDwarfStrDWOSection();
   MCSection *const StrOffsetSection = MCOFI.getDwarfStrOffDWOSection();
@@ -629,7 +562,6 @@ Error write(MCStreamer &Out, ArrayRef<std::string> Inputs,
   uint32_t ContributionOffsets[8] = {};
   uint16_t Version = 0;
   uint32_t IndexVersion = 0;
-  bool AnySectionOverflow = false;
 
   DWPStringPool Strings(Out, StrSection);
 
@@ -640,12 +572,8 @@ Error write(MCStreamer &Out, ArrayRef<std::string> Inputs,
 
   for (const auto &Input : Inputs) {
     auto ErrOrObj = object::ObjectFile::createObjectFile(Input);
-    if (!ErrOrObj) {
-      return handleErrors(ErrOrObj.takeError(),
-                          [&](std::unique_ptr<ECError> EC) -> Error {
-                            return createFileError(Input, Error(std::move(EC)));
-                          });
-    }
+    if (!ErrOrObj)
+      return ErrOrObj.takeError();
 
     auto &Obj = *ErrOrObj->getBinary();
     Objects.push_back(std::move(*ErrOrObj));
@@ -696,31 +624,16 @@ Error write(MCStreamer &Out, ArrayRef<std::string> Inputs,
 
     for (auto Pair : SectionLength) {
       auto Index = getContributionIndex(Pair.first, IndexVersion);
-      CurEntry.Contributions[Index].setOffset(ContributionOffsets[Index]);
-      CurEntry.Contributions[Index].setLength(Pair.second);
-      uint32_t OldOffset = ContributionOffsets[Index];
-      ContributionOffsets[Index] += CurEntry.Contributions[Index].getLength32();
-      if (OldOffset > ContributionOffsets[Index]) {
-        uint32_t SectionIndex = 0;
-        for (auto &Section : Obj.sections()) {
-          if (SectionIndex == Index) {
-            if (Error Err = sectionOverflowErrorOrWarning(
-                    OldOffset, ContributionOffsets[Index], *Section.getName(),
-                    OverflowOptValue, AnySectionOverflow))
-              return Err;
-          }
-          ++SectionIndex;
-        }
-        if (AnySectionOverflow)
-          break;
-      }
+      CurEntry.Contributions[Index].Offset = ContributionOffsets[Index];
+      ContributionOffsets[Index] +=
+          (CurEntry.Contributions[Index].Length = Pair.second);
     }
 
     uint32_t &InfoSectionOffset =
         ContributionOffsets[getContributionIndex(DW_SECT_INFO, IndexVersion)];
     if (CurCUIndexSection.empty()) {
       bool FoundCUUnit = false;
-      Out.switchSection(InfoSection);
+      Out.SwitchSection(InfoSection);
       for (StringRef Info : CurInfoSection) {
         uint64_t UnitOffset = 0;
         while (Info.size() > UnitOffset) {
@@ -733,30 +646,15 @@ Error write(MCStreamer &Out, ArrayRef<std::string> Inputs,
           UnitIndexEntry Entry = CurEntry;
           auto &C = Entry.Contributions[getContributionIndex(DW_SECT_INFO,
                                                              IndexVersion)];
-          C.setOffset(InfoSectionOffset);
-          C.setLength(Header.Length + 4);
-
-          if (std::numeric_limits<uint32_t>::max() - InfoSectionOffset <
-              C.getLength32()) {
-            if (Error Err = sectionOverflowErrorOrWarning(
-                    InfoSectionOffset, InfoSectionOffset + C.getLength32(),
-                    "debug_info", OverflowOptValue, AnySectionOverflow))
-              return Err;
-            if (AnySectionOverflow) {
-              if (Header.Version < 5 ||
-                  Header.UnitType == dwarf::DW_UT_split_compile)
-                FoundCUUnit = true;
-              break;
-            }
-          }
-
-          UnitOffset += C.getLength32();
+          C.Offset = InfoSectionOffset;
+          C.Length = Header.Length + 4;
+          UnitOffset += C.Length;
           if (Header.Version < 5 ||
               Header.UnitType == dwarf::DW_UT_split_compile) {
-            Expected<CompileUnitIdentifiers> EID = getCUIdentifiers(
-                Header, AbbrevSection,
-                Info.substr(UnitOffset - C.getLength32(), C.getLength32()),
-                CurStrOffsetSection, CurStrSection);
+            Expected<CompileUnitIdentifiers> EID =
+                getCUIdentifiers(Header, AbbrevSection,
+                                 Info.substr(UnitOffset - C.Length, C.Length),
+                                 CurStrOffsetSection, CurStrSection);
 
             if (!EID)
               return createFileError(Input, EID.takeError());
@@ -770,16 +668,13 @@ Error write(MCStreamer &Out, ArrayRef<std::string> Inputs,
             FoundCUUnit = true;
           } else if (Header.UnitType == dwarf::DW_UT_split_type) {
             auto P = TypeIndexEntries.insert(
-                std::make_pair(*Header.Signature, Entry));
+                std::make_pair(Header.Signature.getValue(), Entry));
             if (!P.second)
               continue;
           }
-          Out.emitBytes(
-              Info.substr(UnitOffset - C.getLength32(), C.getLength32()));
-          InfoSectionOffset += C.getLength32();
+          Out.emitBytes(Info.substr(UnitOffset - C.Length, C.Length));
+          InfoSectionOffset += C.Length;
         }
-        if (AnySectionOverflow)
-          break;
       }
 
       if (!FoundCUUnit)
@@ -787,14 +682,10 @@ Error write(MCStreamer &Out, ArrayRef<std::string> Inputs,
 
       if (IndexVersion == 2) {
         // Add types from the .debug_types section from DWARF < 5.
-        if (Error Err = addAllTypesFromTypesSection(
-                Out, TypeIndexEntries, TypesSection, CurTypesSection, CurEntry,
-                ContributionOffsets[getContributionIndex(DW_SECT_EXT_TYPES, 2)],
-                OverflowOptValue, AnySectionOverflow))
-          return Err;
+        addAllTypesFromTypesSection(
+            Out, TypeIndexEntries, TypesSection, CurTypesSection, CurEntry,
+            ContributionOffsets[getContributionIndex(DW_SECT_EXT_TYPES, 2)]);
       }
-      if (AnySectionOverflow)
-        break;
       continue;
     }
 
@@ -812,7 +703,7 @@ Error write(MCStreamer &Out, ArrayRef<std::string> Inputs,
                                   utostr(CUIndex.getVersion()) +
                                   " and expecting " + utostr(IndexVersion));
 
-    Out.switchSection(InfoSection);
+    Out.SwitchSection(InfoSection);
     for (const DWARFUnitIndex::Entry &E : CUIndex.getRows()) {
       auto *I = E.getContributions();
       if (!I)
@@ -845,15 +736,15 @@ Error write(MCStreamer &Out, ArrayRef<std::string> Inputs,
           continue;
         auto &C =
             NewEntry.Contributions[getContributionIndex(Kind, IndexVersion)];
-        C.setOffset(C.getOffset() + I->getOffset());
-        C.setLength(I->getLength());
+        C.Offset += I->Offset;
+        C.Length = I->Length;
         ++I;
       }
       unsigned Index = getContributionIndex(DW_SECT_INFO, IndexVersion);
       auto &C = NewEntry.Contributions[Index];
       Out.emitBytes(CUInfoSection);
-      C.setOffset(InfoSectionOffset);
-      InfoSectionOffset += C.getLength32();
+      C.Offset = InfoSectionOffset;
+      InfoSectionOffset += C.Length;
     }
 
     if (!CurTUIndexSection.empty()) {
@@ -887,14 +778,11 @@ Error write(MCStreamer &Out, ArrayRef<std::string> Inputs,
 
       unsigned TypesContributionIndex =
           getContributionIndex(TUSectionKind, IndexVersion);
-      if (Error Err = addAllTypesFromDWP(
-              Out, TypeIndexEntries, TUIndex, OutSection, TypeInputSection,
-              CurEntry, ContributionOffsets[TypesContributionIndex],
-              TypesContributionIndex, OverflowOptValue, AnySectionOverflow))
-        return Err;
+      addAllTypesFromDWP(Out, TypeIndexEntries, TUIndex, OutSection,
+                         TypeInputSection, CurEntry,
+                         ContributionOffsets[TypesContributionIndex],
+                         TypesContributionIndex);
     }
-    if (AnySectionOverflow)
-      break;
   }
 
   if (Version < 5) {

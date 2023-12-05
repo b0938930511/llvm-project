@@ -13,12 +13,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Analysis/LoopPass.h"
-#include "llvm/Analysis/LoopInfo.h"
+#include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/OptBisect.h"
+#include "llvm/IR/PassManager.h"
 #include "llvm/IR/PassTimingInfo.h"
 #include "llvm/IR/PrintPasses.h"
+#include "llvm/IR/StructuralHash.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/TimeProfiler.h"
@@ -67,7 +69,8 @@ char PrintLoopPassWrapper::ID = 0;
 
 char LPPassManager::ID = 0;
 
-LPPassManager::LPPassManager() : FunctionPass(ID) {
+LPPassManager::LPPassManager()
+  : FunctionPass(ID), PMDataManager() {
   LI = nullptr;
   CurrentLoop = nullptr;
 }
@@ -114,7 +117,7 @@ void LPPassManager::markLoopAsDeleted(Loop &L) {
   // there. However, we have to be careful to not remove the back of the queue
   // as that is assumed to match the current loop.
   assert(LQ.back() == CurrentLoop && "Loop queue back isn't the current loop!");
-  llvm::erase(LQ, &L);
+  llvm::erase_value(LQ, &L);
 
   if (&L == CurrentLoop) {
     CurrentLoopDeleted = true;
@@ -190,12 +193,12 @@ bool LPPassManager::runOnFunction(Function &F) {
         PassManagerPrettyStackEntry X(P, *CurrentLoop->getHeader());
         TimeRegion PassTimer(getPassTimer(P));
 #ifdef EXPENSIVE_CHECKS
-        uint64_t RefHash = P->structuralHash(F);
+        uint64_t RefHash = StructuralHash(F);
 #endif
         LocalChanged = P->runOnLoop(CurrentLoop, *this);
 
 #ifdef EXPENSIVE_CHECKS
-        if (!LocalChanged && (RefHash != P->structuralHash(F))) {
+        if (!LocalChanged && (RefHash != StructuralHash(F))) {
           llvm::errs() << "Pass modifies its input and doesn't report it: "
                        << P->getPassName() << "\n";
           llvm_unreachable("Pass modifies its input and doesn't report it");
@@ -373,8 +376,7 @@ bool LoopPass::skipLoop(const Loop *L) const {
     return false;
   // Check the opt bisect limit.
   OptPassGate &Gate = F->getContext().getOptPassGate();
-  if (Gate.isEnabled() &&
-      !Gate.shouldRunPass(this->getPassName(), getDescription(*L)))
+  if (Gate.isEnabled() && !Gate.shouldRunPass(this, getDescription(*L)))
     return true;
   // Check for the OptimizeNone attribute.
   if (F->hasOptNone()) {

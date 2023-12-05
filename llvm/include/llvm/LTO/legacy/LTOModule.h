@@ -40,8 +40,8 @@ private:
   struct NameAndAttributes {
     StringRef name;
     uint32_t           attributes = 0;
-    bool               isFunction = false;
-    const GlobalValue *symbol = nullptr;
+    bool               isFunction = 0;
+    const GlobalValue *symbol = 0;
   };
 
   std::unique_ptr<LLVMContext> OwnedContext;

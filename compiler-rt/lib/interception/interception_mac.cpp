@@ -13,6 +13,6 @@
 
 #include "interception.h"
 
-#if SANITIZER_APPLE
+#if SANITIZER_MAC
 
-#endif  // SANITIZER_APPLE
+#endif  // SANITIZER_MAC

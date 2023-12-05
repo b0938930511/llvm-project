@@ -6,7 +6,7 @@
 
 @import ModuleInSubdir;
 
-void foo(void) {
+void foo() {
   int x = bar();
 }
 

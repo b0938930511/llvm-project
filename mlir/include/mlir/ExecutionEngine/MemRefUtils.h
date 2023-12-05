@@ -17,6 +17,7 @@
 #include "mlir/ExecutionEngine/CRunnerUtils.h"
 #include "mlir/Support/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 
 #include "llvm/Support/raw_ostream.h"
@@ -24,11 +25,9 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
-#include <climits>
 #include <functional>
 #include <initializer_list>
 #include <memory>
-#include <optional>
 
 #ifndef MLIR_EXECUTIONENGINE_MEMREFUTILS_H_
 #define MLIR_EXECUTIONENGINE_MEMREFUTILS_H_
@@ -101,10 +100,10 @@ makeStridedMemRefDescriptor(T *ptr, T *alignedPtr, ArrayRef<int64_t> shape = {},
 template <typename T>
 std::pair<T *, T *>
 allocAligned(size_t nElements, AllocFunType allocFun = &::malloc,
-             std::optional<uint64_t> alignment = std::optional<uint64_t>()) {
-  assert(sizeof(T) <= UINT_MAX && "Elemental type overflows");
+             llvm::Optional<uint64_t> alignment = llvm::Optional<uint64_t>()) {
+  assert(sizeof(T) < (1ul << 32) && "Elemental type overflows");
   auto size = nElements * sizeof(T);
-  auto desiredAlignment = alignment.value_or(nextPowerOf2(sizeof(T)));
+  auto desiredAlignment = alignment.getValueOr(nextPowerOf2(sizeof(T)));
   assert((desiredAlignment & (desiredAlignment - 1)) == 0);
   assert(desiredAlignment >= sizeof(T));
   T *data = reinterpret_cast<T *>(allocFun(size + desiredAlignment));
@@ -146,7 +145,7 @@ public:
   OwningMemRef(
       ArrayRef<int64_t> shape, ArrayRef<int64_t> shapeAlloc = {},
       ElementWiseVisitor<T> init = {},
-      std::optional<uint64_t> alignment = std::optional<uint64_t>(),
+      llvm::Optional<uint64_t> alignment = llvm::Optional<uint64_t>(),
       AllocFunType allocFun = &::malloc,
       std::function<void(StridedMemRefType<T, Rank>)> freeFun =
           [](StridedMemRefType<T, Rank> descriptor) {
@@ -163,7 +162,8 @@ public:
     int64_t nElements = 1;
     for (int64_t s : shapeAlloc)
       nElements *= s;
-    auto [data, alignedData] =
+    T *data, *alignedData;
+    std::tie(data, alignedData) =
         detail::allocAligned<T>(nElements, allocFun, alignment);
     descriptor = detail::makeStridedMemRefDescriptor<Rank>(data, alignedData,
                                                            shape, shapeAlloc);
@@ -175,7 +175,7 @@ public:
     } else {
       memset(descriptor.data, 0,
              nElements * sizeof(T) +
-                 alignment.value_or(detail::nextPowerOf2(sizeof(T))));
+                 alignment.getValueOr(detail::nextPowerOf2(sizeof(T))));
     }
   }
   /// Take ownership of an existing descriptor with a custom deleter.
@@ -191,14 +191,14 @@ public:
     freeFunc = other.freeFunc;
     descriptor = other.descriptor;
     other.freeFunc = nullptr;
-    memset(&other.descriptor, 0, sizeof(other.descriptor));
+    memset(0, &other.descriptor, sizeof(other.descriptor));
   }
   OwningMemRef(OwningMemRef &&other) { *this = std::move(other); }
 
   DescriptorType &operator*() { return descriptor; }
   DescriptorType *operator->() { return &descriptor; }
   T &operator[](std::initializer_list<int64_t> indices) {
-    return descriptor[indices];
+    return descriptor[std::move(indices)];
   }
 
 private:

@@ -68,7 +68,7 @@ typedef struct objc_object {
 @interface AAA (MyCat)
 + (int)getInt;
 @end
-int foo(void) {
+int foo() {
     int y = [AAA getInt];
     return 5/y; // expected-warning {{Division by zero}}
 }
@@ -88,7 +88,7 @@ int foo(void) {
 @end
 @interface CCC : PPP
 @end
-int foo4(void) {
+int foo4() {
     int y = [CCC getInt];
     return 5/y; // expected-warning {{Division by zero}}
 }
@@ -182,7 +182,7 @@ int foo4(void) {
   return 5/y; // expected-warning{{Division by zero}}
 }
 @end
-int foo2(void) {
+int foo2() {
   int y = [MyParentSelf testSelf];
   return 5/y; // expected-warning{{Division by zero}}
 }
@@ -214,7 +214,7 @@ int foo2(void) {
   return [super foo];
 }
 @end
-int checkSelfUsedInparentClassMethod(void) {
+int checkSelfUsedInparentClassMethod() {
     return 5/[SelfUsedInParentChild fooA];
 }
 
@@ -222,7 +222,7 @@ int checkSelfUsedInparentClassMethod(void) {
 @interface Rdar15037033 : NSObject
 @end
 
-void rdar15037033(void) {
+void rdar15037033() {
   [Rdar15037033 forwardDeclaredMethod]; // expected-warning {{class method '+forwardDeclaredMethod' not found}}
   [Rdar15037033 forwardDeclaredVariadicMethod:1, 2, 3, 0]; // expected-warning {{class method '+forwardDeclaredVariadicMethod:' not found}}
 }

@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/DebugInfo/CodeView/StringsAndChecksums.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/DebugInfo/CodeView/CodeView.h"
 #include "llvm/DebugInfo/CodeView/DebugChecksumsSubsection.h"
 #include "llvm/DebugInfo/CodeView/DebugStringTableSubsection.h"

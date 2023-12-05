@@ -1,6 +1,6 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s
 
-void test(void) {
+void test() {
   void *vp;
   int *ip;
   char *cp;

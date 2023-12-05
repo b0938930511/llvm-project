@@ -69,11 +69,13 @@ public:
 
   static lldb::ABISP CreateInstance(lldb::ProcessSP process_sp, const lldb_private::ArchSpec &arch);
 
-  static llvm::StringRef GetPluginNameStatic() { return "sysv-mips"; }
+  static lldb_private::ConstString GetPluginNameStatic();
 
   // PluginInterface protocol
 
-  llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
+  lldb_private::ConstString GetPluginName() override;
+
+  uint32_t GetPluginVersion() override;
 
 protected:
   void CreateRegisterMapIfNeeded();

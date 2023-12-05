@@ -17,7 +17,7 @@
 
 #else
 
-int f(void) {
+int f() {
   int a;
   int b = a==a;
   unsigned x;

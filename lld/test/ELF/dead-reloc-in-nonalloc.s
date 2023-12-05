@@ -46,7 +46,7 @@
 
 # RUN: not ld.lld -z dead-reloc-in-nonalloc='['=0 2>&1 | FileCheck %s --check-prefix=INVALID
 
-# INVALID: error: -z dead-reloc-in-nonalloc=: invalid glob pattern, unmatched '[': [
+# INVALID: error: -z dead-reloc-in-nonalloc=: invalid glob pattern: [
 
 .globl _start
 _start:

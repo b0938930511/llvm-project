@@ -11,12 +11,14 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::cppcoreguidelines {
+namespace clang {
+namespace tidy {
+namespace cppcoreguidelines {
 
 /// This check flags all array to pointer decays
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/cppcoreguidelines/pro-bounds-array-to-pointer-decay.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/cppcoreguidelines-pro-bounds-array-to-pointer-decay.html
 class ProBoundsArrayToPointerDecayCheck : public ClangTidyCheck {
 public:
   ProBoundsArrayToPointerDecayCheck(StringRef Name, ClangTidyContext *Context)
@@ -28,6 +30,8 @@ public:
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
 };
 
-} // namespace clang::tidy::cppcoreguidelines
+} // namespace cppcoreguidelines
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_CPPCOREGUIDELINES_PRO_BOUNDS_ARRAY_TO_POINTER_DECAY_H

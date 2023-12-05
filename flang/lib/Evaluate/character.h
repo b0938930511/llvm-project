@@ -94,19 +94,12 @@ public:
   }
 
   static ConstantSubscript LEN_TRIM(const Character &str) {
-    auto j{str.length()};
-    for (; j >= 1; --j) {
-      if (str[j - 1] != ' ') {
-        break;
-      }
-    }
-    return static_cast<ConstantSubscript>(j);
+    return VERIFY(str, Character{' '}, true);
   }
 
   static Character REPEAT(const Character &str, ConstantSubscript ncopies) {
     Character result;
-    if (!str.empty() && ncopies > 0) {
-      result.reserve(ncopies * str.size());
+    if (!str.empty()) {
       while (ncopies-- > 0) {
         result += str;
       }

@@ -37,18 +37,18 @@ void MemSetOOBTestTemplate(size_t length) {
   MEMSET(array + length, 0, zero);
   MEMSET(array + length + 1, 0, zero);
 
-  // try to memset bytes after array
+  // try to memset bytes to the right of array
   EXPECT_DEATH(MEMSET(array, 0, size + 1),
                RightOOBWriteMessage(0));
   EXPECT_DEATH(MEMSET((char*)(array + length) - 1, element, 6),
                RightOOBWriteMessage(0));
   EXPECT_DEATH(MEMSET(array + 1, element, size + sizeof(T)),
                RightOOBWriteMessage(0));
-  // whole interval is after
+  // whole interval is to the right
   EXPECT_DEATH(MEMSET(array + length + 1, 0, 10),
                RightOOBWriteMessage(sizeof(T)));
 
-  // try to memset bytes before array
+  // try to memset bytes to the left of array
   EXPECT_DEATH(MEMSET((char*)array - 1, element, size),
                LeftOOBWriteMessage(1));
   EXPECT_DEATH(MEMSET((char*)array - 5, 0, 6),
@@ -58,11 +58,11 @@ void MemSetOOBTestTemplate(size_t length) {
     EXPECT_DEATH(memset(array - 5, element, size + 5 * sizeof(T)),
                  LeftOOBWriteMessage(5 * sizeof(T)));
   }
-  // whole interval is before
+  // whole interval is to the left
   EXPECT_DEATH(MEMSET(array - 2, 0, sizeof(T)),
                LeftOOBWriteMessage(2 * sizeof(T)));
 
-  // try to memset bytes both before & after
+  // try to memset bytes both to the left & to the right
   EXPECT_DEATH(MEMSET((char*)array - 2, element, size + 4),
                LeftOOBWriteMessage(2));
 
@@ -114,7 +114,7 @@ TEST(AddressSanitizer, LargeOOBInMemset) {
     // fprintf(stderr, "  large oob memset: %p %p %zd\n", x1, x2, size);
     // Do a memset on x1 with huge out-of-bound access that will end up in x2.
     EXPECT_DEATH(Ident(memset)(x1, 0, size * 2),
-                 "is located 0 bytes after");
+                 "is located 0 bytes to the right");
     delete [] x1;
     delete [] x2;
     return;
@@ -143,25 +143,25 @@ void MemTransferOOBTestTemplate(size_t length) {
   M::transfer(dest, src - 1, zero);
   M::transfer(dest, src, zero);
 
-  // try to change mem after dest
+  // try to change mem to the right of dest
   EXPECT_DEATH(M::transfer(dest + 1, src, size),
                RightOOBWriteMessage(0));
   EXPECT_DEATH(M::transfer((char*)(dest + length) - 1, src, 5),
                RightOOBWriteMessage(0));
 
-  // try to change mem before dest
+  // try to change mem to the left of dest
   EXPECT_DEATH(M::transfer(dest - 2, src, size),
                LeftOOBWriteMessage(2 * sizeof(T)));
   EXPECT_DEATH(M::transfer((char*)dest - 3, src, 4),
                LeftOOBWriteMessage(3));
 
-  // try to access mem after src
+  // try to access mem to the right of src
   EXPECT_DEATH(M::transfer(dest, src + 2, size),
                RightOOBReadMessage(0));
   EXPECT_DEATH(M::transfer(dest, (char*)(src + length) - 3, 6),
                RightOOBReadMessage(0));
 
-  // try to access mem before src
+  // try to access mem to the left of src
   EXPECT_DEATH(M::transfer(dest, src - 1, size),
                LeftOOBReadMessage(sizeof(T)));
   EXPECT_DEATH(M::transfer(dest, (char*)src - 6, 7),

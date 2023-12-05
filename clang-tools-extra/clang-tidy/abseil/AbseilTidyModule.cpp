@@ -9,7 +9,6 @@
 #include "../ClangTidy.h"
 #include "../ClangTidyModule.h"
 #include "../ClangTidyModuleRegistry.h"
-#include "CleanupCtadCheck.h"
 #include "DurationAdditionCheck.h"
 #include "DurationComparisonCheck.h"
 #include "DurationConversionCastCheck.h"
@@ -29,13 +28,13 @@
 #include "TimeSubtractionCheck.h"
 #include "UpgradeDurationConversionsCheck.h"
 
-namespace clang::tidy {
+namespace clang {
+namespace tidy {
 namespace abseil {
 
 class AbseilModule : public ClangTidyModule {
 public:
   void addCheckFactories(ClangTidyCheckFactories &CheckFactories) override {
-    CheckFactories.registerCheck<CleanupCtadCheck>("abseil-cleanup-ctad");
     CheckFactories.registerCheck<DurationAdditionCheck>(
         "abseil-duration-addition");
     CheckFactories.registerCheck<DurationComparisonCheck>(
@@ -84,4 +83,5 @@ static ClangTidyModuleRegistry::Add<AbseilModule> X("abseil-module",
 // and thus register the AbseilModule.
 volatile int AbseilModuleAnchorSource = 0;
 
-} // namespace clang::tidy
+} // namespace tidy
+} // namespace clang

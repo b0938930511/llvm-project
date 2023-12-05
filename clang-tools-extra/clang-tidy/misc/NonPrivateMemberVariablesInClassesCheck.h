@@ -11,7 +11,9 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::misc {
+namespace clang {
+namespace tidy {
+namespace misc {
 
 /// This checker finds classes that not only contain the data
 /// (non-static member variables), but also have logic (non-static member
@@ -23,7 +25,7 @@ namespace clang::tidy::misc {
 /// ignored and optionally all `public` member variables could be ignored.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/misc/non-private-member-variables-in-classes.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/misc-non-private-member-variables-in-classes.html
 class NonPrivateMemberVariablesInClassesCheck : public ClangTidyCheck {
 public:
   NonPrivateMemberVariablesInClassesCheck(StringRef Name,
@@ -40,6 +42,8 @@ private:
   const bool IgnorePublicMemberVariables;
 };
 
-} // namespace clang::tidy::misc
+} // namespace misc
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_MISC_NONPRIVATEMEMBERVARIABLESINCLASSESCHECK_H

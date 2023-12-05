@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TargetInfo/SystemZTargetInfo.h"
-#include "llvm/MC/TargetRegistry.h"
+#include "llvm/Support/TargetRegistry.h"
 
 using namespace llvm;
 
@@ -16,7 +16,6 @@ Target &llvm::getTheSystemZTarget() {
   return TheSystemZTarget;
 }
 
-// NOLINTNEXTLINE(readability-identifier-naming)
 extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeSystemZTargetInfo() {
   RegisterTarget<Triple::systemz, /*HasJIT=*/true> X(
       getTheSystemZTarget(), "systemz", "SystemZ", "SystemZ");

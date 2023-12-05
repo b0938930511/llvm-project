@@ -1,18 +1,12 @@
 add_mlir_dialect_library(MLIRAffineTransforms
   AffineDataCopyGeneration.cpp
-  AffineExpandIndexOps.cpp
   AffineLoopInvariantCodeMotion.cpp
   AffineLoopNormalize.cpp
   AffineParallelize.cpp
   AffineScalarReplacement.cpp
-  DecomposeAffineOps.cpp
-  LoopCoalescing.cpp
-  LoopFusion.cpp
   LoopTiling.cpp
   LoopUnroll.cpp
   LoopUnrollAndJam.cpp
-  PipelineDataTransfer.cpp
-  ReifyValueBounds.cpp
   SuperVectorize.cpp
   SimplifyAffineStructures.cpp
 
@@ -25,20 +19,15 @@ add_mlir_dialect_library(MLIRAffineTransforms
   MLIRLoopLikeInterfaceIncGen
 
   LINK_LIBS PUBLIC
-  MLIRAffineDialect
-  MLIRAffineAnalysis
+  MLIRAffine
   MLIRAffineUtils
-  MLIRArithDialect
   MLIRIR
-  MLIRMemRefDialect
+  MLIRMemRef
   MLIRPass
-  MLIRSCFUtils
   MLIRSideEffectInterfaces
-  MLIRTensorDialect
+  MLIRStandard
   MLIRTransformUtils
-  MLIRValueBoundsOpInterface
-  MLIRVectorDialect
-  MLIRVectorUtils
+  MLIRVector
   MLIRVectorToLLVM
   )
 

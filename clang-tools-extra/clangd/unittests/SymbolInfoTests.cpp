@@ -6,12 +6,19 @@
 //
 //===----------------------------------------------------------------------===//
 #include "Annotations.h"
+#include "Compiler.h"
+#include "Matchers.h"
 #include "ParsedAST.h"
+#include "SyncAPI.h"
+#include "TestFS.h"
 #include "TestTU.h"
 #include "XRefs.h"
+#include "index/FileIndex.h"
+#include "index/SymbolCollector.h"
+#include "clang/Index/IndexingAction.h"
+#include "llvm/Support/Path.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include <optional>
 
 namespace clang {
 namespace clangd {
@@ -19,79 +26,45 @@ namespace {
 
 using ::testing::UnorderedElementsAreArray;
 
-// Partial SymbolDetails with the rest filled in at testing time.
-struct ExpectedSymbolDetails {
-  std::string Name;
-  std::string Container;
-  std::string USR;
-  const char *DeclMarker = nullptr;
-  const char *DefMarker = nullptr;
+auto CreateExpectedSymbolDetails = [](const std::string &name,
+                                      const std::string &container,
+                                      const std::string &USR) {
+  return SymbolDetails{name, container, USR, SymbolID(USR)};
 };
 
 TEST(SymbolInfoTests, All) {
-  std::pair<const char *, std::vector<ExpectedSymbolDetails>>
+  std::pair<const char *, std::vector<SymbolDetails>>
       TestInputExpectedOutput[] = {
           {
               R"cpp( // Simple function reference - declaration
-          void $decl[[foo]]();
+          void foo();
           int bar() {
             fo^o();
           }
         )cpp",
-              {ExpectedSymbolDetails{"foo", "", "c:@F@foo#", "decl"}}},
+              {CreateExpectedSymbolDetails("foo", "", "c:@F@foo#")}},
           {
               R"cpp( // Simple function reference - definition
-          void $def[[foo]]() {}
+          void foo() {}
           int bar() {
             fo^o();
           }
         )cpp",
-              {ExpectedSymbolDetails{"foo", "", "c:@F@foo#", "def", "def"}}},
-          {
-              R"cpp( // Simple function reference - decl and def
-          void $decl[[foo]]();
-          void $def[[foo]]() {}
-          int bar() {
-            fo^o();
-          }
-        )cpp",
-              {ExpectedSymbolDetails{"foo", "", "c:@F@foo#", "decl", "def"}}},
-          {
-              R"cpp( // Simple class reference - decl and def
-          @interface $decl[[Foo]]
-          @end
-          @implementation $def[[Foo]]
-          @end
-          void doSomething(F^oo *obj) {}
-        )cpp",
-              {ExpectedSymbolDetails{"Foo", "", "c:objc(cs)Foo", "decl",
-                                     "def"}}},
-          {
-              R"cpp( // Simple method reference - decl and def
-          @interface Foo
-          - (void)$decl[[foo]];
-          @end
-          @implementation Foo
-          - (void)$def[[fo^o]] {}
-          @end
-        )cpp",
-              {ExpectedSymbolDetails{"foo", "Foo::", "c:objc(cs)Foo(im)foo",
-                                     "decl", "def"}}},
+              {CreateExpectedSymbolDetails("foo", "", "c:@F@foo#")}},
           {
               R"cpp( // Function in namespace reference
           namespace bar {
-            void $decl[[foo]]();
+            void foo();
             int baz() {
               fo^o();
             }
           }
         )cpp",
-              {ExpectedSymbolDetails{"foo", "bar::", "c:@N@bar@F@foo#",
-                                     "decl"}}},
+              {CreateExpectedSymbolDetails("foo", "bar::", "c:@N@bar@F@foo#")}},
           {
               R"cpp( // Function in different namespace reference
           namespace bar {
-            void $decl[[foo]]();
+            void foo();
           }
           namespace barbar {
             int baz() {
@@ -99,11 +72,10 @@ TEST(SymbolInfoTests, All) {
             }
           }
         )cpp",
-              {ExpectedSymbolDetails{"foo", "bar::", "c:@N@bar@F@foo#",
-                                     "decl"}}},
+              {CreateExpectedSymbolDetails("foo", "bar::", "c:@N@bar@F@foo#")}},
           {
               R"cpp( // Function in global namespace reference
-          void $decl[[foo]]();
+          void foo();
           namespace Nbar {
             namespace Nbaz {
               int baz() {
@@ -112,11 +84,11 @@ TEST(SymbolInfoTests, All) {
             }
           }
         )cpp",
-              {ExpectedSymbolDetails{"foo", "", "c:@F@foo#", "decl"}}},
+              {CreateExpectedSymbolDetails("foo", "", "c:@F@foo#")}},
           {
               R"cpp( // Function in anonymous namespace reference
           namespace {
-            void $decl[[foo]]();
+            void foo();
           }
           namespace barbar {
             int baz() {
@@ -124,13 +96,13 @@ TEST(SymbolInfoTests, All) {
             }
           }
         )cpp",
-              {ExpectedSymbolDetails{"foo", "(anonymous)",
-                                     "c:TestTU.cpp@aN@F@foo#", "decl"}}},
+              {CreateExpectedSymbolDetails("foo", "(anonymous)",
+                                           "c:TestTU.cpp@aN@F@foo#")}},
           {
               R"cpp( // Function reference - ADL
           namespace bar {
             struct BarType {};
-            void $decl[[foo]](const BarType&);
+            void foo(const BarType&);
           }
           namespace barbar {
             int baz() {
@@ -139,71 +111,67 @@ TEST(SymbolInfoTests, All) {
             }
           }
         )cpp",
-              {ExpectedSymbolDetails{
-                  "foo", "bar::", "c:@N@bar@F@foo#&1$@N@bar@S@BarType#",
-                  "decl"}}},
+              {CreateExpectedSymbolDetails(
+                  "foo", "bar::", "c:@N@bar@F@foo#&1$@N@bar@S@BarType#")}},
           {
               R"cpp( // Global value reference
-          int $def[[value]];
+          int value;
           void foo(int) { }
           void bar() {
             foo(val^ue);
           }
         )cpp",
-              {ExpectedSymbolDetails{"value", "", "c:@value", "def", "def"}}},
+              {CreateExpectedSymbolDetails("value", "", "c:@value")}},
           {
               R"cpp( // Local value reference
-          void foo() { int $def[[aaa]]; int bbb = aa^a; }
+          void foo() { int aaa; int bbb = aa^a; }
         )cpp",
-              {ExpectedSymbolDetails{"aaa", "foo", "c:TestTU.cpp@49@F@foo#@aaa",
-                                     "def", "def"}}},
+              {CreateExpectedSymbolDetails("aaa", "foo",
+                                           "c:TestTU.cpp@49@F@foo#@aaa")}},
           {
               R"cpp( // Function param
-          void bar(int $def[[aaa]]) {
+          void bar(int aaa) {
             int bbb = a^aa;
           }
         )cpp",
-              {ExpectedSymbolDetails{
-                  "aaa", "bar", "c:TestTU.cpp@38@F@bar#I#@aaa", "def", "def"}}},
+              {CreateExpectedSymbolDetails("aaa", "bar",
+                                           "c:TestTU.cpp@38@F@bar#I#@aaa")}},
           {
               R"cpp( // Lambda capture
           void foo() {
-            int $def[[ii]];
+            int ii;
             auto lam = [ii]() {
               return i^i;
             };
           }
         )cpp",
-              {ExpectedSymbolDetails{"ii", "foo", "c:TestTU.cpp@54@F@foo#@ii",
-                                     "def", "def"}}},
+              {CreateExpectedSymbolDetails("ii", "foo",
+                                           "c:TestTU.cpp@54@F@foo#@ii")}},
           {
               R"cpp( // Macro reference
           #define MACRO 5\nint i = MAC^RO;
         )cpp",
-              {ExpectedSymbolDetails{"MACRO", "",
-                                     "c:TestTU.cpp@38@macro@MACRO"}}},
+              {CreateExpectedSymbolDetails("MACRO", "",
+                                           "c:TestTU.cpp@38@macro@MACRO")}},
           {
               R"cpp( // Macro reference
           #define MACRO 5\nint i = MACRO^;
         )cpp",
-              {ExpectedSymbolDetails{"MACRO", "",
-                                     "c:TestTU.cpp@38@macro@MACRO"}}},
+              {CreateExpectedSymbolDetails("MACRO", "",
+                                           "c:TestTU.cpp@38@macro@MACRO")}},
           {
               R"cpp( // Multiple symbols returned - using overloaded function name
-          void $def[[foo]]() {}
-          void $def_bool[[foo]](bool) {}
-          void $def_int[[foo]](int) {}
+          void foo() {}
+          void foo(bool) {}
+          void foo(int) {}
           namespace bar {
-            using ::$decl[[fo^o]];
+            using ::fo^o;
           }
         )cpp",
-              {ExpectedSymbolDetails{"foo", "", "c:@F@foo#", "def", "def"},
-               ExpectedSymbolDetails{"foo", "", "c:@F@foo#b#", "def_bool",
-                                     "def_bool"},
-               ExpectedSymbolDetails{"foo", "", "c:@F@foo#I#", "def_int",
-                                     "def_int"},
-               ExpectedSymbolDetails{"foo", "bar::", "c:@N@bar@UD@foo",
-                                     "decl"}}},
+              {CreateExpectedSymbolDetails("foo", "", "c:@F@foo#"),
+               CreateExpectedSymbolDetails("foo", "", "c:@F@foo#b#"),
+               CreateExpectedSymbolDetails("foo", "", "c:@F@foo#I#"),
+               CreateExpectedSymbolDetails("foo", "bar::", "c:@N@bar@UD@foo")}},
           {
               R"cpp( // Multiple symbols returned - implicit conversion
           struct foo {};
@@ -212,142 +180,133 @@ TEST(SymbolInfoTests, All) {
           };
           void func_baz1(bar) {}
           void func_baz2() {
-            foo $def[[ff]];
+            foo ff;
             func_baz1(f^f);
           }
         )cpp",
-              {ExpectedSymbolDetails{"ff", "func_baz2",
-                                     "c:TestTU.cpp@218@F@func_baz2#@ff", "def",
-                                     "def"}}},
+              {CreateExpectedSymbolDetails(
+                  "ff", "func_baz2", "c:TestTU.cpp@218@F@func_baz2#@ff")}},
           {
               R"cpp( // Type reference - declaration
-          struct $decl[[foo]];
+          struct foo;
           void bar(fo^o*);
         )cpp",
-              {ExpectedSymbolDetails{"foo", "", "c:@S@foo", "decl"}}},
+              {CreateExpectedSymbolDetails("foo", "", "c:@S@foo")}},
           {
               R"cpp( // Type reference - definition
-          struct $def[[foo]] {};
+          struct foo {};
           void bar(fo^o*);
         )cpp",
-              {ExpectedSymbolDetails{"foo", "", "c:@S@foo", "def", "def"}}},
+              {CreateExpectedSymbolDetails("foo", "", "c:@S@foo")}},
           {
               R"cpp( // Type Reference - template argument
-          struct $def[[foo]] {};
+          struct foo {};
           template<class T> struct bar {};
           void baz() {
             bar<fo^o> b;
           }
         )cpp",
-              {ExpectedSymbolDetails{"foo", "", "c:@S@foo", "def", "def"}}},
+              {CreateExpectedSymbolDetails("foo", "", "c:@S@foo")}},
           {
               R"cpp( // Template parameter reference - type param
-          template<class $def[[TT]]> struct bar {
+          template<class TT> struct bar {
             T^T t;
           };
         )cpp",
-              {ExpectedSymbolDetails{"TT", "bar::", "c:TestTU.cpp@65", "def",
-                                     "def"}}},
+              {CreateExpectedSymbolDetails("TT", "bar::", "c:TestTU.cpp@65")}},
           {
               R"cpp( // Template parameter reference - type param
-          template<int $def[[NN]]> struct bar {
+          template<int NN> struct bar {
             int a = N^N;
           };
         )cpp",
-              {ExpectedSymbolDetails{"NN", "bar::", "c:TestTU.cpp@65", "def",
-                                     "def"}}},
+              {CreateExpectedSymbolDetails("NN", "bar::", "c:TestTU.cpp@65")}},
           {
               R"cpp( // Class member reference - objec
           struct foo {
-            int $def[[aa]];
+            int aa;
           };
           void bar() {
             foo f;
             f.a^a;
           }
         )cpp",
-              {ExpectedSymbolDetails{"aa", "foo::", "c:@S@foo@FI@aa", "def",
-                                     "def"}}},
+              {CreateExpectedSymbolDetails("aa", "foo::", "c:@S@foo@FI@aa")}},
           {
               R"cpp( // Class member reference - pointer
           struct foo {
-            int $def[[aa]];
+            int aa;
           };
           void bar() {
             &foo::a^a;
           }
         )cpp",
-              {ExpectedSymbolDetails{"aa", "foo::", "c:@S@foo@FI@aa", "def",
-                                     "def"}}},
+              {CreateExpectedSymbolDetails("aa", "foo::", "c:@S@foo@FI@aa")}},
           {
               R"cpp( // Class method reference - objec
           struct foo {
-            void $def[[aa]]() {}
+            void aa() {}
           };
           void bar() {
             foo f;
             f.a^a();
           }
         )cpp",
-              {ExpectedSymbolDetails{"aa", "foo::", "c:@S@foo@F@aa#", "def",
-                                     "def"}}},
+              {CreateExpectedSymbolDetails("aa", "foo::", "c:@S@foo@F@aa#")}},
           {
               R"cpp( // Class method reference - pointer
           struct foo {
-            void $def[[aa]]() {}
+            void aa() {}
           };
           void bar() {
             &foo::a^a;
           }
         )cpp",
-              {ExpectedSymbolDetails{"aa", "foo::", "c:@S@foo@F@aa#", "def",
-                                     "def"}}},
+              {CreateExpectedSymbolDetails("aa", "foo::", "c:@S@foo@F@aa#")}},
           {
               R"cpp( // Typedef
-          typedef int $decl[[foo]];
+          typedef int foo;
           void bar() {
             fo^o a;
           }
         )cpp",
-              {ExpectedSymbolDetails{"foo", "", "c:TestTU.cpp@T@foo", "decl"}}},
+              {CreateExpectedSymbolDetails("foo", "", "c:TestTU.cpp@T@foo")}},
           {
               R"cpp( // Type alias
-          using $decl[[foo]] = int;
+          using foo = int;
           void bar() {
             fo^o a;
           }
         )cpp",
-              {ExpectedSymbolDetails{"foo", "", "c:@foo", "decl"}}},
+              {CreateExpectedSymbolDetails("foo", "", "c:@foo")}},
           {
               R"cpp( // Namespace reference
-          namespace $decl[[foo]] {}
+          namespace foo {}
           using namespace fo^o;
         )cpp",
-              {ExpectedSymbolDetails{"foo", "", "c:@N@foo", "decl"}}},
+              {CreateExpectedSymbolDetails("foo", "", "c:@N@foo")}},
           {
               R"cpp( // Enum value reference
-          enum foo { $def[[bar]], baz };
+          enum foo { bar, baz };
           void f() {
             foo fff = ba^r;
           }
         )cpp",
-              {ExpectedSymbolDetails{"bar", "foo", "c:@E@foo@bar", "def",
-                                     "def"}}},
+              {CreateExpectedSymbolDetails("bar", "foo", "c:@E@foo@bar")}},
           {
               R"cpp( // Enum class value reference
-          enum class foo { $def[[bar]], baz };
+          enum class foo { bar, baz };
           void f() {
             foo fff = foo::ba^r;
           }
         )cpp",
-              {ExpectedSymbolDetails{"bar", "foo::", "c:@E@foo@bar", "def",
-                                     "def"}}},
+              {CreateExpectedSymbolDetails("bar", "foo::", "c:@E@foo@bar")}},
           {
               R"cpp( // Parameters in declarations
-          void foo(int $def[[ba^r]]);
+          void foo(int ba^r);
         )cpp",
-              {ExpectedSymbolDetails{
-                  "bar", "foo", "c:TestTU.cpp@50@F@foo#I#@bar", "def", "def"}}},
+              {CreateExpectedSymbolDetails("bar", "foo",
+                                           "c:TestTU.cpp@50@F@foo#I#@bar")}},
           {
               R"cpp( // Type inference with auto keyword
           struct foo {};
@@ -370,26 +329,10 @@ TEST(SymbolInfoTests, All) {
 
   for (const auto &T : TestInputExpectedOutput) {
     Annotations TestInput(T.first);
-    TestTU TU;
-    TU.Code = std::string(TestInput.code());
-    TU.ExtraArgs.push_back("-xobjective-c++");
-    auto AST = TU.build();
-
-    std::vector<SymbolDetails> Expected;
-    for (const auto &Sym : T.second) {
-      std::optional<Location> Decl, Def;
-      if (Sym.DeclMarker)
-        Decl = Location{URIForFile::canonicalize(testPath(TU.Filename), ""),
-                        TestInput.range(Sym.DeclMarker)};
-      if (Sym.DefMarker)
-        Def = Location{URIForFile::canonicalize(testPath(TU.Filename), ""),
-                       TestInput.range(Sym.DefMarker)};
-      Expected.push_back(
-          {Sym.Name, Sym.Container, Sym.USR, SymbolID(Sym.USR), Decl, Def});
-    }
+    auto AST = TestTU::withCode(TestInput.code()).build();
 
     EXPECT_THAT(getSymbolInfo(AST, TestInput.point()),
-                UnorderedElementsAreArray(Expected))
+                UnorderedElementsAreArray(T.second))
         << T.first;
   }
 }

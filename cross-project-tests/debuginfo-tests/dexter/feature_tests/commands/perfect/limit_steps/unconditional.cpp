@@ -2,8 +2,9 @@
 //      Test that \DexLimitSteps can be used without a condition (i.e. the
 //      breakpoint range is set any time from_line is stepped on).
 //
-// RUN: %dexter_regression_test_build %s -o %t
-// RUN: %dexter_regression_test_run --binary %t -- %s | FileCheck %s
+// REQUIRES: system-linux
+//
+// RUN: %dexter_regression_test -- %s | FileCheck %s
 // CHECK: unconditional.cpp
 
 int glob;

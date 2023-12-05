@@ -21,16 +21,27 @@
 namespace llvm {
 namespace jitlink {
 
+/// A LinkGraph pass that splits blocks in an eh-frame section into sub-blocks
+/// representing individual eh-frames.
+/// EHFrameSplitter should not be run without EHFrameEdgeFixer, which is
+/// responsible for adding FDE-to-CIE edges.
+class EHFrameSplitter {
+public:
+  EHFrameSplitter(StringRef EHFrameSectionName);
+  Error operator()(LinkGraph &G);
+
+private:
+  Error processBlock(LinkGraph &G, Block &B, LinkGraph::SplitBlockCache &Cache);
+
+  StringRef EHFrameSectionName;
+};
+
 /// A LinkGraph pass that adds missing FDE-to-CIE, FDE-to-PC and FDE-to-LSDA
 /// edges.
 class EHFrameEdgeFixer {
 public:
-  /// Create an eh-frame edge fixer.
-  /// If a given edge-kind is not supported on the target architecture then
-  /// Edge::Invalid should be used.
   EHFrameEdgeFixer(StringRef EHFrameSectionName, unsigned PointerSize,
-                   Edge::Kind Pointer32, Edge::Kind Pointer64,
-                   Edge::Kind Delta32, Edge::Kind Delta64,
+                   Edge::Kind Delta64, Edge::Kind Delta32,
                    Edge::Kind NegDelta32);
   Error operator()(LinkGraph &G);
 
@@ -46,10 +57,9 @@ private:
     CIEInformation() = default;
     CIEInformation(Symbol &CIESymbol) : CIESymbol(&CIESymbol) {}
     Symbol *CIESymbol = nullptr;
-    bool AugmentationDataPresent = false;
-    bool LSDAPresent = false;
-    uint8_t LSDAEncoding = 0;
-    uint8_t AddressEncoding = 0;
+    bool FDEsHaveLSDAField = false;
+    uint8_t FDEPointerEncoding = 0;
+    uint8_t LSDAPointerEncoding = 0;
   };
 
   struct EdgeTarget {
@@ -60,17 +70,13 @@ private:
     Edge::AddendT Addend = 0;
   };
 
-  struct BlockEdgesInfo {
-    DenseMap<Edge::OffsetT, EdgeTarget> TargetMap;
-    DenseSet<Edge::OffsetT> Multiple;
-  };
-
-  using CIEInfosMap = DenseMap<orc::ExecutorAddr, CIEInformation>;
+  using BlockEdgeMap = DenseMap<Edge::OffsetT, EdgeTarget>;
+  using CIEInfosMap = DenseMap<JITTargetAddress, CIEInformation>;
 
   struct ParseContext {
     ParseContext(LinkGraph &G) : G(G) {}
 
-    Expected<CIEInformation *> findCIEInfo(orc::ExecutorAddr Address) {
+    Expected<CIEInformation *> findCIEInfo(JITTargetAddress Address) {
       auto I = CIEInfos.find(Address);
       if (I == CIEInfos.end())
         return make_error<JITLinkError>("No CIE found at address " +
@@ -81,36 +87,32 @@ private:
     LinkGraph &G;
     CIEInfosMap CIEInfos;
     BlockAddressMap AddrToBlock;
-    DenseMap<orc::ExecutorAddr, Symbol *> AddrToSym;
+    SymbolAddressMap AddrToSyms;
   };
 
   Error processBlock(ParseContext &PC, Block &B);
-  Error processCIE(ParseContext &PC, Block &B, size_t CIEDeltaFieldOffset,
-                   const BlockEdgesInfo &BlockEdges);
-  Error processFDE(ParseContext &PC, Block &B, size_t CIEDeltaFieldOffset,
-                   uint32_t CIEDelta, const BlockEdgesInfo &BlockEdges);
+  Error processCIE(ParseContext &PC, Block &B, size_t RecordOffset,
+                   size_t RecordLength, size_t CIEDeltaFieldOffset);
+  Error processFDE(ParseContext &PC, Block &B, size_t RecordOffset,
+                   size_t RecordLength, size_t CIEDeltaFieldOffset,
+                   uint32_t CIEDelta, BlockEdgeMap &BlockEdges);
 
   Expected<AugmentationInfo>
   parseAugmentationString(BinaryStreamReader &RecordReader);
 
-  Expected<uint8_t> readPointerEncoding(BinaryStreamReader &RecordReader,
-                                        Block &InBlock, const char *FieldName);
-  Error skipEncodedPointer(uint8_t PointerEncoding,
-                           BinaryStreamReader &RecordReader);
-  Expected<Symbol *> getOrCreateEncodedPointerEdge(
-      ParseContext &PC, const BlockEdgesInfo &BlockEdges,
-      uint8_t PointerEncoding, BinaryStreamReader &RecordReader,
-      Block &BlockToFix, size_t PointerFieldOffset, const char *FieldName);
+  static bool isSupportedPointerEncoding(uint8_t PointerEncoding);
+  unsigned getPointerEncodingDataSize(uint8_t PointerEncoding);
+  Expected<std::pair<JITTargetAddress, Edge::Kind>>
+  readEncodedPointer(uint8_t PointerEncoding,
+                     JITTargetAddress PointerFieldAddress,
+                     BinaryStreamReader &RecordReader);
 
-  Expected<Symbol &> getOrCreateSymbol(ParseContext &PC,
-                                       orc::ExecutorAddr Addr);
+  Expected<Symbol &> getOrCreateSymbol(ParseContext &PC, JITTargetAddress Addr);
 
   StringRef EHFrameSectionName;
   unsigned PointerSize;
-  Edge::Kind Pointer32;
-  Edge::Kind Pointer64;
-  Edge::Kind Delta32;
   Edge::Kind Delta64;
+  Edge::Kind Delta32;
   Edge::Kind NegDelta32;
 };
 

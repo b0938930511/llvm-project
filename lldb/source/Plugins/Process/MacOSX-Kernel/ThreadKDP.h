@@ -20,7 +20,7 @@ class ThreadKDP : public lldb_private::Thread {
 public:
   ThreadKDP(lldb_private::Process &process, lldb::tid_t tid);
 
-  ~ThreadKDP() override;
+  virtual ~ThreadKDP();
 
   void RefreshStateAfterStop() override;
 

@@ -11,13 +11,15 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::cert {
+namespace clang {
+namespace tidy {
+namespace cert {
 
 /// Checks if the overloaded postfix ++ and -- operator return a constant
 /// object.
 ///
 /// For the user-facing documentation see:
-/// https://clang.llvm.org/extra/clang-tidy/checks/cert/dcl21-cpp.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/cert-postfix-operator.html
 class PostfixOperatorCheck : public ClangTidyCheck {
 public:
   PostfixOperatorCheck(StringRef Name, ClangTidyContext *Context)
@@ -29,6 +31,8 @@ public:
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
 };
 
-} // namespace clang::tidy::cert
+} // namespace cert
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_CERT_POSTFIX_OPERATOR_H

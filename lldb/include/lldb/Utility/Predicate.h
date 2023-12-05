@@ -14,7 +14,6 @@
 
 #include <condition_variable>
 #include <mutex>
-#include <optional>
 
 #include "lldb/Utility/Timeout.h"
 #include "lldb/lldb-defines.h"
@@ -45,7 +44,7 @@ public:
   ///
   /// Initializes the mutex, condition and value with their default
   /// constructors.
-  Predicate() : m_value() {}
+  Predicate() : m_value(), m_mutex(), m_condition() {}
 
   /// Construct with initial T value \a initial_value.
   ///
@@ -54,7 +53,8 @@ public:
   ///
   /// \param[in] initial_value
   ///     The initial value for our T object.
-  Predicate(T initial_value) : m_value(initial_value) {}
+  Predicate(T initial_value)
+      : m_value(initial_value), m_mutex(), m_condition() {}
 
   /// Destructor.
   ///
@@ -117,10 +117,9 @@ public:
   ///     How long to wait for the condition to hold.
   ///
   /// \return
-  ///     m_value if Cond(m_value) is true, std::nullopt otherwise (timeout
-  ///     occurred).
+  ///     m_value if Cond(m_value) is true, None otherwise (timeout occurred).
   template <typename C>
-  std::optional<T> WaitFor(C Cond, const Timeout<std::micro> &timeout) {
+  llvm::Optional<T> WaitFor(C Cond, const Timeout<std::micro> &timeout) {
     std::unique_lock<std::mutex> lock(m_mutex);
     auto RealCond = [&] { return Cond(m_value); };
     if (!timeout) {
@@ -129,7 +128,7 @@ public:
     }
     if (m_condition.wait_for(lock, *timeout, RealCond))
       return m_value;
-    return std::nullopt;
+    return llvm::None;
   }
   /// Wait for \a m_value to be equal to \a value.
   ///
@@ -154,9 +153,9 @@ public:
   ///     true if the \a m_value is equal to \a value, false otherwise (timeout
   ///     occurred).
   bool WaitForValueEqualTo(T value,
-                           const Timeout<std::micro> &timeout = std::nullopt) {
+                           const Timeout<std::micro> &timeout = llvm::None) {
     return WaitFor([&value](T current) { return value == current; }, timeout) !=
-           std::nullopt;
+           llvm::None;
   }
 
   /// Wait for \a m_value to not be equal to \a value.
@@ -179,11 +178,10 @@ public:
   ///     How long to wait for the condition to hold.
   ///
   /// \return
-  ///     m_value if m_value != value, std::nullopt otherwise (timeout
-  ///     occurred).
-  std::optional<T>
+  ///     m_value if m_value != value, None otherwise (timeout occurred).
+  llvm::Optional<T>
   WaitForValueNotEqualTo(T value,
-                         const Timeout<std::micro> &timeout = std::nullopt) {
+                         const Timeout<std::micro> &timeout = llvm::None) {
     return WaitFor([&value](T current) { return value != current; }, timeout);
   }
 

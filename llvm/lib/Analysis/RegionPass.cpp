@@ -12,16 +12,13 @@
 // Most of this code has been COPIED from LoopPass.cpp
 //
 //===----------------------------------------------------------------------===//
-
 #include "llvm/Analysis/RegionPass.h"
-#include "llvm/Analysis/RegionInfo.h"
 #include "llvm/IR/OptBisect.h"
 #include "llvm/IR/PassTimingInfo.h"
-#include "llvm/IR/PrintPasses.h"
+#include "llvm/IR/StructuralHash.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
-
 using namespace llvm;
 
 #define DEBUG_TYPE "regionpassmgr"
@@ -32,7 +29,8 @@ using namespace llvm;
 
 char RGPassManager::ID = 0;
 
-RGPassManager::RGPassManager() : FunctionPass(ID) {
+RGPassManager::RGPassManager()
+  : FunctionPass(ID), PMDataManager() {
   RI = nullptr;
   CurrentRegion = nullptr;
 }
@@ -95,12 +93,12 @@ bool RGPassManager::runOnFunction(Function &F) {
 
         TimeRegion PassTimer(getPassTimer(P));
 #ifdef EXPENSIVE_CHECKS
-        uint64_t RefHash = P->structuralHash(F);
+        uint64_t RefHash = StructuralHash(F);
 #endif
         LocalChanged = P->runOnRegion(CurrentRegion, *this);
 
 #ifdef EXPENSIVE_CHECKS
-        if (!LocalChanged && (RefHash != P->structuralHash(F))) {
+        if (!LocalChanged && (RefHash != StructuralHash(F))) {
           llvm::errs() << "Pass modifies its input and doesn't report it: "
                        << P->getPassName() << "\n";
           llvm_unreachable("Pass modifies its input and doesn't report it");
@@ -189,8 +187,6 @@ public:
   }
 
   bool runOnRegion(Region *R, RGPassManager &RGM) override {
-    if (!isFunctionInPrintList(R->getEntry()->getParent()->getName()))
-      return false;
     Out << Banner;
     for (const auto *BB : R->blocks()) {
       if (BB)
@@ -283,8 +279,7 @@ static std::string getDescription(const Region &R) {
 bool RegionPass::skipRegion(Region &R) const {
   Function &F = *R.getEntry()->getParent();
   OptPassGate &Gate = F.getContext().getOptPassGate();
-  if (Gate.isEnabled() &&
-      !Gate.shouldRunPass(this->getPassName(), getDescription(R)))
+  if (Gate.isEnabled() && !Gate.shouldRunPass(this, getDescription(R)))
     return true;
 
   if (F.hasOptNone()) {

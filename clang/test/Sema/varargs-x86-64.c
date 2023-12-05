@@ -1,6 +1,7 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s -triple x86_64-apple-darwin9
 
-void f1(void) {
+// rdar://6726818
+void f1() {
   const __builtin_va_list args2;
   (void)__builtin_va_arg(args2, int); // expected-error {{first argument to 'va_arg' is of type 'const __builtin_va_list' and not 'va_list'}}
 }
@@ -32,7 +33,7 @@ void __attribute__((ms_abi)) g3(float a, ...) { // expected-note 2{{parameter of
   __builtin_ms_va_start(ap, (a)); // expected-warning {{passing an object that undergoes default argument promotion to 'va_start' has undefined behavior}}
 }
 
-void __attribute__((ms_abi)) g5(void) {
+void __attribute__((ms_abi)) g5() {
   __builtin_ms_va_list ap;
   __builtin_ms_va_start(ap, ap); // expected-error {{'va_start' used in function with fixed args}}
 }

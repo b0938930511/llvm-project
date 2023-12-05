@@ -12,14 +12,15 @@
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::misc {
+namespace clang {
+namespace tidy {
+namespace misc {
 
 UniqueptrResetReleaseCheck::UniqueptrResetReleaseCheck(
     StringRef Name, ClangTidyContext *Context)
     : ClangTidyCheck(Name, Context),
       Inserter(Options.getLocalOrGlobal("IncludeStyle",
-                                        utils::IncludeSorter::IS_LLVM),
-               areDiagsSelfContained()) {}
+                                        utils::IncludeSorter::IS_LLVM)) {}
 
 void UniqueptrResetReleaseCheck::storeOptions(
     ClangTidyOptions::OptionMap &Opts) {
@@ -146,4 +147,6 @@ void UniqueptrResetReleaseCheck::check(const MatchFinder::MatchResult &Result) {
         Result.SourceManager->getFileID(ResetMember->getBeginLoc()),
         "<utility>");
 }
-} // namespace clang::tidy::misc
+} // namespace misc
+} // namespace tidy
+} // namespace clang

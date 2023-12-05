@@ -8,13 +8,9 @@
 
 // <locale>
 
-// ADDITIONAL_COMPILE_FLAGS: -D_LIBCPP_DISABLE_DEPRECATION_WARNINGS -D_LIBCPP_ENABLE_CXX26_REMOVED_CODECVT
-
 // wstring_convert<Codecvt, Elem, Wide_alloc, Byte_alloc>
 
 // size_t converted() const;
-
-// XFAIL: no-wide-characters
 
 #include <locale>
 #include <codecvt>
@@ -22,7 +18,7 @@
 
 #include "test_macros.h"
 
-template <class CharT, std::size_t = sizeof(CharT)>
+template <class CharT, size_t = sizeof(CharT)>
 struct TestHelper;
 template <class CharT>
 struct TestHelper<CharT, 2> {

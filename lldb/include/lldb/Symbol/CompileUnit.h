@@ -9,13 +9,13 @@
 #ifndef LLDB_SYMBOL_COMPILEUNIT_H
 #define LLDB_SYMBOL_COMPILEUNIT_H
 
+#include "lldb/Core/FileSpecList.h"
 #include "lldb/Core/ModuleChild.h"
 #include "lldb/Core/SourceLocationSpec.h"
 #include "lldb/Symbol/DebugMacros.h"
 #include "lldb/Symbol/Function.h"
 #include "lldb/Symbol/LineTable.h"
 #include "lldb/Symbol/SourceModule.h"
-#include "lldb/Utility/FileSpecList.h"
 #include "lldb/Utility/Stream.h"
 #include "lldb/Utility/UserID.h"
 #include "lldb/lldb-enumerations.h"
@@ -208,9 +208,9 @@ public:
   ///     unit file.
   ///
   /// \param[in] exact
-  ///     If \b true match only if there is a line table entry for this line
+  ///     If \btrue match only if there is a line table entry for this line
   ///     number.
-  ///     If \b false, find the line table entry equal to or after this line
+  ///     If \bfalse, find the line table entry equal to or after this line
   ///     number.
   ///
   /// \param[out] line_entry
@@ -331,7 +331,8 @@ public:
   ///     A line table object pointer that this object now owns.
   void SetLineTable(LineTable *line_table);
 
-  void SetSupportFiles(FileSpecList support_files);
+  void SetSupportFiles(const FileSpecList &support_files);
+  void SetSupportFiles(FileSpecList &&support_files);
 
   void SetDebugMacros(const DebugMacrosSP &debug_macros);
 

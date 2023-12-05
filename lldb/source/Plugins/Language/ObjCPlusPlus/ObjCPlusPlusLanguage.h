@@ -27,8 +27,6 @@ public:
     return lldb::eLanguageTypeObjC_plus_plus;
   }
 
-  llvm::StringRef GetUserEntryPointName() const override { return "main"; }
-
   llvm::StringRef GetNilReferenceSummaryString() override { return "nil"; }
 
   bool IsSourceFile(llvm::StringRef file_path) const override;
@@ -42,12 +40,12 @@ public:
 
   static lldb_private::Language *CreateInstance(lldb::LanguageType language);
 
-  llvm::StringRef GetInstanceVariableName() override { return "self"; }
-
-  static llvm::StringRef GetPluginNameStatic() { return "objcplusplus"; }
+  static lldb_private::ConstString GetPluginNameStatic();
 
   // PluginInterface protocol
-  llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
+  ConstString GetPluginName() override;
+
+  uint32_t GetPluginVersion() override;
 };
 
 } // namespace lldb_private

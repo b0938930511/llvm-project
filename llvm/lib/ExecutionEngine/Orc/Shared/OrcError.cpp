@@ -12,6 +12,7 @@
 
 #include "llvm/ExecutionEngine/Orc/Shared/OrcError.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/ManagedStatic.h"
 
 #include <type_traits>
 
@@ -69,10 +70,7 @@ public:
   }
 };
 
-OrcErrorCategory &getOrcErrCat() {
-  static OrcErrorCategory OrcErrCat;
-  return OrcErrCat;
-}
+static ManagedStatic<OrcErrorCategory> OrcErrCat;
 } // namespace
 
 namespace llvm {
@@ -82,8 +80,8 @@ char DuplicateDefinition::ID = 0;
 char JITSymbolNotFound::ID = 0;
 
 std::error_code orcError(OrcErrorCode ErrCode) {
-  typedef std::underlying_type_t<OrcErrorCode> UT;
-  return std::error_code(static_cast<UT>(ErrCode), getOrcErrCat());
+  typedef std::underlying_type<OrcErrorCode>::type UT;
+  return std::error_code(static_cast<UT>(ErrCode), *OrcErrCat);
 }
 
 DuplicateDefinition::DuplicateDefinition(std::string SymbolName)
@@ -105,9 +103,9 @@ JITSymbolNotFound::JITSymbolNotFound(std::string SymbolName)
     : SymbolName(std::move(SymbolName)) {}
 
 std::error_code JITSymbolNotFound::convertToErrorCode() const {
-  typedef std::underlying_type_t<OrcErrorCode> UT;
+  typedef std::underlying_type<OrcErrorCode>::type UT;
   return std::error_code(static_cast<UT>(OrcErrorCode::JITSymbolNotFound),
-                         getOrcErrCat());
+                         *OrcErrCat);
 }
 
 void JITSymbolNotFound::log(raw_ostream &OS) const {

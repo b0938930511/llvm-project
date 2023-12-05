@@ -6,55 +6,53 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "memory_utils/memory_check_utils.h"
 #include "src/string/memcmp.h"
-#include "test/UnitTest/Test.h"
-#include "test/UnitTest/TestLogger.h"
-
-namespace LIBC_NAMESPACE {
+#include "utils/UnitTest/Test.h"
 
 TEST(LlvmLibcMemcmpTest, CmpZeroByte) {
   const char *lhs = "ab";
-  const char *rhs = "yz";
-  EXPECT_EQ(LIBC_NAMESPACE::memcmp(lhs, rhs, 0), 0);
+  const char *rhs = "bc";
+  EXPECT_EQ(__llvm_libc::memcmp(lhs, rhs, 0), 0);
 }
 
 TEST(LlvmLibcMemcmpTest, LhsRhsAreTheSame) {
   const char *lhs = "ab";
   const char *rhs = "ab";
-  EXPECT_EQ(LIBC_NAMESPACE::memcmp(lhs, rhs, 2), 0);
+  EXPECT_EQ(__llvm_libc::memcmp(lhs, rhs, 2), 0);
 }
 
 TEST(LlvmLibcMemcmpTest, LhsBeforeRhsLexically) {
   const char *lhs = "ab";
-  const char *rhs = "az";
-  EXPECT_LT(LIBC_NAMESPACE::memcmp(lhs, rhs, 2), 0);
+  const char *rhs = "ac";
+  EXPECT_EQ(__llvm_libc::memcmp(lhs, rhs, 2), -1);
 }
 
 TEST(LlvmLibcMemcmpTest, LhsAfterRhsLexically) {
-  const char *lhs = "az";
+  const char *lhs = "ac";
   const char *rhs = "ab";
-  EXPECT_GT(LIBC_NAMESPACE::memcmp(lhs, rhs, 2), 0);
+  EXPECT_EQ(__llvm_libc::memcmp(lhs, rhs, 2), 1);
 }
 
-// Adapt CheckMemcmp signature to memcmp.
-static inline int Adaptor(cpp::span<char> p1, cpp::span<char> p2, size_t size) {
-  return LIBC_NAMESPACE::memcmp(p1.begin(), p2.begin(), size);
-}
+TEST(LlvmLibcMemcmpTest, Sweep) {
+  static constexpr size_t kMaxSize = 1024;
+  char lhs[kMaxSize];
+  char rhs[kMaxSize];
 
-TEST(LlvmLibcMemcmpTest, SizeSweep) {
-  static constexpr size_t kMaxSize = 400;
-  Buffer Buffer1(kMaxSize);
-  Buffer Buffer2(kMaxSize);
-  Randomize(Buffer1.span());
-  for (size_t size = 0; size < kMaxSize; ++size) {
-    auto span1 = Buffer1.span().subspan(0, size);
-    auto span2 = Buffer2.span().subspan(0, size);
-    const bool OK = CheckMemcmp<Adaptor>(span1, span2, size);
-    if (!OK)
-      testing::tlog << "Failed at size=" << size << '\n';
-    ASSERT_TRUE(OK);
+  const auto reset = [](char *const ptr) {
+    for (size_t i = 0; i < kMaxSize; ++i)
+      ptr[i] = 'a';
+  };
+
+  reset(lhs);
+  reset(rhs);
+  for (size_t i = 0; i < kMaxSize; ++i)
+    EXPECT_EQ(__llvm_libc::memcmp(lhs, rhs, i), 0);
+
+  reset(lhs);
+  reset(rhs);
+  for (size_t i = 0; i < kMaxSize; ++i) {
+    rhs[i] = 'b';
+    EXPECT_EQ(__llvm_libc::memcmp(lhs, rhs, kMaxSize), -1);
+    rhs[i] = 'a';
   }
 }
-
-} // namespace LIBC_NAMESPACE

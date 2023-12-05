@@ -14,17 +14,14 @@
 #define LLVM_FILECHECK_FILECHECK_H
 
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Regex.h"
-#include "llvm/Support/SMLoc.h"
+#include "llvm/Support/SourceMgr.h"
 #include <bitset>
-#include <memory>
 #include <string>
 #include <vector>
 
 namespace llvm {
-class MemoryBuffer;
-class SourceMgr;
-template <typename T> class SmallVectorImpl;
 
 /// Contains info about various FileCheck options.
 struct FileCheckRequest {
@@ -48,7 +45,6 @@ namespace Check {
 
 enum FileCheckKind {
   CheckNone = 0,
-  CheckMisspelled,
   CheckPlain,
   CheckNext,
   CheckSame,
@@ -84,7 +80,8 @@ class FileCheckType {
   std::bitset<FileCheckKindModifier::Size> Modifiers;
 
 public:
-  FileCheckType(FileCheckKind Kind = CheckNone) : Kind(Kind), Count(1) {}
+  FileCheckType(FileCheckKind Kind = CheckNone)
+      : Kind(Kind), Count(1), Modifiers() {}
   FileCheckType(const FileCheckType &) = default;
   FileCheckType &operator=(const FileCheckType &) = default;
 
@@ -187,14 +184,24 @@ public:
   explicit FileCheck(FileCheckRequest Req);
   ~FileCheck();
 
+  // Combines the check prefixes into a single regex so that we can efficiently
+  // scan for any of the set.
+  //
+  // The semantics are that the longest-match wins which matches our regex
+  // library.
+  Regex buildCheckPrefixRegex();
+
   /// Reads the check file from \p Buffer and records the expected strings it
   /// contains. Errors are reported against \p SM.
+  ///
+  /// Only expected strings whose prefix is one of those listed in \p PrefixRE
+  /// are recorded. \returns true in case of an error, false otherwise.
   ///
   /// If \p ImpPatBufferIDRange, then the range (inclusive start, exclusive end)
   /// of IDs for source buffers added to \p SM for implicit patterns are
   /// recorded in it.  The range is empty if there are none.
   bool
-  readCheckFile(SourceMgr &SM, StringRef Buffer,
+  readCheckFile(SourceMgr &SM, StringRef Buffer, Regex &PrefixRE,
                 std::pair<unsigned, unsigned> *ImpPatBufferIDRange = nullptr);
 
   bool ValidateCheckPrefixes();

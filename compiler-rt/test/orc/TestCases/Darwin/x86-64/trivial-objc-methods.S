@@ -1,7 +1,5 @@
 // RUN: %clang -c -o %t %s
-// RUN: %llvm_jitlink -preload libobjc.A.dylib %t
-//
-// REQUIRES: jit-compatible-osx-swift-runtime
+// RUN: %llvm_jitlink -dlopen libobjc.A.dylib %t
 //
 // Test that Objective-C class and instance methods work.
 

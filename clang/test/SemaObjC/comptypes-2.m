@@ -11,7 +11,7 @@
 @interface MyClass
 @end
 
-int main(void)
+int main()
 {
   id obj = nil;
   id<MyProtocol> obj_p = nil;

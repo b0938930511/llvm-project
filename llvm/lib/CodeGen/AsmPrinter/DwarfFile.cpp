@@ -12,7 +12,9 @@
 #include "DwarfUnit.h"
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/IR/DebugInfoMetadata.h"
+#include "llvm/IR/Metadata.h"
 #include "llvm/MC/MCStreamer.h"
+#include <algorithm>
 #include <cstdint>
 
 using namespace llvm;
@@ -42,10 +44,10 @@ void DwarfFile::emitUnit(DwarfUnit *TheU, bool UseOffsets) {
 
   // Skip CUs that ended up not being needed (split CUs that were abandoned
   // because they added no information beyond the non-split CU)
-  if (TheU->getUnitDie().values().empty())
+  if (llvm::empty(TheU->getUnitDie().values()))
     return;
 
-  Asm->OutStreamer->switchSection(S);
+  Asm->OutStreamer->SwitchSection(S);
   TheU->emitHeader(UseOffsets);
   Asm->emitDwarfDIE(TheU->getUnitDie());
 
@@ -66,7 +68,7 @@ void DwarfFile::computeSizeAndOffsets() {
 
     // Skip CUs that ended up not being needed (split CUs that were abandoned
     // because they added no information beyond the non-split CU)
-    if (TheU->getUnitDie().values().empty())
+    if (llvm::empty(TheU->getUnitDie().values()))
       return;
 
     TheU->setDebugSectionOffset(SecOffset);
@@ -90,8 +92,7 @@ unsigned DwarfFile::computeSizeAndOffsetsForUnit(DwarfUnit *TheU) {
 // Compute the size and offset of a DIE. The offset is relative to start of the
 // CU. It returns the offset after laying out the DIE.
 unsigned DwarfFile::computeSizeAndOffset(DIE &Die, unsigned Offset) {
-  return Die.computeOffsetsAndAbbrevs(Asm->getDwarfFormParams(), Abbrevs,
-                                      Offset);
+  return Die.computeOffsetsAndAbbrevs(Asm, Abbrevs, Offset);
 }
 
 void DwarfFile::emitAbbrevs(MCSection *Section) { Abbrevs.Emit(Asm, Section); }
@@ -102,16 +103,21 @@ void DwarfFile::emitStrings(MCSection *StrSection, MCSection *OffsetSection,
   StrPool.emit(*Asm, StrSection, OffsetSection, UseRelativeOffsets);
 }
 
-void DwarfFile::addScopeVariable(LexicalScope *LS, DbgVariable *Var) {
+bool DwarfFile::addScopeVariable(LexicalScope *LS, DbgVariable *Var) {
   auto &ScopeVars = ScopeVariables[LS];
   const DILocalVariable *DV = Var->getVariable();
   if (unsigned ArgNum = DV->getArg()) {
-    auto Ret = ScopeVars.Args.insert({ArgNum, Var});
-    assert(Ret.second);
-    (void)Ret;
+    auto Cached = ScopeVars.Args.find(ArgNum);
+    if (Cached == ScopeVars.Args.end())
+      ScopeVars.Args[ArgNum] = Var;
+    else {
+      Cached->second->addMMIEntry(*Var);
+      return false;
+    }
   } else {
     ScopeVars.Locals.push_back(Var);
   }
+  return true;
 }
 
 void DwarfFile::addScopeLabel(LexicalScope *LS, DbgLabel *Label) {

@@ -13,6 +13,7 @@
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/ADT/AllocatorList.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/None.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
@@ -26,6 +27,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/Unicode.h"
 #include "llvm/Support/raw_ostream.h"
+#include <algorithm>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -258,9 +260,8 @@ public:
   Token getNext();
 
   void printError(SMLoc Loc, SourceMgr::DiagKind Kind, const Twine &Message,
-                  ArrayRef<SMRange> Ranges = std::nullopt) {
-    SM.PrintMessage(Loc, Kind, Message, Ranges, /* FixIts= */ std::nullopt,
-                    ShowColors);
+                  ArrayRef<SMRange> Ranges = None) {
+    SM.PrintMessage(Loc, Kind, Message, Ranges, /* FixIts= */ None, ShowColors);
   }
 
   void setError(const Twine &Message, StringRef::iterator Position) {
@@ -392,13 +393,6 @@ private:
   ///        Pos is whitespace or a new line
   bool isBlankOrBreak(StringRef::iterator Position);
 
-  /// Return true if the minimal well-formed code unit subsequence at
-  ///        Pos is considered a "safe" character for plain scalars.
-  bool isPlainSafeNonBlank(StringRef::iterator Position);
-
-  /// Return true if the line is a line break, false otherwise.
-  bool isLineEmpty(StringRef Line);
-
   /// Consume a single b-break[28] if it's present at the current position.
   ///
   /// Return false if the code unit at the current position isn't a line break.
@@ -477,18 +471,6 @@ private:
   /// Scan a block scalar starting with | or >.
   bool scanBlockScalar(bool IsLiteral);
 
-  /// Scan a block scalar style indicator and header.
-  ///
-  /// Note: This is distinct from scanBlockScalarHeader to mirror the fact that
-  /// YAML does not consider the style indicator to be a part of the header.
-  ///
-  /// Return false if an error occurred.
-  bool scanBlockScalarIndicators(char &StyleIndicator, char &ChompingIndicator,
-                                 unsigned &IndentIndicator, bool &IsDone);
-
-  /// Scan a style indicator in a block scalar header.
-  char scanBlockStyleIndicator();
-
   /// Scan a chomping indicator in a block scalar header.
   char scanBlockChompingIndicator();
 
@@ -548,10 +530,6 @@ private:
 
   /// Can the next token be the start of a simple key?
   bool IsSimpleKeyAllowed;
-
-  /// Can the next token be a value indicator even if it does not have a
-  /// trailing space?
-  bool IsAdjacentValueAllowedInFlow;
 
   /// True if an error has occurred.
   bool Failed;
@@ -768,7 +746,7 @@ std::string yaml::escape(StringRef Input, bool EscapePrintable) {
   return EscapedInput;
 }
 
-std::optional<bool> yaml::parseBool(StringRef S) {
+llvm::Optional<bool> yaml::parseBool(StringRef S) {
   switch (S.size()) {
   case 1:
     switch (S.front()) {
@@ -779,78 +757,78 @@ std::optional<bool> yaml::parseBool(StringRef S) {
     case 'N':
       return false;
     default:
-      return std::nullopt;
+      return None;
     }
   case 2:
     switch (S.front()) {
     case 'O':
       if (S[1] == 'N') // ON
         return true;
-      [[fallthrough]];
+      LLVM_FALLTHROUGH;
     case 'o':
       if (S[1] == 'n') //[Oo]n
         return true;
-      return std::nullopt;
+      return None;
     case 'N':
       if (S[1] == 'O') // NO
         return false;
-      [[fallthrough]];
+      LLVM_FALLTHROUGH;
     case 'n':
       if (S[1] == 'o') //[Nn]o
         return false;
-      return std::nullopt;
+      return None;
     default:
-      return std::nullopt;
+      return None;
     }
   case 3:
     switch (S.front()) {
     case 'O':
       if (S.drop_front() == "FF") // OFF
         return false;
-      [[fallthrough]];
+      LLVM_FALLTHROUGH;
     case 'o':
       if (S.drop_front() == "ff") //[Oo]ff
         return false;
-      return std::nullopt;
+      return None;
     case 'Y':
       if (S.drop_front() == "ES") // YES
         return true;
-      [[fallthrough]];
+      LLVM_FALLTHROUGH;
     case 'y':
       if (S.drop_front() == "es") //[Yy]es
         return true;
-      return std::nullopt;
+      return None;
     default:
-      return std::nullopt;
+      return None;
     }
   case 4:
     switch (S.front()) {
     case 'T':
       if (S.drop_front() == "RUE") // TRUE
         return true;
-      [[fallthrough]];
+      LLVM_FALLTHROUGH;
     case 't':
       if (S.drop_front() == "rue") //[Tt]rue
         return true;
-      return std::nullopt;
+      return None;
     default:
-      return std::nullopt;
+      return None;
     }
   case 5:
     switch (S.front()) {
     case 'F':
       if (S.drop_front() == "ALSE") // FALSE
         return false;
-      [[fallthrough]];
+      LLVM_FALLTHROUGH;
     case 'f':
       if (S.drop_front() == "alse") //[Ff]alse
         return false;
-      return std::nullopt;
+      return None;
     default:
-      return std::nullopt;
+      return None;
     }
   default:
-    return std::nullopt;
+    return None;
   }
 }
 
@@ -876,7 +854,6 @@ void Scanner::init(MemoryBufferRef Buffer) {
   FlowLevel = 0;
   IsStartOfStream = true;
   IsSimpleKeyAllowed = true;
-  IsAdjacentValueAllowedInFlow = false;
   Failed = false;
   std::unique_ptr<MemoryBuffer> InputBufferOwner =
       MemoryBuffer::getMemBuffer(Buffer, /*RequiresNullTerminator=*/false);
@@ -1058,22 +1035,6 @@ bool Scanner::isBlankOrBreak(StringRef::iterator Position) {
          *Position == '\n';
 }
 
-bool Scanner::isPlainSafeNonBlank(StringRef::iterator Position) {
-  if (Position == End || isBlankOrBreak(Position))
-    return false;
-  if (FlowLevel &&
-      StringRef(Position, 1).find_first_of(",[]{}") != StringRef::npos)
-    return false;
-  return true;
-}
-
-bool Scanner::isLineEmpty(StringRef Line) {
-  for (const auto *Position = Line.begin(); Position != Line.end(); ++Position)
-    if (!isBlankOrBreak(Position))
-      return false;
-  return true;
-}
-
 bool Scanner::consumeLineBreakIfPresent() {
   auto Next = skip_b_break(Current);
   if (Next == Current)
@@ -1207,7 +1168,6 @@ bool Scanner::scanStreamEnd() {
   unrollIndent(-1);
   SimpleKeys.clear();
   IsSimpleKeyAllowed = false;
-  IsAdjacentValueAllowedInFlow = false;
 
   Token T;
   T.Kind = Token::TK_StreamEnd;
@@ -1221,7 +1181,6 @@ bool Scanner::scanDirective() {
   unrollIndent(-1);
   SimpleKeys.clear();
   IsSimpleKeyAllowed = false;
-  IsAdjacentValueAllowedInFlow = false;
 
   StringRef::iterator Start = Current;
   consume('%');
@@ -1253,7 +1212,6 @@ bool Scanner::scanDocumentIndicator(bool IsStart) {
   unrollIndent(-1);
   SimpleKeys.clear();
   IsSimpleKeyAllowed = false;
-  IsAdjacentValueAllowedInFlow = false;
 
   Token T;
   T.Kind = IsStart ? Token::TK_DocumentStart : Token::TK_DocumentEnd;
@@ -1276,8 +1234,6 @@ bool Scanner::scanFlowCollectionStart(bool IsSequence) {
 
   // And may also be followed by a simple key.
   IsSimpleKeyAllowed = true;
-  // Adjacent values are allowed in flows only after JSON-style keys.
-  IsAdjacentValueAllowedInFlow = false;
   ++FlowLevel;
   return true;
 }
@@ -1285,7 +1241,6 @@ bool Scanner::scanFlowCollectionStart(bool IsSequence) {
 bool Scanner::scanFlowCollectionEnd(bool IsSequence) {
   removeSimpleKeyCandidatesOnFlowLevel(FlowLevel);
   IsSimpleKeyAllowed = false;
-  IsAdjacentValueAllowedInFlow = true;
   Token T;
   T.Kind = IsSequence ? Token::TK_FlowSequenceEnd
                       : Token::TK_FlowMappingEnd;
@@ -1300,7 +1255,6 @@ bool Scanner::scanFlowCollectionEnd(bool IsSequence) {
 bool Scanner::scanFlowEntry() {
   removeSimpleKeyCandidatesOnFlowLevel(FlowLevel);
   IsSimpleKeyAllowed = true;
-  IsAdjacentValueAllowedInFlow = false;
   Token T;
   T.Kind = Token::TK_FlowEntry;
   T.Range = StringRef(Current, 1);
@@ -1313,7 +1267,6 @@ bool Scanner::scanBlockEntry() {
   rollIndent(Column, Token::TK_BlockSequenceStart, TokenQueue.end());
   removeSimpleKeyCandidatesOnFlowLevel(FlowLevel);
   IsSimpleKeyAllowed = true;
-  IsAdjacentValueAllowedInFlow = false;
   Token T;
   T.Kind = Token::TK_BlockEntry;
   T.Range = StringRef(Current, 1);
@@ -1328,7 +1281,6 @@ bool Scanner::scanKey() {
 
   removeSimpleKeyCandidatesOnFlowLevel(FlowLevel);
   IsSimpleKeyAllowed = !FlowLevel;
-  IsAdjacentValueAllowedInFlow = false;
 
   Token T;
   T.Kind = Token::TK_Key;
@@ -1366,7 +1318,6 @@ bool Scanner::scanValue() {
       rollIndent(Column, Token::TK_BlockMappingStart, TokenQueue.end());
     IsSimpleKeyAllowed = !FlowLevel;
   }
-  IsAdjacentValueAllowedInFlow = false;
 
   Token T;
   T.Kind = Token::TK_Value;
@@ -1448,7 +1399,6 @@ bool Scanner::scanFlowScalar(bool IsDoubleQuoted) {
   saveSimpleKeyCandidate(--TokenQueue.end(), ColStart, false);
 
   IsSimpleKeyAllowed = false;
-  IsAdjacentValueAllowedInFlow = true;
 
   return true;
 }
@@ -1463,9 +1413,21 @@ bool Scanner::scanPlainScalar() {
     if (*Current == '#')
       break;
 
-    while (Current != End &&
-           ((*Current != ':' && isPlainSafeNonBlank(Current)) ||
-            (*Current == ':' && isPlainSafeNonBlank(Current + 1)))) {
+    while (Current != End && !isBlankOrBreak(Current)) {
+      if (FlowLevel && *Current == ':' &&
+          (Current + 1 == End ||
+           !(isBlankOrBreak(Current + 1) || *(Current + 1) == ','))) {
+        setError("Found unexpected ':' while scanning a plain scalar", Current);
+        return false;
+      }
+
+      // Check for the end of the plain scalar.
+      if (  (*Current == ':' && isBlankOrBreak(Current + 1))
+          || (  FlowLevel
+          && (StringRef(Current, 1).find_first_of(",:?[]{}")
+              != StringRef::npos)))
+        break;
+
       StringRef::iterator i = skip_nb_char(Current);
       if (i == Current)
         break;
@@ -1516,7 +1478,6 @@ bool Scanner::scanPlainScalar() {
   saveSimpleKeyCandidate(--TokenQueue.end(), ColStart, false);
 
   IsSimpleKeyAllowed = false;
-  IsAdjacentValueAllowedInFlow = false;
 
   return true;
 }
@@ -1552,28 +1513,8 @@ bool Scanner::scanAliasOrAnchor(bool IsAlias) {
   saveSimpleKeyCandidate(--TokenQueue.end(), ColStart, false);
 
   IsSimpleKeyAllowed = false;
-  IsAdjacentValueAllowedInFlow = false;
 
   return true;
-}
-
-bool Scanner::scanBlockScalarIndicators(char &StyleIndicator,
-                                        char &ChompingIndicator,
-                                        unsigned &IndentIndicator,
-                                        bool &IsDone) {
-  StyleIndicator = scanBlockStyleIndicator();
-  if (!scanBlockScalarHeader(ChompingIndicator, IndentIndicator, IsDone))
-    return false;
-  return true;
-}
-
-char Scanner::scanBlockStyleIndicator() {
-  char Indicator = ' ';
-  if (Current != End && (*Current == '>' || *Current == '|')) {
-    Indicator = *Current;
-    skip(1);
-  }
-  return Indicator;
 }
 
 char Scanner::scanBlockChompingIndicator() {
@@ -1714,19 +1655,19 @@ bool Scanner::scanBlockScalarIndent(unsigned BlockIndent,
 }
 
 bool Scanner::scanBlockScalar(bool IsLiteral) {
+  // Eat '|' or '>'
   assert(*Current == '|' || *Current == '>');
-  char StyleIndicator;
+  skip(1);
+
   char ChompingIndicator;
   unsigned BlockIndent;
   bool IsDone = false;
-  if (!scanBlockScalarIndicators(StyleIndicator, ChompingIndicator, BlockIndent,
-                                 IsDone))
+  if (!scanBlockScalarHeader(ChompingIndicator, BlockIndent, IsDone))
     return false;
   if (IsDone)
     return true;
-  bool IsFolded = StyleIndicator == '>';
 
-  const auto *Start = Current;
+  auto Start = Current;
   unsigned BlockExitIndent = Indent < 0 ? 0 : (unsigned)Indent;
   unsigned LineBreaks = 0;
   if (BlockIndent == 0) {
@@ -1747,22 +1688,6 @@ bool Scanner::scanBlockScalar(bool IsLiteral) {
     auto LineStart = Current;
     advanceWhile(&Scanner::skip_nb_char);
     if (LineStart != Current) {
-      if (LineBreaks && IsFolded && !Scanner::isLineEmpty(Str)) {
-        // The folded style "folds" any single line break between content into a
-        // single space, except when that content is "empty" (only contains
-        // whitespace) in which case the line break is left as-is.
-        if (LineBreaks == 1) {
-          Str.append(LineBreaks,
-                     isLineEmpty(StringRef(LineStart, Current - LineStart))
-                         ? '\n'
-                         : ' ');
-        }
-        // If we saw a single line break, we are completely replacing it and so
-        // want `LineBreaks == 0`. Otherwise this decrement accounts for the
-        // fact that the first line break is "trimmed", only being used to
-        // signal a sequence of line breaks which should not be folded.
-        LineBreaks--;
-      }
       Str.append(LineBreaks, '\n');
       Str.append(StringRef(LineStart, Current - LineStart));
       LineBreaks = 0;
@@ -1785,7 +1710,6 @@ bool Scanner::scanBlockScalar(bool IsLiteral) {
   // New lines may start a simple key.
   if (!FlowLevel)
     IsSimpleKeyAllowed = true;
-  IsAdjacentValueAllowedInFlow = false;
 
   Token T;
   T.Kind = Token::TK_BlockScalar;
@@ -1819,7 +1743,6 @@ bool Scanner::scanTag() {
   saveSimpleKeyCandidate(--TokenQueue.end(), ColStart, false);
 
   IsSimpleKeyAllowed = false;
-  IsAdjacentValueAllowedInFlow = false;
 
   return true;
 }
@@ -1869,14 +1792,13 @@ bool Scanner::fetchMoreTokens() {
   if (*Current == ',')
     return scanFlowEntry();
 
-  if (*Current == '-' && (isBlankOrBreak(Current + 1) || Current + 1 == End))
+  if (*Current == '-' && isBlankOrBreak(Current + 1))
     return scanBlockEntry();
 
-  if (*Current == '?' && (Current + 1 == End || isBlankOrBreak(Current + 1)))
+  if (*Current == '?' && (FlowLevel || isBlankOrBreak(Current + 1)))
     return scanKey();
 
-  if (*Current == ':' &&
-      (!isPlainSafeNonBlank(Current + 1) || IsAdjacentValueAllowedInFlow))
+  if (*Current == ':' && (FlowLevel || isBlankOrBreak(Current + 1)))
     return scanValue();
 
   if (*Current == '*')
@@ -1902,10 +1824,15 @@ bool Scanner::fetchMoreTokens() {
 
   // Get a plain scalar.
   StringRef FirstChar(Current, 1);
-  if ((!isBlankOrBreak(Current) &&
-       FirstChar.find_first_of("-?:,[]{}#&*!|>'\"%@`") == StringRef::npos) ||
-      (FirstChar.find_first_of("?:-") != StringRef::npos &&
-       isPlainSafeNonBlank(Current + 1)))
+  if (!(isBlankOrBreak(Current)
+        || FirstChar.find_first_of("-?:,[]{}#&*!|>'\"%@`") != StringRef::npos)
+      || (*Current == '-' && !isBlankOrBreak(Current + 1))
+      || (!FlowLevel && (*Current == '?' || *Current == ':')
+          && isBlankOrBreak(Current + 1))
+      || (!FlowLevel && *Current == ':'
+                      && Current + 2 < End
+                      && *(Current + 1) == ':'
+                      && !isBlankOrBreak(Current + 2)))
     return scanPlainScalar();
 
   setError("Unrecognized character while tokenizing.", Current);
@@ -1914,11 +1841,11 @@ bool Scanner::fetchMoreTokens() {
 
 Stream::Stream(StringRef Input, SourceMgr &SM, bool ShowColors,
                std::error_code *EC)
-    : scanner(new Scanner(Input, SM, ShowColors, EC)) {}
+    : scanner(new Scanner(Input, SM, ShowColors, EC)), CurrentDoc() {}
 
 Stream::Stream(MemoryBufferRef InputBuffer, SourceMgr &SM, bool ShowColors,
                std::error_code *EC)
-    : scanner(new Scanner(InputBuffer, SM, ShowColors, EC)) {}
+    : scanner(new Scanner(InputBuffer, SM, ShowColors, EC)), CurrentDoc() {}
 
 Stream::~Stream() = default;
 
@@ -1949,8 +1876,8 @@ document_iterator Stream::end() {
 }
 
 void Stream::skip() {
-  for (Document &Doc : *this)
-    Doc.skip();
+  for (document_iterator i = begin(), e = end(); i != e; ++i)
+    i->skip();
 }
 
 Node::Node(unsigned int Type, std::unique_ptr<Document> &D, StringRef A,
@@ -1968,7 +1895,7 @@ std::string Node::getVerbatimTag() const {
       Ret = std::string(Doc->getTagMap().find("!")->second);
       Ret += Raw.substr(1);
       return Ret;
-    } else if (Raw.starts_with("!!")) {
+    } else if (Raw.startswith("!!")) {
       Ret = std::string(Doc->getTagMap().find("!!")->second);
       Ret += Raw.substr(2);
       return Ret;
@@ -2030,229 +1957,182 @@ bool Node::failed() const {
 }
 
 StringRef ScalarNode::getValue(SmallVectorImpl<char> &Storage) const {
-  if (Value[0] == '"')
-    return getDoubleQuotedValue(Value, Storage);
-  if (Value[0] == '\'')
-    return getSingleQuotedValue(Value, Storage);
-  return getPlainValue(Value, Storage);
+  // TODO: Handle newlines properly. We need to remove leading whitespace.
+  if (Value[0] == '"') { // Double quoted.
+    // Pull off the leading and trailing "s.
+    StringRef UnquotedValue = Value.substr(1, Value.size() - 2);
+    // Search for characters that would require unescaping the value.
+    StringRef::size_type i = UnquotedValue.find_first_of("\\\r\n");
+    if (i != StringRef::npos)
+      return unescapeDoubleQuoted(UnquotedValue, i, Storage);
+    return UnquotedValue;
+  } else if (Value[0] == '\'') { // Single quoted.
+    // Pull off the leading and trailing 's.
+    StringRef UnquotedValue = Value.substr(1, Value.size() - 2);
+    StringRef::size_type i = UnquotedValue.find('\'');
+    if (i != StringRef::npos) {
+      // We're going to need Storage.
+      Storage.clear();
+      Storage.reserve(UnquotedValue.size());
+      for (; i != StringRef::npos; i = UnquotedValue.find('\'')) {
+        StringRef Valid(UnquotedValue.begin(), i);
+        llvm::append_range(Storage, Valid);
+        Storage.push_back('\'');
+        UnquotedValue = UnquotedValue.substr(i + 2);
+      }
+      llvm::append_range(Storage, UnquotedValue);
+      return StringRef(Storage.begin(), Storage.size());
+    }
+    return UnquotedValue;
+  }
+  // Plain or block.
+  return Value.rtrim(' ');
 }
 
-/// parseScalarValue - A common parsing routine for all flow scalar styles.
-/// It handles line break characters by itself, adds regular content characters
-/// to the result, and forwards escaped sequences to the provided routine for
-/// the style-specific processing.
-///
-/// \param UnquotedValue - An input value without quotation marks.
-/// \param Storage - A storage for the result if the input value is multiline or
-/// contains escaped characters.
-/// \param LookupChars - A set of special characters to search in the input
-/// string. Should include line break characters and the escape character
-/// specific for the processing scalar style, if any.
-/// \param UnescapeCallback - This is called when the escape character is found
-/// in the input.
-/// \returns - The unfolded and unescaped value.
-static StringRef
-parseScalarValue(StringRef UnquotedValue, SmallVectorImpl<char> &Storage,
-                 StringRef LookupChars,
-                 std::function<StringRef(StringRef, SmallVectorImpl<char> &)>
-                     UnescapeCallback) {
-  size_t I = UnquotedValue.find_first_of(LookupChars);
-  if (I == StringRef::npos)
-    return UnquotedValue;
-
+StringRef ScalarNode::unescapeDoubleQuoted( StringRef UnquotedValue
+                                          , StringRef::size_type i
+                                          , SmallVectorImpl<char> &Storage)
+                                          const {
+  // Use Storage to build proper value.
   Storage.clear();
   Storage.reserve(UnquotedValue.size());
-  char LastNewLineAddedAs = '\0';
-  for (; I != StringRef::npos; I = UnquotedValue.find_first_of(LookupChars)) {
-    if (UnquotedValue[I] != '\r' && UnquotedValue[I] != '\n') {
-      llvm::append_range(Storage, UnquotedValue.take_front(I));
-      UnquotedValue = UnescapeCallback(UnquotedValue.drop_front(I), Storage);
-      LastNewLineAddedAs = '\0';
-      continue;
-    }
-    if (size_t LastNonSWhite = UnquotedValue.find_last_not_of(" \t", I);
-        LastNonSWhite != StringRef::npos) {
-      llvm::append_range(Storage, UnquotedValue.take_front(LastNonSWhite + 1));
-      Storage.push_back(' ');
-      LastNewLineAddedAs = ' ';
-    } else {
-      // Note: we can't just check if the last character in Storage is ' ',
-      // '\n', or something else; that would give a wrong result for double
-      // quoted values containing an escaped space character before a new-line
-      // character.
-      switch (LastNewLineAddedAs) {
-      case ' ':
-        assert(!Storage.empty() && Storage.back() == ' ');
-        Storage.back() = '\n';
-        LastNewLineAddedAs = '\n';
-        break;
-      case '\n':
-        assert(!Storage.empty() && Storage.back() == '\n');
-        Storage.push_back('\n');
-        break;
-      default:
-        Storage.push_back(' ');
-        LastNewLineAddedAs = ' ';
-        break;
+  for (; i != StringRef::npos; i = UnquotedValue.find_first_of("\\\r\n")) {
+    // Insert all previous chars into Storage.
+    StringRef Valid(UnquotedValue.begin(), i);
+    llvm::append_range(Storage, Valid);
+    // Chop off inserted chars.
+    UnquotedValue = UnquotedValue.substr(i);
+
+    assert(!UnquotedValue.empty() && "Can't be empty!");
+
+    // Parse escape or line break.
+    switch (UnquotedValue[0]) {
+    case '\r':
+    case '\n':
+      Storage.push_back('\n');
+      if (   UnquotedValue.size() > 1
+          && (UnquotedValue[1] == '\r' || UnquotedValue[1] == '\n'))
+        UnquotedValue = UnquotedValue.substr(1);
+      UnquotedValue = UnquotedValue.substr(1);
+      break;
+    default:
+      if (UnquotedValue.size() == 1) {
+        Token T;
+        T.Range = StringRef(UnquotedValue.begin(), 1);
+        setError("Unrecognized escape code", T);
+        return "";
       }
+      UnquotedValue = UnquotedValue.substr(1);
+      switch (UnquotedValue[0]) {
+      default: {
+          Token T;
+          T.Range = StringRef(UnquotedValue.begin(), 1);
+          setError("Unrecognized escape code", T);
+          return "";
+        }
+      case '\r':
+      case '\n':
+        // Remove the new line.
+        if (   UnquotedValue.size() > 1
+            && (UnquotedValue[1] == '\r' || UnquotedValue[1] == '\n'))
+          UnquotedValue = UnquotedValue.substr(1);
+        // If this was just a single byte newline, it will get skipped
+        // below.
+        break;
+      case '0':
+        Storage.push_back(0x00);
+        break;
+      case 'a':
+        Storage.push_back(0x07);
+        break;
+      case 'b':
+        Storage.push_back(0x08);
+        break;
+      case 't':
+      case 0x09:
+        Storage.push_back(0x09);
+        break;
+      case 'n':
+        Storage.push_back(0x0A);
+        break;
+      case 'v':
+        Storage.push_back(0x0B);
+        break;
+      case 'f':
+        Storage.push_back(0x0C);
+        break;
+      case 'r':
+        Storage.push_back(0x0D);
+        break;
+      case 'e':
+        Storage.push_back(0x1B);
+        break;
+      case ' ':
+        Storage.push_back(0x20);
+        break;
+      case '"':
+        Storage.push_back(0x22);
+        break;
+      case '/':
+        Storage.push_back(0x2F);
+        break;
+      case '\\':
+        Storage.push_back(0x5C);
+        break;
+      case 'N':
+        encodeUTF8(0x85, Storage);
+        break;
+      case '_':
+        encodeUTF8(0xA0, Storage);
+        break;
+      case 'L':
+        encodeUTF8(0x2028, Storage);
+        break;
+      case 'P':
+        encodeUTF8(0x2029, Storage);
+        break;
+      case 'x': {
+          if (UnquotedValue.size() < 3)
+            // TODO: Report error.
+            break;
+          unsigned int UnicodeScalarValue;
+          if (UnquotedValue.substr(1, 2).getAsInteger(16, UnicodeScalarValue))
+            // TODO: Report error.
+            UnicodeScalarValue = 0xFFFD;
+          encodeUTF8(UnicodeScalarValue, Storage);
+          UnquotedValue = UnquotedValue.substr(2);
+          break;
+        }
+      case 'u': {
+          if (UnquotedValue.size() < 5)
+            // TODO: Report error.
+            break;
+          unsigned int UnicodeScalarValue;
+          if (UnquotedValue.substr(1, 4).getAsInteger(16, UnicodeScalarValue))
+            // TODO: Report error.
+            UnicodeScalarValue = 0xFFFD;
+          encodeUTF8(UnicodeScalarValue, Storage);
+          UnquotedValue = UnquotedValue.substr(4);
+          break;
+        }
+      case 'U': {
+          if (UnquotedValue.size() < 9)
+            // TODO: Report error.
+            break;
+          unsigned int UnicodeScalarValue;
+          if (UnquotedValue.substr(1, 8).getAsInteger(16, UnicodeScalarValue))
+            // TODO: Report error.
+            UnicodeScalarValue = 0xFFFD;
+          encodeUTF8(UnicodeScalarValue, Storage);
+          UnquotedValue = UnquotedValue.substr(8);
+          break;
+        }
+      }
+      UnquotedValue = UnquotedValue.substr(1);
     }
-    // Handle Windows-style EOL
-    if (UnquotedValue.substr(I, 2) == "\r\n")
-      I++;
-    UnquotedValue = UnquotedValue.drop_front(I + 1).ltrim(" \t");
   }
   llvm::append_range(Storage, UnquotedValue);
   return StringRef(Storage.begin(), Storage.size());
-}
-
-StringRef
-ScalarNode::getDoubleQuotedValue(StringRef RawValue,
-                                 SmallVectorImpl<char> &Storage) const {
-  assert(RawValue.size() >= 2 && RawValue.front() == '"' &&
-         RawValue.back() == '"');
-  StringRef UnquotedValue = RawValue.substr(1, RawValue.size() - 2);
-
-  auto UnescapeFunc = [this](StringRef UnquotedValue,
-                             SmallVectorImpl<char> &Storage) {
-    assert(UnquotedValue.take_front(1) == "\\");
-    if (UnquotedValue.size() == 1) {
-      Token T;
-      T.Range = UnquotedValue;
-      setError("Unrecognized escape code", T);
-      Storage.clear();
-      return StringRef();
-    }
-    UnquotedValue = UnquotedValue.drop_front(1);
-    switch (UnquotedValue[0]) {
-    default: {
-      Token T;
-      T.Range = UnquotedValue.take_front(1);
-      setError("Unrecognized escape code", T);
-      Storage.clear();
-      return StringRef();
-    }
-    case '\r':
-      // Shrink the Windows-style EOL.
-      if (UnquotedValue.size() >= 2 && UnquotedValue[1] == '\n')
-        UnquotedValue = UnquotedValue.drop_front(1);
-      [[fallthrough]];
-    case '\n':
-      return UnquotedValue.drop_front(1).ltrim(" \t");
-    case '0':
-      Storage.push_back(0x00);
-      break;
-    case 'a':
-      Storage.push_back(0x07);
-      break;
-    case 'b':
-      Storage.push_back(0x08);
-      break;
-    case 't':
-    case 0x09:
-      Storage.push_back(0x09);
-      break;
-    case 'n':
-      Storage.push_back(0x0A);
-      break;
-    case 'v':
-      Storage.push_back(0x0B);
-      break;
-    case 'f':
-      Storage.push_back(0x0C);
-      break;
-    case 'r':
-      Storage.push_back(0x0D);
-      break;
-    case 'e':
-      Storage.push_back(0x1B);
-      break;
-    case ' ':
-      Storage.push_back(0x20);
-      break;
-    case '"':
-      Storage.push_back(0x22);
-      break;
-    case '/':
-      Storage.push_back(0x2F);
-      break;
-    case '\\':
-      Storage.push_back(0x5C);
-      break;
-    case 'N':
-      encodeUTF8(0x85, Storage);
-      break;
-    case '_':
-      encodeUTF8(0xA0, Storage);
-      break;
-    case 'L':
-      encodeUTF8(0x2028, Storage);
-      break;
-    case 'P':
-      encodeUTF8(0x2029, Storage);
-      break;
-    case 'x': {
-      if (UnquotedValue.size() < 3)
-        // TODO: Report error.
-        break;
-      unsigned int UnicodeScalarValue;
-      if (UnquotedValue.substr(1, 2).getAsInteger(16, UnicodeScalarValue))
-        // TODO: Report error.
-        UnicodeScalarValue = 0xFFFD;
-      encodeUTF8(UnicodeScalarValue, Storage);
-      return UnquotedValue.drop_front(3);
-    }
-    case 'u': {
-      if (UnquotedValue.size() < 5)
-        // TODO: Report error.
-        break;
-      unsigned int UnicodeScalarValue;
-      if (UnquotedValue.substr(1, 4).getAsInteger(16, UnicodeScalarValue))
-        // TODO: Report error.
-        UnicodeScalarValue = 0xFFFD;
-      encodeUTF8(UnicodeScalarValue, Storage);
-      return UnquotedValue.drop_front(5);
-    }
-    case 'U': {
-      if (UnquotedValue.size() < 9)
-        // TODO: Report error.
-        break;
-      unsigned int UnicodeScalarValue;
-      if (UnquotedValue.substr(1, 8).getAsInteger(16, UnicodeScalarValue))
-        // TODO: Report error.
-        UnicodeScalarValue = 0xFFFD;
-      encodeUTF8(UnicodeScalarValue, Storage);
-      return UnquotedValue.drop_front(9);
-    }
-    }
-    return UnquotedValue.drop_front(1);
-  };
-
-  return parseScalarValue(UnquotedValue, Storage, "\\\r\n", UnescapeFunc);
-}
-
-StringRef ScalarNode::getSingleQuotedValue(StringRef RawValue,
-                                           SmallVectorImpl<char> &Storage) {
-  assert(RawValue.size() >= 2 && RawValue.front() == '\'' &&
-         RawValue.back() == '\'');
-  StringRef UnquotedValue = RawValue.substr(1, RawValue.size() - 2);
-
-  auto UnescapeFunc = [](StringRef UnquotedValue,
-                         SmallVectorImpl<char> &Storage) {
-    assert(UnquotedValue.take_front(2) == "''");
-    Storage.push_back('\'');
-    return UnquotedValue.drop_front(2);
-  };
-
-  return parseScalarValue(UnquotedValue, Storage, "'\r\n", UnescapeFunc);
-}
-
-StringRef ScalarNode::getPlainValue(StringRef RawValue,
-                                    SmallVectorImpl<char> &Storage) {
-  // Trim trailing whitespace ('b-char' and 's-white').
-  // NOTE: Alternatively we could change the scanner to not include whitespace
-  //       here in the first place.
-  RawValue = RawValue.rtrim("\r\n \t");
-  return parseScalarValue(RawValue, Storage, "\r\n", nullptr);
 }
 
 Node *KeyValueNode::getKey() {
@@ -2349,7 +2229,7 @@ void MappingNode::increment() {
       break;
     default:
       setError("Unexpected token. Expected Key or Block End", T);
-      [[fallthrough]];
+      LLVM_FALLTHROUGH;
     case Token::TK_Error:
       IsAtEnd = true;
       CurrentEntry = nullptr;
@@ -2362,7 +2242,7 @@ void MappingNode::increment() {
       return increment();
     case Token::TK_FlowMappingEnd:
       getNext();
-      [[fallthrough]];
+      LLVM_FALLTHROUGH;
     case Token::TK_Error:
       // Set this to end iterator.
       IsAtEnd = true;
@@ -2405,7 +2285,7 @@ void SequenceNode::increment() {
     default:
       setError( "Unexpected token. Expected Block Entry or Block End."
               , T);
-      [[fallthrough]];
+      LLVM_FALLTHROUGH;
     case Token::TK_Error:
       IsAtEnd = true;
       CurrentEntry = nullptr;
@@ -2434,7 +2314,7 @@ void SequenceNode::increment() {
       return increment();
     case Token::TK_FlowSequenceEnd:
       getNext();
-      [[fallthrough]];
+      LLVM_FALLTHROUGH;
     case Token::TK_Error:
       // Set this to end iterator.
       IsAtEnd = true;

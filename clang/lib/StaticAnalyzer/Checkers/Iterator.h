@@ -63,7 +63,9 @@ public:
     return Cont == X.Cont && Valid == X.Valid && Offset == X.Offset;
   }
 
-  bool operator!=(const IteratorPosition &X) const { return !(*this == X); }
+  bool operator!=(const IteratorPosition &X) const {
+    return Cont != X.Cont || Valid != X.Valid || Offset != X.Offset;
+  }
 
   void Profile(llvm::FoldingSetNodeID &ID) const {
     ID.AddPointer(Cont);
@@ -99,7 +101,9 @@ public:
     return Begin == X.Begin && End == X.End;
   }
 
-  bool operator!=(const ContainerData &X) const { return !(*this == X); }
+  bool operator!=(const ContainerData &X) const {
+    return Begin != X.Begin || End != X.End;
+  }
 
   void Profile(llvm::FoldingSetNodeID &ID) const {
     ID.Add(Begin);

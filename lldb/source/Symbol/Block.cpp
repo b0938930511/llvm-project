@@ -13,7 +13,6 @@
 #include "lldb/Symbol/Function.h"
 #include "lldb/Symbol/SymbolFile.h"
 #include "lldb/Symbol/VariableList.h"
-#include "lldb/Utility/LLDBLog.h"
 #include "lldb/Utility/Log.h"
 
 #include <memory>
@@ -121,16 +120,6 @@ Block *Block::FindBlockByID(user_id_t block_id) {
       break;
   }
   return matching_block;
-}
-
-Block *Block::FindInnermostBlockByOffset(const lldb::addr_t offset) {
-  if (!Contains(offset))
-    return nullptr;
-  for (const BlockSP &block_sp : m_children) {
-    if (Block *block = block_sp->FindInnermostBlockByOffset(offset))
-      return block;
-  }
-  return this;
 }
 
 void Block::CalculateSymbolContext(SymbolContext *sc) {
@@ -335,7 +324,7 @@ void Block::FinalizeRanges() {
 void Block::AddRange(const Range &range) {
   Block *parent_block = GetParent();
   if (parent_block && !parent_block->Contains(range)) {
-    Log *log = GetLog(LLDBLog::Symbols);
+    Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_SYMBOLS));
     if (log) {
       ModuleSP module_sp(m_parent_scope->CalculateSymbolContextModule());
       Function *function = m_parent_scope->CalculateSymbolContextFunction();

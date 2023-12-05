@@ -17,8 +17,7 @@ void int_test() {
   (x) = std::move(x);  // expected-warning{{explicitly moving}}
 
   using std::move;
-  x = move(x); // expected-warning{{explicitly moving}} \
-                   expected-warning {{unqualified call to 'std::move}}
+  x = move(x);  // expected-warning{{explicitly moving}}
 }
 
 int global;
@@ -27,8 +26,7 @@ void global_int_test() {
   (global) = std::move(global);  // expected-warning{{explicitly moving}}
 
   using std::move;
-  global = move(global); // expected-warning{{explicitly moving}} \
-                             expected-warning {{unqualified call to 'std::move}}
+  global = move(global);  // expected-warning{{explicitly moving}}
 }
 
 class field_test {
@@ -38,9 +36,6 @@ class field_test {
     x = std::move(other.x);
     other.x = std::move(x);
     other.x = std::move(other.x);  // expected-warning{{explicitly moving}}
-  }
-  void withSuggest(int x) {
-    x = std::move(x); // expected-warning{{explicitly moving variable of type 'int' to itself; did you mean to move to member 'x'?}}
   }
 };
 

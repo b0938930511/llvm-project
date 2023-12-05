@@ -11,12 +11,6 @@
 
 #include "lldb/API/SBDefines.h"
 
-namespace lldb_private {
-namespace python {
-class SWIGBridge;
-}
-} // namespace lldb_private
-
 namespace lldb {
 
 class SBTypeList;
@@ -139,8 +133,6 @@ public:
 
   bool IsScopedEnumerationType();
 
-  bool IsAggregateType();
-
   lldb::SBType GetPointerType();
 
   lldb::SBType GetPointeeType();
@@ -188,8 +180,6 @@ public:
 
   lldb::SBType GetTemplateArgumentType(uint32_t idx);
 
-  /// Return the TemplateArgumentKind of the template argument at index idx.
-  /// Variadic argument packs are automatically expanded.
   lldb::TemplateArgumentKind GetTemplateArgumentKind(uint32_t idx);
 
   lldb::SBType GetFunctionReturnType();
@@ -214,8 +204,6 @@ public:
 
   bool GetDescription(lldb::SBStream &description,
                       lldb::DescriptionLevel description_level);
-
-  lldb::SBType FindDirectNestedType(const char *name);
 
   lldb::SBType &operator=(const lldb::SBType &rhs);
 
@@ -244,9 +232,6 @@ protected:
   friend class SBTypeMemberFunction;
   friend class SBTypeList;
   friend class SBValue;
-  friend class SBWatchpoint;
-
-  friend class lldb_private::python::SWIGBridge;
 
   SBType(const lldb_private::CompilerType &);
   SBType(const lldb::TypeSP &);

@@ -22,6 +22,7 @@
 #include "clang/Lex/Lexer.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/None.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -34,7 +35,6 @@
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
-#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -87,7 +87,7 @@ bool matchesAnyBase(const CXXRecordDecl &Node,
       [Finder, Builder, &BaseSpecMatcher](const CXXBaseSpecifier *BaseSpec,
                                           CXXBasePath &IgnoredParam) {
         BoundNodesTreeBuilder Result(*Builder);
-        if (BaseSpecMatcher.matches(*BaseSpec, Finder, &Result)) {
+        if (BaseSpecMatcher.matches(*BaseSpec, Finder, Builder)) {
           *Builder = std::move(Result);
           return true;
         }
@@ -140,7 +140,7 @@ public:
     return Result;
   }
 
-  std::optional<clang::TraversalKind> TraversalKind() const override {
+  llvm::Optional<clang::TraversalKind> TraversalKind() const override {
     return InnerMatcher->TraversalKind();
   }
 
@@ -176,7 +176,7 @@ public:
     return this->InnerMatcher->dynMatches(DynNode, Finder, Builder);
   }
 
-  std::optional<clang::TraversalKind> TraversalKind() const override {
+  llvm::Optional<clang::TraversalKind> TraversalKind() const override {
     return TK;
   }
 
@@ -339,9 +339,8 @@ bool DynTypedMatcher::matchesNoKindCheck(const DynTypedNode &DynNode,
   return false;
 }
 
-std::optional<DynTypedMatcher> DynTypedMatcher::tryBind(StringRef ID) const {
-  if (!AllowBind)
-    return std::nullopt;
+llvm::Optional<DynTypedMatcher> DynTypedMatcher::tryBind(StringRef ID) const {
+  if (!AllowBind) return llvm::None;
   auto Result = *this;
   Result.Implementation =
       new IdDynMatcher(ID, std::move(Result.Implementation));
@@ -469,8 +468,8 @@ hasAnyOverloadedOperatorNameFunc(ArrayRef<const StringRef *> NameRefs) {
 }
 
 HasNameMatcher::HasNameMatcher(std::vector<std::string> N)
-    : UseUnqualifiedMatch(
-          llvm::all_of(N, [](StringRef Name) { return !Name.contains("::"); })),
+    : UseUnqualifiedMatch(llvm::all_of(
+          N, [](StringRef Name) { return Name.find("::") == Name.npos; })),
       Names(std::move(N)) {
 #ifndef NDEBUG
   for (StringRef Name : Names)
@@ -686,7 +685,7 @@ static bool isTokenAtLoc(const SourceManager &SM, const LangOptions &LangOpts,
   return !Invalid && Text == TokenText;
 }
 
-std::optional<SourceLocation>
+llvm::Optional<SourceLocation>
 getExpansionLocOfMacro(StringRef MacroName, SourceLocation Loc,
                        const ASTContext &Context) {
   auto &SM = Context.getSourceManager();
@@ -697,14 +696,14 @@ getExpansionLocOfMacro(StringRef MacroName, SourceLocation Loc,
     if (Expansion.isMacroArgExpansion())
       // Check macro argument for an expansion of the given macro. For example,
       // `F(G(3))`, where `MacroName` is `G`.
-      if (std::optional<SourceLocation> ArgLoc = getExpansionLocOfMacro(
+      if (llvm::Optional<SourceLocation> ArgLoc = getExpansionLocOfMacro(
               MacroName, Expansion.getSpellingLoc(), Context))
         return ArgLoc;
     Loc = Expansion.getExpansionLocStart();
     if (isTokenAtLoc(SM, LangOpts, MacroName, Loc))
       return Loc;
   }
-  return std::nullopt;
+  return llvm::None;
 }
 
 std::shared_ptr<llvm::Regex> createAndVerifyRegex(StringRef Regex,
@@ -769,23 +768,9 @@ const internal::VariadicDynCastAllOfMatcher<Decl, TemplateTypeParmDecl>
 const internal::VariadicDynCastAllOfMatcher<Decl, TemplateTemplateParmDecl>
     templateTemplateParmDecl;
 
-const internal::VariadicAllOfMatcher<LambdaCapture> lambdaCapture;
 const internal::VariadicAllOfMatcher<QualType> qualType;
 const internal::VariadicAllOfMatcher<Type> type;
 const internal::VariadicAllOfMatcher<TypeLoc> typeLoc;
-
-const internal::VariadicDynCastAllOfMatcher<TypeLoc, QualifiedTypeLoc>
-    qualifiedTypeLoc;
-const internal::VariadicDynCastAllOfMatcher<TypeLoc, PointerTypeLoc>
-    pointerTypeLoc;
-const internal::VariadicDynCastAllOfMatcher<TypeLoc, ReferenceTypeLoc>
-    referenceTypeLoc;
-const internal::VariadicDynCastAllOfMatcher<TypeLoc,
-                                            TemplateSpecializationTypeLoc>
-    templateSpecializationTypeLoc;
-const internal::VariadicDynCastAllOfMatcher<TypeLoc, ElaboratedTypeLoc>
-    elaboratedTypeLoc;
-
 const internal::VariadicDynCastAllOfMatcher<Stmt, UnaryExprOrTypeTraitExpr>
     unaryExprOrTypeTraitExpr;
 const internal::VariadicDynCastAllOfMatcher<Decl, ValueDecl> valueDecl;
@@ -800,7 +785,6 @@ const internal::VariadicDynCastAllOfMatcher<Decl, TagDecl> tagDecl;
 const internal::VariadicDynCastAllOfMatcher<Decl, CXXMethodDecl> cxxMethodDecl;
 const internal::VariadicDynCastAllOfMatcher<Decl, CXXConversionDecl>
     cxxConversionDecl;
-const internal::VariadicDynCastAllOfMatcher<Decl, ConceptDecl> conceptDecl;
 const internal::VariadicDynCastAllOfMatcher<Decl, VarDecl> varDecl;
 const internal::VariadicDynCastAllOfMatcher<Decl, FieldDecl> fieldDecl;
 const internal::VariadicDynCastAllOfMatcher<Decl, IndirectFieldDecl>
@@ -883,10 +867,6 @@ const internal::VariadicDynCastAllOfMatcher<Stmt, CXXNoexceptExpr>
     cxxNoexceptExpr;
 const internal::VariadicDynCastAllOfMatcher<Stmt, ArraySubscriptExpr>
     arraySubscriptExpr;
-const internal::VariadicDynCastAllOfMatcher<Stmt, ArrayInitIndexExpr>
-    arrayInitIndexExpr;
-const internal::VariadicDynCastAllOfMatcher<Stmt, ArrayInitLoopExpr>
-    arrayInitLoopExpr;
 const internal::VariadicDynCastAllOfMatcher<Stmt, CXXDefaultArgExpr>
     cxxDefaultArgExpr;
 const internal::VariadicDynCastAllOfMatcher<Stmt, CXXOperatorCallExpr>
@@ -915,8 +895,6 @@ const internal::VariadicDynCastAllOfMatcher<Stmt, SwitchCase> switchCase;
 const internal::VariadicDynCastAllOfMatcher<Stmt, CaseStmt> caseStmt;
 const internal::VariadicDynCastAllOfMatcher<Stmt, DefaultStmt> defaultStmt;
 const internal::VariadicDynCastAllOfMatcher<Stmt, CompoundStmt> compoundStmt;
-const internal::VariadicDynCastAllOfMatcher<Stmt, CoroutineBodyStmt>
-    coroutineBodyStmt;
 const internal::VariadicDynCastAllOfMatcher<Stmt, CXXCatchStmt> cxxCatchStmt;
 const internal::VariadicDynCastAllOfMatcher<Stmt, CXXTryStmt> cxxTryStmt;
 const internal::VariadicDynCastAllOfMatcher<Stmt, CXXThrowExpr> cxxThrowExpr;
@@ -925,7 +903,6 @@ const internal::VariadicDynCastAllOfMatcher<Stmt, AsmStmt> asmStmt;
 const internal::VariadicDynCastAllOfMatcher<Stmt, CXXBoolLiteralExpr>
     cxxBoolLiteral;
 const internal::VariadicDynCastAllOfMatcher<Stmt, StringLiteral> stringLiteral;
-const internal::VariadicDynCastAllOfMatcher<Stmt, ObjCStringLiteral> objcStringLiteral;
 const internal::VariadicDynCastAllOfMatcher<Stmt, CharacterLiteral>
     characterLiteral;
 const internal::VariadicDynCastAllOfMatcher<Stmt, IntegerLiteral>
@@ -941,8 +918,6 @@ const internal::VariadicDynCastAllOfMatcher<Stmt, CompoundLiteralExpr>
 const internal::VariadicDynCastAllOfMatcher<Stmt, CXXNullPtrLiteralExpr>
     cxxNullPtrLiteralExpr;
 const internal::VariadicDynCastAllOfMatcher<Stmt, ChooseExpr> chooseExpr;
-const internal::VariadicDynCastAllOfMatcher<Stmt, ConvertVectorExpr>
-    convertVectorExpr;
 const internal::VariadicDynCastAllOfMatcher<Stmt, CoawaitExpr>
     coawaitExpr;
 const internal::VariadicDynCastAllOfMatcher<Stmt, DependentCoawaitExpr>
@@ -1025,20 +1000,19 @@ const internal::ArgumentAdaptingMatcherFunc<internal::ForEachDescendantMatcher>
     forEachDescendant = {};
 const internal::ArgumentAdaptingMatcherFunc<
     internal::HasParentMatcher,
-    internal::TypeList<Decl, NestedNameSpecifierLoc, Stmt, TypeLoc, Attr>,
-    internal::TypeList<Decl, NestedNameSpecifierLoc, Stmt, TypeLoc, Attr>>
+    internal::TypeList<Decl, NestedNameSpecifierLoc, Stmt, TypeLoc>,
+    internal::TypeList<Decl, NestedNameSpecifierLoc, Stmt, TypeLoc>>
     hasParent = {};
 const internal::ArgumentAdaptingMatcherFunc<
     internal::HasAncestorMatcher,
-    internal::TypeList<Decl, NestedNameSpecifierLoc, Stmt, TypeLoc, Attr>,
-    internal::TypeList<Decl, NestedNameSpecifierLoc, Stmt, TypeLoc, Attr>>
+    internal::TypeList<Decl, NestedNameSpecifierLoc, Stmt, TypeLoc>,
+    internal::TypeList<Decl, NestedNameSpecifierLoc, Stmt, TypeLoc>>
     hasAncestor = {};
 const internal::VariadicOperatorMatcherFunc<1, 1> unless = {
     internal::DynTypedMatcher::VO_UnaryNot};
 const internal::VariadicAllOfMatcher<NestedNameSpecifier> nestedNameSpecifier;
 const internal::VariadicAllOfMatcher<NestedNameSpecifierLoc>
     nestedNameSpecifierLoc;
-const internal::VariadicAllOfMatcher<Attr> attr;
 const internal::VariadicDynCastAllOfMatcher<Stmt, CUDAKernelCallExpr>
     cudaKernelCallExpr;
 const AstTypeMatcher<BuiltinType> builtinType;
@@ -1048,7 +1022,6 @@ const AstTypeMatcher<ConstantArrayType> constantArrayType;
 const AstTypeMatcher<DeducedTemplateSpecializationType>
     deducedTemplateSpecializationType;
 const AstTypeMatcher<DependentSizedArrayType> dependentSizedArrayType;
-const AstTypeMatcher<DependentSizedExtVectorType> dependentSizedExtVectorType;
 const AstTypeMatcher<IncompleteArrayType> incompleteArrayType;
 const AstTypeMatcher<VariableArrayType> variableArrayType;
 const AstTypeMatcher<AtomicType> atomicType;
@@ -1058,7 +1031,6 @@ const AstTypeMatcher<FunctionType> functionType;
 const AstTypeMatcher<FunctionProtoType> functionProtoType;
 const AstTypeMatcher<ParenType> parenType;
 const AstTypeMatcher<BlockPointerType> blockPointerType;
-const AstTypeMatcher<MacroQualifiedType> macroQualifiedType;
 const AstTypeMatcher<MemberPointerType> memberPointerType;
 const AstTypeMatcher<PointerType> pointerType;
 const AstTypeMatcher<ObjCObjectPointerType> objcObjectPointerType;
@@ -1072,7 +1044,6 @@ const AstTypeMatcher<UnaryTransformType> unaryTransformType;
 const AstTypeMatcher<RecordType> recordType;
 const AstTypeMatcher<TagType> tagType;
 const AstTypeMatcher<ElaboratedType> elaboratedType;
-const AstTypeMatcher<UsingType> usingType;
 const AstTypeMatcher<SubstTemplateTypeParmType> substTemplateTypeParmType;
 const AstTypeMatcher<TemplateTypeParmType> templateTypeParmType;
 const AstTypeMatcher<InjectedClassNameType> injectedClassNameType;

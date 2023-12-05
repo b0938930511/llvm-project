@@ -125,8 +125,8 @@ bool LVLGen::runOnMachineFunction(MachineFunction &F) {
   TII = Subtarget.getInstrInfo();
   TRI = Subtarget.getRegisterInfo();
 
-  for (MachineBasicBlock &MBB : F)
-    Changed |= runOnMachineBasicBlock(MBB);
+  for (MachineFunction::iterator FI = F.begin(), FE = F.end(); FI != FE; ++FI)
+    Changed |= runOnMachineBasicBlock(*FI);
 
   if (Changed) {
     LLVM_DEBUG(dbgs() << "\n");

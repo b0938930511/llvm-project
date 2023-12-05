@@ -1,6 +1,6 @@
 set(LLVM_LINK_COMPONENTS
   Support
-  FuzzerCLI
+  FuzzMutate
 )
 
 add_llvm_fuzzer(llvm-yaml-parser-fuzzer

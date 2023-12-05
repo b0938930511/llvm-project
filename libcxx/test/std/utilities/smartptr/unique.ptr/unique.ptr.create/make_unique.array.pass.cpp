@@ -17,40 +17,31 @@
 
 class foo {
 public:
-  TEST_CONSTEXPR_CXX23 foo() : val_(3) {}
-  TEST_CONSTEXPR_CXX23 int get() const { return val_; }
-
+    foo () : val_(3) {}
+    int get () const { return val_; }
 private:
-  int val_;
-};
+    int val_;
+    };
 
-TEST_CONSTEXPR_CXX23 bool test() {
-  {
+int main(int, char**)
+{
+    {
     auto p1 = std::make_unique<int[]>(5);
-    for (int i = 0; i < 5; ++i)
-      assert(p1[i] == 0);
-  }
+    for ( int i = 0; i < 5; ++i )
+        assert ( p1[i] == 0 );
+    }
 
-  {
+    {
     auto p2 = std::make_unique<std::string[]>(5);
-    for (int i = 0; i < 5; ++i)
-      assert(p2[i].size() == 0);
-  }
+    for ( int i = 0; i < 5; ++i )
+        assert ( p2[i].size () == 0 );
+    }
 
-  {
+    {
     auto p3 = std::make_unique<foo[]>(7);
-    for (int i = 0; i < 7; ++i)
-      assert(p3[i].get() == 3);
-  }
-
-  return true;
-}
-
-int main(int, char**) {
-  test();
-#if TEST_STD_VER >= 23
-  static_assert(test());
-#endif
+    for ( int i = 0; i < 7; ++i )
+        assert ( p3[i].get () == 3 );
+    }
 
   return 0;
 }

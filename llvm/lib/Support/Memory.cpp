@@ -13,6 +13,7 @@
 
 #include "llvm/Support/Memory.h"
 #include "llvm/Config/llvm-config.h"
+#include "llvm/Support/Valgrind.h"
 
 #ifndef NDEBUG
 #include "llvm/Support/raw_ostream.h"

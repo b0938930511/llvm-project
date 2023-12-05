@@ -38,11 +38,9 @@ struct CoverageViewOptions {
   bool ShowBranchSummary;
   bool ShowRegionSummary;
   bool ShowInstantiationSummary;
-  bool ShowDirectoryCoverage;
   bool ExportSummaryOnly;
   bool SkipExpansions;
   bool SkipFunctions;
-  bool SkipBranches;
   OutputFormat Format;
   BranchOutputType ShowBranches;
   std::string ShowOutputDirectory;
@@ -52,8 +50,6 @@ struct CoverageViewOptions {
   std::string CreatedTimeStr;
   unsigned NumThreads;
   std::string CompilationDirectory;
-  float HighCovWatermark;
-  float LowCovWatermark;
 
   /// Change the output's stream color if the colors are enabled.
   ColoredRawOstream colored_ostream(raw_ostream &OS,

@@ -6,11 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-// UNSUPPORTED: c++03, c++11, c++14
-// UNSUPPORTED: availability-filesystem-missing
+// UNSUPPORTED: c++03
 
 // These tests require locale for non-char paths
-// UNSUPPORTED: no-localization
+// UNSUPPORTED: libcpp-has-no-localization
 
 // <filesystem>
 
@@ -21,19 +20,18 @@
 // basic_string<ECharT, Traits, Allocator>
 // generic_string(const Allocator& a = Allocator()) const;
 
-#include <filesystem>
-#include <cassert>
-#include <string>
+#include "filesystem_include.h"
 #include <type_traits>
+#include <cassert>
 
-#include "count_new.h"
-#include "make_string.h"
-#include "min_allocator.h"
-#include "test_iterators.h"
 #include "test_macros.h"
-namespace fs = std::filesystem;
+#include "test_iterators.h"
+#include "count_new.h"
+#include "min_allocator.h"
+#include "filesystem_test_helper.h"
 
 MultiStringType longString = MKSTR("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ/123456789/abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
+
 
 // generic_string<C, T, A> forwards to string<C, T, A>. Tests for
 // string<C, T, A>() are in "path.native.obs/string_alloc.pass.cpp".
@@ -64,9 +62,7 @@ void doAllocTest()
 int main(int, char**)
 {
   doAllocTest<char>();
-#ifndef TEST_HAS_NO_WIDE_CHARACTERS
   doAllocTest<wchar_t>();
-#endif
   doAllocTest<char16_t>();
   doAllocTest<char32_t>();
 #if TEST_STD_VER > 17 && defined(__cpp_lib_char8_t)

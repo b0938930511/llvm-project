@@ -28,11 +28,13 @@ static inline int xdigit_to_sint(char ch) {
 // StringExtractor constructor
 StringExtractor::StringExtractor() : m_packet() {}
 
-StringExtractor::StringExtractor(llvm::StringRef packet_str) : m_packet() {
+StringExtractor::StringExtractor(llvm::StringRef packet_str)
+    : m_packet(), m_index(0) {
   m_packet.assign(packet_str.begin(), packet_str.end());
 }
 
-StringExtractor::StringExtractor(const char *packet_cstr) : m_packet() {
+StringExtractor::StringExtractor(const char *packet_cstr)
+    : m_packet(), m_index(0) {
   if (packet_cstr)
     m_packet.assign(packet_cstr);
 }

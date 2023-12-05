@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/DWARFLinker/DWARFLinkerDeclContext.h"
-#include "llvm/DWARFLinker/DWARFLinkerCompileUnit.h"
 #include "llvm/DebugInfo/DWARF/DWARFContext.h"
 #include "llvm/DebugInfo/DWARF/DWARFDie.h"
 #include "llvm/DebugInfo/DWARF/DWARFUnit.h"
@@ -64,7 +63,7 @@ DeclContextTree::getChildDeclContext(DeclContext &Context, const DWARFDie &DIE,
          Context.getTag() == dwarf::DW_TAG_compile_unit) &&
         !dwarf::toUnsigned(DIE.find(dwarf::DW_AT_external), 0))
       return PointerIntPair<DeclContext *, 1>(nullptr);
-    [[fallthrough]];
+    LLVM_FALLTHROUGH;
   case dwarf::DW_TAG_member:
   case dwarf::DW_TAG_namespace:
   case dwarf::DW_TAG_structure_type:
@@ -174,7 +173,7 @@ DeclContextTree::getChildDeclContext(DeclContext &Context, const DWARFDie &DIE,
              !(*ContextIter)->setLastSeenDIE(U, DIE)) {
     // The context was found, but it is ambiguous with another context
     // in the same file. Mark it invalid.
-    return PointerIntPair<DeclContext *, 1>(*ContextIter, /* IntVal= */ 1);
+    return PointerIntPair<DeclContext *, 1>(*ContextIter, /* Invalid= */ 1);
   }
 
   assert(ContextIter != Contexts.end());
@@ -184,7 +183,7 @@ DeclContextTree::getChildDeclContext(DeclContext &Context, const DWARFDie &DIE,
        Context.getTag() != dwarf::DW_TAG_structure_type &&
        Context.getTag() != dwarf::DW_TAG_class_type) ||
       (Tag == dwarf::DW_TAG_union_type))
-    return PointerIntPair<DeclContext *, 1>(*ContextIter, /* IntVal= */ 1);
+    return PointerIntPair<DeclContext *, 1>(*ContextIter, /* Invalid= */ 1);
 
   return PointerIntPair<DeclContext *, 1>(*ContextIter);
 }

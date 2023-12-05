@@ -14,7 +14,9 @@
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::bugprone {
+namespace clang {
+namespace tidy {
+namespace bugprone {
 
 namespace {
 AST_MATCHER(CXXMethodDecl, isStatic) { return Node.isStatic(); }
@@ -38,11 +40,11 @@ static bool checkOverridingFunctionReturnType(const ASTContext *Context,
                                               const CXXMethodDecl *BaseMD,
                                               const CXXMethodDecl *DerivedMD) {
   QualType BaseReturnTy = BaseMD->getType()
-                              ->castAs<FunctionType>()
+                              ->getAs<FunctionType>()
                               ->getReturnType()
                               .getCanonicalType();
   QualType DerivedReturnTy = DerivedMD->getType()
-                                 ->castAs<FunctionType>()
+                                 ->getAs<FunctionType>()
                                  ->getReturnType()
                                  .getCanonicalType();
 
@@ -265,4 +267,6 @@ void VirtualNearMissCheck::check(const MatchFinder::MatchResult &Result) {
   }
 }
 
-} // namespace clang::tidy::bugprone
+} // namespace bugprone
+} // namespace tidy
+} // namespace clang

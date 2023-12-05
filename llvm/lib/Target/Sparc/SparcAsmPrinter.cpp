@@ -29,7 +29,7 @@
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSymbol.h"
-#include "llvm/MC/TargetRegistry.h"
+#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace llvm;
 
@@ -55,8 +55,8 @@ namespace {
     void emitFunctionBodyStart() override;
     void emitInstruction(const MachineInstr *MI) override;
 
-    static const char *getRegisterName(MCRegister Reg) {
-      return SparcInstPrinter::getRegisterName(Reg);
+    static const char *getRegisterName(unsigned RegNo) {
+      return SparcInstPrinter::getRegisterName(RegNo);
     }
 
     bool PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
@@ -250,8 +250,6 @@ void SparcAsmPrinter::LowerGETPCXAndEmitMCInsts(const MachineInstr *MI,
 }
 
 void SparcAsmPrinter::emitInstruction(const MachineInstr *MI) {
-  Sparc_MC::verifyInstructionPredicates(MI->getOpcode(),
-                                        getSubtargetInfo().getFeatureBits());
 
   switch (MI->getOpcode()) {
   default: break;
@@ -301,7 +299,7 @@ void SparcAsmPrinter::printOperand(const MachineInstr *MI, int opNum,
     if (MI->getOpcode() == SP::CALL)
       assert(TF == SparcMCExpr::VK_Sparc_None &&
              "Cannot handle target flags on call address");
-    else if (MI->getOpcode() == SP::SETHIi)
+    else if (MI->getOpcode() == SP::SETHIi || MI->getOpcode() == SP::SETHIXi)
       assert((TF == SparcMCExpr::VK_Sparc_HI
               || TF == SparcMCExpr::VK_Sparc_H44
               || TF == SparcMCExpr::VK_Sparc_HH
@@ -329,7 +327,7 @@ void SparcAsmPrinter::printOperand(const MachineInstr *MI, int opNum,
     else if (MI->getOpcode() == SP::TLS_LDXrr)
       assert(TF == SparcMCExpr::VK_Sparc_TLS_IE_LDX &&
              "Cannot handle target flags on ldx for TLS");
-    else if (MI->getOpcode() == SP::XORri)
+    else if (MI->getOpcode() == SP::XORri || MI->getOpcode() == SP::XORXri)
       assert((TF == SparcMCExpr::VK_Sparc_TLS_LDO_LOX10
               || TF == SparcMCExpr::VK_Sparc_TLS_LE_LOX10) &&
              "Cannot handle target flags on xor for TLS");

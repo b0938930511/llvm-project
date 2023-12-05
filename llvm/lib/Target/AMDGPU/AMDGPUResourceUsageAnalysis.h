@@ -17,6 +17,7 @@
 
 #include "llvm/Analysis/CallGraphSCCPass.h"
 #include "llvm/CodeGen/MachineModuleInfo.h"
+#include "llvm/IR/ValueMap.h"
 
 namespace llvm {
 
@@ -24,7 +25,7 @@ class GCNSubtarget;
 class MachineFunction;
 class TargetMachine;
 
-struct AMDGPUResourceUsageAnalysis : public ModulePass {
+struct AMDGPUResourceUsageAnalysis : public CallGraphSCCPass {
   static char ID;
 
 public:
@@ -43,21 +44,17 @@ public:
     bool HasIndirectCall = false;
 
     int32_t getTotalNumSGPRs(const GCNSubtarget &ST) const;
-    // Total number of VGPRs is actually a combination of AGPR and VGPR
-    // depending on architecture - and some alignment constraints
-    int32_t getTotalNumVGPRs(const GCNSubtarget &ST, int32_t NumAGPR,
-                             int32_t NumVGPR) const;
     int32_t getTotalNumVGPRs(const GCNSubtarget &ST) const;
   };
 
-  AMDGPUResourceUsageAnalysis() : ModulePass(ID) {}
+  AMDGPUResourceUsageAnalysis() : CallGraphSCCPass(ID) {}
 
-  bool doInitialization(Module &M) override {
+  bool runOnSCC(CallGraphSCC &SCC) override;
+
+  bool doInitialization(CallGraph &CG) override {
     CallGraphResourceInfo.clear();
-    return ModulePass::doInitialization(M);
+    return CallGraphSCCPass::doInitialization(CG);
   }
-
-  bool runOnModule(Module &M) override;
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<MachineModuleInfoWrapperPass>();

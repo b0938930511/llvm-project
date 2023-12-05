@@ -9,25 +9,25 @@
 #ifndef LLVM_LIBC_TEST_SRC_MATH_REMQUOTEST_H
 #define LLVM_LIBC_TEST_SRC_MATH_REMQUOTEST_H
 
-#include "src/__support/FPUtil/BasicOperations.h"
-#include "src/__support/FPUtil/FPBits.h"
-#include "test/UnitTest/FPMatcher.h"
-#include "test/UnitTest/Test.h"
+#include "utils/FPUtil/BasicOperations.h"
+#include "utils/FPUtil/FPBits.h"
+#include "utils/FPUtil/TestHelpers.h"
 #include "utils/MPFRWrapper/MPFRUtils.h"
+#include "utils/UnitTest/Test.h"
 #include <math.h>
 
-namespace mpfr = LIBC_NAMESPACE::testing::mpfr;
+namespace mpfr = __llvm_libc::testing::mpfr;
 
 template <typename T>
-class RemQuoTestTemplate : public LIBC_NAMESPACE::testing::Test {
-  using FPBits = LIBC_NAMESPACE::fputil::FPBits<T>;
+class RemQuoTestTemplate : public __llvm_libc::testing::Test {
+  using FPBits = __llvm_libc::fputil::FPBits<T>;
   using UIntType = typename FPBits::UIntType;
 
-  const T zero = T(LIBC_NAMESPACE::fputil::FPBits<T>::zero());
-  const T neg_zero = T(LIBC_NAMESPACE::fputil::FPBits<T>::neg_zero());
-  const T inf = T(LIBC_NAMESPACE::fputil::FPBits<T>::inf());
-  const T neg_inf = T(LIBC_NAMESPACE::fputil::FPBits<T>::neg_inf());
-  const T nan = T(LIBC_NAMESPACE::fputil::FPBits<T>::build_quiet_nan(1));
+  const T zero = T(__llvm_libc::fputil::FPBits<T>::zero());
+  const T negZero = T(__llvm_libc::fputil::FPBits<T>::negZero());
+  const T inf = T(__llvm_libc::fputil::FPBits<T>::inf());
+  const T negInf = T(__llvm_libc::fputil::FPBits<T>::negInf());
+  const T nan = T(__llvm_libc::fputil::FPBits<T>::buildNaN(1));
 
 public:
   typedef T (*RemQuoFunc)(T, T, int *);
@@ -39,13 +39,13 @@ public:
     y = T(1.0);
     x = inf;
     EXPECT_FP_EQ(nan, func(x, y, &quotient));
-    x = neg_inf;
+    x = negInf;
     EXPECT_FP_EQ(nan, func(x, y, &quotient));
 
     x = T(1.0);
     y = zero;
     EXPECT_FP_EQ(nan, func(x, y, &quotient));
-    y = neg_zero;
+    y = negZero;
     EXPECT_FP_EQ(nan, func(x, y, &quotient));
 
     y = nan;
@@ -64,9 +64,9 @@ public:
     y = T(1.0);
     EXPECT_FP_EQ(func(x, y, &quotient), zero);
 
-    x = neg_zero;
+    x = negZero;
     y = T(1.0);
-    EXPECT_FP_EQ(func(x, y, &quotient), neg_zero);
+    EXPECT_FP_EQ(func(x, y, &quotient), negZero);
 
     x = T(1.125);
     y = inf;
@@ -87,21 +87,20 @@ public:
     EXPECT_FP_EQ(func(x, -y, &q), zero);
     EXPECT_EQ(q, -1);
 
-    EXPECT_FP_EQ(func(-x, y, &q), neg_zero);
+    EXPECT_FP_EQ(func(-x, y, &q), negZero);
     EXPECT_EQ(q, -1);
 
-    EXPECT_FP_EQ(func(-x, -y, &q), neg_zero);
+    EXPECT_FP_EQ(func(-x, -y, &q), negZero);
     EXPECT_EQ(q, 1);
   }
 
   void testSubnormalRange(RemQuoFunc func) {
-    constexpr UIntType COUNT = 100'001;
-    constexpr UIntType STEP =
-        (UIntType(FPBits::MAX_SUBNORMAL) - UIntType(FPBits::MIN_SUBNORMAL)) /
-        COUNT;
-    for (UIntType v = FPBits::MIN_SUBNORMAL, w = FPBits::MAX_SUBNORMAL;
-         v <= FPBits::MAX_SUBNORMAL && w >= FPBits::MIN_SUBNORMAL;
-         v += STEP, w -= STEP) {
+    constexpr UIntType count = 1000001;
+    constexpr UIntType step =
+        (FPBits::maxSubnormal - FPBits::minSubnormal) / count;
+    for (UIntType v = FPBits::minSubnormal, w = FPBits::maxSubnormal;
+         v <= FPBits::maxSubnormal && w >= FPBits::minSubnormal;
+         v += step, w -= step) {
       T x = T(FPBits(v)), y = T(FPBits(w));
       mpfr::BinaryOutput<T> result;
       mpfr::BinaryInput<T> input{x, y};
@@ -111,12 +110,11 @@ public:
   }
 
   void testNormalRange(RemQuoFunc func) {
-    constexpr UIntType COUNT = 1'001;
-    constexpr UIntType STEP =
-        (UIntType(FPBits::MAX_NORMAL) - UIntType(FPBits::MIN_NORMAL)) / COUNT;
-    for (UIntType v = FPBits::MIN_NORMAL, w = FPBits::MAX_NORMAL;
-         v <= FPBits::MAX_NORMAL && w >= FPBits::MIN_NORMAL;
-         v += STEP, w -= STEP) {
+    constexpr UIntType count = 1000001;
+    constexpr UIntType step = (FPBits::maxNormal - FPBits::minNormal) / count;
+    for (UIntType v = FPBits::minNormal, w = FPBits::maxNormal;
+         v <= FPBits::maxNormal && w >= FPBits::minNormal;
+         v += step, w -= step) {
       T x = T(FPBits(v)), y = T(FPBits(w));
       mpfr::BinaryOutput<T> result;
       mpfr::BinaryInput<T> input{x, y};

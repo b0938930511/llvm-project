@@ -26,7 +26,7 @@ typedef int NSInteger;
 
 extern void NSLog(NSString *format, ...);
 
-void testSizeSpecifier(void) {
+void testSizeSpecifier() {
   NSInteger i = 0;
   NSUInteger j = 0;
   NSLog(@"max NSInteger = %zi", i);

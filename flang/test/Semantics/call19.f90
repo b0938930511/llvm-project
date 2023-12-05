@@ -1,4 +1,5 @@
-! RUN: %python %S/test_errors.py %s %flang_fc1
+! RUN: %S/test_errors.sh %s %t %flang_fc1
+! REQUIRES: shell
 ! Ensures that things that aren't procedures aren't allowed to be called.
 module m
   integer :: i
@@ -10,7 +11,6 @@ module m
     integer, len :: len
   end type
   type(pdt(1,2)) :: x
-  !ERROR: 'i' is not a variable
   namelist /nml/i
  contains
   subroutine s(d)

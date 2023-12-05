@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// UNSUPPORTED: no-threads
-// UNSUPPORTED: c++03
+// UNSUPPORTED: libcpp-has-no-threads
+
 // ALLOW_RETRIES: 2
 
 // <mutex>
@@ -16,12 +16,10 @@
 
 // void lock();
 
-#include <cassert>
-#include <chrono>
-#include <cstdlib>
 #include <mutex>
-#include <system_error>
 #include <thread>
+#include <cstdlib>
+#include <cassert>
 
 #include "make_test_thread.h"
 #include "test_macros.h"

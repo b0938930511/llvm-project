@@ -4,6 +4,6 @@
 
 @import Test;
 
-void foo(void) {
+void foo() {
   test_me_call();
 }

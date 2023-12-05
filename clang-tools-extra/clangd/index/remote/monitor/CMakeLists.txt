@@ -5,7 +5,7 @@ add_clang_executable(clangd-index-server-monitor
   Monitor.cpp
 
   DEPENDS
-  clangdRemoteIndexServiceProto
+  RemoteIndexServiceProto
   )
 
 target_link_libraries(clangd-index-server-monitor
@@ -13,6 +13,6 @@ target_link_libraries(clangd-index-server-monitor
   clangBasic
   clangdSupport
 
-  clangdMonitoringServiceProto
-  clangdRemoteIndexServiceProto
+  MonitoringServiceProto
+  RemoteIndexServiceProto
   )

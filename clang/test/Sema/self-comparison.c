@@ -36,7 +36,7 @@ int bar2(float x) {
 
 #define IS_THE_ANSWER(x) (x == 42)
 
-int macro_comparison(void) {
+int macro_comparison() {
   return IS_THE_ANSWER(42);
 }
 
@@ -45,7 +45,7 @@ int compare_sizeof(int x) {
   return sizeof(x == x); // no-warning
 }
 
-int array_comparisons(void) {
+int array_comparisons() {
   int array1[2];
   int array2[2];
 
@@ -76,7 +76,7 @@ int array_comparisons(void) {
 }
 
 // Don't issue a warning when either the left or right side of the comparison
-// results from a macro expansion.
+// results from a macro expansion.  <rdar://problem/8435950>
 #define R8435950_A i 
 #define R8435950_B i 
 
@@ -88,6 +88,6 @@ int R8435950(int i) {
 
 __attribute__((weak)) int weak_1[3];
 __attribute__((weak)) int weak_2[3];
-_Bool compare_weak(void) {
+_Bool compare_weak() {
   return weak_1 == weak_2;
 }

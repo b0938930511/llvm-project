@@ -21,7 +21,6 @@
 #include "lldb/Target/Target.h"
 #include "lldb/Target/Thread.h"
 #include "lldb/Target/ThreadPlanRunToAddress.h"
-#include "lldb/Utility/LLDBLog.h"
 #include "lldb/Utility/Log.h"
 #include "lldb/Utility/Stream.h"
 
@@ -34,7 +33,7 @@ using namespace lldb_private;
 bool ThreadPlanCallFunction::ConstructorSetup(
     Thread &thread, ABI *&abi, lldb::addr_t &start_load_addr,
     lldb::addr_t &function_load_addr) {
-  SetIsControllingPlan(true);
+  SetIsMasterPlan(true);
   SetOkayToDiscard(false);
   SetPrivate(true);
 
@@ -47,7 +46,7 @@ bool ThreadPlanCallFunction::ConstructorSetup(
   if (!abi)
     return false;
 
-  Log *log = GetLog(LLDBLog::Step);
+  Log *log(lldb_private::GetLogIfAnyCategoriesSet(LIBLLDB_LOG_STEP));
 
   SetBreakpoints();
 
@@ -104,10 +103,7 @@ ThreadPlanCallFunction::ThreadPlanCallFunction(
       m_ignore_breakpoints(options.DoesIgnoreBreakpoints()),
       m_debug_execution(options.GetDebug()),
       m_trap_exceptions(options.GetTrapExceptions()), m_function_addr(function),
-      m_start_addr(), m_function_sp(0), m_subplan_sp(),
-      m_cxx_language_runtime(nullptr), m_objc_language_runtime(nullptr),
-      m_stored_thread_state(), m_real_stop_info_sp(), m_constructor_errors(),
-      m_return_valobj_sp(), m_takedown_done(false),
+      m_function_sp(0), m_takedown_done(false),
       m_should_clear_objc_exception_bp(false),
       m_should_clear_cxx_exception_bp(false),
       m_stop_address(LLDB_INVALID_ADDRESS), m_return_type(return_type) {
@@ -137,10 +133,7 @@ ThreadPlanCallFunction::ThreadPlanCallFunction(
       m_ignore_breakpoints(options.DoesIgnoreBreakpoints()),
       m_debug_execution(options.GetDebug()),
       m_trap_exceptions(options.GetTrapExceptions()), m_function_addr(function),
-      m_start_addr(), m_function_sp(0), m_subplan_sp(),
-      m_cxx_language_runtime(nullptr), m_objc_language_runtime(nullptr),
-      m_stored_thread_state(), m_real_stop_info_sp(), m_constructor_errors(),
-      m_return_valobj_sp(), m_takedown_done(false),
+      m_function_sp(0), m_takedown_done(false),
       m_should_clear_objc_exception_bp(false),
       m_should_clear_cxx_exception_bp(false),
       m_stop_address(LLDB_INVALID_ADDRESS), m_return_type(CompilerType()) {}
@@ -150,7 +143,7 @@ ThreadPlanCallFunction::~ThreadPlanCallFunction() {
 }
 
 void ThreadPlanCallFunction::ReportRegisterState(const char *message) {
-  Log *log = GetLog(LLDBLog::Step);
+  Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_STEP));
   if (log && log->GetVerbose()) {
     StreamString strm;
     RegisterContext *reg_ctx = GetThread().GetRegisterContext().get();
@@ -163,7 +156,7 @@ void ThreadPlanCallFunction::ReportRegisterState(const char *message) {
          reg_idx < num_registers; ++reg_idx) {
       const RegisterInfo *reg_info = reg_ctx->GetRegisterInfoAtIndex(reg_idx);
       if (reg_ctx->ReadRegister(reg_info, reg_value)) {
-        DumpRegisterValue(reg_value, strm, *reg_info, true, false,
+        DumpRegisterValue(reg_value, &strm, reg_info, true, false,
                           eFormatDefault);
         strm.EOL();
       }
@@ -173,7 +166,7 @@ void ThreadPlanCallFunction::ReportRegisterState(const char *message) {
 }
 
 void ThreadPlanCallFunction::DoTakedown(bool success) {
-  Log *log = GetLog(LLDBLog::Step);
+  Log *log(lldb_private::GetLogIfAnyCategoriesSet(LIBLLDB_LOG_STEP));
 
   if (!m_valid) {
     // Don't call DoTakedown if we were never valid to begin with.
@@ -249,7 +242,8 @@ Vote ThreadPlanCallFunction::ShouldReportStop(Event *event_ptr) {
 }
 
 bool ThreadPlanCallFunction::DoPlanExplainsStop(Event *event_ptr) {
-  Log *log(GetLog(LLDBLog::Step | LLDBLog::Process));
+  Log *log(lldb_private::GetLogIfAnyCategoriesSet(LIBLLDB_LOG_STEP |
+                                                  LIBLLDB_LOG_PROCESS));
   m_real_stop_info_sp = GetPrivateStopInfo();
 
   // If our subplan knows why we stopped, even if it's done (which would
@@ -291,10 +285,10 @@ bool ThreadPlanCallFunction::DoPlanExplainsStop(Event *event_ptr) {
     BreakpointSiteSP bp_site_sp;
     bp_site_sp = m_process.GetBreakpointSiteList().FindByID(break_site_id);
     if (bp_site_sp) {
-      uint32_t num_owners = bp_site_sp->GetNumberOfConstituents();
+      uint32_t num_owners = bp_site_sp->GetNumberOfOwners();
       bool is_internal = true;
       for (uint32_t i = 0; i < num_owners; i++) {
-        Breakpoint &bp = bp_site_sp->GetConstituentAtIndex(i)->GetBreakpoint();
+        Breakpoint &bp = bp_site_sp->GetOwnerAtIndex(i)->GetBreakpoint();
         LLDB_LOGF(log,
                   "ThreadPlanCallFunction::PlanExplainsStop: hit "
                   "breakpoint %d while calling function",
@@ -388,7 +382,7 @@ void ThreadPlanCallFunction::DidPush() {
 bool ThreadPlanCallFunction::WillStop() { return true; }
 
 bool ThreadPlanCallFunction::MischiefManaged() {
-  Log *log = GetLog(LLDBLog::Step);
+  Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_STEP));
 
   if (IsPlanComplete()) {
     LLDB_LOGF(log, "ThreadPlanCallFunction(%p): Completed call function plan.",
@@ -439,7 +433,7 @@ bool ThreadPlanCallFunction::BreakpointsExplainStop() {
         (m_objc_language_runtime &&
          m_objc_language_runtime->ExceptionBreakpointsExplainStop(
              stop_info_sp))) {
-      Log *log = GetLog(LLDBLog::Step);
+      Log *log(lldb_private::GetLogIfAnyCategoriesSet(LIBLLDB_LOG_STEP));
       LLDB_LOGF(log, "ThreadPlanCallFunction::BreakpointsExplainStop - Hit an "
                      "exception breakpoint, setting plan complete.");
 

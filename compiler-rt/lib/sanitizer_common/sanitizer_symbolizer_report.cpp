@@ -32,10 +32,10 @@ void ReportErrorSummary(const char *error_type, const AddressInfo &info,
                         const char *alt_tool_name) {
   if (!common_flags()->print_summary) return;
   InternalScopedString buff;
-  buff.AppendF("%s ", error_type);
-  StackTracePrinter::GetOrInit()->RenderFrame(
-      &buff, "%L %F", 0, info.address, &info,
-      common_flags()->symbolize_vs_style, common_flags()->strip_path_prefix);
+  buff.append("%s ", error_type);
+  RenderFrame(&buff, "%L %F", 0, info.address, &info,
+              common_flags()->symbolize_vs_style,
+              common_flags()->strip_path_prefix);
   ReportErrorSummary(buff.data(), alt_tool_name);
 }
 #endif
@@ -88,16 +88,10 @@ void ReportErrorSummary(const char *error_type, const StackTrace *stack,
 #endif
 }
 
-void ReportMmapWriteExec(int prot, int flags) {
+void ReportMmapWriteExec(int prot) {
 #if SANITIZER_POSIX && (!SANITIZER_GO && !SANITIZER_ANDROID)
-  int pflags = (PROT_WRITE | PROT_EXEC);
-  if ((prot & pflags) != pflags)
+  if ((prot & (PROT_WRITE | PROT_EXEC)) != (PROT_WRITE | PROT_EXEC))
     return;
-
-#  if SANITIZER_APPLE && defined(MAP_JIT)
-  if ((flags & MAP_JIT) == MAP_JIT)
-    return;
-#  endif
 
   ScopedErrorReportLock l;
   SanitizerCommonDecorator d;
@@ -107,7 +101,8 @@ void ReportMmapWriteExec(int prot, int flags) {
   stack->Reset();
   uptr top = 0;
   uptr bottom = 0;
-  GET_CALLER_PC_BP;
+  GET_CALLER_PC_BP_SP;
+  (void)sp;
   bool fast = common_flags()->fast_unwind_on_fatal;
   if (StackTrace::WillUseFastUnwind(fast)) {
     GetThreadStackTopAndBottom(false, &top, &bottom);
@@ -148,22 +143,22 @@ static void MaybeReportNonExecRegion(uptr pc) {
 static void PrintMemoryByte(InternalScopedString *str, const char *before,
                             u8 byte) {
   SanitizerCommonDecorator d;
-  str->AppendF("%s%s%x%x%s ", before, d.MemoryByte(), byte >> 4, byte & 15,
-               d.Default());
+  str->append("%s%s%x%x%s ", before, d.MemoryByte(), byte >> 4, byte & 15,
+              d.Default());
 }
 
 static void MaybeDumpInstructionBytes(uptr pc) {
   if (!common_flags()->dump_instruction_bytes || (pc < GetPageSizeCached()))
     return;
   InternalScopedString str;
-  str.AppendF("First 16 instruction bytes at pc: ");
+  str.append("First 16 instruction bytes at pc: ");
   if (IsAccessibleMemoryRange(pc, 16)) {
     for (int i = 0; i < 16; ++i) {
       PrintMemoryByte(&str, "", ((u8 *)pc)[i]);
     }
-    str.AppendF("\n");
+    str.append("\n");
   } else {
-    str.AppendF("unaccessible\n");
+    str.append("unaccessible\n");
   }
   Report("%s", str.data());
 }
@@ -210,9 +205,9 @@ static void ReportDeadlySignalImpl(const SignalContext &sig, u32 tid,
     Report("Hint: pc points to the zero page.\n");
   if (sig.is_memory_access) {
     const char *access_type =
-        sig.write_flag == SignalContext::Write
+        sig.write_flag == SignalContext::WRITE
             ? "WRITE"
-            : (sig.write_flag == SignalContext::Read ? "READ" : "UNKNOWN");
+            : (sig.write_flag == SignalContext::READ ? "READ" : "UNKNOWN");
     Report("The signal is caused by a %s memory access.\n", access_type);
     if (!sig.is_true_faulting_addr)
       Report("Hint: this fault was caused by a dereference of a high value "

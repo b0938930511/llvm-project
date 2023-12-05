@@ -8,20 +8,17 @@
 
 #include "ExplainOutputStyle.h"
 
+#include "FormatUtil.h"
+#include "InputFile.h"
 #include "StreamUtil.h"
 #include "llvm-pdbutil.h"
 
 #include "llvm/DebugInfo/CodeView/Formatters.h"
-#include "llvm/DebugInfo/CodeView/LazyRandomTypeCollection.h"
 #include "llvm/DebugInfo/MSF/MappedBlockStream.h"
 #include "llvm/DebugInfo/PDB/Native/DbiStream.h"
-#include "llvm/DebugInfo/PDB/Native/FormatUtil.h"
 #include "llvm/DebugInfo/PDB/Native/InfoStream.h"
-#include "llvm/DebugInfo/PDB/Native/InputFile.h"
-#include "llvm/DebugInfo/PDB/Native/NativeSession.h"
 #include "llvm/DebugInfo/PDB/Native/PDBFile.h"
 #include "llvm/DebugInfo/PDB/Native/RawTypes.h"
-#include "llvm/Object/COFF.h"
 #include "llvm/Support/BinaryByteStream.h"
 #include "llvm/Support/BinaryStreamArray.h"
 #include "llvm/Support/Error.h"
@@ -32,7 +29,7 @@ using namespace llvm::msf;
 using namespace llvm::pdb;
 
 ExplainOutputStyle::ExplainOutputStyle(InputFile &File, uint64_t FileOffset)
-    : File(File), FileOffset(FileOffset), P(2, false, outs(), opts::Filters) {}
+    : File(File), FileOffset(FileOffset), P(2, false, outs()) {}
 
 Error ExplainOutputStyle::dump() {
   P.formatLine("Explaining file offset {0} of file '{1}'.", FileOffset,
@@ -66,8 +63,9 @@ Error ExplainOutputStyle::explainPdbFile() {
 }
 
 Error ExplainOutputStyle::explainBinaryFile() {
-  std::unique_ptr<BinaryByteStream> Stream = std::make_unique<BinaryByteStream>(
-      File.unknown().getBuffer(), llvm::endianness::little);
+  std::unique_ptr<BinaryByteStream> Stream =
+      std::make_unique<BinaryByteStream>(File.unknown().getBuffer(),
+                                          llvm::support::little);
   switch (opts::explain::InputType) {
   case opts::explain::InputFileType::DBIStream: {
     DbiStream Dbi(std::move(Stream));
@@ -123,14 +121,14 @@ bool ExplainOutputStyle::isPdbStreamDirectoryBlock() const {
   return llvm::is_contained(Layout.DirectoryBlocks, pdbBlockIndex());
 }
 
-std::optional<uint32_t> ExplainOutputStyle::getPdbBlockStreamIndex() const {
+Optional<uint32_t> ExplainOutputStyle::getPdbBlockStreamIndex() const {
   const auto &Layout = File.pdb().getMsfLayout();
   for (const auto &Entry : enumerate(Layout.StreamMap)) {
     if (!llvm::is_contained(Entry.value(), pdbBlockIndex()))
       continue;
     return Entry.index();
   }
-  return std::nullopt;
+  return None;
 }
 
 bool ExplainOutputStyle::explainPdbBlockStatus() {
@@ -375,7 +373,7 @@ static void explainDbiModiSubstreamOffset(LinePrinter &P, DbiStream &Dbi,
     ++Index;
   }
 
-  const DbiModuleDescriptor &Descriptor = *Prev;
+  DbiModuleDescriptor &Descriptor = *Prev;
   P.formatLine("which contains the descriptor for module {0} ({1}).", Index,
                Descriptor.getModuleName());
 }

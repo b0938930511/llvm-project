@@ -13,10 +13,7 @@
 
 #include "ReduceArguments.h"
 #include "Delta.h"
-#include "Utils.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
 #include <set>
 #include <vector>
@@ -29,10 +26,6 @@ static void replaceFunctionCalls(Function &OldF, Function &NewF,
   const auto &Users = OldF.users();
   for (auto I = Users.begin(), E = Users.end(); I != E; )
     if (auto *CI = dyn_cast<CallInst>(*I++)) {
-      // Skip uses in call instructions where OldF isn't the called function
-      // (e.g. if OldF is an argument of the call).
-      if (CI->getCalledFunction() != &OldF)
-        continue;
       SmallVector<Value *, 8> Args;
       for (auto ArgI = CI->arg_begin(), E = CI->arg_end(); ArgI != E; ++ArgI)
         if (ArgIndexesToKeep.count(ArgI - CI->arg_begin()))
@@ -56,23 +49,20 @@ static bool shouldRemoveArguments(const Function &F) {
 
 /// Removes out-of-chunk arguments from functions, and modifies their calls
 /// accordingly. It also removes allocations of out-of-chunk arguments.
-static void extractArgumentsFromModule(Oracle &O, ReducerWorkItem &WorkItem) {
-  Module &Program = WorkItem.getModule();
-  std::vector<Argument *> InitArgsToKeep;
+static void extractArgumentsFromModule(std::vector<Chunk> ChunksToKeep,
+                                       Module *Program) {
+  Oracle O(ChunksToKeep);
+
+  std::set<Argument *> ArgsToKeep;
   std::vector<Function *> Funcs;
   // Get inside-chunk arguments, as well as their parent function
-  for (auto &F : Program)
+  for (auto &F : *Program)
     if (shouldRemoveArguments(F)) {
       Funcs.push_back(&F);
       for (auto &A : F.args())
         if (O.shouldKeep())
-          InitArgsToKeep.push_back(&A);
+          ArgsToKeep.insert(&A);
     }
-
-  // We create a vector first, then convert it to a set, so that we don't have
-  // to pay the cost of rebalancing the set frequently if the order we insert
-  // the elements doesn't match the order they should appear inside the set.
-  std::set<Argument *> ArgsToKeep(InitArgsToKeep.begin(), InitArgsToKeep.end());
 
   for (auto *F : Funcs) {
     ValueToValueMapTy VMap;
@@ -81,7 +71,7 @@ static void extractArgumentsFromModule(Oracle &O, ReducerWorkItem &WorkItem) {
       if (!ArgsToKeep.count(&A)) {
         // By adding undesired arguments to the VMap, CloneFunction will remove
         // them from the resulting Function
-        VMap[&A] = getDefaultValue(A.getType());
+        VMap[&A] = UndefValue::get(A.getType());
         for (auto *U : A.users())
           if (auto *I = dyn_cast<Instruction>(*&U))
             InstToDelete.push_back(I);
@@ -91,7 +81,7 @@ static void extractArgumentsFromModule(Oracle &O, ReducerWorkItem &WorkItem) {
       if (!V)
         continue;
       auto *I = cast<Instruction>(V);
-      I->replaceAllUsesWith(getDefaultValue(I->getType()));
+      I->replaceAllUsesWith(UndefValue::get(I->getType()));
       if (!I->isTerminator())
         I->eraseFromParent();
     }
@@ -101,24 +91,45 @@ static void extractArgumentsFromModule(Oracle &O, ReducerWorkItem &WorkItem) {
       continue;
 
     std::set<int> ArgIndexesToKeep;
-    for (const auto &[Index, Arg] : enumerate(F->args()))
-      if (ArgsToKeep.count(&Arg))
-        ArgIndexesToKeep.insert(Index);
+    for (auto &Arg : enumerate(F->args()))
+      if (ArgsToKeep.count(&Arg.value()))
+        ArgIndexesToKeep.insert(Arg.index());
 
     auto *ClonedFunc = CloneFunction(F, VMap);
     // In order to preserve function order, we move Clone after old Function
     ClonedFunc->removeFromParent();
-    Program.getFunctionList().insertAfter(F->getIterator(), ClonedFunc);
+    Program->getFunctionList().insertAfter(F->getIterator(), ClonedFunc);
 
     replaceFunctionCalls(*F, *ClonedFunc, ArgIndexesToKeep);
     // Rename Cloned Function to Old's name
     std::string FName = std::string(F->getName());
-    F->replaceAllUsesWith(ClonedFunc);
+    F->replaceAllUsesWith(ConstantExpr::getBitCast(ClonedFunc, F->getType()));
     F->eraseFromParent();
     ClonedFunc->setName(FName);
   }
 }
 
+/// Counts the amount of arguments in functions and prints their respective
+/// name, index, and parent function name
+static int countArguments(Module *Program) {
+  // TODO: Silence index with --quiet flag
+  outs() << "----------------------------\n";
+  outs() << "Param Index Reference:\n";
+  int ArgsCount = 0;
+  for (auto &F : *Program)
+    if (shouldRemoveArguments(F)) {
+      outs() << "  " << F.getName() << "\n";
+      for (auto &A : F.args())
+        outs() << "\t" << ++ArgsCount << ": " << A.getName() << "\n";
+
+      outs() << "----------------------------\n";
+    }
+
+  return ArgsCount;
+}
+
 void llvm::reduceArgumentsDeltaPass(TestRunner &Test) {
-  runDeltaPass(Test, extractArgumentsFromModule, "Reducing Arguments");
+  outs() << "*** Reducing Arguments...\n";
+  int ArgCount = countArguments(Test.getProgram());
+  runDeltaPass(Test, ArgCount, extractArgumentsFromModule);
 }

@@ -20,7 +20,7 @@
 namespace llvm {
 
 template <typename IRUnitT, typename... ExtraArgTs>
-inline AnalysisManager<IRUnitT, ExtraArgTs...>::AnalysisManager() = default;
+inline AnalysisManager<IRUnitT, ExtraArgTs...>::AnalysisManager() {}
 
 template <typename IRUnitT, typename... ExtraArgTs>
 inline AnalysisManager<IRUnitT, ExtraArgTs...>::AnalysisManager(

@@ -1,13 +1,8 @@
 static_library("BinaryFormat") {
   output_name = "LLVMBinaryFormat"
-  deps = [
-    "//llvm/lib/Support",
-    "//llvm/lib/TargetParser",
-  ]
+  deps = [ "//llvm/lib/Support" ]
   sources = [
     "AMDGPUMetadataVerifier.cpp",
-    "COFF.cpp",
-    "DXContainer.cpp",
     "Dwarf.cpp",
     "ELF.cpp",
     "MachO.cpp",

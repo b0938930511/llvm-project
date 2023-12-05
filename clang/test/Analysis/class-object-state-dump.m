@@ -3,7 +3,7 @@
 
 // expected-no-diagnostics
 
-void clang_analyzer_printState(void);
+void clang_analyzer_printState();
 
 @interface NSObject {
 }

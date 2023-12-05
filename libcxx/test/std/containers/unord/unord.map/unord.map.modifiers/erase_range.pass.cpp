@@ -17,7 +17,6 @@
 #include <unordered_map>
 #include <string>
 #include <cassert>
-#include <iterator>
 
 #include "test_macros.h"
 #include "min_allocator.h"
@@ -38,7 +37,7 @@ int main(int, char**)
         };
         C c(a, a + sizeof(a)/sizeof(a[0]));
         C::const_iterator i = c.find(2);
-        C::const_iterator j = std::next(i, 1);
+        C::const_iterator j = next(i, 1);
         C::iterator k = c.erase(i, i);
         assert(k == i);
         assert(c.size() == 4);
@@ -75,7 +74,7 @@ int main(int, char**)
         };
         C c(a, a + sizeof(a)/sizeof(a[0]));
         C::const_iterator i = c.find(2);
-        C::const_iterator j = std::next(i, 1);
+        C::const_iterator j = next(i, 1);
         C::iterator k = c.erase(i, i);
         assert(k == i);
         assert(c.size() == 4);

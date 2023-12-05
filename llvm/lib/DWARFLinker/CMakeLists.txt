@@ -11,13 +11,11 @@ add_llvm_component_library(LLVMDWARFLinker
   intrinsics_gen
 
   LINK_COMPONENTS
-  AsmPrinter
   BinaryFormat
-  CodeGen
-  CodeGenTypes
   DebugInfoDWARF
+  AsmPrinter
+  CodeGen
   MC
   Object
   Support
-  TargetParser
   )

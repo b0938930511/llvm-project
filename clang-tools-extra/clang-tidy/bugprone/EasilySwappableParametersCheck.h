@@ -11,14 +11,16 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::bugprone {
+namespace clang {
+namespace tidy {
+namespace bugprone {
 
 /// Finds function definitions where parameters of convertible types follow
 /// each other directly, making call sites prone to calling the function with
 /// swapped (or badly ordered) arguments.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/bugprone/easily-swappable-parameters.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/bugprone-easily-swappable-parameters.html
 class EasilySwappableParametersCheck : public ClangTidyCheck {
 public:
   EasilySwappableParametersCheck(StringRef Name, ClangTidyContext *Context);
@@ -31,11 +33,11 @@ public:
   const std::size_t MinimumLength;
 
   /// The parameter names (as written in the source text) to be ignored.
-  const std::vector<StringRef> IgnoredParameterNames;
+  const std::vector<std::string> IgnoredParameterNames;
 
   /// The parameter typename suffixes (as written in the source code) to be
   /// ignored.
-  const std::vector<StringRef> IgnoredParameterTypeSuffixes;
+  const std::vector<std::string> IgnoredParameterTypeSuffixes;
 
   /// Whether to consider differently qualified versions of the same type
   /// mixable.
@@ -57,6 +59,8 @@ public:
   const std::size_t NamePrefixSuffixSilenceDissimilarityTreshold;
 };
 
-} // namespace clang::tidy::bugprone
+} // namespace bugprone
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_BUGPRONE_EASILYSWAPPABLEPARAMETERSCHECK_H

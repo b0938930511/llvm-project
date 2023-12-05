@@ -31,21 +31,22 @@ using namespace llvm;
 
 static MCSymbol *GetSymbolFromOperand(const MachineOperand &MO,
                                       AsmPrinter &AP) {
-  if (MO.isGlobal()) {
-    // Get the symbol from the global, accounting for XCOFF-specific
-    // intricacies (see TargetLoweringObjectFileXCOFF::getTargetSymbol).
-    const GlobalValue *GV = MO.getGlobal();
-    return AP.getSymbol(GV);
-  }
-
-  assert(MO.isSymbol() && "Isn't a symbol reference");
+  const TargetMachine &TM = AP.TM;
+  Mangler &Mang = TM.getObjFileLowering()->getMangler();
+  const DataLayout &DL = AP.getDataLayout();
+  MCContext &Ctx = AP.OutContext;
 
   SmallString<128> Name;
-  const DataLayout &DL = AP.getDataLayout();
-  Mangler::getNameWithPrefix(Name, MO.getSymbolName(), DL);
+  if (!MO.isGlobal()) {
+    assert(MO.isSymbol() && "Isn't a symbol reference");
+    Mangler::getNameWithPrefix(Name, MO.getSymbolName(), DL);
+  } else {
+    const GlobalValue *GV = MO.getGlobal();
+    TM.getNameWithPrefix(Name, GV, Mang);
+  }
 
-  MCContext &Ctx = AP.OutContext;
   MCSymbol *Sym = Ctx.getOrCreateSymbol(Name);
+
   return Sym;
 }
 
@@ -79,8 +80,6 @@ static MCOperand GetSymbolRef(const MachineOperand &MO, const MCSymbol *Symbol,
       break;
   }
 
-  const TargetMachine &TM = Printer.TM;
-
   if (MO.getTargetFlags() == PPCII::MO_PLT)
     RefKind = MCSymbolRefExpr::VK_PLT;
   else if (MO.getTargetFlags() == PPCII::MO_PCREL_FLAG)
@@ -95,21 +94,12 @@ static MCOperand GetSymbolRef(const MachineOperand &MO, const MCSymbol *Symbol,
     RefKind = MCSymbolRefExpr::VK_PPC_GOT_TLSLD_PCREL;
   else if (MO.getTargetFlags() == PPCII::MO_GOT_TPREL_PCREL_FLAG)
     RefKind = MCSymbolRefExpr::VK_PPC_GOT_TPREL_PCREL;
-  else if (MO.getTargetFlags() == PPCII::MO_TPREL_FLAG) {
-    assert(MO.isGlobal() && "Only expecting a global MachineOperand here!");
-    TLSModel::Model Model = TM.getTLSModel(MO.getGlobal());
-    // For the local-exec TLS model, we may generate the offset from the TLS
-    // base as an immediate operand (instead of using a TOC entry).
-    // Set the relocation type in case the result is used for purposes other
-    // than a TOC reference. In TOC reference cases, this result is discarded.
-    if (Model == TLSModel::LocalExec)
-      RefKind = MCSymbolRefExpr::VK_PPC_AIX_TLSLE;
-  }
 
   const MachineInstr *MI = MO.getParent();
   const MachineFunction *MF = MI->getMF();
   const Module *M = MF->getFunction().getParent();
   const PPCSubtarget *Subtarget = &(MF->getSubtarget<PPCSubtarget>());
+  const TargetMachine &TM = Printer.TM;
 
   unsigned MIOpcode = MI->getOpcode();
   assert((Subtarget->isUsingPCRelativeCalls() || MIOpcode != PPC::BL8_NOTOC) &&
@@ -117,7 +107,7 @@ static MCOperand GetSymbolRef(const MachineOperand &MO, const MCSymbol *Symbol,
   if (Subtarget->isUsingPCRelativeCalls()) {
     if (MIOpcode == PPC::TAILB || MIOpcode == PPC::TAILB8 ||
         MIOpcode == PPC::TCRETURNdi || MIOpcode == PPC::TCRETURNdi8 ||
-        MIOpcode == PPC::BL8_NOTOC || MIOpcode == PPC::BL8_NOTOC_RM) {
+        MIOpcode == PPC::BL8_NOTOC) {
       RefKind = MCSymbolRefExpr::VK_PPC_NOTOC;
     }
     if (MO.getTargetFlags() == PPCII::MO_PCREL_OPT_FLAG)
@@ -162,9 +152,9 @@ void llvm::LowerPPCMachineInstrToMCInst(const MachineInstr *MI, MCInst &OutMI,
                                         AsmPrinter &AP) {
   OutMI.setOpcode(MI->getOpcode());
 
-  for (const MachineOperand &MO : MI->operands()) {
+  for (unsigned i = 0, e = MI->getNumOperands(); i != e; ++i) {
     MCOperand MCOp;
-    if (LowerPPCMachineOperandToMCOperand(MO, MCOp, AP))
+    if (LowerPPCMachineOperandToMCOperand(MI->getOperand(i), MCOp, AP))
       OutMI.addOperand(MCOp);
   }
 }

@@ -12,7 +12,6 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringRef.h"
 #include <mutex>
-#include <optional>
 
 namespace lldb_private {
 
@@ -25,10 +24,10 @@ public:
   typedef uint32_t id_t;
   virtual ~UserIDResolver(); // anchor
 
-  std::optional<llvm::StringRef> GetUserName(id_t uid) {
+  llvm::Optional<llvm::StringRef> GetUserName(id_t uid) {
     return Get(uid, m_uid_cache, &UserIDResolver::DoGetUserName);
   }
-  std::optional<llvm::StringRef> GetGroupName(id_t gid) {
+  llvm::Optional<llvm::StringRef> GetGroupName(id_t gid) {
     return Get(gid, m_gid_cache, &UserIDResolver::DoGetGroupName);
   }
 
@@ -37,15 +36,15 @@ public:
   static UserIDResolver &GetNoopResolver();
 
 protected:
-  virtual std::optional<std::string> DoGetUserName(id_t uid) = 0;
-  virtual std::optional<std::string> DoGetGroupName(id_t gid) = 0;
+  virtual llvm::Optional<std::string> DoGetUserName(id_t uid) = 0;
+  virtual llvm::Optional<std::string> DoGetGroupName(id_t gid) = 0;
 
 private:
-  using Map = llvm::DenseMap<id_t, std::optional<std::string>>;
+  using Map = llvm::DenseMap<id_t, llvm::Optional<std::string>>;
 
-  std::optional<llvm::StringRef>
+  llvm::Optional<llvm::StringRef>
   Get(id_t id, Map &cache,
-      std::optional<std::string> (UserIDResolver::*do_get)(id_t));
+      llvm::Optional<std::string> (UserIDResolver::*do_get)(id_t));
 
   std::mutex m_mutex;
   Map m_uid_cache;

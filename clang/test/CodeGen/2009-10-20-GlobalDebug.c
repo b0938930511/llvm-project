@@ -5,7 +5,7 @@
 // CHECK: @global ={{.*}} global i32 0, align 4, !dbg [[G:![0-9]+]]
 
 int global;
-int main(void) {
+int main() {
   static int localstatic;
   return 0;
 }

@@ -1,6 +1,5 @@
 LIBRARY library
 EXPORTS
   function
-  alias == function
   data DATA
   constant CONSTANT

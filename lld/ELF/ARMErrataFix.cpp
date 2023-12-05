@@ -14,16 +14,18 @@
 //===----------------------------------------------------------------------===//
 
 #include "ARMErrataFix.h"
-#include "InputFiles.h"
+
+#include "Config.h"
 #include "LinkerScript.h"
 #include "OutputSections.h"
 #include "Relocations.h"
 #include "Symbols.h"
 #include "SyntheticSections.h"
 #include "Target.h"
-#include "lld/Common/CommonLinkerContext.h"
+#include "lld/Common/Memory.h"
 #include "lld/Common/Strings.h"
 #include "llvm/Support/Endian.h"
+#include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 
 using namespace llvm;
@@ -68,7 +70,7 @@ using namespace lld::elf;
 // 00001002       2 - bytes padding
 // 00001004 __CortexA8657417_00000FFE: B.w func
 
-class elf::Patch657417Section final : public SyntheticSection {
+class elf::Patch657417Section : public SyntheticSection {
 public:
   Patch657417Section(InputSection *p, uint64_t off, uint32_t instr, bool isARM);
 
@@ -140,9 +142,9 @@ Patch657417Section::Patch657417Section(InputSection *p, uint64_t off,
       patchee(p), patcheeOffset(off), instr(instr), isARM(isARM) {
   parent = p->getParent();
   patchSym = addSyntheticLocal(
-      saver().save("__CortexA8657417_" + utohexstr(getBranchAddr())), STT_FUNC,
+      saver.save("__CortexA8657417_" + utohexstr(getBranchAddr())), STT_FUNC,
       isARM ? 0 : 1, getSize(), *this);
-  addSyntheticLocal(saver().save(isARM ? "$a" : "$t"), STT_NOTYPE, 0, 0, *this);
+  addSyntheticLocal(saver.save(isARM ? "$a" : "$t"), STT_NOTYPE, 0, 0, *this);
 }
 
 uint64_t Patch657417Section::getBranchAddr() const {
@@ -181,8 +183,8 @@ void Patch657417Section::writeTo(uint8_t *buf) {
   else
     write32le(buf, 0x9000f000);
   // If we have a relocation then apply it.
-  if (!relocs().empty()) {
-    target->relocateAlloc(*this, buf);
+  if (!relocations.empty()) {
+    relocateAlloc(buf, buf + getSize());
     return;
   }
 
@@ -207,7 +209,7 @@ static bool branchDestInFirstRegion(const InputSection *isec, uint64_t off,
                                     uint32_t instr, const Relocation *r) {
   uint64_t sourceAddr = isec->getVA(0) + off;
   assert((sourceAddr & 0xfff) == 0xffe);
-  uint64_t destAddr;
+  uint64_t destAddr = sourceAddr;
   // If there is a branch relocation at the same offset we must use this to
   // find the destination address as the branch could be indirected via a thunk
   // or the PLT.
@@ -266,7 +268,7 @@ static ScanResult scanCortexA8Errata657417(InputSection *isec, uint64_t &off,
   }
 
   ScanResult scanRes = {0, 0, nullptr};
-  const uint8_t *buf = isec->content().begin();
+  const uint8_t *buf = isec->data().begin();
   // ARMv7-A Thumb 32-bit instructions are encoded 2 consecutive
   // little-endian halfwords.
   const ulittle16_t *instBuf = reinterpret_cast<const ulittle16_t *>(buf + off);
@@ -281,12 +283,12 @@ static ScanResult scanCortexA8Errata657417(InputSection *isec, uint64_t &off,
       // Find a relocation for the branch if it exists. This will be used
       // to determine the target.
       uint64_t branchOff = off + 4;
-      auto relIt = llvm::find_if(isec->relocs(), [=](const Relocation &r) {
+      auto relIt = llvm::find_if(isec->relocations, [=](const Relocation &r) {
         return r.offset == branchOff &&
                (r.type == R_ARM_THM_JUMP19 || r.type == R_ARM_THM_JUMP24 ||
                 r.type == R_ARM_THM_CALL);
       });
-      if (relIt != isec->relocs().end())
+      if (relIt != isec->relocations.end())
         scanRes.rel = &(*relIt);
       if (branchDestInFirstRegion(isec, branchOff, instr2, scanRes.rel)) {
         if (patchInRange(isec, branchOff, instr2)) {
@@ -317,18 +319,19 @@ void ARMErr657417Patcher::init() {
   // [Symbol Value, End of section). The type, code or data, is determined by
   // the mapping symbol name, $a for Arm code, $t for Thumb code, $d for data.
   auto isArmMapSymbol = [](const Symbol *s) {
-    return s->getName() == "$a" || s->getName().starts_with("$a.");
+    return s->getName() == "$a" || s->getName().startswith("$a.");
   };
   auto isThumbMapSymbol = [](const Symbol *s) {
-    return s->getName() == "$t" || s->getName().starts_with("$t.");
+    return s->getName() == "$t" || s->getName().startswith("$t.");
   };
   auto isDataMapSymbol = [](const Symbol *s) {
-    return s->getName() == "$d" || s->getName().starts_with("$d.");
+    return s->getName() == "$d" || s->getName().startswith("$d.");
   };
 
   // Collect mapping symbols for every executable InputSection.
-  for (ELFFileBase *file : ctx.objectFiles) {
-    for (Symbol *s : file->getLocalSymbols()) {
+  for (InputFile *file : objectFiles) {
+    auto *f = cast<ObjFile<ELF32LE>>(file);
+    for (Symbol *s : f->getLocalSymbols()) {
       auto *def = dyn_cast<Defined>(s);
       if (!def)
         continue;
@@ -393,7 +396,7 @@ void ARMErr657417Patcher::insertPatches(
   // determine the insertion point. This is ok as we only merge into an
   // InputSectionDescription once per pass, and at the end of the pass
   // assignAddresses() will recalculate all the outSecOff values.
-  SmallVector<InputSection *, 0> tmp;
+  std::vector<InputSection *> tmp;
   tmp.reserve(isd.sections.size() + patches.size());
   auto mergeCmp = [](const InputSection *a, const InputSection *b) {
     if (a->outSecOff != b->outSecOff)
@@ -451,7 +454,7 @@ static void implementPatch(ScanResult sr, InputSection *isec,
       patchRelType = R_ARM_JUMP24;
       patchRelAddend -= 4;
     }
-    psec->addReloc(
+    psec->relocations.push_back(
         Relocation{sr.rel->expr, patchRelType, 0, patchRelAddend, sr.rel->sym});
     // Redirect the existing branch relocation to the patch.
     sr.rel->expr = R_PC;
@@ -470,7 +473,8 @@ static void implementPatch(ScanResult sr, InputSection *isec,
       type = R_ARM_THM_JUMP24;
     else
       type = R_ARM_THM_CALL;
-    isec->addReloc(Relocation{R_PC, type, sr.off, -4, psec->patchSym});
+    isec->relocations.push_back(
+        Relocation{R_PC, type, sr.off, -4, psec->patchSym});
   }
   patches.push_back(psec);
 }
@@ -497,8 +501,8 @@ ARMErr657417Patcher::patchInputSectionDescription(
     while (thumbSym != mapSyms.end()) {
       auto nonThumbSym = std::next(thumbSym);
       uint64_t off = (*thumbSym)->value;
-      uint64_t limit = nonThumbSym == mapSyms.end() ? isec->content().size()
-                                                    : (*nonThumbSym)->value;
+      uint64_t limit = (nonThumbSym == mapSyms.end()) ? isec->data().size()
+                                                      : (*nonThumbSym)->value;
 
       while (off < limit) {
         ScanResult sr = scanCortexA8Errata657417(isec, off, limit);
@@ -521,8 +525,8 @@ bool ARMErr657417Patcher::createFixes() {
   for (OutputSection *os : outputSections) {
     if (!(os->flags & SHF_ALLOC) || !(os->flags & SHF_EXECINSTR))
       continue;
-    for (SectionCommand *cmd : os->commands)
-      if (auto *isd = dyn_cast<InputSectionDescription>(cmd)) {
+    for (BaseCommand *bc : os->sectionCommands)
+      if (auto *isd = dyn_cast<InputSectionDescription>(bc)) {
         std::vector<Patch657417Section *> patches =
             patchInputSectionDescription(*isd);
         if (!patches.empty()) {

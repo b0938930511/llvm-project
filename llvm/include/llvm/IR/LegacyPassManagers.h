@@ -90,6 +90,7 @@ template <typename T> class ArrayRef;
 class Module;
 class StringRef;
 class Value;
+class Timer;
 class PMDataManager;
 
 // enums for debugging strings
@@ -294,7 +295,9 @@ private:
 /// used by pass managers.
 class PMDataManager {
 public:
-  explicit PMDataManager() { initializeAnalysisInfo(); }
+  explicit PMDataManager() : TPM(nullptr), Depth(0) {
+    initializeAnalysisInfo();
+  }
 
   virtual ~PMDataManager();
 
@@ -416,14 +419,14 @@ public:
 
 protected:
   // Top level manager.
-  PMTopLevelManager *TPM = nullptr;
+  PMTopLevelManager *TPM;
 
   // Collection of pass that are managed by this manager
   SmallVector<Pass *, 16> PassVector;
 
   // Collection of Analysis provided by Parent pass manager and
-  // used by current pass manager. At any time there can not be more
-  // then PMT_Last active pass managers.
+  // used by current pass manager. At at time there can not be more
+  // then PMT_Last active pass mangers.
   DenseMap<AnalysisID, Pass *> *InheritedAnalysis[PMT_Last];
 
   /// isPassDebuggingExecutionsOrMore - Return true if -debug-pass=Executions
@@ -444,7 +447,7 @@ private:
   // this manager.
   SmallVector<Pass *, 16> HigherLevelAnalysis;
 
-  unsigned Depth = 0;
+  unsigned Depth;
 };
 
 //===----------------------------------------------------------------------===//
@@ -457,7 +460,8 @@ private:
 class FPPassManager : public ModulePass, public PMDataManager {
 public:
   static char ID;
-  explicit FPPassManager() : ModulePass(ID) {}
+  explicit FPPassManager()
+  : ModulePass(ID), PMDataManager() { }
 
   /// run - Execute all of the passes scheduled for execution.  Keep track of
   /// whether any of the passes modifies the module, and if so, return true.

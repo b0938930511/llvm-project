@@ -14,6 +14,7 @@
 #include "llvm/CodeGen/LivePhysRegs.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/Support/Compiler.h"
+#include <cstdint>
 #include <vector>
 
 namespace llvm {
@@ -22,6 +23,7 @@ class BasicBlock;
 class MachineBranchProbabilityInfo;
 class MachineFunction;
 class MachineLoopInfo;
+class MachineModuleInfo;
 class MachineRegisterInfo;
 class MBFIWrapper;
 class ProfileSummaryInfo;
@@ -113,15 +115,15 @@ class TargetRegisterInfo;
     };
     std::vector<SameTailElt> SameTails;
 
-    bool AfterBlockPlacement = false;
-    bool EnableTailMerge = false;
-    bool EnableHoistCommonCode = false;
-    bool UpdateLiveIns = false;
+    bool AfterBlockPlacement;
+    bool EnableTailMerge;
+    bool EnableHoistCommonCode;
+    bool UpdateLiveIns;
     unsigned MinCommonTailLength;
-    const TargetInstrInfo *TII = nullptr;
-    const MachineRegisterInfo *MRI = nullptr;
-    const TargetRegisterInfo *TRI = nullptr;
-    MachineLoopInfo *MLI = nullptr;
+    const TargetInstrInfo *TII;
+    const MachineRegisterInfo *MRI;
+    const TargetRegisterInfo *TRI;
+    MachineLoopInfo *MLI;
     LivePhysRegs LiveRegs;
 
   private:

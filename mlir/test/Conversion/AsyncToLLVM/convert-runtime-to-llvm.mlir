@@ -1,16 +1,17 @@
 // RUN: mlir-opt %s -convert-async-to-llvm | FileCheck %s --dump-input=always
 
 // CHECK-LABEL: @create_token
-func.func @create_token() {
+func @create_token() {
   // CHECK: %[[TOKEN:.*]] = call @mlirAsyncRuntimeCreateToken
   %0 = async.runtime.create : !async.token
   return
 }
 
 // CHECK-LABEL: @create_value
-func.func @create_value() {
-  // CHECK: %[[NULL:.*]] = llvm.mlir.zero : !llvm.ptr
-  // CHECK: %[[OFFSET:.*]] = llvm.getelementptr %[[NULL]][1]
+func @create_value() {
+  // CHECK: %[[NULL:.*]] = llvm.mlir.null : !llvm.ptr<f32>
+  // CHECK: %[[ONE:.*]] = llvm.mlir.constant(1 : i32) : i32
+  // CHECK: %[[OFFSET:.*]] = llvm.getelementptr %[[NULL]][%[[ONE]]]
   // CHECK: %[[SIZE:.*]] = llvm.ptrtoint %[[OFFSET]]
   // CHECK: %[[VALUE:.*]] = call @mlirAsyncRuntimeCreateValue(%[[SIZE]])
   %0 = async.runtime.create : !async.value<f32>
@@ -18,17 +19,17 @@ func.func @create_value() {
 }
 
 // CHECK-LABEL: @create_group
-func.func @create_group() {
-  // CHECK: %[[C:.*]] = arith.constant 1 : index
+func @create_group() {
+  // CHECK: %[[C:.*]] = constant 1 : index
   // CHECK: %[[S:.*]] = builtin.unrealized_conversion_cast %[[C]] : index to i64
-  %c = arith.constant 1 : index
+  %c = constant 1 : index
   // CHECK: %[[GROUP:.*]] = call @mlirAsyncRuntimeCreateGroup(%[[S]])
   %0 = async.runtime.create_group  %c: !async.group
   return
 }
 
 // CHECK-LABEL: @set_token_available
-func.func @set_token_available() {
+func @set_token_available() {
   // CHECK: %[[TOKEN:.*]] = call @mlirAsyncRuntimeCreateToken
   %0 = async.runtime.create : !async.token
   // CHECK: call @mlirAsyncRuntimeEmplaceToken(%[[TOKEN]])
@@ -37,7 +38,7 @@ func.func @set_token_available() {
 }
 
 // CHECK-LABEL: @set_value_available
-func.func @set_value_available() {
+func @set_value_available() {
   // CHECK: %[[VALUE:.*]] = call @mlirAsyncRuntimeCreateValue
   %0 = async.runtime.create : !async.value<f32>
   // CHECK: call @mlirAsyncRuntimeEmplaceValue(%[[VALUE]])
@@ -46,7 +47,7 @@ func.func @set_value_available() {
 }
 
 // CHECK-LABEL: @is_token_error
-func.func @is_token_error() -> i1 {
+func @is_token_error() -> i1 {
   // CHECK: %[[TOKEN:.*]] = call @mlirAsyncRuntimeCreateToken
   %0 = async.runtime.create : !async.token
   // CHECK: %[[ERR:.*]] = call @mlirAsyncRuntimeIsTokenError(%[[TOKEN]])
@@ -55,7 +56,7 @@ func.func @is_token_error() -> i1 {
 }
 
 // CHECK-LABEL: @is_value_error
-func.func @is_value_error() -> i1 {
+func @is_value_error() -> i1 {
   // CHECK: %[[VALUE:.*]] = call @mlirAsyncRuntimeCreateValue
   %0 = async.runtime.create : !async.value<f32>
   // CHECK: %[[ERR:.*]] = call @mlirAsyncRuntimeIsValueError(%[[VALUE]])
@@ -64,7 +65,7 @@ func.func @is_value_error() -> i1 {
 }
 
 // CHECK-LABEL: @await_token
-func.func @await_token() {
+func @await_token() {
   // CHECK: %[[TOKEN:.*]] = call @mlirAsyncRuntimeCreateToken
   %0 = async.runtime.create : !async.token
   // CHECK: call @mlirAsyncRuntimeAwaitToken(%[[TOKEN]])
@@ -73,7 +74,7 @@ func.func @await_token() {
 }
 
 // CHECK-LABEL: @await_value
-func.func @await_value() {
+func @await_value() {
   // CHECK: %[[VALUE:.*]] = call @mlirAsyncRuntimeCreateValue
   %0 = async.runtime.create : !async.value<f32>
   // CHECK: call @mlirAsyncRuntimeAwaitValue(%[[VALUE]])
@@ -82,8 +83,8 @@ func.func @await_value() {
 }
 
 // CHECK-LABEL: @await_group
-func.func @await_group() {
-  %c = arith.constant 1 : index
+func @await_group() {
+  %c = constant 1 : index
   // CHECK: %[[GROUP:.*]] = call @mlirAsyncRuntimeCreateGroup
   %0 = async.runtime.create_group %c: !async.group
   // CHECK: call @mlirAsyncRuntimeAwaitAllInGroup(%[[GROUP]])
@@ -92,7 +93,7 @@ func.func @await_group() {
 }
 
 // CHECK-LABEL: @await_and_resume_token
-func.func @await_and_resume_token() {
+func @await_and_resume_token() {
   %0 = async.coro.id
   // CHECK: %[[HDL:.*]] = llvm.intr.coro.begin
   %1 = async.coro.begin %0
@@ -106,7 +107,7 @@ func.func @await_and_resume_token() {
 }
 
 // CHECK-LABEL: @await_and_resume_value
-func.func @await_and_resume_value() {
+func @await_and_resume_value() {
   %0 = async.coro.id
   // CHECK: %[[HDL:.*]] = llvm.intr.coro.begin
   %1 = async.coro.begin %0
@@ -120,8 +121,8 @@ func.func @await_and_resume_value() {
 }
 
 // CHECK-LABEL: @await_and_resume_group
-func.func @await_and_resume_group() {
-  %c = arith.constant 1 : index
+func @await_and_resume_group() {
+  %c = constant 1 : index
   %0 = async.coro.id
   // CHECK: %[[HDL:.*]] = llvm.intr.coro.begin
   %1 = async.coro.begin %0
@@ -135,7 +136,7 @@ func.func @await_and_resume_group() {
 }
 
 // CHECK-LABEL: @resume
-func.func @resume() {
+func @resume() {
   %0 = async.coro.id
   // CHECK: %[[HDL:.*]] = llvm.intr.coro.begin
   %1 = async.coro.begin %0
@@ -146,31 +147,33 @@ func.func @resume() {
 }
 
 // CHECK-LABEL: @store
-func.func @store() {
-  // CHECK: %[[CST:.*]] = arith.constant 1.0
-  %0 = arith.constant 1.0 : f32
+func @store() {
+  // CHECK: %[[CST:.*]] = constant 1.0
+  %0 = constant 1.0 : f32
   // CHECK: %[[VALUE:.*]] = call @mlirAsyncRuntimeCreateValue
   %1 = async.runtime.create : !async.value<f32>
   // CHECK: %[[P0:.*]] = call @mlirAsyncRuntimeGetValueStorage(%[[VALUE]])
-  // CHECK: llvm.store %[[CST]], %[[P0]] : f32, !llvm.ptr
+  // CHECK: %[[P1:.*]] = llvm.bitcast %[[P0]] : !llvm.ptr<i8> to !llvm.ptr<f32>
+  // CHECK: llvm.store %[[CST]], %[[P1]]
   async.runtime.store %0, %1 : !async.value<f32>
   return
 }
 
 // CHECK-LABEL: @load
-func.func @load() -> f32 {
+func @load() -> f32 {
   // CHECK: %[[VALUE:.*]] = call @mlirAsyncRuntimeCreateValue
   %0 = async.runtime.create : !async.value<f32>
   // CHECK: %[[P0:.*]] = call @mlirAsyncRuntimeGetValueStorage(%[[VALUE]])
-  // CHECK: %[[VALUE:.*]] = llvm.load %[[P0]] : !llvm.ptr -> f32
+  // CHECK: %[[P1:.*]] = llvm.bitcast %[[P0]] : !llvm.ptr<i8> to !llvm.ptr<f32>
+  // CHECK: %[[VALUE:.*]] = llvm.load %[[P1]]
   %1 = async.runtime.load %0 : !async.value<f32>
   // CHECK: return %[[VALUE]] : f32
   return %1 : f32
 }
 
 // CHECK-LABEL: @add_token_to_group
-func.func @add_token_to_group() {
-  %c = arith.constant 1 : index
+func @add_token_to_group() {
+  %c = constant 1 : index
   // CHECK: %[[TOKEN:.*]] = call @mlirAsyncRuntimeCreateToken
   %0 = async.runtime.create : !async.token
   // CHECK: %[[GROUP:.*]] = call @mlirAsyncRuntimeCreateGroup

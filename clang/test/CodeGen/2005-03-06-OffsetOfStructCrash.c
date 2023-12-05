@@ -5,10 +5,10 @@ struct XXX {
   struct  Y F;
 };
 
-void test1(void) {
+void test1() {
    (int)&((struct XXX*)(((void *)0)))->F;
 }
 
-void test2(void) {
+void test2() {
    &((struct XXX*)(((void *)0)))->F;
 }

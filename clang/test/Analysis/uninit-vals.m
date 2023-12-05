@@ -1,4 +1,4 @@
-// RUN: %clang_analyze_cc1 -analyzer-checker=core,unix.Malloc,debug.ExprInspection -analyzer-output=text -verify %s
+// RUN: %clang_analyze_cc1 -analyzer-store=region -analyzer-checker=core,unix.Malloc,debug.ExprInspection -analyzer-output=text -verify %s
 
 typedef unsigned int NSUInteger;
 typedef __typeof__(sizeof(int)) size_t;
@@ -17,7 +17,7 @@ struct s global;
 
 void g(int);
 
-void f4(void) {
+void f4() {
   int a;
   if (global.data == 0)
     a = 3;
@@ -28,9 +28,9 @@ void f4(void) {
 
 // Test uninitialized value due to part of the structure being uninitialized.
 struct TestUninit { int x; int y; };
-struct TestUninit test_uninit_aux(void);
+struct TestUninit test_uninit_aux();
 void test_unit_aux2(int);
-void test_uninit_pos(void) {
+void test_uninit_pos() {
   struct TestUninit v1 = { 0, 0 };
   struct TestUninit v2 = test_uninit_aux();
   int z; // expected-note{{'z' declared without an initial value}}
@@ -38,27 +38,27 @@ void test_uninit_pos(void) {
             // expected-note@-1{{Assigned value is garbage or undefined}}
   test_unit_aux2(v2.x + v1.y);
 }
-void test_uninit_pos_2(void) {
+void test_uninit_pos_2() {
   struct TestUninit v1 = { 0, 0 };
   struct TestUninit v2;
   test_unit_aux2(v2.x + v1.y);  // expected-warning{{The left operand of '+' is a garbage value}}
                                 // expected-note@-1{{The left operand of '+' is a garbage value}}
 }
-void test_uninit_pos_3(void) {
+void test_uninit_pos_3() {
   struct TestUninit v1 = { 0, 0 };
   struct TestUninit v2;
   test_unit_aux2(v1.y + v2.x);  // expected-warning{{The right operand of '+' is a garbage value}}
                                 // expected-note@-1{{The right operand of '+' is a garbage value}}
 }
 
-void test_uninit_neg(void) {
+void test_uninit_neg() {
   struct TestUninit v1 = { 0, 0 };
   struct TestUninit v2 = test_uninit_aux();
   test_unit_aux2(v2.x + v1.y);
 }
 
 extern void test_uninit_struct_arg_aux(struct TestUninit arg);
-void test_uninit_struct_arg(void) {
+void test_uninit_struct_arg() {
   struct TestUninit x; // expected-note{{'x' initialized here}}
   test_uninit_struct_arg_aux(x); // expected-warning{{Passed-by-value struct argument contains uninitialized data (e.g., field: 'x')}}
                                  // expected-note@-1{{Passed-by-value struct argument contains uninitialized data (e.g., field: 'x')}}
@@ -73,9 +73,9 @@ void testFoo(Foo *o) {
                  // expected-note@-1{{Passed-by-value struct argument contains uninitialized data (e.g., field: 'x')}}
 }
 
-// Test case shows an uninitialized value being used in the LHS of a compound
-// assignment.
-void rdar_7780304(void) {
+// Test case from <rdar://problem/7780304>.  That shows an uninitialized value
+// being used in the LHS of a compound assignment.
+void rdar_7780304() {
   typedef struct s_r7780304 { int x; } s_r7780304;
   s_r7780304 b;
   b.x |= 1; // expected-warning{{The left expression of the compound assignment is an uninitialized value. The computed value will also be garbage}}
@@ -157,7 +157,7 @@ Point makePoint(float x, float y) {
   return result;
 }
 
-void PR14765_test(void) {
+void PR14765_test() {
   Circle *testObj = calloc(sizeof(Circle), 1);
 
   clang_analyzer_eval(testObj->size == 0); // expected-warning{{TRUE}}
@@ -169,7 +169,7 @@ void PR14765_test(void) {
 
   // FIXME: Assigning to 'testObj->origin' kills the default binding for the
   // whole region, meaning that we've forgotten that testObj->size should also
-  // default to 0.
+  // default to 0. Tracked by <rdar://problem/12701038>.
   // This should be TRUE.
   clang_analyzer_eval(testObj->size == 0); // expected-warning{{UNKNOWN}}
                                            // expected-note@-1{{UNKNOWN}}
@@ -206,7 +206,7 @@ IntPoint makeIntPoint(int x, int y) {
   return result;
 }
 
-void PR14765_test_int(void) {
+void PR14765_test_int() {
   IntCircle *testObj = calloc(sizeof(IntCircle), 1);
 
   clang_analyzer_eval(testObj->size == 0); // expected-warning{{TRUE}}
@@ -230,7 +230,7 @@ void PR14765_test_int(void) {
 
   // FIXME: Assigning to 'testObj->origin' kills the default binding for the
   // whole region, meaning that we've forgotten that testObj->size should also
-  // default to 0.
+  // default to 0. Tracked by <rdar://problem/12701038>.
   // This should be TRUE.
   clang_analyzer_eval(testObj->size == 0); // expected-warning{{UNKNOWN}}
                                            // expected-note@-1{{UNKNOWN}}
@@ -289,7 +289,7 @@ IntPoint2D makeIntPoint2D(int x, int y) {
   return result;
 }
 
-void testSmallStructsCopiedPerField(void) {
+void testSmallStructsCopiedPerField() {
   IntPoint2D a;
   a.x = 0;
 
@@ -300,7 +300,7 @@ void testSmallStructsCopiedPerField(void) {
                // expected-note@-1{{uninitialized}}
 }
 
-void testLargeStructsNotCopiedPerField(void) {
+void testLargeStructsNotCopiedPerField() {
   IntPoint a;
   a.x = 0;
 
@@ -310,7 +310,7 @@ void testLargeStructsNotCopiedPerField(void) {
   useInt(b.y); // no-warning
 }
 
-void testSmallStructInLargerStruct(void) {
+void testSmallStructInLargerStruct() {
   IntCircle2D *testObj = calloc(sizeof(IntCircle2D), 1);
 
   clang_analyzer_eval(testObj->size == 0); // expected-warning{{TRUE}}
@@ -352,7 +352,7 @@ void testCopySmallStructIntoArgument(IntCircle2D *testObj) {
                                                // expected-note@-1{{TRUE}}
 }
 
-void testSmallStructBitfields(void) {
+void testSmallStructBitfields() {
   struct {
     int x : 4;
     int y : 4;
@@ -368,7 +368,7 @@ void testSmallStructBitfields(void) {
                                  // expected-note@-1{{TRUE}}
 }
 
-void testSmallStructBitfieldsFirstUndef(void) {
+void testSmallStructBitfieldsFirstUndef() {
   struct {
     int x : 4;
     int y : 4;
@@ -383,7 +383,7 @@ void testSmallStructBitfieldsFirstUndef(void) {
                                  // expected-note@-1{{garbage}}
 }
 
-void testSmallStructBitfieldsSecondUndef(void) {
+void testSmallStructBitfieldsSecondUndef() {
   struct {
     int x : 4;
     int y : 4;
@@ -398,7 +398,7 @@ void testSmallStructBitfieldsSecondUndef(void) {
                                  // expected-note@-1{{garbage}}
 }
 
-void testSmallStructBitfieldsFirstUnnamed(void) {
+void testSmallStructBitfieldsFirstUnnamed() {
   struct {
     int : 4;
     int y : 4;
@@ -415,7 +415,7 @@ void testSmallStructBitfieldsFirstUnnamed(void) {
                                  // expected-note@-1{{garbage}}
 }
 
-void testSmallStructBitfieldsSecondUnnamed(void) {
+void testSmallStructBitfieldsSecondUnnamed() {
   struct {
     int x : 4;
     int : 4;

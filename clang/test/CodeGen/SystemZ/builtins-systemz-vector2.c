@@ -33,11 +33,11 @@ void test_core(void) {
   vul = __builtin_s390_vbperm(vuc, vuc);
   // CHECK: call <2 x i64> @llvm.s390.vbperm(<16 x i8> %{{.*}}, <16 x i8> %{{.*}})
 
-  vsc = __builtin_s390_vlrlr(len, cptr);
-  // CHECK: call <16 x i8> @llvm.s390.vlrl(i32 %{{.*}}, ptr %{{.*}})
+  vsc = __builtin_s390_vlrl(len, cptr);
+  // CHECK: call <16 x i8> @llvm.s390.vlrl(i32 %{{.*}}, i8* %{{.*}})
 
-  __builtin_s390_vstrlr(vsc, len, ptr);
-  // CHECK: call void @llvm.s390.vstrl(<16 x i8> %{{.*}}, i32 %{{.*}}, ptr %{{.*}})
+  __builtin_s390_vstrl(vsc, len, ptr);
+  // CHECK: call void @llvm.s390.vstrl(<16 x i8> %{{.*}}, i32 %{{.*}}, i8* %{{.*}})
 }
 
 void test_integer(void) {

@@ -23,7 +23,6 @@
 #include "lldb/Target/Target.h"
 #include "lldb/Utility/ArchSpec.h"
 #include "lldb/Utility/FileSpec.h"
-#include "lldb/Utility/LLDBLog.h"
 #include "lldb/Utility/Log.h"
 #include "lldb/Utility/StreamString.h"
 
@@ -59,7 +58,7 @@ void PlatformRemoteMacOSX::Terminate() {
 
 PlatformSP PlatformRemoteMacOSX::CreateInstance(bool force,
                                                 const ArchSpec *arch) {
-  Log *log = GetLog(LLDBLog::Platform);
+  Log *log(GetLogIfAllCategoriesSet(LIBLLDB_LOG_PLATFORM));
   if (log) {
     const char *arch_name;
     if (arch && arch->GetArchitectureName())
@@ -70,8 +69,8 @@ PlatformSP PlatformRemoteMacOSX::CreateInstance(bool force,
     const char *triple_cstr =
         arch ? arch->GetTriple().getTriple().c_str() : "<null>";
 
-    LLDB_LOGF(log, "PlatformRemoteMacOSX::%s(force=%s, arch={%s,%s})",
-              __FUNCTION__, force ? "true" : "false", arch_name, triple_cstr);
+    LLDB_LOGF(log, "PlatformMacOSX::%s(force=%s, arch={%s,%s})", __FUNCTION__,
+              force ? "true" : "false", arch_name, triple_cstr);
   }
 
   bool create = force;
@@ -125,23 +124,89 @@ PlatformSP PlatformRemoteMacOSX::CreateInstance(bool force,
   return PlatformSP();
 }
 
-std::vector<ArchSpec>
-PlatformRemoteMacOSX::GetSupportedArchitectures(const ArchSpec &host_info) {
+bool PlatformRemoteMacOSX::GetSupportedArchitectureAtIndex(uint32_t idx,
+                                                           ArchSpec &arch) {
   // macOS for ARM64 support both native and translated x86_64 processes
-  std::vector<ArchSpec> result;
-  ARMGetSupportedArchitectures(result, llvm::Triple::MacOSX);
+  if (!m_num_arm_arches || idx < m_num_arm_arches) {
+    bool res = ARMGetSupportedArchitectureAtIndex(idx, arch);
+    if (res)
+      return true;
+    if (!m_num_arm_arches)
+      m_num_arm_arches = idx;
+  }
 
-  // We can't use x86GetSupportedArchitectures() because it uses
+  // We can't use x86GetSupportedArchitectureAtIndex() because it uses
   // the system architecture for some of its return values and also
   // has a 32bits variant.
-  result.push_back(ArchSpec("x86_64-apple-macosx"));
-  result.push_back(ArchSpec("x86_64-apple-ios-macabi"));
-  result.push_back(ArchSpec("arm64-apple-ios"));
-  result.push_back(ArchSpec("arm64e-apple-ios"));
-  return result;
+  if (idx == m_num_arm_arches) {
+    arch.SetTriple("x86_64-apple-macosx");
+    return true;
+  } else if (idx == m_num_arm_arches + 1) {
+    arch.SetTriple("x86_64-apple-ios-macabi");
+    return true;
+  } else if (idx == m_num_arm_arches + 2) {
+    arch.SetTriple("arm64-apple-ios");
+    return true;
+  } else if (idx == m_num_arm_arches + 3) {
+    arch.SetTriple("arm64e-apple-ios");
+    return true;
+  }
+
+  return false;
 }
 
-llvm::StringRef PlatformRemoteMacOSX::GetDescriptionStatic() {
+lldb_private::Status PlatformRemoteMacOSX::GetFileWithUUID(
+    const lldb_private::FileSpec &platform_file,
+    const lldb_private::UUID *uuid_ptr, lldb_private::FileSpec &local_file) {
+  if (m_remote_platform_sp) {
+    std::string local_os_build;
+#if !defined(__linux__)
+    HostInfo::GetOSBuildString(local_os_build);
+#endif
+    std::string remote_os_build;
+    m_remote_platform_sp->GetOSBuildString(remote_os_build);
+    if (local_os_build == remote_os_build) {
+      // same OS version: the local file is good enough
+      local_file = platform_file;
+      return Status();
+    } else {
+      // try to find the file in the cache
+      std::string cache_path(GetLocalCacheDirectory());
+      std::string module_path(platform_file.GetPath());
+      cache_path.append(module_path);
+      FileSpec module_cache_spec(cache_path);
+      if (FileSystem::Instance().Exists(module_cache_spec)) {
+        local_file = module_cache_spec;
+        return Status();
+      }
+      // bring in the remote module file
+      FileSpec module_cache_folder =
+          module_cache_spec.CopyByRemovingLastPathComponent();
+      // try to make the local directory first
+      Status err(
+          llvm::sys::fs::create_directory(module_cache_folder.GetPath()));
+      if (err.Fail())
+        return err;
+      err = GetFile(platform_file, module_cache_spec);
+      if (err.Fail())
+        return err;
+      if (FileSystem::Instance().Exists(module_cache_spec)) {
+        local_file = module_cache_spec;
+        return Status();
+      } else
+        return Status("unable to obtain valid module file");
+    }
+  }
+  local_file = platform_file;
+  return Status();
+}
+
+lldb_private::ConstString PlatformRemoteMacOSX::GetPluginNameStatic() {
+  static ConstString g_name("remote-macosx");
+  return g_name;
+}
+
+const char *PlatformRemoteMacOSX::GetDescriptionStatic() {
   return "Remote Mac OS X user platform plug-in.";
 }
 

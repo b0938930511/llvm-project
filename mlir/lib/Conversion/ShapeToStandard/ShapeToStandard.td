@@ -13,7 +13,6 @@
 #ifndef MLIR_CONVERSION_SHAPETOSTANDARD_TD
 #define MLIR_CONVERSION_SHAPETOSTANDARD_TD
 
-include "mlir/IR/PatternBase.td"
 include "mlir/Dialect/Shape/IR/ShapeOps.td"
 
 def BroadcastableStringAttr : NativeCodeCall<[{

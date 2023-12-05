@@ -14,6 +14,7 @@
 
 namespace llvm {
 
+class raw_ostream;
 namespace pdb {
 
 class PDBSymbolTypePointer : public PDBSymbol {
@@ -36,7 +37,7 @@ public:
   FORWARD_SYMBOL_METHOD(isVolatileType)
 };
 
-} // namespace pdb
 } // namespace llvm
+}
 
 #endif // LLVM_DEBUGINFO_PDB_PDBSYMBOLTYPEPOINTER_H

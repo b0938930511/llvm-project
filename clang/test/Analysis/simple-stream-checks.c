@@ -36,7 +36,7 @@ void checkLeakFollowedByAssert(int *Data) {
   }
 }
 
-void CloseOnlyOnValidFileHandle(void) {
+void CloseOnlyOnValidFileHandle() {
   FILE *F = fopen("myfile.txt", "w");
   if (F)
     fclose(F);
@@ -58,14 +58,14 @@ FILE *leakOnEnfOfPath3(int *Data) {
 }
 
 void myfclose(FILE *F);
-void SymbolEscapedThroughFunctionCall(void) {
+void SymbolEscapedThroughFunctionCall() {
   FILE *F = fopen("myfile.txt", "w");
   myfclose(F);
   return; // no warning
 }
 
 FILE *GlobalF;
-void SymbolEscapedThroughAssignmentToGlobal(void) {
+void SymbolEscapedThroughAssignmentToGlobal() {
   FILE *F = fopen("myfile.txt", "w");
   GlobalF = F;
   return; // no warning
@@ -78,19 +78,19 @@ void SymbolDoesNotEscapeThoughStringAPIs(char *Data) {
 }
 
 void passConstPointer(const FILE * F);
-void testPassConstPointer(void) {
+void testPassConstPointer() {
   FILE *F = fopen("myfile.txt", "w");
   passConstPointer(F);
   return; // expected-warning {{Opened file is never closed; potential resource leak}}
 }
 
-void testPassToSystemHeaderFunctionIndirectly(void) {
+void testPassToSystemHeaderFunctionIndirectly() {
   FileStruct fs;
   fs.p = fopen("myfile.txt", "w");
   fakeSystemHeaderCall(&fs); // invalidates fs, making fs.p unreachable
 }  // no-warning
 
-void testOverwrite(void) {
+void testOverwrite() {
   FILE *fp = fopen("myfile.txt", "w");
   fp = 0;
 } // expected-warning {{Opened file is never closed; potential resource leak}}

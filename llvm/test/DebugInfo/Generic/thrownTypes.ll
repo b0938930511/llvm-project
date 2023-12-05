@@ -1,17 +1,17 @@
-; RUN: %llc_dwarf -O0 -filetype=obj < %s | llvm-dwarfdump -debug-info - | FileCheck %s
+; RUN: %llc_dwarf -O0 -filetype=obj < %s | llvm-dwarfdump -v -debug-info - | FileCheck %s
 
 ; CHECK: DW_TAG_subprogram
-; CHECK:   DW_AT_name ("f")
+; CHECK:   DW_AT_name {{.*}} "f"
 ; CHECK-NOT: DW_TAG
 ; CHECK:   DW_TAG_thrown_type
-; CHECK-NEXT:   DW_AT_type ([[ERROR:0x........]]
+; CHECK-NEXT:   DW_AT_type {{.*}} {[[ERROR:.*]]}
 ; CHECK-NOT: DW_TAG
 ; CHECK:   DW_TAG_thrown_type
-; CHECK-NEXT:   DW_AT_type ([[ERROR2:0x........]]
+; CHECK-NEXT:   DW_AT_type {{.*}} {[[ERROR2:.*]]}
 ; CHECK: [[ERROR]]: DW_TAG_structure_type
-; CHECK-NEXT:   DW_AT_name ("Error")
+; CHECK-NEXT:   DW_AT_name {{.*}} "Error"
 ; CHECK: [[ERROR2]]: DW_TAG_structure_type
-; CHECK-NEXT:   DW_AT_name ("DifferentError")
+; CHECK-NEXT:   DW_AT_name {{.*}} "DifferentError"
 
 ; Function Attrs: nounwind uwtable
 define void @f() #0 !dbg !5 {

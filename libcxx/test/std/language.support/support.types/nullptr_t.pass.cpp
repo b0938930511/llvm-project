@@ -51,15 +51,19 @@ void test_comparisons()
     assert(!(nullptr != p));
 }
 
-TEST_DIAGNOSTIC_PUSH
-TEST_CLANG_DIAGNOSTIC_IGNORED("-Wnull-conversion")
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wnull-conversion"
+#endif
 void test_nullptr_conversions() {
     {
         bool b(nullptr);
         assert(!b);
     }
 }
-TEST_DIAGNOSTIC_POP
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
 
 
 int main(int, char**)
@@ -76,9 +80,14 @@ int main(int, char**)
         test_conversions<int A::*>();
     }
     {
-        // TODO: Enable this assertion when GCC compilers implements http://wg21.link/CWG583.
-#if !defined(TEST_COMPILER_GCC)
+#ifdef _LIBCPP_HAS_NO_NULLPTR
         static_assert(!has_less<std::nullptr_t>::value, "");
+        // FIXME: our C++03 nullptr emulation still allows for comparisons
+        // with other pointer types by way of the conversion operator.
+        //static_assert(!has_less<void*>::value, "");
+#else
+        // TODO Enable this assertion when all compilers implement core DR 583.
+        // static_assert(!has_less<std::nullptr_t>::value, "");
 #endif
         test_comparisons<std::nullptr_t>();
         test_comparisons<void*>();

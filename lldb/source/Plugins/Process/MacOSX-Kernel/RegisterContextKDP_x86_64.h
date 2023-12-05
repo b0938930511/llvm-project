@@ -17,7 +17,7 @@ class RegisterContextKDP_x86_64 : public RegisterContextDarwin_x86_64 {
 public:
   RegisterContextKDP_x86_64(ThreadKDP &thread, uint32_t concrete_frame_idx);
 
-  ~RegisterContextKDP_x86_64() override;
+  virtual ~RegisterContextKDP_x86_64();
 
 protected:
   int DoReadGPR(lldb::tid_t tid, int flavor, GPR &gpr) override;

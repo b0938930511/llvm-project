@@ -19,9 +19,8 @@
 #include "lldb/Utility/ArchSpec.h"
 #include "lldb/Utility/FileSpec.h"
 #include "lldb/lldb-types.h"
-#include "llvm/ADT/SmallPtrSet.h"
 
-#include "IntelPTCollector.h"
+#include "IntelPTManager.h"
 #include "NativeThreadLinux.h"
 #include "Plugins/Process/POSIX/NativeProcessELF.h"
 #include "Plugins/Process/Utility/NativeProcessSoftwareSingleStep.h"
@@ -41,45 +40,20 @@ namespace process_linux {
 class NativeProcessLinux : public NativeProcessELF,
                            private NativeProcessSoftwareSingleStep {
 public:
-  class Manager : public NativeProcessProtocol::Manager {
+  class Factory : public NativeProcessProtocol::Factory {
   public:
-    Manager(MainLoop &mainloop);
+    llvm::Expected<std::unique_ptr<NativeProcessProtocol>>
+    Launch(ProcessLaunchInfo &launch_info, NativeDelegate &native_delegate,
+           MainLoop &mainloop) const override;
 
     llvm::Expected<std::unique_ptr<NativeProcessProtocol>>
-    Launch(ProcessLaunchInfo &launch_info,
-           NativeDelegate &native_delegate) override;
-
-    llvm::Expected<std::unique_ptr<NativeProcessProtocol>>
-    Attach(lldb::pid_t pid, NativeDelegate &native_delegate) override;
+    Attach(lldb::pid_t pid, NativeDelegate &native_delegate,
+           MainLoop &mainloop) const override;
 
     Extension GetSupportedExtensions() const override;
-
-    void AddProcess(NativeProcessLinux &process) {
-      m_processes.insert(&process);
-    }
-
-    void RemoveProcess(NativeProcessLinux &process) {
-      m_processes.erase(&process);
-    }
-
-    // Collect an event for the given tid, waiting for it if necessary.
-    void CollectThread(::pid_t tid);
-
-  private:
-    MainLoop::SignalHandleUP m_sigchld_handle;
-
-    llvm::SmallPtrSet<NativeProcessLinux *, 2> m_processes;
-
-    // Threads (events) which haven't been claimed by any process.
-    llvm::DenseSet<::pid_t> m_unowned_threads;
-
-    void SigchldHandler();
   };
 
   // NativeProcessProtocol Interface
-
-  ~NativeProcessLinux() override { m_manager.RemoveProcess(*this); }
-
   Status Resume(const ResumeActionList &resume_actions) override;
 
   Status Halt() override;
@@ -161,10 +135,6 @@ public:
 
   bool SupportHardwareSingleStepping() const;
 
-  /// Writes a siginfo_t structure corresponding to the given thread ID to the
-  /// memory region pointed to by \p siginfo.
-  Status GetSignalInfo(lldb::tid_t tid, void *siginfo) const;
-
 protected:
   llvm::Expected<llvm::ArrayRef<uint8_t>>
   GetSoftwareBreakpointTrapOpcode(size_t size_hint) override;
@@ -172,8 +142,9 @@ protected:
   llvm::Expected<uint64_t> Syscall(llvm::ArrayRef<uint64_t> args);
 
 private:
-  Manager &m_manager;
+  MainLoop::SignalHandleUP m_sigchld_handle;
   ArchSpec m_arch;
+  MainLoop& m_main_loop;
 
   LazyBool m_supports_mem_region = eLazyBoolCalculate;
   std::vector<std::pair<MemoryRegionInfo, FileSpec>> m_mem_region_cache;
@@ -185,7 +156,7 @@ private:
 
   // Private Instance Methods
   NativeProcessLinux(::pid_t pid, int terminal_fd, NativeDelegate &delegate,
-                     const ArchSpec &arch, Manager &manager,
+                     const ArchSpec &arch, MainLoop &mainloop,
                      llvm::ArrayRef<::pid_t> tids);
 
   // Returns a list of process threads that we have attached to.
@@ -193,9 +164,9 @@ private:
 
   static Status SetDefaultPtraceOpts(const lldb::pid_t);
 
-  bool TryHandleWaitStatus(lldb::pid_t pid, WaitStatus status);
+  void MonitorCallback(lldb::pid_t pid, bool exited, WaitStatus status);
 
-  void MonitorCallback(NativeThreadLinux &thread, WaitStatus status);
+  void WaitForCloneNotification(::pid_t pid);
 
   void MonitorSIGTRAP(const siginfo_t &info, NativeThreadLinux &thread);
 
@@ -205,11 +176,12 @@ private:
 
   void MonitorWatchpoint(NativeThreadLinux &thread, uint32_t wp_index);
 
-  void MonitorSignal(const siginfo_t &info, NativeThreadLinux &thread);
+  void MonitorSignal(const siginfo_t &info, NativeThreadLinux &thread,
+                     bool exited);
 
   bool HasThreadNoLock(lldb::tid_t thread_id);
 
-  void StopTrackingThread(NativeThreadLinux &thread);
+  bool StopTrackingThread(lldb::tid_t thread_id);
 
   /// Create a new thread.
   ///
@@ -234,9 +206,9 @@ private:
   /// stopping for threads being destroyed.
   Status NotifyTracersOfThreadDestroyed(lldb::tid_t tid);
 
-  void NotifyTracersProcessWillResume() override;
-
-  void NotifyTracersProcessDidStop() override;
+  /// Writes a siginfo_t structure corresponding to the given thread ID to the
+  /// memory region pointed to by \p siginfo.
+  Status GetSignalInfo(lldb::tid_t tid, void *siginfo);
 
   /// Writes the raw event message code (vis-a-vis PTRACE_GETEVENTMSG)
   /// corresponding to the given thread ID to the memory pointed to by @p
@@ -270,11 +242,22 @@ private:
   Status PopulateMemoryRegionCache();
 
   /// Manages Intel PT process and thread traces.
-  IntelPTCollector m_intel_pt_collector;
+  IntelPTManager m_intel_pt_manager;
 
-  // Handle a clone()-like event.
-  bool MonitorClone(NativeThreadLinux &parent, lldb::pid_t child_pid,
-                    int event);
+  struct CloneInfo {
+    int event;
+    lldb::tid_t parent_tid;
+  };
+
+  // Map of child processes that have been signaled once, and we are
+  // waiting for the second signal.
+  llvm::DenseMap<lldb::pid_t, llvm::Optional<CloneInfo>> m_pending_pid_map;
+
+  // Handle a clone()-like event.  If received by parent, clone_info contains
+  // additional info.  Returns true if the event is handled, or false if it
+  // is pending second notification.
+  bool MonitorClone(lldb::pid_t child_pid,
+                    llvm::Optional<CloneInfo> clone_info);
 };
 
 } // namespace process_linux

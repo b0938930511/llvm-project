@@ -9,6 +9,7 @@
 #include "ScriptInterpreterNone.h"
 #include "lldb/Core/Debugger.h"
 #include "lldb/Core/PluginManager.h"
+#include "lldb/Core/StreamFile.h"
 #include "lldb/Utility/Stream.h"
 #include "lldb/Utility/StringList.h"
 
@@ -26,19 +27,17 @@ ScriptInterpreterNone::ScriptInterpreterNone(Debugger &debugger)
 
 ScriptInterpreterNone::~ScriptInterpreterNone() = default;
 
-static const char *no_interpreter_err_msg =
-    "error: Embedded script interpreter unavailable. LLDB was built without "
-    "scripting language support.\n";
-
 bool ScriptInterpreterNone::ExecuteOneLine(llvm::StringRef command,
                                            CommandReturnObject *,
                                            const ExecuteScriptOptions &) {
-  m_debugger.GetErrorStream().PutCString(no_interpreter_err_msg);
+  m_debugger.GetErrorStream().PutCString(
+      "error: there is no embedded script interpreter in this mode.\n");
   return false;
 }
 
 void ScriptInterpreterNone::ExecuteInterpreterLoop() {
-  m_debugger.GetErrorStream().PutCString(no_interpreter_err_msg);
+  m_debugger.GetErrorStream().PutCString(
+      "error: there is no embedded script interpreter in this mode.\n");
 }
 
 void ScriptInterpreterNone::Initialize() {
@@ -58,6 +57,17 @@ ScriptInterpreterNone::CreateInstance(Debugger &debugger) {
   return std::make_shared<ScriptInterpreterNone>(debugger);
 }
 
-llvm::StringRef ScriptInterpreterNone::GetPluginDescriptionStatic() {
+lldb_private::ConstString ScriptInterpreterNone::GetPluginNameStatic() {
+  static ConstString g_name("script-none");
+  return g_name;
+}
+
+const char *ScriptInterpreterNone::GetPluginDescriptionStatic() {
   return "Null script interpreter";
 }
+
+lldb_private::ConstString ScriptInterpreterNone::GetPluginName() {
+  return GetPluginNameStatic();
+}
+
+uint32_t ScriptInterpreterNone::GetPluginVersion() { return 1; }

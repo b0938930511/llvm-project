@@ -1,7 +1,7 @@
-// RUN: %clang_analyze_cc1 -triple i386-apple-darwin10 -analyzer-checker=core,osx.cocoa.NilArg,osx.cocoa.RetainCount,alpha.core -verify -Wno-objc-root-class %s
-// RUN: %clang_analyze_cc1 -triple i386-apple-darwin10 -analyzer-checker=core,osx.cocoa.NilArg,osx.cocoa.RetainCount,alpha.core -analyzer-config mode=shallow -verify -Wno-objc-root-class %s
-// RUN: %clang_analyze_cc1 -DTEST_64 -triple x86_64-apple-darwin10 -analyzer-checker=core,osx.cocoa.NilArg,osx.cocoa.RetainCount,alpha.core -verify -Wno-objc-root-class %s
-// RUN: %clang_analyze_cc1 -DOSATOMIC_USE_INLINED -triple i386-apple-darwin10 -analyzer-checker=core,osx.cocoa.NilArg,osx.cocoa.RetainCount,alpha.core -verify -Wno-objc-root-class %s
+// RUN: %clang_analyze_cc1 -triple i386-apple-darwin10 -analyzer-checker=core,osx.cocoa.NilArg,osx.cocoa.RetainCount,alpha.core -analyzer-store=region -verify -Wno-objc-root-class %s
+// RUN: %clang_analyze_cc1 -triple i386-apple-darwin10 -analyzer-checker=core,osx.cocoa.NilArg,osx.cocoa.RetainCount,alpha.core -analyzer-store=region -analyzer-config mode=shallow -verify -Wno-objc-root-class %s
+// RUN: %clang_analyze_cc1 -DTEST_64 -triple x86_64-apple-darwin10 -analyzer-checker=core,osx.cocoa.NilArg,osx.cocoa.RetainCount,alpha.core -analyzer-store=region -verify -Wno-objc-root-class %s
+// RUN: %clang_analyze_cc1 -DOSATOMIC_USE_INLINED -triple i386-apple-darwin10 -analyzer-checker=core,osx.cocoa.NilArg,osx.cocoa.RetainCount,alpha.core -analyzer-store=region -verify -Wno-objc-root-class %s
 
 //===----------------------------------------------------------------------===//
 // The following code is reduced using delta-debugging from
@@ -134,7 +134,7 @@ NSString* f7(NSString* s1, NSString* s2, NSString* s3) {
   return s4;
 }
 
-NSMutableArray* f8(void) {
+NSMutableArray* f8() {
   
   NSString* s = [[NSString alloc] init];
   NSMutableArray* a = [[NSMutableArray alloc] initWithCapacity:2];
@@ -143,7 +143,7 @@ NSMutableArray* f8(void) {
   return a;
 }
 
-void f9(void) {
+void f9() {
   
   NSString* s = [[NSString alloc] init];
   NSString* q = s;
@@ -151,12 +151,13 @@ void f9(void) {
   [q release]; // expected-warning {{used after it is released}}
 }
 
-NSString* f10(void) {
+NSString* f10() {
   static NSString* s = 0;
   if (!s) s = [[NSString alloc] init];
   return s; // no-warning
 }
 
+// Test case for regression reported in <rdar://problem/6452745>.
 // Essentially 's' should not be considered allocated on the false branch.
 // This exercises the 'EvalAssume' logic in GRTransferFuncs (CFRefCount.cpp).
 NSString* f11(CFDictionaryRef dict, const char* key) {
@@ -171,7 +172,7 @@ NSString* f11(CFDictionaryRef dict, const char* key) {
 // Test case for passing a tracked object by-reference to a function we
 // don't understand.
 void unknown_function_f12(NSString** s);
-void f12(void) {
+void f12() {
   NSString *string = [[NSString alloc] init];
   unknown_function_f12(&string); // no-warning
 }
@@ -274,7 +275,7 @@ void f14(MyString *s) {
 }
 @end
 
-id testSharedClassFromFunction(void) {
+id testSharedClassFromFunction() {
   return [[SharedClass alloc] _init]; // no-warning
 }
 
@@ -299,7 +300,7 @@ extern BOOL objc_atomicCompareAndSwapPtr(id predicate, id replacement, volatile 
 }
 #endif
 
-void testOSCompareAndSwap(void) {
+void testOSCompareAndSwap() {
   NSString *old = 0;
   NSString *s = [[NSString alloc] init]; // no-warning
   if (!OSAtomicCompareAndSwapPtr(0, s, (void**) &old))
@@ -308,7 +309,7 @@ void testOSCompareAndSwap(void) {
     [old release];
 }
 
-void testOSCompareAndSwapXXBarrier_local(void) {
+void testOSCompareAndSwapXXBarrier_local() {
   NSString *old = 0;
   NSString *s = [[NSString alloc] init]; // no-warning
   if (!COMPARE_SWAP_BARRIER((intptr_t) 0, (intptr_t) s, (intptr_t*) &old))
@@ -317,7 +318,7 @@ void testOSCompareAndSwapXXBarrier_local(void) {
     [old release];
 }
 
-void testOSCompareAndSwapXXBarrier_local_no_direct_release(void) {
+void testOSCompareAndSwapXXBarrier_local_no_direct_release() {
   NSString *old = 0;
   NSString *s = [[NSString alloc] init]; // no-warning
   if (!COMPARE_SWAP_BARRIER((intptr_t) 0, (intptr_t) s, (intptr_t*) &old))
@@ -332,7 +333,7 @@ int testOSCompareAndSwapXXBarrier_id(Class myclass, id xclass) {
   return 0;
 }
 
-void test_objc_atomicCompareAndSwap_local(void) {
+void test_objc_atomicCompareAndSwap_local() {
   NSString *old = 0;
   NSString *s = [[NSString alloc] init]; // no-warning
   if (!objc_atomicCompareAndSwapPtr(0, s, &old))
@@ -341,7 +342,7 @@ void test_objc_atomicCompareAndSwap_local(void) {
     [old release];
 }
 
-void test_objc_atomicCompareAndSwap_local_no_direct_release(void) {
+void test_objc_atomicCompareAndSwap_local_no_direct_release() {
   NSString *old = 0;
   NSString *s = [[NSString alloc] init]; // no-warning
   if (!objc_atomicCompareAndSwapPtr(0, s, &old))
@@ -367,14 +368,14 @@ void test_objc_atomicCompareAndSwap_parameter_no_direct_release(NSString **old) 
 }
 
 
-// Test stringWithFormat
-void test_stringWithFormat(void) {  
+// Test stringWithFormat (<rdar://problem/6815234>)
+void test_stringWithFormat() {  
   NSString *string = [[NSString stringWithFormat:@"%ld", (long) 100] retain];
   [string release];
   [string release]; // expected-warning{{Incorrect decrement of the reference count}}
 }
 
-// Test isTrackedObjectType(void).
+// Test isTrackedObjectType().
 typedef NSString* WonkyTypedef;
 @interface TestIsTracked
 + (WonkyTypedef)newString;

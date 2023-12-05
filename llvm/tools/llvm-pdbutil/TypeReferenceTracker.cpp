@@ -9,12 +9,10 @@
 #include "TypeReferenceTracker.h"
 
 #include "llvm/DebugInfo/CodeView/LazyRandomTypeCollection.h"
-#include "llvm/DebugInfo/PDB/Native/GlobalsStream.h"
-#include "llvm/DebugInfo/PDB/Native/NativeSession.h"
 #include "llvm/DebugInfo/PDB/Native/PDBFile.h"
-#include "llvm/DebugInfo/PDB/Native/SymbolStream.h"
 #include "llvm/DebugInfo/PDB/Native/TpiStream.h"
-#include "llvm/Object/COFF.h"
+#include "llvm/DebugInfo/PDB/Native/GlobalsStream.h"
+#include "llvm/DebugInfo/PDB/Native/SymbolStream.h"
 
 using namespace llvm;
 using namespace llvm::pdb;
@@ -24,8 +22,7 @@ using namespace llvm::codeview;
 // just iterate up front to find out.
 static uint32_t getNumRecordsInCollection(LazyRandomTypeCollection &Types) {
   uint32_t NumTypes = 0;
-  for (std::optional<TypeIndex> TI = Types.getFirst(); TI;
-       TI = Types.getNext(*TI))
+  for (Optional<TypeIndex> TI = Types.getFirst(); TI; TI = Types.getNext(*TI))
     ++NumTypes;
   return NumTypes;
 }
@@ -55,7 +52,7 @@ void TypeReferenceTracker::mark() {
   // - globals
   // - modi symbols
   // - LF_UDT_MOD_SRC_LINE? VC always links these in.
-  for (const SymbolGroup &SG : File.symbol_groups()) {
+  for (SymbolGroup SG : File.symbol_groups()) {
     if (File.isObj()) {
       for (const auto &SS : SG.getDebugSubsections()) {
         // FIXME: Are there other type-referencing subsections? Inlinees?
@@ -130,9 +127,9 @@ void TypeReferenceTracker::markReferencedTypes() {
     TiRefKind RefKind;
     TypeIndex RefTI;
     std::tie(RefKind, RefTI) = RefWorklist.pop_back_val();
-    std::optional<CVType> Rec = (Ids && RefKind == TiRefKind::IndexRef)
-                                    ? Ids->tryGetType(RefTI)
-                                    : Types.tryGetType(RefTI);
+    Optional<CVType> Rec = (Ids && RefKind == TiRefKind::IndexRef)
+                               ? Ids->tryGetType(RefTI)
+                               : Types.tryGetType(RefTI);
     if (!Rec)
       continue; // FIXME: Report a reference to a non-existant type.
 

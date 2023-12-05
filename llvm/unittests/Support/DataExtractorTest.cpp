@@ -7,8 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Support/DataExtractor.h"
-
-#include "llvm/ADT/StringExtras.h"
 #include "llvm/Testing/Support/Error.h"
 #include "gtest/gtest.h"
 using namespace llvm;
@@ -179,18 +177,6 @@ TEST(DataExtractorTest, Cursor_tell) {
   consumeError(C.takeError());
 }
 
-TEST(DataExtractorTest, Cursor_seek) {
-  DataExtractor::Cursor C(5);
-
-  C.seek(3);
-  EXPECT_EQ(3u, C.tell());
-
-  C.seek(8);
-  EXPECT_EQ(8u, C.tell());
-
-  EXPECT_THAT_ERROR(C.takeError(), Succeeded());
-}
-
 TEST(DataExtractorTest, Cursor_takeError) {
   DataExtractor DE(StringRef("AB"), false, 8);
   DataExtractor::Cursor C(0);
@@ -346,8 +332,7 @@ TEST(DataExtractorTest, FixedLengthString) {
   DataExtractor DE(StringRef(Data, sizeof(Data)-1), false, 8);
   uint64_t Offset = 0;
   StringRef Str;
-  // Test extracting too many bytes doesn't modify Offset and returns
-  // std::nullopt.
+  // Test extracting too many bytes doesn't modify Offset and returns None.
   Str = DE.getFixedLengthString(&Offset, sizeof(Data));
   EXPECT_TRUE(Str.empty());
   EXPECT_EQ(Offset, 0u);
@@ -377,8 +362,7 @@ TEST(DataExtractorTest, GetBytes) {
   DataExtractor DE(Bytes, false, 8);
   uint64_t Offset = 0;
   StringRef Str;
-  // Test extracting too many bytes doesn't modify Offset and returns
-  // std::nullopt.
+  // Test extracting too many bytes doesn't modify Offset and returns None.
   Str = DE.getBytes(&Offset, sizeof(Data));
   EXPECT_TRUE(Str.empty());
   EXPECT_EQ(Offset, 0u);

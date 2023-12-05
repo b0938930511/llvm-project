@@ -47,6 +47,9 @@ class ObjCContainersChecker : public Checker< check::PreStmt<CallExpr>,
                    CheckerContext &C) const;
 
 public:
+  /// A tag to id this checker.
+  static void *getTag() { static int Tag; return &Tag; }
+
   void checkPostStmt(const CallExpr *CE, CheckerContext &C) const;
   void checkPreStmt(const CallExpr *CE, CheckerContext &C) const;
   ProgramStateRef checkPointerEscape(ProgramStateRef State,
@@ -134,8 +137,8 @@ void ObjCContainersChecker::checkPreStmt(const CallExpr *CE,
 
     // Now, check if 'Idx in [0, Size-1]'.
     const QualType T = IdxExpr->getType();
-    ProgramStateRef StInBound, StOutBound;
-    std::tie(StInBound, StOutBound) = State->assumeInBoundDual(Idx, *Size, T);
+    ProgramStateRef StInBound = State->assumeInBound(Idx, *Size, true, T);
+    ProgramStateRef StOutBound = State->assumeInBound(Idx, *Size, false, T);
     if (StOutBound && !StInBound) {
       ExplodedNode *N = C.generateErrorNode(StOutBound);
       if (!N)

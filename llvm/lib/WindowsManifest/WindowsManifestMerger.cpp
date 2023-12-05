@@ -14,6 +14,8 @@
 #include "llvm/Config/config.h"
 #include "llvm/Support/MemoryBuffer.h"
 
+#include <map>
+
 #if LLVM_ENABLE_LIBXML2
 #include <libxml/xmlreader.h>
 #endif
@@ -33,7 +35,7 @@ void WindowsManifestError::log(raw_ostream &OS) const { OS << Msg; }
 class WindowsManifestMerger::WindowsManifestMergerImpl {
 public:
   ~WindowsManifestMergerImpl();
-  Error merge(MemoryBufferRef Manifest);
+  Error merge(const MemoryBuffer &Manifest);
   std::unique_ptr<MemoryBuffer> getMergedManifest();
 
 private:
@@ -618,7 +620,7 @@ WindowsManifestMerger::WindowsManifestMergerImpl::~WindowsManifestMergerImpl() {
 }
 
 Error WindowsManifestMerger::WindowsManifestMergerImpl::merge(
-    MemoryBufferRef Manifest) {
+    const MemoryBuffer &Manifest) {
   if (Merged)
     return make_error<WindowsManifestError>(
         "merge after getMergedManifest is not supported");
@@ -667,7 +669,7 @@ WindowsManifestMerger::WindowsManifestMergerImpl::getMergedManifest() {
     std::unique_ptr<xmlDoc, XmlDeleter> OutputDoc(
         xmlNewDoc((const unsigned char *)"1.0"));
     xmlDocSetRootElement(OutputDoc.get(), CombinedRoot);
-    assert(nullptr == xmlDocGetRootElement(CombinedDoc));
+    assert(0 == xmlDocGetRootElement(CombinedDoc));
 
     xmlKeepBlanksDefault(0);
     xmlChar *Buff = nullptr;
@@ -688,7 +690,7 @@ WindowsManifestMerger::WindowsManifestMergerImpl::~WindowsManifestMergerImpl() {
 }
 
 Error WindowsManifestMerger::WindowsManifestMergerImpl::merge(
-    MemoryBufferRef Manifest) {
+    const MemoryBuffer &Manifest) {
   return make_error<WindowsManifestError>("no libxml2");
 }
 
@@ -704,9 +706,9 @@ bool windows_manifest::isAvailable() { return false; }
 WindowsManifestMerger::WindowsManifestMerger()
     : Impl(std::make_unique<WindowsManifestMergerImpl>()) {}
 
-WindowsManifestMerger::~WindowsManifestMerger() = default;
+WindowsManifestMerger::~WindowsManifestMerger() {}
 
-Error WindowsManifestMerger::merge(MemoryBufferRef Manifest) {
+Error WindowsManifestMerger::merge(const MemoryBuffer &Manifest) {
   return Impl->merge(Manifest);
 }
 

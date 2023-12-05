@@ -12,10 +12,10 @@
 #undef _HAVE_X
 #undef X__Y
 
-#undef __cplusplus // expected-warning {{undefining builtin macro}}
+#undef __cplusplus
 #define __cplusplus
 
-// allowlisted definitions
+// whitelisted definitions
 #define while while
 #define const
 #define static

@@ -1,10 +1,8 @@
 // RUN: %clang_cc1 -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast -pedantic -fsyntax-only %s -verify -fblocks
 
-extern int printf(const char *, ...);
-
 typedef void (^CL)(void);
 
-CL foo(void) {
+CL foo() {
   short y;
   short (^add1)(void) = ^{ return y+1; }; // expected-error {{incompatible block pointer types initializing 'short (^)(void)' with an expression of type 'int (^)(void)'}}
 
@@ -48,7 +46,7 @@ CL foo(void) {
 
 typedef int (^CL2)(void);
 
-CL2 foo2(void) {
+CL2 foo2() {
   return ^{ return 1; };
 }
 
@@ -62,11 +60,11 @@ typedef struct {
     Boolean (^isEqual)(const CFBasicHash *, uintptr_t stack_value_or_key1, uintptr_t stack_value_or_key2, Boolean is_key);
 } CFBasicHashCallbacks;
 
-int foo3(void) {
+int foo3() {
     CFBasicHashCallbacks cb;
-
+    
     Boolean (*value_equal)(uintptr_t, uintptr_t) = 0;
-
+            
     cb.isEqual = ^(const CFBasicHash *table, uintptr_t stack_value_or_key1, uintptr_t stack_value_or_key2, Boolean is_key) {
       return (Boolean)(uintptr_t)INVOKE_CALLBACK2(value_equal, (uintptr_t)stack_value_or_key1, (uintptr_t)stack_value_or_key2);
     };
@@ -75,15 +73,16 @@ int foo3(void) {
 static int funk(char *s) {
   if (^{} == ((void*)0))
     return 1;
-  else
+  else 
     return 0;
 }
-void next(void);
-void foo4(void) {
+void next();
+void foo4() {
   int (^xx)(const char *s) = ^(char *s) { return 1; }; // expected-error {{incompatible block pointer types initializing 'int (^)(const char *)' with an expression of type 'int (^)(char *)'}}
-  int (*yy)(const char *s) = funk; // expected-error {{incompatible function pointer types initializing 'int (*)(const char *)' with an expression of type 'int (char *)'}}
-
-  int (^nested)(char *s) = ^(char *str) { void (^nest)(void) = ^(void) { printf("%s\n", str); }; next(); return 1; };
+  int (*yy)(const char *s) = funk; // expected-warning {{incompatible function pointer types initializing 'int (*)(const char *)' with an expression of type 'int (char *)'}}
+  
+  int (^nested)(char *s) = ^(char *str) { void (^nest)(void) = ^(void) { printf("%s\n", str); }; next(); return 1; }; // expected-warning{{implicitly declaring library function 'printf' with type 'int (const char *, ...)'}} \
+  // expected-note{{include the header <stdio.h> or explicitly provide a declaration for 'printf'}}
 }
 
 typedef void (^bptr)(void);
@@ -98,11 +97,10 @@ bptr foo5(int j) {
 }
 
 int (*funcptr3[5])(long);
-int sz8 = sizeof(^int (*[5])(long) {return funcptr3;}); // expected-error {{block cannot return array type}} expected-error {{incompatible pointer to integer conversion}}
+int sz8 = sizeof(^int (*[5])(long) {return funcptr3;}); // expected-error {{block cannot return array type}} expected-warning {{incompatible pointer to integer conversion}}
 int sz9 = sizeof(^int(*())()[3]{ }); // expected-error {{function cannot return array type}}
-                                     // expected-warning@-1 {{a function declaration without a prototype is deprecated in all versions of C}}
 
-void foo6(void) {
+void foo6() {
   int (^b)(int) __attribute__((noreturn));
   b = ^ (int i) __attribute__((noreturn)) { return 1; };  // expected-error {{block declared 'noreturn' should not return}}
   b(1);
@@ -110,7 +108,7 @@ void foo6(void) {
 }
 
 
-void foo7(void)
+void foo7()
 {
  const int (^BB) (void) = ^{ const int i = 1; return i; }; // OK - initializing 'const int (^)(void)' with an expression of type 'int (^)(void)'
 
@@ -132,10 +130,12 @@ void foo7(void)
   int (^NN) (void)  = ^{ return cint; };
 }
 
+// rdar://11069896
 void (^blk)(void) = ^{
     return (void)0; // expected-warning {{void block literal should not return void expression}}
 };
 
+// rdar://13463504
 enum Test8 { T8_a, T8_b, T8_c };
 void test8(void) {
   extern void test8_helper(int (^)(int));

@@ -9,32 +9,31 @@
 #ifndef LLVM_LIBC_TEST_SRC_MATH_NEXTAFTERTEST_H
 #define LLVM_LIBC_TEST_SRC_MATH_NEXTAFTERTEST_H
 
-#include "src/__support/CPP/bit.h"
-#include "src/__support/CPP/type_traits.h"
-#include "src/__support/FPUtil/BasicOperations.h"
-#include "src/__support/FPUtil/FPBits.h"
-#include "test/UnitTest/FPMatcher.h"
-#include "test/UnitTest/Test.h"
+#include "utils/CPP/TypeTraits.h"
+#include "utils/FPUtil/BasicOperations.h"
+#include "utils/FPUtil/FPBits.h"
+#include "utils/FPUtil/TestHelpers.h"
+#include "utils/UnitTest/Test.h"
 #include <math.h>
 
 template <typename T>
-class NextAfterTestTemplate : public LIBC_NAMESPACE::testing::Test {
-  using FPBits = LIBC_NAMESPACE::fputil::FPBits<T>;
-  using MantissaWidth = LIBC_NAMESPACE::fputil::MantissaWidth<T>;
+class NextAfterTestTemplate : public __llvm_libc::testing::Test {
+  using FPBits = __llvm_libc::fputil::FPBits<T>;
+  using MantissaWidth = __llvm_libc::fputil::MantissaWidth<T>;
   using UIntType = typename FPBits::UIntType;
 
-  static constexpr int BIT_WIDTH_OF_TYPE =
-      LIBC_NAMESPACE::fputil::FloatProperties<T>::BIT_WIDTH;
+  static constexpr int bitWidthOfType =
+      __llvm_libc::fputil::FloatProperties<T>::bitWidth;
 
   const T zero = T(FPBits::zero());
-  const T neg_zero = T(FPBits::neg_zero());
+  const T negZero = T(FPBits::negZero());
   const T inf = T(FPBits::inf());
-  const T neg_inf = T(FPBits::neg_inf());
-  const T nan = T(FPBits::build_quiet_nan(1));
-  const UIntType min_subnormal = FPBits::MIN_SUBNORMAL;
-  const UIntType max_subnormal = FPBits::MAX_SUBNORMAL;
-  const UIntType min_normal = FPBits::MIN_NORMAL;
-  const UIntType max_normal = FPBits::MAX_NORMAL;
+  const T negInf = T(FPBits::negInf());
+  const T nan = T(FPBits::buildNaN(1));
+  const UIntType minSubnormal = FPBits::minSubnormal;
+  const UIntType maxSubnormal = FPBits::maxSubnormal;
+  const UIntType minNormal = FPBits::minNormal;
+  const UIntType maxNormal = FPBits::maxNormal;
 
 public:
   typedef T (*NextAfterFunc)(T, T);
@@ -45,97 +44,95 @@ public:
   }
 
   void testBoundaries(NextAfterFunc func) {
-    ASSERT_FP_EQ(func(zero, neg_zero), neg_zero);
-    ASSERT_FP_EQ(func(neg_zero, zero), zero);
+    ASSERT_FP_EQ(func(zero, negZero), negZero);
+    ASSERT_FP_EQ(func(negZero, zero), zero);
 
-    // 'from' is zero|neg_zero.
+    // 'from' is zero|negZero.
     T x = zero;
     T result = func(x, T(1));
-    UIntType expected_bits = 1;
-    T expected = LIBC_NAMESPACE::cpp::bit_cast<T>(expected_bits);
+    UIntType expectedBits = 1;
+    T expected = *reinterpret_cast<T *>(&expectedBits);
     ASSERT_FP_EQ(result, expected);
 
     result = func(x, T(-1));
-    expected_bits = (UIntType(1) << (BIT_WIDTH_OF_TYPE - 1)) + 1;
-    expected = LIBC_NAMESPACE::cpp::bit_cast<T>(expected_bits);
+    expectedBits = (UIntType(1) << (bitWidthOfType - 1)) + 1;
+    expected = *reinterpret_cast<T *>(&expectedBits);
     ASSERT_FP_EQ(result, expected);
 
-    x = neg_zero;
+    x = negZero;
     result = func(x, 1);
-    expected_bits = 1;
-    expected = LIBC_NAMESPACE::cpp::bit_cast<T>(expected_bits);
+    expectedBits = 1;
+    expected = *reinterpret_cast<T *>(&expectedBits);
     ASSERT_FP_EQ(result, expected);
 
     result = func(x, -1);
-    expected_bits = (UIntType(1) << (BIT_WIDTH_OF_TYPE - 1)) + 1;
-    expected = LIBC_NAMESPACE::cpp::bit_cast<T>(expected_bits);
+    expectedBits = (UIntType(1) << (bitWidthOfType - 1)) + 1;
+    expected = *reinterpret_cast<T *>(&expectedBits);
     ASSERT_FP_EQ(result, expected);
 
     // 'from' is max subnormal value.
-    x = LIBC_NAMESPACE::cpp::bit_cast<T>(max_subnormal);
+    x = *reinterpret_cast<const T *>(&maxSubnormal);
     result = func(x, 1);
-    expected = LIBC_NAMESPACE::cpp::bit_cast<T>(min_normal);
+    expected = *reinterpret_cast<const T *>(&minNormal);
     ASSERT_FP_EQ(result, expected);
 
     result = func(x, 0);
-    expected_bits = max_subnormal - 1;
-    expected = LIBC_NAMESPACE::cpp::bit_cast<T>(expected_bits);
+    expectedBits = maxSubnormal - 1;
+    expected = *reinterpret_cast<T *>(&expectedBits);
     ASSERT_FP_EQ(result, expected);
 
     x = -x;
 
     result = func(x, -1);
-    expected_bits = (UIntType(1) << (BIT_WIDTH_OF_TYPE - 1)) + min_normal;
-    expected = LIBC_NAMESPACE::cpp::bit_cast<T>(expected_bits);
+    expectedBits = (UIntType(1) << (bitWidthOfType - 1)) + minNormal;
+    expected = *reinterpret_cast<T *>(&expectedBits);
     ASSERT_FP_EQ(result, expected);
 
     result = func(x, 0);
-    expected_bits =
-        (UIntType(1) << (BIT_WIDTH_OF_TYPE - 1)) + max_subnormal - 1;
-    expected = LIBC_NAMESPACE::cpp::bit_cast<T>(expected_bits);
+    expectedBits = (UIntType(1) << (bitWidthOfType - 1)) + maxSubnormal - 1;
+    expected = *reinterpret_cast<T *>(&expectedBits);
     ASSERT_FP_EQ(result, expected);
 
     // 'from' is min subnormal value.
-    x = LIBC_NAMESPACE::cpp::bit_cast<T>(min_subnormal);
+    x = *reinterpret_cast<const T *>(&minSubnormal);
     result = func(x, 1);
-    expected_bits = min_subnormal + 1;
-    expected = LIBC_NAMESPACE::cpp::bit_cast<T>(expected_bits);
+    expectedBits = minSubnormal + 1;
+    expected = *reinterpret_cast<T *>(&expectedBits);
     ASSERT_FP_EQ(result, expected);
     ASSERT_FP_EQ(func(x, 0), 0);
 
     x = -x;
     result = func(x, -1);
-    expected_bits =
-        (UIntType(1) << (BIT_WIDTH_OF_TYPE - 1)) + min_subnormal + 1;
-    expected = LIBC_NAMESPACE::cpp::bit_cast<T>(expected_bits);
+    expectedBits = (UIntType(1) << (bitWidthOfType - 1)) + minSubnormal + 1;
+    expected = *reinterpret_cast<T *>(&expectedBits);
     ASSERT_FP_EQ(result, expected);
     ASSERT_FP_EQ(func(x, 0), T(-0.0));
 
     // 'from' is min normal.
-    x = LIBC_NAMESPACE::cpp::bit_cast<T>(min_normal);
+    x = *reinterpret_cast<const T *>(&minNormal);
     result = func(x, 0);
-    expected_bits = max_subnormal;
-    expected = LIBC_NAMESPACE::cpp::bit_cast<T>(expected_bits);
+    expectedBits = maxSubnormal;
+    expected = *reinterpret_cast<T *>(&expectedBits);
     ASSERT_FP_EQ(result, expected);
 
     result = func(x, inf);
-    expected_bits = min_normal + 1;
-    expected = LIBC_NAMESPACE::cpp::bit_cast<T>(expected_bits);
+    expectedBits = minNormal + 1;
+    expected = *reinterpret_cast<T *>(&expectedBits);
     ASSERT_FP_EQ(result, expected);
 
     x = -x;
     result = func(x, 0);
-    expected_bits = (UIntType(1) << (BIT_WIDTH_OF_TYPE - 1)) + max_subnormal;
-    expected = LIBC_NAMESPACE::cpp::bit_cast<T>(expected_bits);
+    expectedBits = (UIntType(1) << (bitWidthOfType - 1)) + maxSubnormal;
+    expected = *reinterpret_cast<T *>(&expectedBits);
     ASSERT_FP_EQ(result, expected);
 
     result = func(x, -inf);
-    expected_bits = (UIntType(1) << (BIT_WIDTH_OF_TYPE - 1)) + min_normal + 1;
-    expected = LIBC_NAMESPACE::cpp::bit_cast<T>(expected_bits);
+    expectedBits = (UIntType(1) << (bitWidthOfType - 1)) + minNormal + 1;
+    expected = *reinterpret_cast<T *>(&expectedBits);
     ASSERT_FP_EQ(result, expected);
 
     // 'from' is max normal and 'to' is infinity.
-    x = LIBC_NAMESPACE::cpp::bit_cast<T>(max_normal);
+    x = *reinterpret_cast<const T *>(&maxNormal);
     result = func(x, inf);
     ASSERT_FP_EQ(result, inf);
 
@@ -145,48 +142,46 @@ public:
     // 'from' is infinity.
     x = inf;
     result = func(x, 0);
-    expected_bits = max_normal;
-    expected = LIBC_NAMESPACE::cpp::bit_cast<T>(expected_bits);
+    expectedBits = maxNormal;
+    expected = *reinterpret_cast<T *>(&expectedBits);
     ASSERT_FP_EQ(result, expected);
     ASSERT_FP_EQ(func(x, inf), inf);
 
-    x = neg_inf;
+    x = negInf;
     result = func(x, 0);
-    expected_bits = (UIntType(1) << (BIT_WIDTH_OF_TYPE - 1)) + max_normal;
-    expected = LIBC_NAMESPACE::cpp::bit_cast<T>(expected_bits);
+    expectedBits = (UIntType(1) << (bitWidthOfType - 1)) + maxNormal;
+    expected = *reinterpret_cast<T *>(&expectedBits);
     ASSERT_FP_EQ(result, expected);
-    ASSERT_FP_EQ(func(x, neg_inf), neg_inf);
+    ASSERT_FP_EQ(func(x, negInf), negInf);
 
     // 'from' is a power of 2.
     x = T(32.0);
     result = func(x, 0);
-    FPBits x_bits = FPBits(x);
-    FPBits result_bits = FPBits(result);
-    ASSERT_EQ(result_bits.get_unbiased_exponent(),
-              uint16_t(x_bits.get_unbiased_exponent() - 1));
-    ASSERT_EQ(result_bits.get_mantissa(),
-              (UIntType(1) << MantissaWidth::VALUE) - 1);
+    FPBits xBits = FPBits(x);
+    FPBits resultBits = FPBits(result);
+    ASSERT_EQ(resultBits.getUnbiasedExponent(),
+              uint16_t(xBits.getUnbiasedExponent() - 1));
+    ASSERT_EQ(resultBits.getMantissa(),
+              (UIntType(1) << MantissaWidth::value) - 1);
 
     result = func(x, T(33.0));
-    result_bits = FPBits(result);
-    ASSERT_EQ(result_bits.get_unbiased_exponent(),
-              x_bits.get_unbiased_exponent());
-    ASSERT_EQ(result_bits.get_mantissa(), x_bits.get_mantissa() + UIntType(1));
+    resultBits = FPBits(result);
+    ASSERT_EQ(resultBits.getUnbiasedExponent(), xBits.getUnbiasedExponent());
+    ASSERT_EQ(resultBits.getMantissa(), xBits.getMantissa() + UIntType(1));
 
     x = -x;
 
     result = func(x, 0);
-    result_bits = FPBits(result);
-    ASSERT_EQ(result_bits.get_unbiased_exponent(),
-              uint16_t(x_bits.get_unbiased_exponent() - 1));
-    ASSERT_EQ(result_bits.get_mantissa(),
-              (UIntType(1) << MantissaWidth::VALUE) - 1);
+    resultBits = FPBits(result);
+    ASSERT_EQ(resultBits.getUnbiasedExponent(),
+              uint16_t(xBits.getUnbiasedExponent() - 1));
+    ASSERT_EQ(resultBits.getMantissa(),
+              (UIntType(1) << MantissaWidth::value) - 1);
 
     result = func(x, T(-33.0));
-    result_bits = FPBits(result);
-    ASSERT_EQ(result_bits.get_unbiased_exponent(),
-              x_bits.get_unbiased_exponent());
-    ASSERT_EQ(result_bits.get_mantissa(), x_bits.get_mantissa() + UIntType(1));
+    resultBits = FPBits(result);
+    ASSERT_EQ(resultBits.getUnbiasedExponent(), xBits.getUnbiasedExponent());
+    ASSERT_EQ(resultBits.getMantissa(), xBits.getMantissa() + UIntType(1));
   }
 };
 

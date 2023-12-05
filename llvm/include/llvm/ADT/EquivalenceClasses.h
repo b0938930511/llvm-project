@@ -5,11 +5,10 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-///
-/// \file
-/// Generic implementation of equivalence classes through the use Tarjan's
-/// efficient union-find algorithm.
-///
+//
+// Generic implementation of equivalence classes through the use Tarjan's
+// efficient union-find algorithm.
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef LLVM_ADT_EQUIVALENCECLASSES_H
@@ -31,8 +30,7 @@ namespace llvm {
 ///
 /// This implementation is an efficient implementation that only stores one copy
 /// of the element being indexed per entry in the set, and allows any arbitrary
-/// type to be indexed (as long as it can be ordered with operator< or a
-/// comparator is provided).
+/// type to be indexed (as long as it can be ordered with operator<).
 ///
 /// Here is a simple example using integers:
 ///
@@ -56,7 +54,7 @@ namespace llvm {
 ///   4
 ///   5 1 2
 ///
-template <class ElemTy, class Compare = std::less<ElemTy>>
+template <class ElemTy>
 class EquivalenceClasses {
   /// ECValue - The EquivalenceClasses data structure is just a set of these.
   /// Each of these represents a relation for a value.  First it stores the
@@ -103,40 +101,22 @@ class EquivalenceClasses {
       assert(RHS.isLeader() && RHS.getNext() == nullptr && "Not a singleton!");
     }
 
+    bool operator<(const ECValue &UFN) const { return Data < UFN.Data; }
+
     bool isLeader() const { return (intptr_t)Next & 1; }
     const ElemTy &getData() const { return Data; }
 
     const ECValue *getNext() const {
       return (ECValue*)((intptr_t)Next & ~(intptr_t)1);
     }
-  };
 
-  /// A wrapper of the comparator, to be passed to the set.
-  struct ECValueComparator {
-    using is_transparent = void;
-
-    ECValueComparator() : compare(Compare()) {}
-
-    bool operator()(const ECValue &lhs, const ECValue &rhs) const {
-      return compare(lhs.Data, rhs.Data);
-    }
-
-    template <typename T>
-    bool operator()(const T &lhs, const ECValue &rhs) const {
-      return compare(lhs, rhs.Data);
-    }
-
-    template <typename T>
-    bool operator()(const ECValue &lhs, const T &rhs) const {
-      return compare(lhs.Data, rhs);
-    }
-
-    const Compare compare;
+    template<typename T>
+    bool operator<(const T &Val) const { return Data < Val; }
   };
 
   /// TheMapping - This implicitly provides a mapping from ElemTy values to the
   /// ECValues, it just keeps the key as part of the value.
-  std::set<ECValue, ECValueComparator> TheMapping;
+  std::set<ECValue> TheMapping;
 
 public:
   EquivalenceClasses() = default;
@@ -161,8 +141,7 @@ public:
   //
 
   /// iterator* - Provides a way to iterate over all values in the set.
-  using iterator =
-      typename std::set<ECValue, ECValueComparator>::const_iterator;
+  using iterator = typename std::set<ECValue>::const_iterator;
 
   iterator begin() const { return TheMapping.begin(); }
   iterator end() const { return TheMapping.end(); }

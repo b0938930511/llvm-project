@@ -8,9 +8,9 @@ add_mlir_translation_library(MLIRArmNeonToLLVMIRTranslation
   Core
 
   LINK_LIBS PUBLIC
-  MLIRArmNeonDialect
+  MLIRArmNeon
   MLIRIR
-  MLIRLLVMDialect
+  MLIRLLVMIR
   MLIRSupport
   MLIRTargetLLVMIRExport
   )

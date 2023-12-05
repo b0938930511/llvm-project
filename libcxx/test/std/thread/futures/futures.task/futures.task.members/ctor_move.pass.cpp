@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// UNSUPPORTED: no-threads
+// UNSUPPORTED: libcpp-has-no-threads
 // UNSUPPORTED: c++03
 
 // <future>
@@ -38,7 +38,7 @@ int main(int, char**)
         assert(!p0.valid());
         assert(p.valid());
         std::future<double> f = p.get_future();
-        p(3, 97);
+        p(3, 'a');
         assert(f.get() == 105.0);
     }
     {

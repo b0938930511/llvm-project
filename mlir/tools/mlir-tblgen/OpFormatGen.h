@@ -22,7 +22,7 @@ class Operator;
 // Generate the assembly format for the given operator.
 void generateOpFormat(const Operator &constOp, OpClass &opClass);
 
-} // namespace tblgen
-} // namespace mlir
+} // end namespace tblgen
+} // end namespace mlir
 
 #endif // MLIR_TOOLS_MLIRTBLGEN_OPFORMATGEN_H_

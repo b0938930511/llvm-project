@@ -1,4 +1,3 @@
-// UNSUPPORTED: target={{.*}}-zos{{.*}}, target={{.*}}-aix{{.*}}
 // Test for assertion failure due to objc_externally_retained on a function.
 
 // Without PCH
@@ -23,7 +22,7 @@ id sharedObject = 0;
 #else
 //===----------------------------------------------------------------------===//
 
-void callDoSomething(void) {
+void callDoSomething() {
   doSomething(sharedObject);
 }
 

@@ -14,8 +14,6 @@
 #ifndef LLVM_ANALYSIS_SPARSEPROPAGATION_H
 #define LLVM_ANALYSIS_SPARSEPROPAGATION_H
 
-#include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/Debug.h"
 #include <set>
@@ -331,8 +329,8 @@ void SparseSolver<LatticeKey, LatticeVal, KeyInfo>::getFeasibleSuccessors(
     return;
   }
 
-  if (!isa<SwitchInst>(TI)) {
-    // Unknown termintor, assume all successors are feasible.
+  if (TI.isExceptionalTerminator() ||
+      TI.isIndirectTerminator()) {
     Succs.assign(Succs.size(), true);
     return;
   }

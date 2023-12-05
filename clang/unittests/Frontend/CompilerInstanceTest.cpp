@@ -55,10 +55,8 @@ TEST(CompilerInstance, DefaultVFSOverlayFromInvocation) {
   IntrusiveRefCntPtr<DiagnosticsEngine> Diags =
       CompilerInstance::createDiagnostics(new DiagnosticOptions());
 
-  CreateInvocationOptions CIOpts;
-  CIOpts.Diags = Diags;
   std::shared_ptr<CompilerInvocation> CInvok =
-      createInvocation(Args, std::move(CIOpts));
+      createInvocationFromCommandLine(Args, Diags);
 
   if (!CInvok)
     FAIL() << "could not create compiler invocation";

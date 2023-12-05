@@ -1,3 +1,4 @@
+// -*- C++ -*-
 //===----------------------------------------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -13,12 +14,15 @@
 // bool empty() const noexcept;
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
-// UNSUPPORTED: availability-filesystem-missing
 
-#include <filesystem>
-namespace fs = std::filesystem;
+#include "filesystem_include.h"
 
-void f() {
+#include "test_macros.h"
+
+int main(int, char**)
+{
     fs::path c;
     c.empty(); // expected-warning {{ignoring return value of function declared with 'nodiscard' attribute}}
+
+    return 0;
 }

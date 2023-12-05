@@ -1,15 +1,8 @@
 # Welcome to Flang's documentation
 
-Flang is LLVM's Fortran frontend that can be found
-[here](https://github.com/llvm/llvm-project/tree/main/flang). It is often
-referred to as "LLVM Flang" to differentiate itself from ["Classic
-Flang"](https://github.com/flang-compiler/flang) - these are two separate and
-independent Fortran compilers. LLVM Flang is under active development. While it
-is capable of generating executables for a number of examples, some
-functionality is still missing. See [GettingInvolved](GettingInvolved) for tips
-on how to get in touch with us and to learn more about the current status.
+Flang is LLVM's Fortran frontend
 
-```{eval-rst}
+```eval_rst
 .. toctree::
    :titlesonly:
 
@@ -18,74 +11,54 @@ on how to get in touch with us and to learn more about the current status.
 
 # Contributing to Flang
 
-```{eval-rst}
+```eval_rst
 .. toctree::
    :titlesonly:
 
-   C++17
-   C++style
-   DesignGuideline
-   FortranForCProgrammers
    GettingInvolved
-   GettingStarted
-   ImplementingASemanticCheck
+   FortranForCProgrammers
+   C++style
+   C++17
    PullRequestChecklist
+   ImplementingASemanticCheck
 ```
 
 # Design Documents
 
-```{eval-rst}
+```eval_rst
 .. toctree::
    :titlesonly:
 
-   Aliasing
-   AliasingAnalysisFIR
-   ArrayComposition
-   AssumedRank
-   BijectiveInternalNameUniquing
-   Calls
-   Character
-   ComplexOperations
-   ControlFlowGraph
-   Directives
-   DoConcurrent
-   Extensions
-   F202X
-   FIRArrayOperations
-   FIRLangRef
-   FlangCommandLineReference
-   FlangDriver
-   FortranFeatureHistory
-   FortranIR
-   FortranLLVMTestSuite
-   HighLevelFIR
-   IORuntimeInternals
-   InternalProcedureTrampolines
-   Intrinsics
-   IntrinsicTypes
+   Overview
+   Preprocessing
+   Parsing
    LabelResolution
    ModFiles
-   OpenACC
-   OpenMP-4.5-grammar.md
+   Semantics
    OpenMP-semantics
+   ControlFlowGraph
+   FortranIR
+   IORuntimeInternals
+   f2018-grammar.md
+   OpenMP-4.5-grammar.md
+   Directives
+   Extensions
+   Intrinsics
    OptionComparison
-   Overview
-   ParameterizedDerivedTypes
    ParserCombinators
-   Parsing
-   PolymorphicEntities
-   Preprocessing
-   ProcedurePointer
    RuntimeDescriptor
    RuntimeTypeInfo
-   Semantics
-   f2018-grammar.md
-   fstack-arrays
+   Calls
+   Character
+   ArrayComposition
+   BijectiveInternalNameUniquing
+   DoConcurrent
+   FortranLLVMTestSuite
 ```
 
 # Indices and tables
 
-```{eval-rst}
+```eval_rst
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`

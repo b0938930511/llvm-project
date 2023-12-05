@@ -1,6 +1,6 @@
 // NOTE: Use '-fobjc-gc' to test the analysis being run twice, and multiple reports are not issued.
-// RUN: %clang_analyze_cc1 -triple i386-apple-darwin10 -analyzer-checker=core,alpha.core,osx.cocoa.AtSync -Wno-strict-prototypes -Wno-pointer-to-int-cast -verify -fblocks -Wno-unreachable-code -Wno-null-dereference -Wno-objc-root-class %s
-// RUN: %clang_analyze_cc1 -triple x86_64-apple-darwin10 -analyzer-checker=core,alpha.core,osx.cocoa.AtSync -Wno-strict-prototypes -Wno-pointer-to-int-cast -verify -fblocks -Wno-unreachable-code -Wno-null-dereference -Wno-objc-root-class %s
+// RUN: %clang_analyze_cc1 -triple i386-apple-darwin10 -analyzer-checker=core,alpha.core,osx.cocoa.AtSync -analyzer-store=region -Wno-pointer-to-int-cast -verify -fblocks -Wno-unreachable-code -Wno-null-dereference -Wno-objc-root-class %s
+// RUN: %clang_analyze_cc1 -triple x86_64-apple-darwin10 -analyzer-checker=core,alpha.core,osx.cocoa.AtSync -analyzer-store=region -Wno-pointer-to-int-cast -verify -fblocks -Wno-unreachable-code -Wno-null-dereference -Wno-objc-root-class %s
 
 #ifndef __clang_analyzer__
 #error __clang_analyzer__ not defined
@@ -59,6 +59,7 @@ typedef struct _NSRect {
     NSSize size;
 } NSRect;
 
+// Reduced test case from crash in <rdar://problem/6253157>
 @interface A @end
 @implementation A
 - (void)foo:(void (^)(NSObject *x))block {
@@ -72,9 +73,12 @@ typedef struct _NSRect {
 unsigned foo(unsigned x) { return __alignof__((x)) + sizeof(x); }
 
 // Improvement to path-sensitivity involving compound assignments.
-unsigned r6268365Aux(void);
+//  Addresses false positive in <rdar://problem/6268365>
+//
 
-void r6268365(void) {
+unsigned r6268365Aux();
+
+void r6268365() {
   unsigned x = 0;
   x &= r6268365Aux();
   unsigned j = 0;
@@ -100,7 +104,7 @@ void divzeroassumeB(unsigned x, unsigned j) {
 // InitListExpr processing
 
 typedef float __m128 __attribute__((__vector_size__(16), __may_alias__));
-__m128 return128(void) {
+__m128 return128() {
   // This compound literal has a Vector type.  We currently just
   // return UnknownVal.
   return __extension__(__m128) { 0.0f, 0.0f, 0.0f, 0.0f };
@@ -147,7 +151,7 @@ void check_deref_undef(void) {
 
 // PR 3422
 void pr3422_helper(char *p);
-void pr3422(void) {
+void pr3422() {
   char buf[100];
   char *q = &buf[10];
   pr3422_helper(&q[1]);
@@ -158,6 +162,7 @@ void pr_3543(void) {
   ({});
 }
 
+// <rdar://problem/6611677>
 // This test case test the use of a vector type within an array subscript
 // expression.
 typedef long long __a64vector __attribute__((__vector_size__(8)));
@@ -217,14 +222,15 @@ void pr3772(void)
 // PR 3780 - This tests that StmtIterator isn't broken for VLAs in DeclGroups.
 void pr3780(int sz) { typedef double MAT[sz][sz]; }
 
-// Test that we don't symbolicate doubles before we are ready to do something
-// with them.
+// <rdar://problem/6695527> - Test that we don't symbolicate doubles before
+// we are ready to do something with them.
 int rdar6695527(double x) {
   if (!x) { return 0; }
   return 1;
 }
 
-// Test that we properly invalidate structs passed-by-reference to a function.
+// <rdar://problem/6708148> - Test that we properly invalidate structs
+//  passed-by-reference to a function.
 void pr6708148_invalidate(NSRect *x);
 void pr6708148_use(NSRect x);
 void pr6708148_test(void) {
@@ -234,8 +240,8 @@ void pr6708148_test(void) {
 }
 
 // Handle both kinds of noreturn attributes for pruning paths.
-void rdar_6777003_noret(void) __attribute__((noreturn));
-void rdar_6777003_analyzer_noret(void) __attribute__((analyzer_noreturn));
+void rdar_6777003_noret() __attribute__((noreturn));
+void rdar_6777003_analyzer_noret() __attribute__((analyzer_noreturn));
 
 void rdar_6777003(int x) {
   int *p = 0;
@@ -254,7 +260,7 @@ void rdar_6777003(int x) {
 }
 
 // Check that the pointer-to-conts arguments do not get invalidated by Obj C 
-// interfaces.
+// interfaces. radar://10595327
 int rdar_10595327(char *str) {
   char fl = str[0]; 
   int *p = 0;
@@ -267,6 +273,7 @@ int rdar_10595327(char *str) {
 // For pointer arithmetic, --/++ should be treated as preserving non-nullness,
 // regardless of how well the underlying StoreManager reasons about pointer
 // arithmetic.
+// <rdar://problem/6777209>
 void rdar_6777209(char *p) {
   if (p == 0)
     return;
@@ -281,7 +288,7 @@ void rdar_6777209(char *p) {
 // PR 4033.  A symbolic 'void *' pointer can be used as the address for a
 // computed goto.
 typedef void *Opcode;
-Opcode pr_4033_getOpcode(void);
+Opcode pr_4033_getOpcode();
 void pr_4033(void) {
   void *lbl = &&next_opcode;
 next_opcode:
@@ -295,7 +302,7 @@ next_opcode:
 // example came from a recent false positive due to a regression where the
 // branch condition was falsely reported as being uninitialized.
 void invalidate_by_ref(char **x);
-int test_invalidate_by_ref(void) {
+int test_invalidate_by_ref() {
   unsigned short y;
   invalidate_by_ref((char**) &y);
   if (y) // no-warning
@@ -303,32 +310,34 @@ int test_invalidate_by_ref(void) {
   return 0;  
 }
 
-// This just tests that the CFG is constructed correctly.  Previously, the
-// successor block of the entrance was the block containing the merge for '?',
-// which would trigger an assertion failure.
-int rdar_7027684_aux(void);
-int rdar_7027684_aux_2(void) __attribute__((noreturn));
+// Test for <rdar://problem/7027684>.  This just tests that the CFG is
+// constructed correctly.  Previously, the successor block of the entrance
+// was the block containing the merge for '?', which would trigger an
+// assertion failure.
+int rdar_7027684_aux();
+int rdar_7027684_aux_2() __attribute__((noreturn));
 void rdar_7027684(int x, int y) {
   {}; // this empty compound statement is critical.
   (rdar_7027684_aux() ? rdar_7027684_aux_2() : (void) 0);
 }
 
 // Test that we handle casts of string literals to arbitrary types.
-unsigned const char *string_literal_test1(void) {
+unsigned const char *string_literal_test1() {
   return (const unsigned char*) "hello";
 }
 
-const float *string_literal_test2(void) {
+const float *string_literal_test2() {
   return (const float*) "hello";
 }
 
 // Test that we handle casts *from* incomplete struct types.
 extern const struct _FooAssertStruct _cmd;
 void test_cast_from_incomplete_struct_aux(volatile const void *x);
-void test_cast_from_incomplete_struct(void) {
+void test_cast_from_incomplete_struct() {
   test_cast_from_incomplete_struct_aux(&_cmd);
 }
 
+// Test for <rdar://problem/7034511> 
 //  "ValueManager::makeIntVal(uint64_t X, QualType T) should return a 'Loc' 
 //   when 'T' is a pointer"
 //
@@ -341,13 +350,13 @@ void test_rdar_7034511(NSArray *y) {
 
 // Handle casts of function pointers (CodeTextRegions) to arbitrary pointer
 // types. This was previously causing a crash in CastRegion.
-void handle_funcptr_voidptr_casts(void) {
+void handle_funcptr_voidptr_casts() {
   void **ptr;
   typedef void *PVOID;
   typedef void *PCHAR;  
   typedef long INT_PTR, *PINT_PTR;
-  typedef INT_PTR (*FARPROC)(void);
-  FARPROC handle_funcptr_voidptr_casts_aux(void);
+  typedef INT_PTR (*FARPROC)();
+  FARPROC handle_funcptr_voidptr_casts_aux();
   PVOID handle_funcptr_voidptr_casts_aux_2(PVOID volatile *x);
   PVOID handle_funcptr_voidptr_casts_aux_3(PCHAR volatile *x);  
   
@@ -358,7 +367,7 @@ void handle_funcptr_voidptr_casts(void) {
 
 // RegionStore::Retrieve previously crashed on this example.  This example
 // was previously in the test file 'xfail_regionstore_wine_crash.c'.
-void testA(void) {
+void testA() {
   long x = 0;
   char *y = (char *) &x;
   if (!*y)
@@ -387,7 +396,7 @@ void testB(BStruct *b) {
 }
 
 void test_trivial_symbolic_comparison(int *x) {
-  int test_trivial_symbolic_comparison_aux(void);
+  int test_trivial_symbolic_comparison_aux();
   int a = test_trivial_symbolic_comparison_aux();
   int b = a;
   if (a != b) {
@@ -404,14 +413,14 @@ void test_trivial_symbolic_comparison(int *x) {
 }
 
 // Test for:
-// false positive null dereference due to BasicStoreManager not tracking
-// *static* globals
+//  <rdar://problem/7062158> false positive null dereference due to
+//   BasicStoreManager not tracking *static* globals
 //
 // This just tests the proper tracking of symbolic values for globals (both 
 // static and non-static).
 //
 static int* x_rdar_7062158;
-void rdar_7062158(void) {
+void rdar_7062158() {
   int *current = x_rdar_7062158;
   if (current == x_rdar_7062158)
     return;
@@ -421,7 +430,7 @@ void rdar_7062158(void) {
 }
 
 int* x_rdar_7062158_2;
-void rdar_7062158_2(void) {
+void rdar_7062158_2() {
   int *current = x_rdar_7062158_2;
   if (current == x_rdar_7062158_2)
     return;
@@ -447,8 +456,8 @@ unsigned char test_array_index_bitwidth(const unsigned char *p) {
 
 // This case tests that CastRegion handles casts involving BlockPointerTypes.
 // It should not crash.
-void test_block_cast(void) {
-  id test_block_cast_aux(void);
+void test_block_cast() {
+  id test_block_cast_aux();
   (void (^)(void *))test_block_cast_aux(); // expected-warning{{expression result unused}}
 }
 
@@ -482,7 +491,7 @@ void radar11390991_NoBarrier_CompareAndSwap(volatile Atomic32 *ptr,
 }
 
 // PR 4594 - This was a crash when handling casts in SimpleSValuator.
-void PR4594(void) {
+void PR4594() {
   char *buf[1];
   char **foo = buf;
   *foo = "test";
@@ -490,7 +499,7 @@ void PR4594(void) {
 
 // Test invalidation logic where an integer is casted to an array with a
 // different sign and then invalidated.
-void test_invalidate_cast_int(void) {
+void test_invalidate_cast_int() {
   void test_invalidate_cast_int_aux(unsigned *i);
   signed i;  
   test_invalidate_cast_int_aux((unsigned*) &i);
@@ -508,7 +517,7 @@ static NSNumber *test_ivar_offset(id self, SEL _cmd, Ivar inIvar) {
 
 // Reduced from a crash in StoreManager::CastRegion involving a divide-by-zero.
 // This resulted from not properly handling region casts to 'const void*'.
-void test_cast_const_voidptr(void) {
+void test_cast_const_voidptr() {
   char x[10];
   char *p = &x[1];
   const void* q = p;
@@ -516,7 +525,7 @@ void test_cast_const_voidptr(void) {
 
 // Reduced from a crash when analyzing Wine.  This test handles loads from
 // function addresses.
-typedef long (*FARPROC)(void);
+typedef long (*FARPROC)();
 FARPROC test_load_func(FARPROC origfun) {
   if (!*(unsigned char*) origfun)
     return origfun;
@@ -529,7 +538,7 @@ struct test_pass_val {
   int y;
 };
 void test_pass_val_aux(struct test_pass_val s);
-void test_pass_val(void) {
+void test_pass_val() {
   struct test_pass_val s;
   s.x = 1;
   s.y = 2;
@@ -567,8 +576,8 @@ void pr4781(unsigned long *raw1) {
   }
 }
 
-// 'self' should be treated as being non-null upon entry to an objective-c
-// method.
+// <rdar://problem/7185647> - 'self' should be treated as being non-null
+// upon entry to an objective-c method.
 @interface RDar7185647
 - (id)foo;
 @end
@@ -590,21 +599,21 @@ struct test_offsetof_B {
   int w;
   int z;
 };
-void test_offsetof_1(void) {
+void test_offsetof_1() {
   if (__builtin_offsetof(struct test_offsetof_A, x) ==
       __builtin_offsetof(struct test_offsetof_B, w))
     return;
   int *p = 0;
   *p = 0xDEADBEEF; // no-warning
 }
-void test_offsetof_2(void) {
+void test_offsetof_2() {
   if (__builtin_offsetof(struct test_offsetof_A, y) ==
       __builtin_offsetof(struct test_offsetof_B, z))
     return;
   int *p = 0;
   *p = 0xDEADBEEF; // no-warning
 }
-void test_offsetof_3(void) {
+void test_offsetof_3() {
   if (__builtin_offsetof(struct test_offsetof_A, y) -
       __builtin_offsetof(struct test_offsetof_A, x)
       ==
@@ -614,7 +623,7 @@ void test_offsetof_3(void) {
   int *p = 0;
   *p = 0xDEADBEEF; // no-warning
 }
-void test_offsetof_4(void) {
+void test_offsetof_4() {
   if (__builtin_offsetof(struct test_offsetof_A, y) ==
       __builtin_offsetof(struct test_offsetof_B, w))
     return;
@@ -622,16 +631,16 @@ void test_offsetof_4(void) {
   *p = 0xDEADBEEF; // expected-warning{{Dereference of null pointer}}
 }
 
-// "nil receiver" false positive: make tracking  of the MemRegion for 'self'
-// path-sensitive
+// <rdar://problem/6829164> "nil receiver" false positive: make tracking 
+// of the MemRegion for 'self' path-sensitive
 @interface RDar6829164 : NSObject {
   double x; int y;
 }
 - (id) init;
 @end
 
-id rdar_6829164_1(void);
-double rdar_6829164_2(void);
+id rdar_6829164_1();
+double rdar_6829164_2();
 
 @implementation RDar6829164
 - (id) init {
@@ -645,17 +654,18 @@ double rdar_6829164_2(void);
 }
 @end
 
-// Invalidate values passed-by-reference to functions when the pointer to the
-// value is passed as an integer.
+// <rdar://problem/7242015> - Invalidate values passed-by-reference
+// to functions when the pointer to the value is passed as an integer.
 void test_7242015_aux(unsigned long);
-int rdar_7242015(void) {
+int rdar_7242015() {
   int x;
   test_7242015_aux((unsigned long) &x); // no-warning
   return x; // Previously we return and uninitialized value when
             // using RegionStore.
 }
 
-// [RegionStore] compound literal assignment with floats not honored
+// <rdar://problem/7242006> [RegionStore] compound literal assignment with
+//  floats not honored
 CGFloat rdar7242006(CGFloat x) {
   NSSize y = (NSSize){x, 10};
   return y.width; // no-warning
@@ -668,8 +678,9 @@ void pr_4988(void) {
   pr_4988; // expected-warning{{expression result unused}}
 }
 
-// A 'signed char' is used as a flag, which is implicitly converted to an int.
-void *rdar7152418_bar(void);
+// <rdar://problem/7152418> - A 'signed char' is used as a flag, which is
+//  implicitly converted to an int.
+void *rdar7152418_bar();
 @interface RDar7152418 {
   signed char x;
 }
@@ -749,7 +760,7 @@ NSSwappedFloat test_cast_nonstruct_to_union(float x) {
   return ((union bran *)&x)->sf; // no-warning
 }
 
-void test_undefined_array_subscript(void) {
+void test_undefined_array_subscript() {
   int i, a[10];
   int *p = &a[i]; // expected-warning{{Array subscript is undefined}}
 }
@@ -835,8 +846,8 @@ void f(kwset_t *kws, char const *p, char const *q) {
 }
 
 //===----------------------------------------------------------------------===//
-// When handling sizeof(VLA) it leads to a hole in the ExplodedGraph (causing a
-// false positive).
+// <rdar://problem/7593875> When handling sizeof(VLA) it leads to a hole in
+// the ExplodedGraph (causing a false positive)
 //===----------------------------------------------------------------------===//
 
 int rdar_7593875_aux(int x);
@@ -853,9 +864,9 @@ int rdar_7593875(int n) {
 // Previously this caused an assertion failure.
 //===----------------------------------------------------------------------===//
 
-void *foo_rev95119(void);
+void *foo_rev95119();
 void baz_rev95119(double x);
-void bar_rev95119(void) {
+void bar_rev95119() {
   // foo_rev95119() returns a symbolic pointer.  It is then 
   // cast to an int which is then cast to a double.
   int value = (int) foo_rev95119();
@@ -882,8 +893,8 @@ void foo_rev95192(int **x) {
 // violates our invariants.
 //===----------------------------------------------------------------------===//
 
-void *foo_rev95267(void);
-int bar_rev95267(void) {
+void *foo_rev95267();
+int bar_rev95267() {
   char (*Callback_rev95267)(void) = (char (*)(void)) foo_rev95267;
   if ((*Callback_rev95267)() == (char) 0)
     return 1;
@@ -891,20 +902,20 @@ int bar_rev95267(void) {
 }
 
 // Same as previous case, but handle casts to 'void'.
-int bar_rev95274(void) {
+int bar_rev95274() {
   void (*Callback_rev95274)(void) = (void (*)(void)) foo_rev95267;
   (*Callback_rev95274)();
   return 0;
 }
 
-void rdar7582031_test_static_init_zero(void) {
+void rdar7582031_test_static_init_zero() {
   static unsigned x;
   if (x == 0)
     return;
   int *p = 0;
   *p = 0xDEADBEEF;
 }
-void rdar7582031_test_static_init_zero_b(void) {
+void rdar7582031_test_static_init_zero_b() {
   static void* x;
   if (x == 0)
     return;
@@ -936,7 +947,7 @@ void foo_rev95547_b(struct s_rev95547 w) {
 // This previously triggered a crash.
 //===----------------------------------------------------------------------===//
 
-void pr6938(void) {
+void pr6938() {
   if (1 && ({
     while (0);
     0;
@@ -944,7 +955,7 @@ void pr6938(void) {
   }
 }
 
-void pr6938_b(void) {
+void pr6938_b() {
   if (1 && *({ // expected-warning{{Dereference of null pointer}}
     while (0) {}
     ({
@@ -955,8 +966,8 @@ void pr6938_b(void) {
 }
 
 //===----------------------------------------------------------------------===//
-// The CFG for code containing an empty @synchronized block was previously
-// broken (and would crash the analyzer).
+// <rdar://problem/7979430> - The CFG for code containing an empty
+//  @synchronized block was previously broken (and would crash the analyzer).
 //===----------------------------------------------------------------------===//
 
 void r7979430(id x) {
@@ -977,8 +988,8 @@ MAKE_TEST_FN() // expected-warning{{null pointer}}
 // PR 7491 - Test that symbolic expressions can be used as conditions.
 //===----------------------------------------------------------------------===
 
-void pr7491 (void) {
-  extern int getint(void);
+void pr7491 () {
+  extern int getint();
   int a = getint()-1;
   if (a) {
     return;
@@ -997,22 +1008,22 @@ void pr7491 (void) {
 //===----------------------------------------------------------------------===
 
 int *pr7475_someGlobal;
-void pr7475_setUpGlobal(void);
+void pr7475_setUpGlobal();
 
-void pr7475(void) {
+void pr7475() {
   if (pr7475_someGlobal == 0)
     pr7475_setUpGlobal();
   *pr7475_someGlobal = 0; // no-warning
 }
 
-void pr7475_warn(void) {
+void pr7475_warn() {
   static int *someStatic = 0;
   if (someStatic == 0)
     pr7475_setUpGlobal();
   *someStatic = 0; // expected-warning{{null pointer}}
 }
 
-// __imag passed non-complex should not crash
+// <rdar://problem/8202272> - __imag passed non-complex should not crash
 float f0(_Complex float x) {
   float l0 = __real x;
   return  __real l0 + __imag l0;
@@ -1037,8 +1048,8 @@ void reduce_to_constant(int x, int y) {
     (void)*(char*)0; // no-warning
 }
 
-// Test that code after a switch statement with no 'case:' labels is correctly
-// evaluated.
+// <rdar://problem/8360854> - Test that code after a switch statement with no 
+// 'case:' labels is correctly evaluated.
 void r8360854(int n) {
   switch (n) {
    default: ;
@@ -1059,8 +1070,8 @@ void pr8050(struct PR8050 **arg)
     *arg = malloc(1);
 }
 
-// Switch on enum should not consider default case live if all enum values are
-// covered.
+// <rdar://problem/5880430> Switch on enum should not consider default case live
+//  if all enum values are covered
 enum Cases { C1, C2, C3, C4 };
 void test_enum_cases(enum Cases C) {
   switch (C) {
@@ -1085,8 +1096,8 @@ void test_enum_cases_positive(enum Cases C) {
   *p = 0xDEADBEEF; // expected-warning{{Dereference of null pointer}}
 }
 
-// Warn if synchronization mutex can be nil
-void rdar6351970(void) {
+// <rdar://problem/6351970> rule request: warn if synchronization mutex can be nil
+void rdar6351970() {
   id x = 0;
   @synchronized(x) {} // expected-warning{{Nil value used as mutex for @synchronized() (no synchronization will occur)}}
 }
@@ -1096,7 +1107,7 @@ void rdar6351970_b(id x) {
     @synchronized(x) {} // expected-warning{{Nil value used as mutex for @synchronized() (no synchronization will occur)}}
 }
 
-void rdar6351970_c(void) {
+void rdar6351970_c() {
   id x;
   @synchronized(x) {} // expected-warning{{Uninitialized value used as mutex for @synchronized}}
 }
@@ -1115,7 +1126,7 @@ void rdar8578650(id x) {
   }
 }
 
-// Direct structure member access null pointer dereference
+// <rdar://problem/6352035> rule request: direct structure member access null pointer dereference
 @interface RDar6352035 {
   int c;
 }
@@ -1158,8 +1169,8 @@ static struct {
   char **data;
 } saved_pr8440;
 
-char *foo_pr8440(void);
-char **bar_pr8440(void);
+char *foo_pr8440();
+char **bar_pr8440();
 void baz_pr8440(int n)
 {
    saved_pr8440.num = n;
@@ -1172,12 +1183,13 @@ void baz_pr8440(int n)
 
 // Support direct accesses to non-null memory.  Reported in:
 //  PR 5272
-int test_direct_address_load(void) {
+//  <rdar://problem/6839683>
+int test_direct_address_load() {
   int *p = (int*) 0x4000;
   return *p; // no-warning
 }
 
-void pr5272_test(void) {
+void pr5272_test() {
   struct pr5272 { int var2; };
   (*(struct pr5272*)0xBC000000).var2 = 0; // no-warning
   (*(struct pr5272*)0xBC000000).var2 += 2; // no-warning
@@ -1185,11 +1197,11 @@ void pr5272_test(void) {
 
 // Support casting the return value of function to another different type
 // This previously caused a crash, although we likely need more precise
-// reasoning here.
-void* rdar8663544(void);
+// reasoning here. <rdar://problem/8663544>
+void* rdar8663544();
 typedef struct {} Val8663544;
-Val8663544 bazR8663544(void) {
-  Val8663544(*func) (void) = (Val8663544(*) (void)) rdar8663544;
+Val8663544 bazR8663544() {
+  Val8663544(*func) () = (Val8663544(*) ()) rdar8663544;
   return func();
 }
 
@@ -1206,7 +1218,7 @@ void pr8619(int a, int b, int c) {
 union pr8648_union {
         signed long long pr8648_union_field;
 };
-void pr8648(void) {
+void pr8648() {
   long long y;
   union pr8648_union x = { .pr8648_union_field = 0LL };
   y = x.pr8648_union_field;
@@ -1228,7 +1240,7 @@ void pr8648(void) {
 // contains a condition with multiple basic blocks, and the value of the
 // statement expression is then indexed as part of a bigger condition expression.
 // This example exposed a bug in child traversal in the CFGBuilder.
-void pr9269(void) {
+void pr9269() {
   struct s { char *bar[10]; } baz[2] = { 0 };
   unsigned i = 0;
   for (i = 0;
@@ -1259,7 +1271,7 @@ void pr9287_c(int type, int *p) {
   }
 }
 
-void test_switch(void) {
+void test_switch() {
   switch (4) {
     case 1: {
       int *p = 0;
@@ -1293,8 +1305,8 @@ static void test(unsigned int bit_mask)
 }
 
 // Don't crash on code containing __label__.
-int radar9414427_aux(void);
-void radar9414427(void) {
+int radar9414427_aux();
+void radar9414427() {
   __label__ mylabel;
   if (radar9414427_aux()) {
   mylabel: do {}
@@ -1331,7 +1343,7 @@ void radar9414427(void) {
 
 // Don't crash when a ?: is only preceded by a statement (not an expression)
 // in the CFG.
-void __assert_fail(void);
+void __assert_fail();
 
 enum rdar1196620_e { E_A, E_B, E_C, E_D };
 struct rdar1196620_s { int ints[E_D+1]; };

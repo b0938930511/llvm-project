@@ -1,3 +1,4 @@
+// -*- C++ -*-
 //===----------------------------------------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -7,6 +8,9 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14
+
+// Throwing bad_variant_access is supported starting in macosx10.13
+// XFAIL: use_system_cxx_lib && target={{.+}}-apple-macosx10.{{9|10|11|12}} && !no-exceptions
 
 // <variant>
 
@@ -19,7 +23,6 @@
 #include <string>
 #include <type_traits>
 #include <variant>
-#include <vector>
 #include <memory>
 
 #include "test_macros.h"
@@ -146,10 +149,8 @@ void test_T_assignment_sfinae() {
     };
     static_assert(!std::is_assignable<V, X>::value,
                   "no boolean conversion in operator=");
-#ifndef _LIBCPP_ENABLE_NARROWING_CONVERSIONS_IN_VARIANT
-    static_assert(std::is_assignable<V, std::false_type>::value,
-                  "converted to bool in operator=");
-#endif
+    static_assert(!std::is_assignable<V, std::false_type>::value,
+                  "no converted to bool in operator=");
   }
   {
     struct X {};
@@ -210,6 +211,16 @@ void test_T_assignment_basic() {
     v = nullptr;
     assert(v.index() == 1);
     assert(std::get<1>(v) == nullptr);
+  }
+  {
+    std::variant<bool volatile, int> v = 42;
+    v = false;
+    assert(v.index() == 0);
+    assert(!std::get<0>(v));
+    bool lvt = true;
+    v = lvt;
+    assert(v.index() == 0);
+    assert(std::get<0>(v));
   }
 #if !defined(TEST_VARIANT_HAS_NO_REFERENCES)
   {
@@ -298,23 +309,12 @@ void test_T_assignment_performs_assignment() {
 #endif // TEST_HAS_NO_EXCEPTIONS
 }
 
-void test_T_assignment_vector_bool() {
-#ifndef _LIBCPP_ENABLE_NARROWING_CONVERSIONS_IN_VARIANT
-  std::vector<bool> vec = {true};
-  std::variant<bool, int> v;
-  v = vec[0];
-  assert(v.index() == 0);
-  assert(std::get<0>(v) == true);
-#endif
-}
-
 int main(int, char**) {
   test_T_assignment_basic();
   test_T_assignment_performs_construction();
   test_T_assignment_performs_assignment();
   test_T_assignment_noexcept();
   test_T_assignment_sfinae();
-  test_T_assignment_vector_bool();
 
   return 0;
 }

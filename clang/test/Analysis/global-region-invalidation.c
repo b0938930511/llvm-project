@@ -1,5 +1,4 @@
-// RUN: %clang_analyze_cc1 -triple x86_64-apple-darwin10 -disable-free -verify %s \
-// RUN:   -analyzer-checker=core,deadcode,alpha.security.taint,debug.TaintTest,debug.ExprInspection
+// RUN: %clang_analyze_cc1 -triple x86_64-apple-darwin10 -disable-free -analyzer-checker=core,deadcode,alpha.security.taint,debug.TaintTest,debug.ExprInspection -verify %s
 
 void clang_analyzer_eval(int);
 
@@ -8,7 +7,7 @@ void clang_analyzer_eval(int);
 
 // Test that system header does not invalidate the internal global.
 int size_rdar9373039 = 1;
-int rdar9373039(void) {
+int rdar9373039() {
   int x;
   int j = 0;
 
@@ -25,8 +24,8 @@ int rdar9373039(void) {
 }
 
 // Test stdin does not get invalidated by a system call nor by an internal call.
-void foo(void);
-int stdinTest(void) {
+void foo();
+int stdinTest() {
   int i = 0;
   fscanf(stdin, "%d", &i);
   foo();
@@ -36,16 +35,43 @@ int stdinTest(void) {
   return m + j; // expected-warning + {{tainted}}
 }
 
+// Test errno gets invalidated by a system call.
+int testErrnoSystem() {
+  int i;
+  int *p = 0;
+  fscanf(stdin, "%d", &i);
+  if (errno == 0) {
+    fscanf(stdin, "%d", &i); // errno gets invalidated here.
+    return 5 / errno; // no-warning
+  }
+
+  errno = 0;
+  fscanf(stdin, "%d", &i); // errno gets invalidated here.
+  return 5 / errno; // no-warning
+}
+
+// Test that errno gets invalidated by internal calls.
+int testErrnoInternal() {
+  int i;
+  int *p = 0;
+  fscanf(stdin, "%d", &i);
+  if (errno == 0) {
+    foo(); // errno gets invalidated here.
+    return 5 / errno; // no-warning
+  }
+  return 0;
+}
+
 // Test that const integer does not get invalidated.
 const int x = 0;
-int constIntGlob(void) {
+int constIntGlob() {
   const int *m = &x;
     foo();
   return 3 / *m; // expected-warning {{Division by zero}}
 }
 
 extern const int y;
-int constIntGlobExtern(void) {
+int constIntGlobExtern() {
   if (y == 0) {
     foo();
     return 5 / y; // expected-warning {{Division by zero}}
@@ -54,20 +80,20 @@ int constIntGlobExtern(void) {
 }
 
 static void * const ptr = 0;
-void constPtrGlob(void) {
+void constPtrGlob() {
   clang_analyzer_eval(ptr == 0); // expected-warning{{TRUE}}
   foo();
   clang_analyzer_eval(ptr == 0); // expected-warning{{TRUE}}
 }
 
 static const int x2 = x;
-void constIntGlob2(void) {
+void constIntGlob2() {
   clang_analyzer_eval(x2 == 0); // expected-warning{{TRUE}}
   foo();
   clang_analyzer_eval(x2 == 0); // expected-warning{{TRUE}}
 }
 
-void testAnalyzerEvalIsPure(void) {
+void testAnalyzerEvalIsPure() {
   extern int someGlobal;
   if (someGlobal == 0) {
     clang_analyzer_eval(someGlobal == 0); // expected-warning{{TRUE}}
@@ -78,7 +104,7 @@ void testAnalyzerEvalIsPure(void) {
 // Test that static variables with initializers do not get reinitialized on
 // recursive calls.
 void Function2(void);
-int *getPtr(void);
+int *getPtr();
 void Function1(void) {
   static unsigned flag;
   static int *p = 0;
@@ -98,3 +124,4 @@ void SetToNonZero(void) {
   static int g = 5;
   clang_analyzer_eval(g == 5); // expected-warning{{TRUE}}
 }
+

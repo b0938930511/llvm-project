@@ -22,14 +22,11 @@
 #define LLVM_CODEGEN_GLOBALISEL_LOCALIZER_H
 
 #include "llvm/ADT/SetVector.h"
+#include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 
 namespace llvm {
 // Forward declarations.
-class AnalysisUsage;
-class MachineBasicBlock;
-class MachineInstr;
-class MachineOperand;
 class MachineRegisterInfo;
 class TargetTransformInfo;
 
@@ -51,9 +48,9 @@ private:
 
   /// MRI contains all the register class/bank information that this
   /// pass uses and updates.
-  MachineRegisterInfo *MRI = nullptr;
+  MachineRegisterInfo *MRI;
   /// TTI used for getting remat costs for instructions.
-  TargetTransformInfo *TTI = nullptr;
+  TargetTransformInfo *TTI;
 
   /// Check if \p MOUse is used in the same basic block as \p Def.
   /// If the use is in the same block, we say it is local.

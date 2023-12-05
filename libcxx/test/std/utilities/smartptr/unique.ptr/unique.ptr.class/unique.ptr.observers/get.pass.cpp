@@ -19,7 +19,7 @@
 #include "unique_ptr_test_helper.h"
 
 template <bool IsArray>
-TEST_CONSTEXPR_CXX23 void test_basic() {
+void test_basic() {
   typedef typename std::conditional<IsArray, int[], int>::type VT;
   typedef const VT CVT;
   {
@@ -44,18 +44,9 @@ TEST_CONSTEXPR_CXX23 void test_basic() {
   }
 }
 
-TEST_CONSTEXPR_CXX23 bool test() {
+int main(int, char**) {
   test_basic</*IsArray*/ false>();
   test_basic<true>();
-
-  return true;
-}
-
-int main(int, char**) {
-  test();
-#if TEST_STD_VER >= 23
-  static_assert(test());
-#endif
 
   return 0;
 }

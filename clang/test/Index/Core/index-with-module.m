@@ -1,4 +1,3 @@
-// XFAIL: target={{.*}}-aix{{.*}}
 // RUN: rm -rf %t.mcp
 // RUN: c-index-test core -print-source-symbols -dump-imported-module-files -- %s -I %S/Inputs/module -fmodules -fmodules-cache-path=%t.mcp | FileCheck %s
 
@@ -24,5 +23,5 @@ void foo() {
 // CHECK-DAG: 2:6 | function/C | ModA_func | c:@F@ModA_func | {{.*}} | Decl | rel: 0
 // CHECK-DAG: 2:6 | function/C | SubModA_func | c:@F@SubModA_func | {{.*}} | Decl | rel: 0
 // CHECK: ---- Module Inputs ----
-// CHECK: user | {{.*}}module.modulemap
 // CHECK: user | {{.*}}ModA.h
+// CHECK: user | {{.*}}module.modulemap

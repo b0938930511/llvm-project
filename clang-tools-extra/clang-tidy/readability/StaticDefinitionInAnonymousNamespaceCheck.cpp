@@ -13,14 +13,16 @@
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::readability {
+namespace clang {
+namespace tidy {
+namespace readability {
 
 void StaticDefinitionInAnonymousNamespaceCheck::registerMatchers(
     MatchFinder *Finder) {
   Finder->addMatcher(
       namedDecl(anyOf(functionDecl(isDefinition(), isStaticStorageClass()),
                       varDecl(isDefinition(), isStaticStorageClass())),
-                isInAnonymousNamespace())
+                hasParent(namespaceDecl(isAnonymous())))
           .bind("static-def"),
       this);
 }
@@ -58,4 +60,6 @@ void StaticDefinitionInAnonymousNamespaceCheck::check(
   }
 }
 
-} // namespace clang::tidy::readability
+} // namespace readability
+} // namespace tidy
+} // namespace clang

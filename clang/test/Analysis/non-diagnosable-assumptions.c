@@ -11,9 +11,9 @@
 // non-diagnosable conditions.
 
 // Function calls are currently non-diagnosable.
-int non_diagnosable(void);
+int non_diagnosable();
 
-void test_true(void) {
+void test_true() {
   if (non_diagnosable()) {
     // expected-note@-1{{Assuming the condition is true}}
     // expected-note@-2{{Taking true branch}}
@@ -23,7 +23,7 @@ void test_true(void) {
   }
 }
 
-void test_false(void) {
+void test_false() {
   if (non_diagnosable()) {
     // expected-note@-1{{Assuming the condition is false}}
     // expected-note@-2{{Taking false branch}}
@@ -36,7 +36,7 @@ void test_false(void) {
 
 // Test that we're still reporting that the condition is true,
 // when we encounter an exclamation mark (used to be broken).
-void test_exclamation_mark(void) {
+void test_exclamation_mark() {
   if (!non_diagnosable()) {
     // expected-note@-1{{Assuming the condition is true}}
     // expected-note@-2{{Taking true branch}}

@@ -6,8 +6,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-// UNSUPPORTED: c++03, c++11
-
 // <map>
 
 // class map
@@ -19,11 +17,16 @@
 // equal_range shall not participate in overload resolution unless the
 // qualified-id Compare::is_transparent is valid and denotes a type
 
+
 #include <map>
 #include <cassert>
 
 #include "test_macros.h"
 #include "is_transparent.h"
+
+#if TEST_STD_VER <= 11
+#error "This test requires is C++14 (or later)"
+#else
 
 int main(int, char**)
 {
@@ -33,3 +36,4 @@ int main(int, char**)
     TEST_IGNORE_NODISCARD M().lower_bound(C2Int{5});
     }
 }
+#endif

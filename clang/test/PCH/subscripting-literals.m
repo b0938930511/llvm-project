@@ -53,7 +53,7 @@ void testDict(NSString *key, id newObject, id oldObject) {
   NSDictionary *dict = @{ key: newObject, key: oldObject };
 }
 
-void testBoxableValue(void) {
+void testBoxableValue() {
   some_struct ss;
   id value = @(ss);
 }

@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "mlir/Dialect/Affine/Analysis/Utils.h"
+#include "mlir/Analysis/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Pass/Pass.h"
@@ -19,42 +19,39 @@
 #define PASS_NAME "test-affine-loop-unswitch"
 
 using namespace mlir;
-using namespace mlir::affine;
 
 namespace {
 
 /// This pass applies the permutation on the first maximal perfect nest.
 struct TestAffineLoopUnswitching
-    : public PassWrapper<TestAffineLoopUnswitching, OperationPass<>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TestAffineLoopUnswitching)
-
+    : public PassWrapper<TestAffineLoopUnswitching, FunctionPass> {
   StringRef getArgument() const final { return PASS_NAME; }
   StringRef getDescription() const final {
     return "Tests affine loop unswitching / if/else hoisting";
   }
   TestAffineLoopUnswitching() = default;
-  TestAffineLoopUnswitching(const TestAffineLoopUnswitching &pass) = default;
+  TestAffineLoopUnswitching(const TestAffineLoopUnswitching &pass) {}
 
-  void runOnOperation() override;
+  void runOnFunction() override;
 
   /// The maximum number of iterations to run this for.
   constexpr static unsigned kMaxIterations = 5;
 };
 
-} // namespace
+} // end anonymous namespace
 
-void TestAffineLoopUnswitching::runOnOperation() {
+void TestAffineLoopUnswitching::runOnFunction() {
   // Each hoisting invalidates a lot of IR around. Just stop the walk after the
   // first if/else hoisting, and repeat until no more hoisting can be done, or
   // the maximum number of iterations have been run.
-  Operation *op = getOperation();
+  auto func = getFunction();
   unsigned i = 0;
   do {
     auto walkFn = [](AffineIfOp op) {
       return succeeded(hoistAffineIfOp(op)) ? WalkResult::interrupt()
                                             : WalkResult::advance();
     };
-    if (op->walk(walkFn).wasInterrupted())
+    if (func.walk(walkFn).wasInterrupted())
       break;
   } while (++i < kMaxIterations);
 }

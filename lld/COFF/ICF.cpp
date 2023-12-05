@@ -18,7 +18,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "ICF.h"
-#include "COFFLinkerContext.h"
 #include "Chunks.h"
 #include "Symbols.h"
 #include "lld/Common/ErrorHandler.h"
@@ -26,7 +25,6 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Parallel.h"
-#include "llvm/Support/TimeProfiler.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/xxhash.h"
 #include <algorithm>
@@ -35,12 +33,15 @@
 
 using namespace llvm;
 
-namespace lld::coff {
+namespace lld {
+namespace coff {
+
+static Timer icfTimer("ICF", Timer::root());
 
 class ICF {
 public:
-  ICF(COFFLinkerContext &c) : ctx(c){};
-  void run();
+  ICF(ICFLevel icfLevel) : icfLevel(icfLevel){};
+  void run(ArrayRef<Chunk *> v);
 
 private:
   void segregate(size_t begin, size_t end, bool constant);
@@ -62,8 +63,7 @@ private:
   std::vector<SectionChunk *> chunks;
   int cnt = 0;
   std::atomic<bool> repeat = {false};
-
-  COFFLinkerContext &ctx;
+  ICFLevel icfLevel = ICFLevel::All;
 };
 
 // Returns true if section S is subject of ICF.
@@ -84,7 +84,7 @@ bool ICF::isEligible(SectionChunk *c) {
     return false;
 
   // Under regular (not safe) ICF, all code sections are eligible.
-  if ((ctx.config.doICF == ICFLevel::All) &&
+  if ((icfLevel == ICFLevel::All) &&
       c->getOutputCharacteristics() & llvm::COFF::IMAGE_SCN_MEM_EXECUTE)
     return true;
 
@@ -94,10 +94,7 @@ bool ICF::isEligible(SectionChunk *c) {
     return true;
 
   // So are vtables.
-  const char *itaniumVtablePrefix =
-      ctx.config.machine == I386 ? "__ZTV" : "_ZTV";
-  if (c->sym && (c->sym->getName().starts_with("??_7") ||
-                 c->sym->getName().starts_with(itaniumVtablePrefix)))
+  if (c->sym && c->sym->getName().startswith("??_7"))
     return true;
 
   // Anything else not in an address-significance table is eligible.
@@ -136,7 +133,7 @@ bool ICF::assocEquals(const SectionChunk *a, const SectionChunk *b) {
   // debug info and CFGuard metadata.
   auto considerForICF = [](const SectionChunk &assoc) {
     StringRef Name = assoc.getSectionName();
-    return !(Name.starts_with(".debug") || Name == ".gfids$y" ||
+    return !(Name.startswith(".debug") || Name == ".gfids$y" ||
              Name == ".giats$y" || Name == ".gljmp$y");
   };
   auto ra = make_filter_range(a->children(), considerForICF);
@@ -235,10 +232,10 @@ void ICF::forEachClass(std::function<void(size_t, size_t)> fn) {
   size_t boundaries[numShards + 1];
   boundaries[0] = 0;
   boundaries[numShards] = chunks.size();
-  parallelFor(1, numShards, [&](size_t i) {
+  parallelForEachN(1, numShards, [&](size_t i) {
     boundaries[i] = findBoundary((i - 1) * step, chunks.size());
   });
-  parallelFor(1, numShards + 1, [&](size_t i) {
+  parallelForEachN(1, numShards + 1, [&](size_t i) {
     if (boundaries[i - 1] < boundaries[i]) {
       forEachClassRange(boundaries[i - 1], boundaries[i], fn);
     }
@@ -249,13 +246,12 @@ void ICF::forEachClass(std::function<void(size_t, size_t)> fn) {
 // Merge identical COMDAT sections.
 // Two sections are considered the same if their section headers,
 // contents and relocations are all the same.
-void ICF::run() {
-  llvm::TimeTraceScope timeScope("ICF");
-  ScopedTimer t(ctx.icfTimer);
+void ICF::run(ArrayRef<Chunk *> vec) {
+  ScopedTimer t(icfTimer);
 
   // Collect only mergeable sections and group by hash value.
   uint32_t nextId = 1;
-  for (Chunk *c : ctx.symtab.getChunks()) {
+  for (Chunk *c : vec) {
     if (auto *sc = dyn_cast<SectionChunk>(c)) {
       if (isEligible(sc))
         chunks.push_back(sc);
@@ -266,14 +262,14 @@ void ICF::run() {
 
   // Make sure that ICF doesn't merge sections that are being handled by string
   // tail merging.
-  for (MergeChunk *mc : ctx.mergeChunkInstances)
+  for (MergeChunk *mc : MergeChunk::instances)
     if (mc)
       for (SectionChunk *sc : mc->sections)
         sc->eqClass[0] = nextId++;
 
   // Initially, we use hash values to partition sections.
   parallelForEach(chunks, [&](SectionChunk *sc) {
-    sc->eqClass[0] = xxh3_64bits(sc->getContents());
+    sc->eqClass[0] = xxHash64(sc->getContents());
   });
 
   // Combine the hashes of the sections referenced by each section into its
@@ -321,6 +317,9 @@ void ICF::run() {
 }
 
 // Entry point to ICF.
-void doICF(COFFLinkerContext &ctx) { ICF(ctx).run(); }
+void doICF(ArrayRef<Chunk *> chunks, ICFLevel icfLevel) {
+  ICF(icfLevel).run(chunks);
+}
 
-} // namespace lld::coff
+} // namespace coff
+} // namespace lld

@@ -1,3 +1,4 @@
+// -*- C++ -*-
 //===----------------------------------------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -6,12 +7,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-// Test that _LIBCPP_NODISCARD_EXT is not defined to [[nodiscard]] when
-// _LIBCPP_DISABLE_NODISCARD_EXT is defined
-
-// ADDITIONAL_COMPILE_FLAGS: -D_LIBCPP_DISABLE_NODISCARD_EXT
+// Test that _LIBCPP_NODISCARD_EXT is not defined to [[nodiscard]] unless
+// explicitly enabled by _LIBCPP_ENABLE_NODISCARD
 
 #include <__config>
+
+#include "test_macros.h"
 
 _LIBCPP_NODISCARD_EXT int foo() { return 42; }
 

@@ -1,4 +1,5 @@
-! RUN: %python %S/test_errors.py %s %flang_fc1
+! RUN: %S/test_errors.sh %s %t %flang_fc1
+! REQUIRES: shell
 ! Test 15.7 C1591 & others: contexts requiring pure subprograms
 
 module m
@@ -39,7 +40,7 @@ module m
     end forall
     !ERROR: DO CONCURRENT mask expression may not reference impure procedure 'impure'
     do concurrent (j=1:1, impure(j) /= 0) ! C1121
-      !ERROR: Impure procedure 'impure' may not be referenced in DO CONCURRENT
+      !ERROR: Call to an impure procedure is not allowed in DO CONCURRENT
       a(j) = impure(j) ! C1139
     end do
   end subroutine
@@ -61,7 +62,7 @@ module m
     end do
     !ERROR: DO CONCURRENT mask expression may not reference impure procedure 'impure'
     do concurrent (j=1:1, x%tbp_impure(j) /= 0) ! C1121
-      !ERROR: Impure procedure 'impure' may not be referenced in DO CONCURRENT
+      !ERROR: Call to an impure procedure component is not allowed in DO CONCURRENT
       a(j) = x%tbp_impure(j) ! C1139
     end do
   end subroutine

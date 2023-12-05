@@ -1,4 +1,4 @@
-//===-- flang/unittests/Runtime/NumericalFormatTest.cpp ---------*- C++ -*-===//
+//===-- flang/unittests/RuntimeGTest/NumericalFormatTest.cpp ----*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -7,8 +7,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "CrashHandlerFixture.h"
-#include "flang/Runtime/descriptor.h"
-#include "flang/Runtime/io-api.h"
+#include "../../runtime/descriptor.h"
+#include "../../runtime/io-api.h"
 #include <algorithm>
 #include <array>
 #include <cstring>
@@ -19,7 +19,7 @@ using namespace Fortran::runtime;
 using namespace Fortran::runtime::io;
 
 static bool CompareFormattedStrings(
-    const std::string &expect, const std::string &got) {
+    const std::string &expect, const std::string &&got) {
   std::string want{expect};
   want.resize(got.size(), ' ');
   return want == got;
@@ -32,45 +32,24 @@ static bool CompareFormattedStrings(
 
 // Perform format and compare the result with expected value
 static bool CompareFormatReal(
-    const char *format, double x, const char *expect, std::string &got) {
+    const char *format, double x, const char *expect) {
   char buffer[800];
   auto cookie{IONAME(BeginInternalFormattedOutput)(
       buffer, sizeof buffer, format, std::strlen(format))};
   EXPECT_TRUE(IONAME(OutputReal64)(cookie, x));
   auto status{IONAME(EndIoStatement)(cookie)};
   EXPECT_EQ(status, 0);
-  got = std::string{buffer, sizeof buffer};
-  auto lastNonBlank{got.find_last_not_of(" ")};
-  if (lastNonBlank != std::string::npos) {
-    got.resize(lastNonBlank + 1);
-  }
-  return CompareFormattedStrings(expect, got);
+  return CompareFormattedStrings(expect, std::string{buffer, sizeof buffer});
 }
 
 // Convert raw uint64 into double, perform format, and compare with expected
-static bool CompareFormatReal(const char *format, std::uint64_t xInt,
-    const char *expect, std::string &got) {
+static bool CompareFormatReal(
+    const char *format, std::uint64_t xInt, const char *expect) {
   double x;
   static_assert(sizeof(double) == sizeof(std::uint64_t),
       "Size of double != size of uint64_t!");
   std::memcpy(&x, &xInt, sizeof xInt);
-  return CompareFormatReal(format, x, expect, got);
-}
-
-static bool CompareFormatInteger(
-    const char *format, std::int64_t x, const char *expect, std::string &got) {
-  char buffer[800];
-  auto cookie{IONAME(BeginInternalFormattedOutput)(
-      buffer, sizeof buffer, format, std::strlen(format))};
-  EXPECT_TRUE(IONAME(OutputInteger64)(cookie, x));
-  auto status{IONAME(EndIoStatement)(cookie)};
-  EXPECT_EQ(status, 0);
-  got = std::string{buffer, sizeof buffer};
-  auto lastNonBlank{got.find_last_not_of(" ")};
-  if (lastNonBlank != std::string::npos) {
-    got.resize(lastNonBlank + 1);
-  }
-  return CompareFormattedStrings(expect, got);
+  return CompareFormatReal(format, x, expect);
 }
 
 struct IOApiTests : CrashHandlerFixture {};
@@ -87,7 +66,7 @@ TEST(IOApiTests, HelloWorldOutputTest) {
   // Write string, integer, and logical values to buffer
   IONAME(OutputAscii)(cookie, "WORLD", 5);
   IONAME(OutputInteger64)(cookie, 678);
-  IONAME(OutputInteger32)(cookie, 0xfeedface);
+  IONAME(OutputInteger64)(cookie, 0xfeedface);
   IONAME(OutputLogical)(cookie, true);
 
   // Ensure IO succeeded
@@ -139,9 +118,6 @@ TEST(IOApiTests, MultilineOutputTest) {
   auto cookie{IONAME(BeginInternalArrayFormattedOutput)(
       section, format, std::strlen(format))};
 
-  // Fill last line with periods
-  std::memset(buffer[numLines - 1], '.', lineLength);
-
   // Write data to buffer
   IONAME(OutputAscii)(cookie, "WORLD", 5);
   IONAME(OutputAscii)(cookie, "HELLO", 5);
@@ -159,7 +135,7 @@ TEST(IOApiTests, MultilineOutputTest) {
                                   "                                "
                                   "789                 abcd 666 777"
                                   " 888 999                        "
-                                  "................................"};
+                                  "                                "};
   // Ensure formatted string matches expected output
   EXPECT_TRUE(
       CompareFormattedStrings(expect, std::string{buffer[0], sizeof buffer}))
@@ -168,11 +144,11 @@ TEST(IOApiTests, MultilineOutputTest) {
 }
 
 TEST(IOApiTests, ListInputTest) {
-  static const char input[]{",1*,(5.,6.),(7.0,8.0)"};
+  static const char input[]{",1*,(5.,6..)"};
   auto cookie{IONAME(BeginInternalListInput)(input, sizeof input - 1)};
 
   // Create real values for IO tests
-  static constexpr int numRealValues{8};
+  static constexpr int numRealValues{6};
   float z[numRealValues];
   for (int j{0}; j < numRealValues; ++j) {
     z[j] = -(j + 1);
@@ -190,7 +166,7 @@ TEST(IOApiTests, ListInputTest) {
                        << static_cast<int>(status);
 
   // Ensure writing complex values from floats does not result in an error
-  static constexpr int bufferSize{39};
+  static constexpr int bufferSize{33};
   char output[bufferSize];
   output[bufferSize - 1] = '\0';
   cookie = IONAME(BeginInternalListOutput)(output, bufferSize - 1);
@@ -206,8 +182,7 @@ TEST(IOApiTests, ListInputTest) {
                        << static_cast<int>(status);
 
   // Verify output buffer against expected value
-  static const char expect[bufferSize]{
-      " (-1.,-2.) (-3.,-4.) (5.,6.) (7.,8.)  "};
+  static const char expect[bufferSize]{" (-1.,-2.) (-3.,-4.) (5.,6.)    "};
   ASSERT_EQ(std::strncmp(output, expect, bufferSize), 0)
       << "Failed complex list-directed output, expected '" << expect
       << "', but got '" << output << "'";
@@ -290,16 +265,12 @@ TEST(IOApiTests, FormatZeroes) {
       {"(1P,G32.17,';')", "          0.0000000000000000    ;"},
       {"(2P,E32.17,';')", "         00.0000000000000000E+00;"},
       {"(-1P,E32.17,';')", "         0.00000000000000000E+00;"},
-      {"(EX32.17,';')", "        0X0.00000000000000000P+0;"},
-      {"(DC,EX32.17,';')", "        0X0,00000000000000000P+0;"},
       {"(G0,';')", "0.;"},
   };
 
   for (auto const &[format, expect] : zeroes) {
-    std::string got;
-    ASSERT_TRUE(CompareFormatReal(format, 0.0, expect, got))
-        << "Failed to format " << format << ", expected '" << expect
-        << "', got '" << got << "'";
+    ASSERT_TRUE(CompareFormatReal(format, 0.0, expect))
+        << "Failed to format " << format << ", expected " << expect;
   }
 }
 
@@ -323,16 +294,12 @@ TEST(IOApiTests, FormatOnes) {
       {"(2P,G32.17,';')", "          1.0000000000000000    ;"},
       {"(-1P,E32.17,';')", "         0.01000000000000000E+02;"},
       {"(-1P,G32.17,';')", "          1.0000000000000000    ;"},
-      {"(EX32.17,';')", "        0X8.00000000000000000P-3;"},
-      {"(DC,EX32.17,';')", "        0X8,00000000000000000P-3;"},
       {"(G0,';')", "1.;"},
   };
 
   for (auto const &[format, expect] : ones) {
-    std::string got;
-    ASSERT_TRUE(CompareFormatReal(format, 1.0, expect, got))
-        << "Failed to format " << format << ", expected '" << expect
-        << "', got '" << got << "'";
+    ASSERT_TRUE(CompareFormatReal(format, 1.0, expect))
+        << "Failed to format " << format << ", expected " << expect;
   }
 }
 
@@ -341,14 +308,11 @@ TEST(IOApiTests, FormatNegativeOnes) {
       {"(E32.17,';')", "        -0.10000000000000000E+01;"},
       {"(F32.17,';')", "            -1.00000000000000000;"},
       {"(G32.17,';')", "         -1.0000000000000000    ;"},
-      {"(EX32.17,';')", "       -0X8.00000000000000000P-3;"},
       {"(G0,';')", "-1.;"},
   };
   for (auto const &[format, expect] : negOnes) {
-    std::string got;
-    ASSERT_TRUE(CompareFormatReal(format, -1.0, expect, got))
-        << "Failed to format " << format << ", expected '" << expect
-        << "', got '" << got << "'";
+    ASSERT_TRUE(CompareFormatReal(format, -1.0, expect))
+        << "Failed to format " << format << ", expected " << expect;
   }
 }
 
@@ -365,12 +329,10 @@ TEST(IOApiTests, FormatDoubleValues) {
           {
               {"(E9.1,';')", " -0.0E+00;"},
               {"(F4.0,';')", " -0.;"},
-              {"(F0.1,';')", "-.0;"},
               {"(G8.0,';')", "-0.0E+00;"},
               {"(G8.1,';')", " -0.    ;"},
               {"(G0,';')", "-0.;"},
               {"(E9.1,';')", " -0.0E+00;"},
-              {"(EX9.1,';')", "-0X0.0P+0;"},
           }},
       {// +Inf
           0x7ff0000000000000,
@@ -378,11 +340,9 @@ TEST(IOApiTests, FormatDoubleValues) {
               {"(E9.1,';')", "      Inf;"},
               {"(F9.1,';')", "      Inf;"},
               {"(G9.1,';')", "      Inf;"},
-              {"(EX9.1,';')", "      Inf;"},
               {"(SP,E9.1,';')", "     +Inf;"},
               {"(SP,F9.1,';')", "     +Inf;"},
               {"(SP,G9.1,';')", "     +Inf;"},
-              {"(SP,EX9.1,';')", "     +Inf;"},
               {"(G0,';')", "Inf;"},
           }},
       {// -Inf
@@ -391,7 +351,6 @@ TEST(IOApiTests, FormatDoubleValues) {
               {"(E9.1,';')", "     -Inf;"},
               {"(F9.1,';')", "     -Inf;"},
               {"(G9.1,';')", "     -Inf;"},
-              {"(EX9.1,';')", "     -Inf;"},
               {"(G0,';')", "-Inf;"},
           }},
       {// NaN
@@ -400,7 +359,6 @@ TEST(IOApiTests, FormatDoubleValues) {
               {"(E9.1,';')", "      NaN;"},
               {"(F9.1,';')", "      NaN;"},
               {"(G9.1,';')", "      NaN;"},
-              {"(EX9.1,';')", "      NaN;"},
               {"(G0,';')", "NaN;"},
           }},
       {// NaN (sign irrelevant)
@@ -412,7 +370,6 @@ TEST(IOApiTests, FormatDoubleValues) {
               {"(SP,E9.1,';')", "      NaN;"},
               {"(SP,F9.1,';')", "      NaN;"},
               {"(SP,G9.1,';')", "      NaN;"},
-              {"(SP,EX9.1,';')", "      NaN;"},
               {"(G0,';')", "NaN;"},
           }},
       {// 0.1 rounded
@@ -421,9 +378,9 @@ TEST(IOApiTests, FormatDoubleValues) {
               {"(E62.55,';')",
                   " 0.1000000000000000055511151231257827021181583404541015625E+"
                   "00;"},
-              {"(E0.0,';')", ".1E+00;"},
+              {"(E0.0,';')", "0.E+00;"},
               {"(E0.55,';')",
-                  ".1000000000000000055511151231257827021181583404541015625E+"
+                  "0.1000000000000000055511151231257827021181583404541015625E+"
                   "00;"},
               {"(E0,';')", ".1E+00;"},
               {"(F58.55,';')",
@@ -440,7 +397,6 @@ TEST(IOApiTests, FormatDoubleValues) {
               {"(G0.55,';')",
                   ".1000000000000000055511151231257827021181583404541015625;"},
               {"(G0,';')", ".1;"},
-              {"(EX20.12,';')", " 0XC.CCCCCCCCCCCDP-7;"},
           }},
       {// 1.5
           0x3ff8000000000000,
@@ -448,7 +404,6 @@ TEST(IOApiTests, FormatDoubleValues) {
               {"(E9.2,';')", " 0.15E+01;"},
               {"(F4.1,';')", " 1.5;"},
               {"(G7.1,';')", " 2.    ;"},
-              {"(EX9.1,';')", " 0XC.0P-3;"},
               {"(RN,E8.1,';')", " 0.2E+01;"},
               {"(RN,F3.0,';')", " 2.;"},
               {"(RN,G7.0,';')", " 0.E+01;"},
@@ -478,7 +433,6 @@ TEST(IOApiTests, FormatDoubleValues) {
               {"(RU,E8.1,';')", "-0.1E+01;"},
               {"(RZ,E8.1,';')", "-0.1E+01;"},
               {"(RC,E8.1,';')", "-0.2E+01;"},
-              {"(EX9.1,';')", "-0XC.0P-3;"},
           }},
       {// 2.5
           0x4004000000000000,
@@ -489,7 +443,6 @@ TEST(IOApiTests, FormatDoubleValues) {
               {"(RU,E8.1,';')", " 0.3E+01;"},
               {"(RZ,E8.1,';')", " 0.2E+01;"},
               {"(RC,E8.1,';')", " 0.3E+01;"},
-              {"(EX9.1,';')", " 0XA.0P-2;"},
           }},
       {// -2.5
           0xc004000000000000,
@@ -500,7 +453,6 @@ TEST(IOApiTests, FormatDoubleValues) {
               {"(RU,E8.1,';')", "-0.2E+01;"},
               {"(RZ,E8.1,';')", "-0.2E+01;"},
               {"(RC,E8.1,';')", "-0.3E+01;"},
-              {"(EX9.1,';')", "-0XA.0P-2;"},
           }},
       {// least positive nonzero subnormal
           1,
@@ -523,7 +475,7 @@ TEST(IOApiTests, FormatDoubleValues) {
                   "701797267771758512566055119913150489110145103786273816725095"
                   "583738973359899366480994116420570263709027924276754456522908"
                   "75386825064197182655334472656250-323;"},
-              {"(G0,';')", ".5E-323;"},
+              {"(G0,';')", ".5-323;"},
               {"(E757.750,';')",
                   " 0."
                   "494065645841246544176568792868221372365059802614324764425585"
@@ -599,7 +551,6 @@ TEST(IOApiTests, FormatDoubleValues) {
                   "701797267771758512566055119913150489110145103786273816725095"
                   "583738973359899366480994116420570263709027924276754456522908"
                   "753868250641971826553344726563-323;"},
-              {"(EX24.13,';')", " 0X8.0000000000000P-1077;"},
           }},
       {// least positive nonzero normal
           0x10000000000000,
@@ -619,8 +570,7 @@ TEST(IOApiTests, FormatDoubleValues) {
                   "408698898317506783884692609277397797285865965494109136909540"
                   "61364675687023986783152906809846172109246253967285156250-"
                   "307;"},
-              {"(G0,';')", ".22250738585072014E-307;"},
-              {"(EX24.13,';')", " 0X8.0000000000000P-1025;"},
+              {"(G0,';')", ".22250738585072014-307;"},
           }},
       {// greatest finite
           0x7fefffffffffffffuLL,
@@ -650,41 +600,14 @@ TEST(IOApiTests, FormatDoubleValues) {
                   "090389328944075868508455133942304583236903222948165808559332"
                   "123348274797826204144723168738177180919299881250404026184124"
                   "8583680000+306;"},
-              {"(G0,';')", ".17976931348623157E+309;"},
-              {"(EX24.13,';')", " 0XF.FFFFFFFFFFFF8P+1020;"},
-          }},
-      {// EX rounding
-          0x3ff1000000000000uLL, // 1.0625
-          {
-              {"(F7.4,';')", " 1.0625;"},
-              {"(EX9.1,';')", " 0X8.8P-3;"},
-              {"(EX9.0,';')", "  0X8.P-3;"},
-              {"(RN,EX9.0,';')", "  0X8.P-3;"},
-              {"(RU,EX9.0,';')", "  0X9.P-3;"},
-              {"(RD,EX9.0,';')", "  0X8.P-3;"},
-              {"(RZ,EX9.0,';')", "  0X8.P-3;"},
-              {"(RC,EX9.0,';')", "  0X9.P-3;"},
-          }},
-      {// EX rounding
-          0xbff1000000000000uLL, // -1.0625
-          {
-              {"(F7.4,';')", "-1.0625;"},
-              {"(EX9.1,';')", "-0X8.8P-3;"},
-              {"(EX9.0,';')", " -0X8.P-3;"},
-              {"(RN,EX9.0,';')", " -0X8.P-3;"},
-              {"(RU,EX9.0,';')", " -0X8.P-3;"},
-              {"(RD,EX9.0,';')", " -0X9.P-3;"},
-              {"(RZ,EX9.0,';')", " -0X8.P-3;"},
-              {"(RC,EX9.0,';')", " -0X9.P-3;"},
+              {"(G0,';')", ".17976931348623157+309;"},
           }},
   };
 
   for (auto const &[value, cases] : testCases) {
     for (auto const &[format, expect] : cases) {
-      std::string got;
-      ASSERT_TRUE(CompareFormatReal(format, value, expect, got))
-          << "Failed to format " << format << ", expected '" << expect
-          << "', got '" << got << "'";
+      ASSERT_TRUE(CompareFormatReal(format, value, expect))
+          << "Failed to format " << format << ", expected " << expect;
     }
   }
 
@@ -710,8 +633,6 @@ TEST(IOApiTests, FormatDoubleValues) {
       {"(F5.3,';')", 0.099999, "0.100;"},
       {"(F5.3,';')", 0.0099999, "0.010;"},
       {"(F5.3,';')", 0.00099999, "0.001;"},
-      {"(F5.3,';')", 0.0005, "0.001;"},
-      {"(F5.3,';')", 0.00049999, "0.000;"},
       {"(F5.3,';')", 0.000099999, "0.000;"},
       {"(F5.3,';')", -99.999, "*****;"},
       {"(F5.3,';')", -9.9999, "*****;"},
@@ -719,110 +640,21 @@ TEST(IOApiTests, FormatDoubleValues) {
       {"(F5.3,';')", -0.099999, "-.100;"},
       {"(F5.3,';')", -0.0099999, "-.010;"},
       {"(F5.3,';')", -0.00099999, "-.001;"},
-      {"(F5.3,';')", -0.0005, "-.001;"},
-      {"(F5.3,';')", -0.00049999, "-.000;"},
       {"(F5.3,';')", -0.000099999, "-.000;"},
-      {"(F0.1,';')", 0.0, ".0;"},
   };
 
   for (auto const &[format, value, expect] : individualTestCases) {
-    std::string got;
-    ASSERT_TRUE(CompareFormatReal(format, value, expect, got))
-        << "Failed to format " << format << ", expected '" << expect
-        << "', got '" << got << "'";
-  }
-
-  // Problematic EN formatting edge cases with rounding
-  using IndividualENTestCaseTy = std::tuple<std::uint64_t, const char *>;
-  static const std::vector<IndividualENTestCaseTy> individualENTestCases{
-      {0x3E11183197785F8C, " 995.0E-12"}, // 0.9950312500000000115852E-09
-      {0x3E11180E68455D30, " 995.0E-12"}, // 0.9949999999999999761502E-09
-      {0x3E112BD8F4F6B0D7, " 999.5E-12"}, // 0.9994999999999999089118E-09
-      {0x3E45794883CA8782, "  10.0E-09"}, // 0.9999499999999999642266E-08
-      {0x3F506218230C7482, " 999.9E-06"}, // 0.9999499999999998840761E-03
-      {0x3FB99652BD3C3612, " 100.0E-03"}, // 0.9999500000000000055067E+00
-      {0x4023E66666666667, "  10.0E+00"}, // 0.9950000000000001065814E+01
-  };
-
-  for (auto const &[value, expect] : individualENTestCases) {
-    std::string got;
-    ASSERT_TRUE(CompareFormatReal("(EN10.1)", value, expect, got))
-        << "Failed to format EN10.1, expected '" << expect << "', got '" << got
-        << "'";
-  }
-}
-
-TEST(IOApiTests, FormatIntegerValues) {
-  using IntTestCaseTy = std::tuple<const char *, std::int64_t, const char *>;
-  static const std::vector<IntTestCaseTy> intTestCases{
-      {"(I4)", 0, "   0"},
-      {"(I4)", 1, "   1"},
-      {"(I4)", 9999, "9999"},
-      {"(SP,I4)", 1, "  +1"},
-      {"(SP,I4)", 9999, "****"},
-      {"(SP,I4)", 999, "+999"},
-      {"(I4)", -1, "  -1"},
-      {"(I4)", -9999, "****"},
-      {"(I4)", -999, "-999"},
-      {"(I4.2)", 1, "  01"},
-      {"(I4.2)", -1, " -01"},
-      {"(I4.2)", 999, " 999"},
-      {"(I4.4)", 999, "0999"},
-      {"(I0)", 0, "0"},
-      {"(I0)", 1, "1"},
-      {"(I0)", 9999, "9999"},
-      {"(SP,I0)", 1, "+1"},
-      {"(SP,I0)", 9999, "+9999"},
-      {"(SP,I0)", 999, "+999"},
-      {"(I0)", -1, "-1"},
-      {"(I0)", -9999, "-9999"},
-      {"(I0)", -999, "-999"},
-      {"(I0.2)", 1, "01"},
-      {"(I0.2)", -1, "-01"},
-      {"(I0.2)", 999, "999"},
-      {"(I0.4)", 999, "0999"},
-      {"(G4)", 0, "   0"},
-      {"(G4)", 1, "   1"},
-      {"(G4)", 9999, "9999"},
-      {"(SP,G4)", 1, "  +1"},
-      {"(SP,G4)", 9999, "****"},
-      {"(SP,G4)", 999, "+999"},
-      {"(G4)", -1, "  -1"},
-      {"(G4)", -9999, "****"},
-      {"(G4)", -999, "-999"},
-      {"(G4.2)", 1, "   1"},
-      {"(G4.2)", -1, "  -1"},
-      {"(G4.2)", 999, " 999"},
-      {"(G4.4)", 999, " 999"},
-      {"(G0)", 0, "0"},
-      {"(G0)", 1, "1"},
-      {"(G0)", 9999, "9999"},
-      {"(SP,G0)", 1, "+1"},
-      {"(SP,G0)", 9999, "+9999"},
-      {"(SP,G0)", 999, "+999"},
-      {"(G0)", -1, "-1"},
-      {"(G0)", -9999, "-9999"},
-      {"(G0)", -999, "-999"},
-      {"(G0.2)", 1, "1"},
-      {"(G0.2)", -1, "-1"},
-      {"(G0.2)", 999, "999"},
-      {"(G0.4)", 999, "999"},
-  };
-
-  for (auto const &[fmt, value, expect] : intTestCases) {
-    std::string got;
-    ASSERT_TRUE(CompareFormatInteger(fmt, value, expect, got))
-        << "Failed to format " << fmt << ", expected '" << expect << "', got '"
-        << got << "'";
+    ASSERT_TRUE(CompareFormatReal(format, value, expect))
+        << "Failed to format " << format << ", expected " << expect;
   }
 }
 
 //------------------------------------------------------------------------------
-/// Tests for input editing real values
+/// Tests for input formatting real values
 //------------------------------------------------------------------------------
 
 // Ensure double input values correctly map to raw uint64 values
-TEST(IOApiTests, EditDoubleInputValues) {
+TEST(IOApiTests, FormatDoubleInputValues) {
   using TestCaseTy = std::tuple<const char *, const char *, std::uint64_t>;
   static const std::vector<TestCaseTy> testCases{
       {"(F18.0)", "                 0", 0x0},
@@ -846,24 +678,7 @@ TEST(IOApiTests, EditDoubleInputValues) {
       {"(1P,F18.0)", "               125", 0x4029000000000000}, // 12.5
       {"(BZ,F18.0)", "              125 ", 0x4093880000000000}, // 1250
       {"(BZ,F18.0)", "       125 . e +1 ", 0x42a6bcc41e900000}, // 1.25e13
-      {"(BZ,F18.0)", "           .      ", 0x0},
-      {"(BZ,F18.0)", "           . e +1 ", 0x0},
       {"(DC,F18.0)", "              12,5", 0x4029000000000000},
-      {"(EX22.0)", "0X0P0                 ", 0x0}, // +0.
-      {"(EX22.0)", "-0X0P0                ", 0x8000000000000000}, // -0.
-      {"(EX22.0)", "0X.8P1                ", 0x3ff0000000000000}, // 1.0
-      {"(EX22.0)", "0X8.P-3               ", 0x3ff0000000000000}, // 1.0
-      {"(EX22.0)", "0X.1P4                ", 0x3ff0000000000000}, // 1.0
-      {"(EX22.0)", "0X10.P-4              ", 0x3ff0000000000000}, // 1.0
-      {"(EX22.0)", "0X8.00P-3             ", 0x3ff0000000000000}, // 1.0
-      {"(EX22.0)", "0X80.0P-6             ", 0x4000000000000000}, // 2.0
-      {"(EX22.0)", "0XC.CCCCCCCCCCCDP-7   ", 0x3fb999999999999a}, // 0.1
-      {"(EX22.0)", "0X.8P-1021            ", 0x0010000000000000}, // min normal
-      {"(EX22.0)", "0X.8P-1022            ", 0x0008000000000000}, // subnormal
-      {"(EX22.0)", "0X.8P-1073            ", 0x0000000000000001}, // min subn.
-      {"(EX22.0)", "0X.FFFFFFFFFFFFF8P1024", 0x7fefffffffffffff}, // max finite
-      {"(EX22.0)", "0X.8P1025             ", 0x7ff0000000000000}, // +Inf
-      {"(EX22.0)", "-0X.8P1025            ", 0xfff0000000000000}, // -Inf
   };
   for (auto const &[format, data, want] : testCases) {
     auto cookie{IONAME(BeginInternalFormattedInput)(
@@ -891,6 +706,7 @@ TEST(IOApiTests, EditDoubleInputValues) {
 
     // Ensure raw uint64 value matches expected conversion from double
     ASSERT_EQ(u.raw, want) << '\'' << format << "' failed reading '" << data
-                           << "', want " << want << ", got " << u.raw;
+                           << "', want 0x" << std::hex << want << ", got 0x"
+                           << u.raw;
   }
 }

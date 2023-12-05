@@ -21,34 +21,25 @@
 struct TT {
   int state_;
   static int count;
-  TEST_CONSTEXPR_CXX23 TT() : state_(-1) {
-    if (!TEST_IS_CONSTANT_EVALUATED)
-      ++count;
-  }
-  TEST_CONSTEXPR_CXX23 explicit TT(int i) : state_(i) {
-    if (!TEST_IS_CONSTANT_EVALUATED)
-      ++count;
-  }
-  TEST_CONSTEXPR_CXX23 TT(const TT& a) : state_(a.state_) {
-    if (!TEST_IS_CONSTANT_EVALUATED)
-      ++count;
-  }
-  TEST_CONSTEXPR_CXX23 TT& operator=(const TT& a) {
+  TT() : state_(-1) { ++count; }
+  explicit TT(int i) : state_(i) { ++count; }
+  TT(const TT& a) : state_(a.state_) { ++count; }
+  TT& operator=(const TT& a) {
     state_ = a.state_;
     return *this;
   }
-  TEST_CONSTEXPR_CXX23 ~TT() {
-    if (!TEST_IS_CONSTANT_EVALUATED)
-      --count;
-  }
+  ~TT() { --count; }
 
-  friend TEST_CONSTEXPR_CXX23 bool operator==(const TT& x, const TT& y) { return x.state_ == y.state_; }
+  friend bool operator==(const TT& x, const TT& y) {
+    return x.state_ == y.state_;
+  }
 };
 
 int TT::count = 0;
 
 template <class T>
-TEST_CONSTEXPR_CXX23 typename std::remove_all_extents<T>::type* newValueInit(int size, int new_value) {
+typename std::remove_all_extents<T>::type* newValueInit(int size,
+                                                        int new_value) {
   typedef typename std::remove_all_extents<T>::type VT;
   VT* p = newValue<T>(size);
   for (int i = 0; i < size; ++i)
@@ -57,7 +48,7 @@ TEST_CONSTEXPR_CXX23 typename std::remove_all_extents<T>::type* newValueInit(int
 }
 
 template <bool IsArray>
-TEST_CONSTEXPR_CXX23 void test_basic() {
+void test_basic() {
   typedef typename std::conditional<IsArray, TT[], TT>::type VT;
   const int expect_alive = IsArray ? 5 : 1;
 #if TEST_STD_VER >= 11
@@ -85,25 +76,14 @@ TEST_CONSTEXPR_CXX23 void test_basic() {
     assert(s2.get() == p1);
     assert(*s2.get() == TT(1));
     assert(s2.get_deleter().state() == 1);
-    if (!TEST_IS_CONSTANT_EVALUATED)
-      assert(TT::count == (expect_alive * 2));
+    assert(TT::count == (expect_alive * 2));
   }
-  if (!TEST_IS_CONSTANT_EVALUATED)
-    assert(TT::count == 0);
-}
-
-TEST_CONSTEXPR_CXX23 bool test() {
-  test_basic</*IsArray*/ false>();
-  test_basic<true>();
-
-  return true;
+  assert(TT::count == 0);
 }
 
 int main(int, char**) {
-  test();
-#if TEST_STD_VER >= 23
-  static_assert(test());
-#endif
+  test_basic</*IsArray*/ false>();
+  test_basic<true>();
 
   return 0;
 }

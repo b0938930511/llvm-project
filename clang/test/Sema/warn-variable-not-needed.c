@@ -2,7 +2,7 @@
 // expected-no-diagnostics
 
 static int a;
-int bar(void) {
+int bar() {
   extern int a;
   return a;
 }

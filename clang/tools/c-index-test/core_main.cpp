@@ -13,7 +13,6 @@
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Frontend/FrontendAction.h"
-#include "clang/Frontend/Utils.h"
 #include "clang/Index/IndexDataConsumer.h"
 #include "clang/Index/IndexingAction.h"
 #include "clang/Index/USRGeneration.h"
@@ -221,10 +220,7 @@ static bool printSourceSymbols(const char *Executable,
   ArgsWithProgName.append(Args.begin(), Args.end());
   IntrusiveRefCntPtr<DiagnosticsEngine>
     Diags(CompilerInstance::createDiagnostics(new DiagnosticOptions));
-  CreateInvocationOptions CIOpts;
-  CIOpts.Diags = Diags;
-  CIOpts.ProbePrecompiled = true; // FIXME: historical default. Needed?
-  auto CInvok = createInvocation(ArgsWithProgName, std::move(CIOpts));
+  auto CInvok = createInvocationFromCommandLine(ArgsWithProgName, Diags);
   if (!CInvok)
     return true;
 
@@ -270,13 +266,11 @@ static bool printSourceSymbolsFromModule(StringRef modulePath,
     return true;
   }
 
-  auto HSOpts = std::make_shared<HeaderSearchOptions>();
-
   IntrusiveRefCntPtr<DiagnosticsEngine> Diags =
       CompilerInstance::createDiagnostics(new DiagnosticOptions());
   std::unique_ptr<ASTUnit> AU = ASTUnit::LoadFromASTFile(
       std::string(modulePath), *pchRdr, ASTUnit::LoadASTOnly, Diags,
-      FileSystemOpts, HSOpts,
+      FileSystemOpts, /*UseDebugInfo=*/false,
       /*OnlyLocalDecls=*/true, CaptureDiagsKind::None,
       /*AllowASTWithCompilerErrors=*/true,
       /*UserFilesAreVolatile=*/false);

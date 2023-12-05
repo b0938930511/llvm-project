@@ -13,6 +13,7 @@
 #include "TestTU.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest-param-test.h"
 #include "gtest/gtest.h"
 
 namespace clang {

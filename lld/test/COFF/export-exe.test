@@ -4,6 +4,7 @@
 
 CHECK:      Export Table:
 CHECK-NEXT: DLL name: export-exe.test.tmp.exe
-CHECK-NEXT: Ordinal base: 1
+CHECK-NEXT: Ordinal base: 0
 CHECK-NEXT: Ordinal      RVA  Name
+CHECK-NEXT:       0        0
 CHECK-NEXT:       1   0x1000  main

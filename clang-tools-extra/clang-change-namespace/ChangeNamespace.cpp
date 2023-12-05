@@ -206,7 +206,7 @@ std::string getShortestQualifiedNameInNamespace(llvm::StringRef DeclName,
                                                 llvm::StringRef NsName) {
   DeclName = DeclName.ltrim(':');
   NsName = NsName.ltrim(':');
-  if (!DeclName.contains(':'))
+  if (DeclName.find(':') == llvm::StringRef::npos)
     return std::string(DeclName);
 
   auto NsNameSplitted = splitSymbolName(NsName);
@@ -308,14 +308,14 @@ bool conflictInNamespace(const ASTContext &AST, llvm::StringRef QualifiedSymbol,
     // symbol name would have been shortened.
     const NamedDecl *Scope =
         LookupDecl(*AST.getTranslationUnitDecl(), NsSplitted.front());
-    for (const auto &I : llvm::drop_begin(NsSplitted)) {
-      if (I == SymbolTopNs) // Handles "::ny" in "::nx::ny" case.
+    for (auto I = NsSplitted.begin() + 1, E = NsSplitted.end(); I != E; ++I) {
+      if (*I == SymbolTopNs) // Handles "::ny" in "::nx::ny" case.
         return true;
       // Handles "::util" and "::nx::util" conflicts.
       if (Scope) {
         if (LookupDecl(*Scope, SymbolTopNs))
           return true;
-        Scope = LookupDecl(*Scope, I);
+        Scope = LookupDecl(*Scope, *I);
       }
     }
     if (Scope && LookupDecl(*Scope, SymbolTopNs))
@@ -442,7 +442,7 @@ void ChangeNamespaceTool::registerMatchers(ast_matchers::MatchFinder *Finder) {
                                hasDeclaration(DeclMatcher),
                                unless(templateSpecializationType()))))),
                            hasParent(nestedNameSpecifierLoc()),
-                           hasAncestor(decl(isImplicit())),
+                           hasAncestor(isImplicit()),
                            hasAncestor(UsingShadowDeclInClass),
                            hasAncestor(functionDecl(isDefaulted())))),
               hasAncestor(decl().bind("dc")))
@@ -466,7 +466,7 @@ void ChangeNamespaceTool::registerMatchers(ast_matchers::MatchFinder *Finder) {
           hasAncestor(decl(IsInMovedNs).bind("dc")),
           loc(nestedNameSpecifier(
               specifiesType(hasDeclaration(DeclMatcher.bind("from_decl"))))),
-          unless(anyOf(hasAncestor(decl(isImplicit())),
+          unless(anyOf(hasAncestor(isImplicit()),
                        hasAncestor(UsingShadowDeclInClass),
                        hasAncestor(functionDecl(isDefaulted())),
                        hasAncestor(typeLoc(loc(qualType(hasDeclaration(
@@ -495,7 +495,7 @@ void ChangeNamespaceTool::registerMatchers(ast_matchers::MatchFinder *Finder) {
                                 hasAncestor(cxxRecordDecl()))),
                    hasParent(namespaceDecl()));
   Finder->addMatcher(expr(hasAncestor(decl().bind("dc")), IsInMovedNs,
-                          unless(hasAncestor(decl(isImplicit()))),
+                          unless(hasAncestor(isImplicit())),
                           anyOf(callExpr(callee(FuncMatcher)).bind("call"),
                                 declRefExpr(to(FuncMatcher.bind("func_decl")))
                                     .bind("func_ref"))),
@@ -567,12 +567,14 @@ void ChangeNamespaceTool::run(
     if (Loc.getTypeLocClass() == TypeLoc::Elaborated) {
       NestedNameSpecifierLoc NestedNameSpecifier =
           Loc.castAs<ElaboratedTypeLoc>().getQualifierLoc();
-      // FIXME: avoid changing injected class names.
-      if (auto *NNS = NestedNameSpecifier.getNestedNameSpecifier()) {
-        const Type *SpecifierType = NNS->getAsType();
-        if (SpecifierType && SpecifierType->isRecordType())
-          return;
-      }
+      // This happens for friend declaration of a base class with injected class
+      // name.
+      if (!NestedNameSpecifier.getNestedNameSpecifier())
+        return;
+      const Type *SpecifierType =
+          NestedNameSpecifier.getNestedNameSpecifier()->getAsType();
+      if (SpecifierType && SpecifierType->isRecordType())
+        return;
     }
     fixTypeLoc(Result, startLocationForType(Loc), endLocationForType(Loc), Loc);
   } else if (const auto *VarRef =

@@ -16,15 +16,19 @@
 #include "LanaiCondCode.h"
 #include "LanaiInstrInfo.h"
 #include "TargetInfo/LanaiTargetInfo.h"
-#include "llvm/MC/MCDecoderOps.h"
+#include "llvm/MC/MCFixedLenDisassembler.h"
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCSubtargetInfo.h"
-#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/MathExtras.h"
+#include "llvm/Support/TargetRegistry.h"
 
 using namespace llvm;
 
 typedef MCDisassembler::DecodeStatus DecodeStatus;
+
+namespace llvm {
+Target &getTheLanaiTarget();
+}
 
 static MCDisassembler *createLanaiDisassembler(const Target & /*T*/,
                                                const MCSubtargetInfo &STI,
@@ -45,30 +49,26 @@ LanaiDisassembler::LanaiDisassembler(const MCSubtargetInfo &STI, MCContext &Ctx)
 // Definition is further down.
 static DecodeStatus DecodeGPRRegisterClass(MCInst &Inst, unsigned RegNo,
                                            uint64_t Address,
-                                           const MCDisassembler *Decoder);
+                                           const void *Decoder);
 
 static DecodeStatus decodeRiMemoryValue(MCInst &Inst, unsigned Insn,
-                                        uint64_t Address,
-                                        const MCDisassembler *Decoder);
+                                        uint64_t Address, const void *Decoder);
 
 static DecodeStatus decodeRrMemoryValue(MCInst &Inst, unsigned Insn,
-                                        uint64_t Address,
-                                        const MCDisassembler *Decoder);
+                                        uint64_t Address, const void *Decoder);
 
 static DecodeStatus decodeSplsValue(MCInst &Inst, unsigned Insn,
-                                    uint64_t Address,
-                                    const MCDisassembler *Decoder);
+                                    uint64_t Address, const void *Decoder);
 
 static DecodeStatus decodeBranch(MCInst &Inst, unsigned Insn, uint64_t Address,
-                                 const MCDisassembler *Decoder);
+                                 const void *Decoder);
 
 static DecodeStatus decodePredicateOperand(MCInst &Inst, unsigned Val,
                                            uint64_t Address,
-                                           const MCDisassembler *Decoder);
+                                           const void *Decoder);
 
 static DecodeStatus decodeShiftImm(MCInst &Inst, unsigned Insn,
-                                   uint64_t Address,
-                                   const MCDisassembler *Decoder);
+                                   uint64_t Address, const void *Decoder);
 
 #include "LanaiGenDisassemblerTables.inc"
 
@@ -162,7 +162,7 @@ static const unsigned GPRDecoderTable[] = {
 
 DecodeStatus DecodeGPRRegisterClass(MCInst &Inst, unsigned RegNo,
                                     uint64_t /*Address*/,
-                                    const MCDisassembler * /*Decoder*/) {
+                                    const void * /*Decoder*/) {
   if (RegNo > 31)
     return MCDisassembler::Fail;
 
@@ -172,8 +172,7 @@ DecodeStatus DecodeGPRRegisterClass(MCInst &Inst, unsigned RegNo,
 }
 
 static DecodeStatus decodeRiMemoryValue(MCInst &Inst, unsigned Insn,
-                                        uint64_t Address,
-                                        const MCDisassembler *Decoder) {
+                                        uint64_t Address, const void *Decoder) {
   // RI memory values encoded using 23 bits:
   //   5 bit register, 16 bit constant
   unsigned Register = (Insn >> 18) & 0x1f;
@@ -185,8 +184,7 @@ static DecodeStatus decodeRiMemoryValue(MCInst &Inst, unsigned Insn,
 }
 
 static DecodeStatus decodeRrMemoryValue(MCInst &Inst, unsigned Insn,
-                                        uint64_t Address,
-                                        const MCDisassembler *Decoder) {
+                                        uint64_t Address, const void *Decoder) {
   // RR memory values encoded using 20 bits:
   //   5 bit register, 5 bit register, 2 bit PQ, 3 bit ALU operator, 5 bit JJJJJ
   unsigned Register = (Insn >> 15) & 0x1f;
@@ -198,8 +196,7 @@ static DecodeStatus decodeRrMemoryValue(MCInst &Inst, unsigned Insn,
 }
 
 static DecodeStatus decodeSplsValue(MCInst &Inst, unsigned Insn,
-                                    uint64_t Address,
-                                    const MCDisassembler *Decoder) {
+                                    uint64_t Address, const void *Decoder) {
   // RI memory values encoded using 17 bits:
   //   5 bit register, 10 bit constant
   unsigned Register = (Insn >> 12) & 0x1f;
@@ -213,13 +210,14 @@ static DecodeStatus decodeSplsValue(MCInst &Inst, unsigned Insn,
 static bool tryAddingSymbolicOperand(int64_t Value, bool IsBranch,
                                      uint64_t Address, uint64_t Offset,
                                      uint64_t Width, MCInst &MI,
-                                     const MCDisassembler *Decoder) {
-  return Decoder->tryAddingSymbolicOperand(MI, Value, Address, IsBranch, Offset,
-                                           Width, /*InstSize=*/0);
+                                     const void *Decoder) {
+  const MCDisassembler *Dis = static_cast<const MCDisassembler *>(Decoder);
+  return Dis->tryAddingSymbolicOperand(MI, Value, Address, IsBranch, Offset,
+                                       Width);
 }
 
 static DecodeStatus decodeBranch(MCInst &MI, unsigned Insn, uint64_t Address,
-                                 const MCDisassembler *Decoder) {
+                                 const void *Decoder) {
   if (!tryAddingSymbolicOperand(Insn + Address, false, Address, 2, 23, MI,
                                 Decoder))
     MI.addOperand(MCOperand::createImm(Insn));
@@ -227,8 +225,7 @@ static DecodeStatus decodeBranch(MCInst &MI, unsigned Insn, uint64_t Address,
 }
 
 static DecodeStatus decodeShiftImm(MCInst &Inst, unsigned Insn,
-                                   uint64_t Address,
-                                   const MCDisassembler *Decoder) {
+                                   uint64_t Address, const void *Decoder) {
   unsigned Offset = (Insn & 0xffff);
   Inst.addOperand(MCOperand::createImm(SignExtend32<16>(Offset)));
 
@@ -237,7 +234,7 @@ static DecodeStatus decodeShiftImm(MCInst &Inst, unsigned Insn,
 
 static DecodeStatus decodePredicateOperand(MCInst &Inst, unsigned Val,
                                            uint64_t Address,
-                                           const MCDisassembler *Decoder) {
+                                           const void *Decoder) {
   if (Val >= LPCC::UNKNOWN)
     return MCDisassembler::Fail;
   Inst.addOperand(MCOperand::createImm(Val));

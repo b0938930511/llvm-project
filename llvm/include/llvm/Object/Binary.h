@@ -14,11 +14,11 @@
 #define LLVM_OBJECT_BINARY_H
 
 #include "llvm-c/Types.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/Object/Error.h"
-#include "llvm/Support/CBindingWrapping.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/TargetParser/Triple.h"
+#include <algorithm>
 #include <memory>
 #include <utility>
 
@@ -50,8 +50,6 @@ protected:
 
     ID_WinRes, // Windows resource (.res) file.
 
-    ID_Offload, // Offloading binary file.
-
     // Object and children.
     ID_StartObjects,
     ID_COFF,
@@ -69,7 +67,6 @@ protected:
     ID_MachO64L, // MachO 64-bit, little endian
     ID_MachO64B, // MachO 64-bit, big endian
 
-    ID_GOFF,
     ID_Wasm,
 
     ID_EndObjects
@@ -136,8 +133,6 @@ public:
 
   bool isWasm() const { return TypeID == ID_Wasm; }
 
-  bool isOffloadFile() const { return TypeID == ID_Offload; }
-
   bool isCOFFImportFile() const {
     return TypeID == ID_COFFImportFile;
   }
@@ -145,8 +140,6 @@ public:
   bool isIR() const {
     return TypeID == ID_IR;
   }
-
-  bool isGOFF() const { return TypeID == ID_GOFF; }
 
   bool isMinidump() const { return TypeID == ID_Minidump; }
 
@@ -167,8 +160,6 @@ public:
       return Triple::MachO;
     if (isELF())
       return Triple::ELF;
-    if (isGOFF())
-      return Triple::GOFF;
     return Triple::UnknownObjectFormat;
   }
 

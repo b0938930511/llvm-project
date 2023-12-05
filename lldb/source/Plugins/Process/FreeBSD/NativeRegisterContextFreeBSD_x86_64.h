@@ -19,7 +19,6 @@
 // clang-format on
 
 #include <array>
-#include <optional>
 
 #include "Plugins/Process/FreeBSD/NativeRegisterContextFreeBSD.h"
 #include "Plugins/Process/Utility/RegisterContext_x86.h"
@@ -49,7 +48,7 @@ public:
   Status WriteRegister(const RegisterInfo *reg_info,
                        const RegisterValue &reg_value) override;
 
-  Status ReadAllRegisterValues(lldb::WritableDataBufferSP &data_sp) override;
+  Status ReadAllRegisterValues(lldb::DataBufferSP &data_sp) override;
 
   Status WriteAllRegisterValues(const lldb::DataBufferSP &data_sp) override;
 
@@ -75,7 +74,7 @@ private:
   std::array<uint32_t, MaxRegSet + 1> m_xsave_offsets;
   std::array<size_t, MaxRegSet + 1> m_regset_offsets;
 
-  std::optional<RegSetKind> GetSetForNativeRegNum(uint32_t reg_num) const;
+  llvm::Optional<RegSetKind> GetSetForNativeRegNum(uint32_t reg_num) const;
 
   Status ReadRegisterSet(RegSetKind set);
   Status WriteRegisterSet(RegSetKind set);
@@ -86,7 +85,7 @@ private:
     void *xmm;
     void *ymm_hi;
   };
-  std::optional<YMMSplitPtr> GetYMMSplitReg(uint32_t reg);
+  llvm::Optional<YMMSplitPtr> GetYMMSplitReg(uint32_t reg);
 };
 
 } // namespace process_freebsd

@@ -3,16 +3,16 @@
 typedef const void *CFTypeRef;
 typedef const struct __CFString *CFStringRef;
 
-CFTypeRef CFCreateSomething(void);
-CFStringRef CFCreateString(void);
-CFTypeRef CFGetSomething(void);
-CFStringRef CFGetString(void);
+CFTypeRef CFCreateSomething();
+CFStringRef CFCreateString();
+CFTypeRef CFGetSomething();
+CFStringRef CFGetString();
 
 @interface NSString
 @end
 
-id CreateSomething(void);
-NSString *CreateNSString(void);
+id CreateSomething();
+NSString *CreateNSString();
 
 #if __has_feature(objc_arc)
 #define BRIDGE __bridge

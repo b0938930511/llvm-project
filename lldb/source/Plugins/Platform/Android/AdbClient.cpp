@@ -42,26 +42,28 @@ using namespace lldb_private;
 using namespace lldb_private::platform_android;
 using namespace std::chrono;
 
-static const seconds kReadTimeout(20);
-static const char *kOKAY = "OKAY";
-static const char *kFAIL = "FAIL";
-static const char *kDATA = "DATA";
-static const char *kDONE = "DONE";
+namespace {
 
-static const char *kSEND = "SEND";
-static const char *kRECV = "RECV";
-static const char *kSTAT = "STAT";
+const seconds kReadTimeout(20);
+const char *kOKAY = "OKAY";
+const char *kFAIL = "FAIL";
+const char *kDATA = "DATA";
+const char *kDONE = "DONE";
 
-static const size_t kSyncPacketLen = 8;
+const char *kSEND = "SEND";
+const char *kRECV = "RECV";
+const char *kSTAT = "STAT";
+
+const size_t kSyncPacketLen = 8;
 // Maximum size of a filesync DATA packet.
-static const size_t kMaxPushData = 2 * 1024;
+const size_t kMaxPushData = 2 * 1024;
 // Default mode for pushed files.
-static const uint32_t kDefaultMode = 0100770; // S_IFREG | S_IRWXU | S_IRWXG
+const uint32_t kDefaultMode = 0100770; // S_IFREG | S_IRWXU | S_IRWXG
 
-static const char *kSocketNamespaceAbstract = "localabstract";
-static const char *kSocketNamespaceFileSystem = "localfilesystem";
+const char *kSocketNamespaceAbstract = "localabstract";
+const char *kSocketNamespaceFileSystem = "localfilesystem";
 
-static Status ReadAllBytes(Connection &conn, void *buffer, size_t size) {
+Status ReadAllBytes(Connection &conn, void *buffer, size_t size) {
 
   Status error;
   ConnectionStatus status;
@@ -87,6 +89,8 @@ static Status ReadAllBytes(Connection &conn, void *buffer, size_t size) {
         status);
   return error;
 }
+
+} // namespace
 
 Status AdbClient::CreateByDeviceID(const std::string &device_id,
                                    AdbClient &adb) {
@@ -584,13 +588,14 @@ AdbClient::SyncService::~SyncService() = default;
 Status AdbClient::SyncService::SendSyncRequest(const char *request_id,
                                                const uint32_t data_len,
                                                const void *data) {
-  DataEncoder encoder(eByteOrderLittle, sizeof(void *));
-  encoder.AppendData(llvm::StringRef(request_id));
-  encoder.AppendU32(data_len);
-  llvm::ArrayRef<uint8_t> bytes = encoder.GetData();
+  const DataBufferSP data_sp(new DataBufferHeap(kSyncPacketLen, 0));
+  DataEncoder encoder(data_sp, eByteOrderLittle, sizeof(void *));
+  auto offset = encoder.PutData(0, request_id, strlen(request_id));
+  encoder.PutUnsigned(offset, 4, data_len);
+
   Status error;
   ConnectionStatus status;
-  m_conn->Write(bytes.data(), kSyncPacketLen, status, &error);
+  m_conn->Write(data_sp->GetBytes(), kSyncPacketLen, status, &error);
   if (error.Fail())
     return error;
 

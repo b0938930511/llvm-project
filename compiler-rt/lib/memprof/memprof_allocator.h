@@ -39,10 +39,6 @@ void InitializeAllocator();
 
 struct MemprofMapUnmapCallback {
   void OnMap(uptr p, uptr size) const;
-  void OnMapSecondary(uptr p, uptr size, uptr user_begin,
-                      uptr user_size) const {
-    OnMap(p, size);
-  }
   void OnUnmap(uptr p, uptr size) const;
 };
 
@@ -102,6 +98,7 @@ int memprof_posix_memalign(void **memptr, uptr alignment, uptr size,
 uptr memprof_malloc_usable_size(const void *ptr, uptr pc, uptr bp);
 
 void PrintInternalAllocatorStats();
+void MemprofSoftRssLimitExceededCallback(bool exceeded);
 
 } // namespace __memprof
 #endif // MEMPROF_ALLOCATOR_H

@@ -5,6 +5,7 @@
 
 #ifdef TEST1
 
+// rdar://15522601
 class MyClass {
  static void meth();
 };
@@ -37,9 +38,9 @@ namespace nm {
 
 float foo() {
   _ZN1TD1Ev();
-// CHECK: call void @_ZN1TD1Ev()
+// CHECK: call void bitcast ({{.*}} (%struct.T*)* @_ZN1TD1Ev to void ()*)()
   T t;
-// CHECK: call {{.*}} @_ZN1TD1Ev(ptr {{[^,]*}} %t)
+// CHECK: call {{.*}} @_ZN1TD1Ev(%struct.T* {{[^,]*}} %t)
   return _ZN2nm3abcE + nm::abc;
 }
 

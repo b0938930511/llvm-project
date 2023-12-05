@@ -1,7 +1,7 @@
 // RUN: %clang_analyze_cc1 -analyzer-checker=core,debug.ExprInspection -analyzer-inline-max-stack-depth=3 -analyzer-config ipa-always-inline-size=3 -verify %s
 
 void clang_analyzer_eval(int);
-int nested5(void) {
+int nested5() {
   if (5 < 3)
     return 0;
   else
@@ -9,40 +9,40 @@ int nested5(void) {
       return 0;
   return 0;
 }
-int nested4(void) {
+int nested4() {
   return nested5();
 }
-int nested3(void) {
+int nested3() {
   return nested4();
 }
-int nested2(void) {
+int nested2() {
   return nested3();
 }
-int nested1(void) {
+int nested1() {
   return nested2();
 }
 
-void testNested(void) {
+void testNested() {
   clang_analyzer_eval(nested1() == 0); // expected-warning{{TRUE}}
 }
 
 // Make sure we terminate a recursive path.
-int recursive(void) {
+int recursive() {
   return recursive();
 }
-int callRecursive(void) {
+int callRecursive() {
   return recursive();
 }
 
-int mutuallyRecursive1(void);
+int mutuallyRecursive1();
 
-int mutuallyRecursive2(void) {
+int mutuallyRecursive2() {
   return mutuallyRecursive1();
 }
 
-int mutuallyRecursive1(void) {
+int mutuallyRecursive1() {
   return mutuallyRecursive2();
 }
-int callMutuallyRecursive(void) {
+int callMutuallyRecursive() {
   return mutuallyRecursive1();
 }

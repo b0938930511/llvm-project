@@ -1,4 +1,5 @@
-! RUN: %python %S/test_symbols.py %s %flang_fc1
+! RUN: %S/test_symbols.sh %s %t %flang_fc1
+! REQUIRES: shell
 
 ! Test that a procedure is only implicitly resolved as an intrinsic function
 ! (resp. subroutine) if this is a function (resp. subroutine)

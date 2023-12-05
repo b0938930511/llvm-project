@@ -4,9 +4,9 @@
   target datalayout = "e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
   target triple = "x86_64-apple-macosx11.0.0"
 
-  declare ptr @objc_retainAutoreleasedReturnValue(ptr)
-  declare ptr @objc_unsafeClaimAutoreleasedReturnValue(ptr)
-  declare ptr @fn()
+  declare i8* @objc_retainAutoreleasedReturnValue(i8*)
+  declare i8* @objc_unsafeClaimAutoreleasedReturnValue(i8*)
+  declare i8* @fn()
 
   define void @test_objc_retainAutoreleaseReturnedValue() {
     ret void
@@ -30,13 +30,11 @@
 # CHECK:      bb.0
 # CHECK-NEXT:   frame-setup PUSH64r undef $rax, implicit-def $rsp, implicit $rsp
 # CHECK-NEXT:   CFI_INSTRUCTION def_cfa_offset 16
-# CHECK-NEXT:   BUNDLE
-# CHECK-NEXT:     CALL64pcrel32 @fn, csr_64, implicit $rsp, implicit $ssp, implicit $rsp, implicit $ssp, implicit-def $rsp, implicit-def $ssp, implicit-def $rax
-# CHECK-NEXT:     $rdi = MOV64rr internal $rax
-# CHECK-NEXT:     CALL64pcrel32 @objc_retainAutoreleasedReturnValue, csr_64, implicit internal $rsp, implicit internal $ssp, implicit-def $rax
-# CHECK-NEXT:   }
+# CHECK-NEXT:   CALL64pcrel32 @fn, csr_64, implicit $rsp, implicit $ssp, implicit $rsp, implicit $ssp, implicit-def $rsp, implicit-def $ssp, implicit-def $rax
+# CHECK-NEXT:   $rdi = MOV64rr $rax
+# CHECK-NEXT:   CALL64pcrel32 @objc_retainAutoreleasedReturnValue, csr_64, implicit $rsp, implicit $ssp, implicit-def $rax
 # CHECK-NEXT:   $rcx = frame-destroy POP64r implicit-def $rsp, implicit $rsp
-# CHECK-NEXT:   RET64
+# CHECK-NEXT:   RETQ
 #
 
 name:            test_objc_retainAutoreleaseReturnedValue
@@ -54,7 +52,7 @@ body:             |
   bb.0 (%ir-block.0):
     frame-setup PUSH64r undef $rax, implicit-def $rsp, implicit $rsp
     CFI_INSTRUCTION def_cfa_offset 16
-    CALL64pcrel32_RVMARKER @objc_retainAutoreleasedReturnValue, @fn, csr_64, implicit $rsp, implicit $ssp, implicit-def $rsp, implicit-def $ssp, implicit-def $rax
+    CALL64pcrel32_RVMARKER 0, @fn, csr_64, implicit $rsp, implicit $ssp, implicit-def $rsp, implicit-def $ssp, implicit-def $rax
     $rcx = frame-destroy POP64r implicit-def $rsp, implicit $rsp
     RET 0, $rax
 
@@ -64,13 +62,11 @@ body:             |
 # CHECK:      bb.0
 # CHECK-NEXT:   frame-setup PUSH64r undef $rax, implicit-def $rsp, implicit $rsp
 # CHECK-NEXT:   CFI_INSTRUCTION def_cfa_offset 16
-# CHECK-NEXT:   BUNDLE
-# CHECK-NEXT:     CALL64pcrel32 @fn, csr_64, implicit $rsp, implicit $ssp, implicit $rsp, implicit $ssp, implicit-def $rsp, implicit-def $ssp, implicit-def $rax
-# CHECK-NEXT:     $rdi = MOV64rr internal $rax
-# CHECK-NEXT:     CALL64pcrel32 @objc_unsafeClaimAutoreleasedReturnValue, csr_64, implicit internal $rsp, implicit internal $ssp, implicit-def $rax
-# CHECK-NEXT:   }
+# CHECK-NEXT:   CALL64pcrel32 @fn, csr_64, implicit $rsp, implicit $ssp, implicit $rsp, implicit $ssp, implicit-def $rsp, implicit-def $ssp, implicit-def $rax
+# CHECK-NEXT:   $rdi = MOV64rr $rax
+# CHECK-NEXT:   CALL64pcrel32 @objc_unsafeClaimAutoreleasedReturnValue, csr_64, implicit $rsp, implicit $ssp, implicit-def $rax
 # CHECK-NEXT:   $rcx = frame-destroy POP64r implicit-def $rsp, implicit $rsp
-# CHECK-NEXT:   RET64
+# CHECK-NEXT:   RETQ
 #
 name:            test_objc_unsafeClaimAutoreleasedReturnValue
 alignment:       16
@@ -87,7 +83,7 @@ body:             |
   bb.0 (%ir-block.0):
     frame-setup PUSH64r undef $rax, implicit-def $rsp, implicit $rsp
     CFI_INSTRUCTION def_cfa_offset 16
-    CALL64pcrel32_RVMARKER @objc_unsafeClaimAutoreleasedReturnValue, @fn, csr_64, implicit $rsp, implicit $ssp, implicit-def $rsp, implicit-def $ssp, implicit-def $rax
+    CALL64pcrel32_RVMARKER 1, @fn, csr_64, implicit $rsp, implicit $ssp, implicit-def $rsp, implicit-def $ssp, implicit-def $rax
     $rcx = frame-destroy POP64r implicit-def $rsp, implicit $rsp
     RET 0, $rax
 
@@ -99,13 +95,11 @@ body:             |
 # CHECK-NEXT:   $rax = MOV64rr $rdi
 # CHECK-NEXT:   $rdi = MOV64rr killed $rdx
 # CHECK-NEXT:   $rdx = MOV64rr killed $rax
-# CHECK-NEXT:   BUNDLE
-# CHECK-NEXT:     CALL64pcrel32 @fn, csr_64, implicit $rsp, implicit $ssp, implicit $rsp, implicit $ssp, implicit $rdi, implicit $rsi, implicit $rdx, implicit-def $rsp, implicit-def $ssp, implicit-def $rax
-# CHECK-NEXT:     $rdi = MOV64rr internal $rax
-# CHECK-NEXT:     CALL64pcrel32 @objc_retainAutoreleasedReturnValue, csr_64, implicit internal $rsp, implicit internal $ssp, implicit-def dead $rax
-# CHECK-NEXT:  }
+# CHECK-NEXT:   CALL64pcrel32 @fn, csr_64, implicit $rsp, implicit $ssp, implicit $rsp, implicit $ssp, implicit $rdi, implicit $rsi, implicit $rdx, implicit-def $rsp, implicit-def $ssp, implicit-def $rax
+# CHECK-NEXT:   $rdi = MOV64rr $rax
+# CHECK-NEXT:   CALL64pcrel32 @objc_retainAutoreleasedReturnValue, csr_64, implicit $rsp, implicit $ssp, implicit-def dead $rax
 # CHECK-NEXT:   $rax = frame-destroy POP64r implicit-def $rsp, implicit $rsp
-# CHECK-NEXT:   RET64
+# CHECK-NEXT:   RETQ
 #
 name:            test_objc_unsafeClaimAutoreleasedReturnValue_2_args
 alignment:       16
@@ -126,7 +120,7 @@ body:             |
     $rax = MOV64rr $rdi
     $rdi = MOV64rr killed $rdx
     $rdx = MOV64rr killed $rax
-    CALL64pcrel32_RVMARKER @objc_retainAutoreleasedReturnValue, @fn, csr_64, implicit $rsp, implicit $ssp, implicit $rdi, implicit $rsi, implicit $rdx, implicit-def $rsp, implicit-def $ssp, implicit-def dead $rax
+    CALL64pcrel32_RVMARKER 0, @fn, csr_64, implicit $rsp, implicit $ssp, implicit $rdi, implicit $rsi, implicit $rdx, implicit-def $rsp, implicit-def $ssp, implicit-def dead $rax
     $rax = frame-destroy POP64r implicit-def $rsp, implicit $rsp
     RET 0, $rax
 
@@ -135,13 +129,11 @@ body:             |
 # CHECK:      bb.0
 # CHECK-NEXT:   frame-setup PUSH64r undef $rax, implicit-def $rsp, implicit $rsp
 # CHECK-NEXT:   CFI_INSTRUCTION def_cfa_offset 16
-# CHECK-NEXT:   BUNDLE
-# CHECK-NEXT:     CALL64pcrel32 @fn, csr_64, implicit $rsp, implicit $ssp, implicit $rsp, implicit $ssp, implicit-def $rsp, implicit-def $ssp, implicit-def $rax
-# CHECK-NEXT:     $rdi = MOV64rr internal $rax
-# CHECK-NEXT:     CALL64pcrel32 @objc_retainAutoreleasedReturnValue, csr_64, implicit internal $rsp, implicit internal $ssp, implicit-def dead $rax
-# CHECK-NEXT:  }
+# CHECK-NEXT:   CALL64pcrel32 @fn, csr_64, implicit $rsp, implicit $ssp, implicit $rsp, implicit $ssp, implicit-def $rsp, implicit-def $ssp, implicit-def $rax
+# CHECK-NEXT:   $rdi = MOV64rr $rax
+# CHECK-NEXT:   CALL64pcrel32 @objc_retainAutoreleasedReturnValue, csr_64, implicit $rsp, implicit $ssp, implicit-def dead $rax
 # CHECK-NEXT:   $rax = frame-destroy POP64r implicit-def $rsp, implicit $rsp
-# CHECK-NEXT:   RET64
+# CHECK-NEXT:   RETQ
 #
 name:            test_ret_void
 alignment:       16
@@ -158,6 +150,6 @@ body:             |
   bb.0 (%ir-block.0):
     frame-setup PUSH64r undef $rax, implicit-def $rsp, implicit $rsp
     CFI_INSTRUCTION def_cfa_offset 16
-    CALL64pcrel32_RVMARKER @objc_retainAutoreleasedReturnValue, @fn, csr_64, implicit $rsp, implicit $ssp, implicit-def $rsp, implicit-def $ssp, implicit-def dead $rax
+    CALL64pcrel32_RVMARKER 0, @fn, csr_64, implicit $rsp, implicit $ssp, implicit-def $rsp, implicit-def $ssp, implicit-def dead $rax
     $rax = frame-destroy POP64r implicit-def $rsp, implicit $rsp
     RET 0

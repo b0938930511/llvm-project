@@ -17,15 +17,18 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
 
-namespace llvm::codeview {
+namespace llvm {
+namespace codeview {
 struct GloballyHashedType;
-}
-namespace llvm::pdb {
+} // namespace codeview
+namespace pdb {
 class NativeSession;
 class TpiStream;
 }
+} // namespace llvm
 
-namespace lld::coff {
+namespace lld {
+namespace coff {
 
 using llvm::codeview::GloballyHashedType;
 using llvm::codeview::TypeIndex;
@@ -34,13 +37,12 @@ class ObjFile;
 class PDBInputFile;
 class TypeMerger;
 struct GHashState;
-class COFFLinkerContext;
 
 class TpiSource {
 public:
   enum TpiKind : uint8_t { Regular, PCH, UsingPCH, PDB, PDBIpi, UsingPDB };
 
-  TpiSource(COFFLinkerContext &ctx, TpiKind k, ObjFile *f);
+  TpiSource(TpiKind k, ObjFile *f);
   virtual ~TpiSource();
 
   /// Produce a mapping from the type and item indices used in the object
@@ -91,8 +93,6 @@ protected:
   // Walk over file->debugTypes and fill in the isItemIndex bit vector.
   void fillIsItemIndexFromDebugT();
 
-  COFFLinkerContext &ctx;
-
 public:
   bool remapTypesInSymbolRecord(MutableArrayRef<uint8_t> rec);
 
@@ -106,18 +106,41 @@ public:
   /// it is unique. This prevents a record from being added to the input ghash
   /// table.
   bool shouldOmitFromPdb(uint32_t ghashIdx) {
-    return ghashIdx == endPrecompIdx;
+    return ghashIdx == endPrecompGHashIdx;
   }
+
+  /// All sources of type information in the program.
+  static std::vector<TpiSource *> instances;
+
+  /// Dependency type sources, such as type servers or PCH object files. These
+  /// must be processed before objects that rely on them. Set by
+  /// TpiSources::sortDependencies.
+  static ArrayRef<TpiSource *> dependencySources;
+
+  /// Object file sources. These must be processed after dependencySources.
+  static ArrayRef<TpiSource *> objectSources;
+
+  /// Sorts the dependencies and reassigns TpiSource indices.
+  static void sortDependencies();
+
+  static uint32_t countTypeServerPDBs();
+  static uint32_t countPrecompObjs();
+
+  /// Free heap allocated ghashes.
+  static void clearGHashes();
+
+  /// Clear global data structures for TpiSources.
+  static void clear();
 
   const TpiKind kind;
   bool ownedGHashes = true;
   uint32_t tpiSrcIdx = 0;
 
-  /// The index (zero based, not 0x1000-based) of the LF_ENDPRECOMP record in
-  /// this object, if one exists. This is the all ones value otherwise. It is
-  /// recorded here for validation, and so that it can be omitted from the final
-  /// ghash table.
-  uint32_t endPrecompIdx = ~0U;
+protected:
+  /// The ghash index (zero based, not 0x1000-based) of the LF_ENDPRECOMP record
+  /// in this object, if one exists. This is the all ones value otherwise. It is
+  /// recorded here so that it can be omitted from the final ghash table.
+  uint32_t endPrecompGHashIdx = ~0U;
 
 public:
   ObjFile *file;
@@ -163,15 +186,15 @@ public:
   uint64_t nbTypeRecordsBytes = 0;
 };
 
-TpiSource *makeTpiSource(COFFLinkerContext &ctx, ObjFile *f);
-TpiSource *makeTypeServerSource(COFFLinkerContext &ctx,
-                                PDBInputFile *pdbInputFile);
-TpiSource *makeUseTypeServerSource(COFFLinkerContext &ctx, ObjFile *file,
+TpiSource *makeTpiSource(ObjFile *file);
+TpiSource *makeTypeServerSource(PDBInputFile *pdbInputFile);
+TpiSource *makeUseTypeServerSource(ObjFile *file,
                                    llvm::codeview::TypeServer2Record ts);
-TpiSource *makePrecompSource(COFFLinkerContext &ctx, ObjFile *file);
-TpiSource *makeUsePrecompSource(COFFLinkerContext &ctx, ObjFile *file,
+TpiSource *makePrecompSource(ObjFile *file);
+TpiSource *makeUsePrecompSource(ObjFile *file,
                                 llvm::codeview::PrecompRecord ts);
 
-} // namespace lld::coff
+} // namespace coff
+} // namespace lld
 
 #endif

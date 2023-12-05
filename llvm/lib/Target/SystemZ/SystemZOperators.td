@@ -102,10 +102,17 @@ def SDT_ZMemMemLengthCC     : SDTypeProfile<1, 3,
                                              SDTCisPtrTy<1>,
                                              SDTCisPtrTy<2>,
                                              SDTCisVT<3, i64>]>;
-def SDT_ZMemsetMVC          : SDTypeProfile<0, 3,
+def SDT_ZMemMemLoop         : SDTypeProfile<0, 4,
                                             [SDTCisPtrTy<0>,
-                                             SDTCisVT<1, i64>,
-                                             SDTCisVT<2, i32>]>;
+                                             SDTCisPtrTy<1>,
+                                             SDTCisVT<2, i64>,
+                                             SDTCisVT<3, i64>]>;
+def SDT_ZMemMemLoopCC       : SDTypeProfile<1, 4,
+                                            [SDTCisVT<0, i32>,
+                                             SDTCisPtrTy<1>,
+                                             SDTCisPtrTy<2>,
+                                             SDTCisVT<3, i64>,
+                                             SDTCisVT<4, i64>]>;
 def SDT_ZString             : SDTypeProfile<1, 3,
                                             [SDTCisPtrTy<0>,
                                              SDTCisPtrTy<1>,
@@ -127,11 +134,6 @@ def SDT_ZTBegin             : SDTypeProfile<1, 2,
                                             [SDTCisVT<0, i32>,
                                              SDTCisPtrTy<1>,
                                              SDTCisVT<2, i32>]>;
-def SDT_ZADAENTRY           : SDTypeProfile<1, 3,
-                                            [SDTCisPtrTy<0>,
-                                             SDTCisPtrTy<1>,
-                                             SDTCisPtrTy<2>,
-                                             SDTCisVT<3, i64>]>;
 def SDT_ZTEnd               : SDTypeProfile<1, 0,
                                             [SDTCisVT<0, i32>]>;
 def SDT_ZInsertVectorElt    : SDTypeProfile<1, 3,
@@ -240,7 +242,7 @@ def callseq_end         : SDNode<"ISD::CALLSEQ_END",   SDT_CallSeqEnd,
 def global_offset_table : SDNode<"ISD::GLOBAL_OFFSET_TABLE", SDTPtrLeaf>;
 
 // Nodes for SystemZISD::*.  See SystemZISelLowering.h for more details.
-def z_retglue           : SDNode<"SystemZISD::RET_GLUE", SDTNone,
+def z_retflag           : SDNode<"SystemZISD::RET_FLAG", SDTNone,
                                  [SDNPHasChain, SDNPOptInGlue, SDNPVariadic]>;
 def z_call              : SDNode<"SystemZISD::CALL", SDT_ZCall,
                                  [SDNPHasChain, SDNPOutGlue, SDNPOptInGlue,
@@ -284,6 +286,9 @@ def z_usubo             : SDNode<"SystemZISD::USUBO", SDT_ZBinaryWithFlags>;
 def z_addcarry_1        : SDNode<"SystemZISD::ADDCARRY", SDT_ZBinaryWithCarry>;
 def z_subcarry_1        : SDNode<"SystemZISD::SUBCARRY", SDT_ZBinaryWithCarry>;
 
+def z_membarrier        : SDNode<"SystemZISD::MEMBARRIER", SDTNone,
+                                 [SDNPHasChain, SDNPSideEffect]>;
+
 def z_loadbswap        : SDNode<"SystemZISD::LRV", SDTLoad,
                                  [SDNPHasChain, SDNPMayLoad, SDNPMemOperand]>;
 def z_storebswap       : SDNode<"SystemZISD::STRV", SDTStore,
@@ -323,8 +328,6 @@ def z_vshl_by_scalar    : SDNode<"SystemZISD::VSHL_BY_SCALAR",
 def z_vsrl_by_scalar    : SDNode<"SystemZISD::VSRL_BY_SCALAR",
                                  SDT_ZVecBinaryInt>;
 def z_vsra_by_scalar    : SDNode<"SystemZISD::VSRA_BY_SCALAR",
-                                 SDT_ZVecBinaryInt>;
-def z_vrotl_by_scalar   : SDNode<"SystemZISD::VROTL_BY_SCALAR",
                                  SDT_ZVecBinaryInt>;
 def z_vsum              : SDNode<"SystemZISD::VSUM", SDT_ZVecBinaryConv>;
 def z_vicmpe            : SDNode<"SystemZISD::VICMPE", SDT_ZVecBinary>;
@@ -413,16 +416,24 @@ def z_atomic_cmp_swap_128 : SDNode<"SystemZISD::ATOMIC_CMP_SWAP_128",
 
 def z_mvc               : SDNode<"SystemZISD::MVC", SDT_ZMemMemLength,
                                  [SDNPHasChain, SDNPMayStore, SDNPMayLoad]>;
+def z_mvc_loop          : SDNode<"SystemZISD::MVC_LOOP", SDT_ZMemMemLoop,
+                                 [SDNPHasChain, SDNPMayStore, SDNPMayLoad]>;
 def z_nc                : SDNode<"SystemZISD::NC", SDT_ZMemMemLength,
+                                  [SDNPHasChain, SDNPMayStore, SDNPMayLoad]>;
+def z_nc_loop           : SDNode<"SystemZISD::NC_LOOP", SDT_ZMemMemLoop,
                                   [SDNPHasChain, SDNPMayStore, SDNPMayLoad]>;
 def z_oc                : SDNode<"SystemZISD::OC", SDT_ZMemMemLength,
                                   [SDNPHasChain, SDNPMayStore, SDNPMayLoad]>;
+def z_oc_loop           : SDNode<"SystemZISD::OC_LOOP", SDT_ZMemMemLoop,
+                                  [SDNPHasChain, SDNPMayStore, SDNPMayLoad]>;
 def z_xc                : SDNode<"SystemZISD::XC", SDT_ZMemMemLength,
+                                  [SDNPHasChain, SDNPMayStore, SDNPMayLoad]>;
+def z_xc_loop           : SDNode<"SystemZISD::XC_LOOP", SDT_ZMemMemLoop,
                                   [SDNPHasChain, SDNPMayStore, SDNPMayLoad]>;
 def z_clc               : SDNode<"SystemZISD::CLC", SDT_ZMemMemLengthCC,
                                  [SDNPHasChain, SDNPMayLoad]>;
-def z_memset_mvc        : SDNode<"SystemZISD::MEMSET_MVC", SDT_ZMemsetMVC,
-                                 [SDNPHasChain, SDNPMayStore, SDNPMayLoad]>;
+def z_clc_loop          : SDNode<"SystemZISD::CLC_LOOP", SDT_ZMemMemLoopCC,
+                                 [SDNPHasChain, SDNPMayLoad]>;
 def z_strcmp            : SDNode<"SystemZISD::STRCMP", SDT_ZStringCC,
                                  [SDNPHasChain, SDNPMayLoad]>;
 def z_stpcpy            : SDNode<"SystemZISD::STPCPY", SDT_ZString,
@@ -439,9 +450,6 @@ def z_tbegin_nofloat    : SDNode<"SystemZISD::TBEGIN_NOFLOAT", SDT_ZTBegin,
                                  [SDNPHasChain, SDNPMayStore, SDNPSideEffect]>;
 def z_tend              : SDNode<"SystemZISD::TEND", SDT_ZTEnd,
                                  [SDNPHasChain, SDNPSideEffect]>;
-
-def z_ada_entry         : SDNode<"SystemZISD::ADA_ENTRY",
-                                  SDT_ZADAENTRY>;
 
 def z_vshl              : SDNode<"ISD::SHL", SDT_ZVecBinary>;
 def z_vsra              : SDNode<"ISD::SRA", SDT_ZVecBinary>;

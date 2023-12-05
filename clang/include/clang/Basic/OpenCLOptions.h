@@ -58,7 +58,7 @@ static inline OpenCLVersionID encodeOpenCLVersion(unsigned OpenCLVersion) {
 // mask.
 static inline bool isOpenCLVersionContainedInMask(const LangOptions &LO,
                                                   unsigned Mask) {
-  auto CLVer = LO.getOpenCLCompatibleVersion();
+  auto CLVer = LO.OpenCLCPlusPlus ? 200 : LO.OpenCLVersion;
   OpenCLVersionID Code = encodeOpenCLVersion(CLVer);
   return Mask & Code;
 }
@@ -79,8 +79,8 @@ public:
   // the __opencl_c_program_scope_global_variables feature is supported
   // C++ for OpenCL inherits rule from OpenCL C v2.0.
   bool areProgramScopeVariablesSupported(const LangOptions &Opts) const {
-    return Opts.getOpenCLCompatibleVersion() == 200 ||
-           (Opts.getOpenCLCompatibleVersion() == 300 &&
+    return Opts.OpenCLCPlusPlus || Opts.OpenCLVersion == 200 ||
+           (Opts.OpenCLVersion == 300 &&
             isSupported("__opencl_c_program_scope_global_variables", Opts));
   }
 
@@ -115,7 +115,8 @@ public:
     // Is option available in OpenCL version \p LO.
     bool isAvailableIn(const LangOptions &LO) const {
       // In C++ mode all extensions should work at least as in v2.0.
-      return LO.getOpenCLCompatibleVersion() >= Avail;
+      auto CLVer = LO.OpenCLCPlusPlus ? 200 : LO.OpenCLVersion;
+      return CLVer >= Avail;
     }
 
     // Is core option in OpenCL version \p LO.

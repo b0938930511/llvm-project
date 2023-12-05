@@ -8,6 +8,8 @@
 
 #include "DumpOutputStyle.h"
 
+#include "FormatUtil.h"
+#include "InputFile.h"
 #include "MinimalSymbolDumper.h"
 #include "MinimalTypeDumper.h"
 #include "StreamUtil.h"
@@ -15,7 +17,6 @@
 #include "llvm-pdbutil.h"
 
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/StringExtras.h"
 #include "llvm/DebugInfo/CodeView/CVSymbolVisitor.h"
 #include "llvm/DebugInfo/CodeView/CVTypeVisitor.h"
 #include "llvm/DebugInfo/CodeView/DebugChecksumsSubsection.h"
@@ -37,13 +38,10 @@
 #include "llvm/DebugInfo/MSF/MappedBlockStream.h"
 #include "llvm/DebugInfo/PDB/Native/DbiModuleDescriptor.h"
 #include "llvm/DebugInfo/PDB/Native/DbiStream.h"
-#include "llvm/DebugInfo/PDB/Native/FormatUtil.h"
 #include "llvm/DebugInfo/PDB/Native/GlobalsStream.h"
 #include "llvm/DebugInfo/PDB/Native/ISectionContribVisitor.h"
 #include "llvm/DebugInfo/PDB/Native/InfoStream.h"
-#include "llvm/DebugInfo/PDB/Native/InputFile.h"
 #include "llvm/DebugInfo/PDB/Native/ModuleDebugStream.h"
-#include "llvm/DebugInfo/PDB/Native/NativeSession.h"
 #include "llvm/DebugInfo/PDB/Native/PDBFile.h"
 #include "llvm/DebugInfo/PDB/Native/PublicsStream.h"
 #include "llvm/DebugInfo/PDB/Native/RawError.h"
@@ -63,7 +61,7 @@ using namespace llvm::msf;
 using namespace llvm::pdb;
 
 DumpOutputStyle::DumpOutputStyle(InputFile &File)
-    : File(File), P(2, false, outs(), opts::Filters) {
+    : File(File), P(2, false, outs()) {
   if (opts::dump::DumpTypeRefStats)
     RefTracker.reset(new TypeReferenceTracker(File));
 }
@@ -101,8 +99,8 @@ Error DumpOutputStyle::dump() {
   }
 
   if (opts::dump::DumpSymbolStats) {
-    ExitOnError Err("Unexpected error processing module stats: ");
-    Err(dumpSymbolStats());
+    if (auto EC = dumpSymbolStats())
+      return EC;
     P.NewLine();
   }
 
@@ -131,33 +129,33 @@ Error DumpOutputStyle::dump() {
   }
 
   if (opts::dump::DumpModules) {
-    ExitOnError Err("Unexpected error processing modules: ");
-    Err(dumpModules());
+    if (auto EC = dumpModules())
+      return EC;
   }
 
   if (opts::dump::DumpModuleFiles) {
-    ExitOnError Err("Unexpected error processing files: ");
-    Err(dumpModuleFiles());
+    if (auto EC = dumpModuleFiles())
+      return EC;
   }
 
   if (opts::dump::DumpLines) {
-    ExitOnError Err("Unexpected error processing lines: ");
-    Err(dumpLines());
+    if (auto EC = dumpLines())
+      return EC;
   }
 
   if (opts::dump::DumpInlineeLines) {
-    ExitOnError Err("Unexpected error processing inlinee lines: ");
-    Err(dumpInlineeLines());
+    if (auto EC = dumpInlineeLines())
+      return EC;
   }
 
   if (opts::dump::DumpXmi) {
-    ExitOnError Err("Unexpected error processing cross module imports: ");
-    Err(dumpXmi());
+    if (auto EC = dumpXmi())
+      return EC;
   }
 
   if (opts::dump::DumpXme) {
-    ExitOnError Err("Unexpected error processing cross module exports: ");
-    Err(dumpXme());
+    if (auto EC = dumpXme())
+      return EC;
   }
 
   if (opts::dump::DumpFpo) {
@@ -200,8 +198,9 @@ Error DumpOutputStyle::dump() {
   }
 
   if (opts::dump::DumpSymbols) {
-    ExitOnError Err("Unexpected error processing symbols: ");
-    Err(File.isPdb() ? dumpModuleSymsForPdb() : dumpModuleSymsForObj());
+    auto EC = File.isPdb() ? dumpModuleSymsForPdb() : dumpModuleSymsForObj();
+    if (EC)
+      return EC;
   }
 
   if (opts::dump::DumpTypeRefStats) {
@@ -261,7 +260,7 @@ Error DumpOutputStyle::dumpFileSummary() {
   P.formatLine("Has Globals: {0}", getPdb().hasPDBGlobalsStream());
   P.formatLine("Has Publics: {0}", getPdb().hasPDBPublicsStream());
   if (getPdb().hasPDBDbiStream()) {
-    DbiStream &DBI = Err(getPdb().getPDBDbiStream());
+    auto &DBI = Err(getPdb().getPDBDbiStream());
     P.formatLine("Is incrementally linked: {0}", DBI.isIncrementallyLinked());
     P.formatLine("Has conflicting types: {0}", DBI.hasCTypes());
     P.formatLine("Is stripped: {0}", DBI.isStripped());
@@ -344,6 +343,36 @@ static void printModuleDetailStats(LinePrinter &P, StringRef Label,
   }
 }
 
+static bool isMyCode(const SymbolGroup &Group) {
+  if (Group.getFile().isObj())
+    return true;
+
+  StringRef Name = Group.name();
+  if (Name.startswith("Import:"))
+    return false;
+  if (Name.endswith_insensitive(".dll"))
+    return false;
+  if (Name.equals_insensitive("* linker *"))
+    return false;
+  if (Name.startswith_insensitive("f:\\binaries\\Intermediate\\vctools"))
+    return false;
+  if (Name.startswith_insensitive("f:\\dd\\vctools\\crt"))
+    return false;
+  return true;
+}
+
+static bool shouldDumpSymbolGroup(uint32_t Idx, const SymbolGroup &Group) {
+  if (opts::dump::JustMyCode && !isMyCode(Group))
+    return false;
+
+  // If the arg was not specified on the command line, always dump all modules.
+  if (opts::dump::DumpModi.getNumOccurrences() == 0)
+    return true;
+
+  // Otherwise, only dump if this is the same module specified.
+  return (opts::dump::DumpModi == Idx);
+}
+
 Error DumpOutputStyle::dumpStreamSummary() {
   printHeader(P, "Streams");
 
@@ -360,7 +389,7 @@ Error DumpOutputStyle::dumpStreamSummary() {
   uint32_t StreamCount = getPdb().getNumStreams();
   uint32_t MaxStreamSize = getPdb().getMaxStreamSize();
 
-  for (uint32_t StreamIdx = 0; StreamIdx < StreamCount; ++StreamIdx) {
+  for (uint16_t StreamIdx = 0; StreamIdx < StreamCount; ++StreamIdx) {
     P.formatLine(
         "Stream {0} ({1} bytes): [{2}]",
         fmt_align(StreamIdx, AlignStyle::Right, NumDigits(StreamCount)),
@@ -380,6 +409,93 @@ Error DumpOutputStyle::dumpStreamSummary() {
   return Error::success();
 }
 
+static Expected<ModuleDebugStreamRef> getModuleDebugStream(PDBFile &File,
+                                                           uint32_t Index) {
+  ExitOnError Err("Unexpected error: ");
+
+  auto &Dbi = Err(File.getPDBDbiStream());
+  const auto &Modules = Dbi.modules();
+  auto Modi = Modules.getModuleDescriptor(Index);
+
+  uint16_t ModiStream = Modi.getModuleStreamIndex();
+  if (ModiStream == kInvalidStreamIndex)
+    return make_error<RawError>(raw_error_code::no_stream,
+                                "Module stream not present");
+
+  auto ModStreamData = File.createIndexedStream(ModiStream);
+
+  ModuleDebugStreamRef ModS(Modi, std::move(ModStreamData));
+  if (auto EC = ModS.reload())
+    return make_error<RawError>(raw_error_code::corrupt_file,
+                                "Invalid module stream");
+
+  return std::move(ModS);
+}
+
+template <typename CallbackT>
+static void
+iterateOneModule(InputFile &File, const Optional<PrintScope> &HeaderScope,
+                 const SymbolGroup &SG, uint32_t Modi, CallbackT Callback) {
+  if (HeaderScope) {
+    HeaderScope->P.formatLine(
+        "Mod {0:4} | `{1}`: ",
+        fmt_align(Modi, AlignStyle::Right, HeaderScope->LabelWidth), SG.name());
+  }
+
+  AutoIndent Indent(HeaderScope);
+  Callback(Modi, SG);
+}
+
+template <typename CallbackT>
+static void iterateSymbolGroups(InputFile &Input,
+                                const Optional<PrintScope> &HeaderScope,
+                                CallbackT Callback) {
+  AutoIndent Indent(HeaderScope);
+
+  ExitOnError Err("Unexpected error processing modules: ");
+
+  if (opts::dump::DumpModi.getNumOccurrences() > 0) {
+    assert(opts::dump::DumpModi.getNumOccurrences() == 1);
+    uint32_t Modi = opts::dump::DumpModi;
+    SymbolGroup SG(&Input, Modi);
+    iterateOneModule(Input, withLabelWidth(HeaderScope, NumDigits(Modi)), SG,
+                     Modi, Callback);
+    return;
+  }
+
+  uint32_t I = 0;
+
+  for (const auto &SG : Input.symbol_groups()) {
+    if (shouldDumpSymbolGroup(I, SG))
+      iterateOneModule(Input, withLabelWidth(HeaderScope, NumDigits(I)), SG, I,
+                       Callback);
+
+    ++I;
+  }
+}
+
+template <typename SubsectionT>
+static void iterateModuleSubsections(
+    InputFile &File, const Optional<PrintScope> &HeaderScope,
+    llvm::function_ref<void(uint32_t, const SymbolGroup &, SubsectionT &)>
+        Callback) {
+
+  iterateSymbolGroups(File, HeaderScope,
+                      [&](uint32_t Modi, const SymbolGroup &SG) {
+                        for (const auto &SS : SG.getDebugSubsections()) {
+                          SubsectionT Subsection;
+
+                          if (SS.kind() != Subsection.kind())
+                            continue;
+
+                          BinaryStreamReader Reader(SS.getRecordData());
+                          if (auto EC = Subsection.initialize(Reader))
+                            continue;
+                          Callback(Modi, SG, Subsection);
+                        }
+                      });
+}
+
 static Expected<std::pair<std::unique_ptr<MappedBlockStream>,
                           ArrayRef<llvm::object::coff_section>>>
 loadSectionHeaders(PDBFile &File, DbgHeaderType Type) {
@@ -388,7 +504,7 @@ loadSectionHeaders(PDBFile &File, DbgHeaderType Type) {
         "Section headers require a DBI Stream, which could not be loaded",
         inconvertibleErrorCode());
 
-  DbiStream &Dbi = cantFail(File.getPDBDbiStream());
+  auto &Dbi = cantFail(File.getPDBDbiStream());
   uint32_t SI = Dbi.getDebugStreamIndex(Type);
 
   if (SI == kInvalidStreamIndex)
@@ -413,10 +529,10 @@ loadSectionHeaders(PDBFile &File, DbgHeaderType Type) {
   return std::make_pair(std::move(Stream), Headers);
 }
 
-static Expected<std::vector<std::string>> getSectionNames(PDBFile &File) {
+static std::vector<std::string> getSectionNames(PDBFile &File) {
   auto ExpectedHeaders = loadSectionHeaders(File, DbgHeaderType::SectionHdr);
   if (!ExpectedHeaders)
-    return ExpectedHeaders.takeError();
+    return {};
 
   std::unique_ptr<MappedBlockStream> Stream;
   ArrayRef<object::coff_section> Headers;
@@ -474,44 +590,31 @@ Error DumpOutputStyle::dumpModules() {
   }
 
   AutoIndent Indent(P);
+  ExitOnError Err("Unexpected error processing modules: ");
 
-  Expected<DbiStream &> StreamOrErr = getPdb().getPDBDbiStream();
-  if (!StreamOrErr)
-    return StreamOrErr.takeError();
-  DbiStream &Stream = *StreamOrErr;
+  auto &Stream = Err(getPdb().getPDBDbiStream());
 
   const DbiModuleList &Modules = Stream.modules();
-  return iterateSymbolGroups(
-      File, PrintScope{P, 11},
-      [&](uint32_t Modi, const SymbolGroup &Strings) -> Error {
+  iterateSymbolGroups(
+      File, PrintScope{P, 11}, [&](uint32_t Modi, const SymbolGroup &Strings) {
         auto Desc = Modules.getModuleDescriptor(Modi);
         if (opts::dump::DumpSectionContribs) {
-          auto SectionsOrErr = getSectionNames(getPdb());
-          if (!SectionsOrErr)
-            return SectionsOrErr.takeError();
-          ArrayRef<std::string> Sections = *SectionsOrErr;
+          std::vector<std::string> Sections = getSectionNames(getPdb());
           dumpSectionContrib(P, Desc.getSectionContrib(), Sections, 0);
         }
         P.formatLine("Obj: `{0}`: ", Desc.getObjFileName());
         P.formatLine("debug stream: {0}, # files: {1}, has ec info: {2}",
                      Desc.getModuleStreamIndex(), Desc.getNumberOfFiles(),
                      Desc.hasECInfo());
-
-        auto PdbPathOrErr = Stream.getECName(Desc.getPdbFilePathNameIndex());
-        if (!PdbPathOrErr)
-          return PdbPathOrErr.takeError();
-        StringRef PdbFilePath = *PdbPathOrErr;
-
-        auto SrcPathOrErr = Stream.getECName(Desc.getSourceFileNameIndex());
-        if (!SrcPathOrErr)
-          return SrcPathOrErr.takeError();
-        StringRef SrcFilePath = *SrcPathOrErr;
-
+        StringRef PdbFilePath =
+            Err(Stream.getECName(Desc.getPdbFilePathNameIndex()));
+        StringRef SrcFilePath =
+            Err(Stream.getECName(Desc.getSourceFileNameIndex()));
         P.formatLine("pdb file ni: {0} `{1}`, src file ni: {2} `{3}`",
                      Desc.getPdbFilePathNameIndex(), PdbFilePath,
                      Desc.getSourceFileNameIndex(), SrcFilePath);
-        return Error::success();
       });
+  return Error::success();
 }
 
 Error DumpOutputStyle::dumpModuleFiles() {
@@ -527,20 +630,18 @@ Error DumpOutputStyle::dumpModuleFiles() {
     return Error::success();
   }
 
-  return iterateSymbolGroups(
-      File, PrintScope{P, 11},
-      [this](uint32_t Modi, const SymbolGroup &Strings) -> Error {
-        Expected<DbiStream &> StreamOrErr = getPdb().getPDBDbiStream();
-        if (!StreamOrErr)
-          return StreamOrErr.takeError();
-        DbiStream &Stream = *StreamOrErr;
+  ExitOnError Err("Unexpected error processing modules: ");
 
-        const DbiModuleList &Modules = Stream.modules();
-        for (const auto &F : Modules.source_files(Modi)) {
-          Strings.formatFromFileName(P, F);
-        }
-        return Error::success();
-      });
+  iterateSymbolGroups(File, PrintScope{P, 11},
+                      [this, &Err](uint32_t Modi, const SymbolGroup &Strings) {
+                        auto &Stream = Err(getPdb().getPDBDbiStream());
+
+                        const DbiModuleList &Modules = Stream.modules();
+                        for (const auto &F : Modules.source_files(Modi)) {
+                          Strings.formatFromFileName(P, F);
+                        }
+                      });
+  return Error::success();
 }
 
 Error DumpOutputStyle::dumpSymbolStats() {
@@ -551,40 +652,39 @@ Error DumpOutputStyle::dumpSymbolStats() {
     return Error::success();
   }
 
+  ExitOnError Err("Unexpected error processing modules: ");
+
   StatCollection SymStats;
   StatCollection ChunkStats;
-  PrintScope Scope(P, 2);
 
-  if (Error Err = iterateSymbolGroups(
-          File, Scope, [&](uint32_t Modi, const SymbolGroup &SG) -> Error {
-            StatCollection SS = getSymbolStats(SG, SymStats);
-            StatCollection CS = getChunkStats(SG, ChunkStats);
+  Optional<PrintScope> Scope;
+  if (File.isPdb())
+    Scope.emplace(P, 2);
 
-            if (!SG.getFile().isPdb())
-              return Error::success();
+  iterateSymbolGroups(File, Scope, [&](uint32_t Modi, const SymbolGroup &SG) {
+    StatCollection SS = getSymbolStats(SG, SymStats);
+    StatCollection CS = getChunkStats(SG, ChunkStats);
 
-            AutoIndent Indent(P);
-            auto Modules = cantFail(File.pdb().getPDBDbiStream()).modules();
-            uint32_t ModCount = Modules.getModuleCount();
-            DbiModuleDescriptor Desc = Modules.getModuleDescriptor(Modi);
-            uint32_t StreamIdx = Desc.getModuleStreamIndex();
+    if (SG.getFile().isPdb()) {
+      AutoIndent Indent(P);
+      auto Modules = cantFail(File.pdb().getPDBDbiStream()).modules();
+      uint32_t ModCount = Modules.getModuleCount();
+      DbiModuleDescriptor Desc = Modules.getModuleDescriptor(Modi);
+      uint32_t StreamIdx = Desc.getModuleStreamIndex();
 
-            if (StreamIdx == kInvalidStreamIndex) {
-              P.formatLine(
-                  "Mod {0} (debug info not present): [{1}]",
-                  fmt_align(Modi, AlignStyle::Right, NumDigits(ModCount)),
-                  Desc.getModuleName());
-              return Error::success();
-            }
-            P.formatLine("Stream {0}, {1} bytes", StreamIdx,
-                         getPdb().getStreamByteSize(StreamIdx));
+      if (StreamIdx == kInvalidStreamIndex) {
+        P.formatLine("Mod {0} (debug info not present): [{1}]",
+                     fmt_align(Modi, AlignStyle::Right, NumDigits(ModCount)),
+                     Desc.getModuleName());
+        return;
+      }
+      P.formatLine("Stream {0}, {1} bytes", StreamIdx,
+                   getPdb().getStreamByteSize(StreamIdx));
 
-            printModuleDetailStats<SymbolKind>(P, "Symbols", SS);
-            printModuleDetailStats<DebugSubsectionKind>(P, "Chunks", CS);
-
-            return Error::success();
-          }))
-    return Err;
+      printModuleDetailStats<SymbolKind>(P, "Symbols", SS);
+      printModuleDetailStats<DebugSubsectionKind>(P, "Chunks", CS);
+    }
+  });
 
   if (SymStats.Totals.Count > 0) {
     P.printLine("  Summary |");
@@ -603,8 +703,7 @@ Error DumpOutputStyle::dumpTypeStats() {
   StatCollection TypeStats;
   LazyRandomTypeCollection &Types =
       opts::dump::DumpTypeStats ? File.types() : File.ids();
-  for (std::optional<TypeIndex> TI = Types.getFirst(); TI;
-       TI = Types.getNext(*TI)) {
+  for (Optional<TypeIndex> TI = Types.getFirst(); TI; TI = Types.getNext(*TI)) {
     CVType Type = Types.getType(*TI);
     TypeStats.update(uint32_t(Type.kind()), Type.length());
   }
@@ -694,7 +793,7 @@ Error DumpOutputStyle::dumpUdtStats() {
       Kind = kNoneUdtKind;
     else if (UDT.Type.isSimple())
       Kind = kSimpleUdtKind;
-    else if (std::optional<CVType> T = TpiTypes.tryGetType(UDT.Type)) {
+    else if (Optional<CVType> T = TpiTypes.tryGetType(UDT.Type)) {
       Kind = T->kind();
       RecordSize = T->length();
     } else
@@ -845,11 +944,11 @@ Error DumpOutputStyle::dumpLines() {
 
   uint32_t LastModi = UINT32_MAX;
   uint32_t LastNameIndex = UINT32_MAX;
-  return iterateModuleSubsections<DebugLinesSubsectionRef>(
+  iterateModuleSubsections<DebugLinesSubsectionRef>(
       File, PrintScope{P, 4},
-      [this, &LastModi,
-       &LastNameIndex](uint32_t Modi, const SymbolGroup &Strings,
-                       DebugLinesSubsectionRef &Lines) -> Error {
+      [this, &LastModi, &LastNameIndex](uint32_t Modi,
+                                        const SymbolGroup &Strings,
+                                        DebugLinesSubsectionRef &Lines) {
         uint16_t Segment = Lines.header()->RelocSegment;
         uint32_t Begin = Lines.header()->RelocOffset;
         uint32_t End = Begin + Lines.header()->CodeSize;
@@ -871,8 +970,9 @@ Error DumpOutputStyle::dumpLines() {
           P.NewLine();
           typesetLinesAndColumns(P, Begin, Block);
         }
-        return Error::success();
       });
+
+  return Error::success();
 }
 
 Error DumpOutputStyle::dumpInlineeLines() {
@@ -883,10 +983,10 @@ Error DumpOutputStyle::dumpInlineeLines() {
     return Error::success();
   }
 
-  return iterateModuleSubsections<DebugInlineeLinesSubsectionRef>(
+  iterateModuleSubsections<DebugInlineeLinesSubsectionRef>(
       File, PrintScope{P, 2},
       [this](uint32_t Modi, const SymbolGroup &Strings,
-             DebugInlineeLinesSubsectionRef &Lines) -> Error {
+             DebugInlineeLinesSubsectionRef &Lines) {
         P.formatLine("{0,+8} | {1,+5} | {2}", "Inlinee", "Line", "Source File");
         for (const auto &Entry : Lines) {
           P.formatLine("{0,+8} | {1,+5} | ", Entry.Header->Inlinee,
@@ -898,8 +998,9 @@ Error DumpOutputStyle::dumpInlineeLines() {
           }
         }
         P.NewLine();
-        return Error::success();
       });
+
+  return Error::success();
 }
 
 Error DumpOutputStyle::dumpXmi() {
@@ -910,10 +1011,10 @@ Error DumpOutputStyle::dumpXmi() {
     return Error::success();
   }
 
-  return iterateModuleSubsections<DebugCrossModuleImportsSubsectionRef>(
+  iterateModuleSubsections<DebugCrossModuleImportsSubsectionRef>(
       File, PrintScope{P, 2},
       [this](uint32_t Modi, const SymbolGroup &Strings,
-             DebugCrossModuleImportsSubsectionRef &Imports) -> Error {
+             DebugCrossModuleImportsSubsectionRef &Imports) {
         P.formatLine("{0,=32} | {1}", "Imported Module", "Type IDs");
 
         for (const auto &Xmi : Imports) {
@@ -938,8 +1039,9 @@ Error DumpOutputStyle::dumpXmi() {
               typesetItemList(TIs, P.getIndentLevel() + 35, 12, " ");
           P.formatLine("{0,+32} | {1}", Module, Result);
         }
-        return Error::success();
       });
+
+  return Error::success();
 }
 
 Error DumpOutputStyle::dumpXme() {
@@ -950,17 +1052,18 @@ Error DumpOutputStyle::dumpXme() {
     return Error::success();
   }
 
-  return iterateModuleSubsections<DebugCrossModuleExportsSubsectionRef>(
+  iterateModuleSubsections<DebugCrossModuleExportsSubsectionRef>(
       File, PrintScope{P, 2},
       [this](uint32_t Modi, const SymbolGroup &Strings,
-             DebugCrossModuleExportsSubsectionRef &Exports) -> Error {
+             DebugCrossModuleExportsSubsectionRef &Exports) {
         P.formatLine("{0,-10} | {1}", "Local ID", "Global ID");
         for (const auto &Export : Exports) {
           P.formatLine("{0,+10:X+} | {1}", TypeIndex(Export.Local),
                        TypeIndex(Export.Global));
         }
-        return Error::success();
       });
+
+  return Error::success();
 }
 
 std::string formatFrameType(object::frame_type FT) {
@@ -981,7 +1084,7 @@ Error DumpOutputStyle::dumpOldFpo(PDBFile &File) {
   printHeader(P, "Old FPO Data");
 
   ExitOnError Err("Error dumping old fpo data:");
-  DbiStream &Dbi = Err(File.getPDBDbiStream());
+  auto &Dbi = Err(File.getPDBDbiStream());
 
   if (!Dbi.hasOldFpoRecords()) {
     printStreamNotPresent("FPO");
@@ -1008,7 +1111,7 @@ Error DumpOutputStyle::dumpNewFpo(PDBFile &File) {
   printHeader(P, "New FPO Data");
 
   ExitOnError Err("Error dumping new fpo data:");
-  DbiStream &Dbi = Err(File.getPDBDbiStream());
+  auto &Dbi = Err(File.getPDBDbiStream());
 
   if (!Dbi.hasNewFpoRecords()) {
     printStreamNotPresent("New FPO");
@@ -1129,10 +1232,10 @@ Error DumpOutputStyle::dumpStringTableFromPdb() {
 }
 
 Error DumpOutputStyle::dumpStringTableFromObj() {
-  return iterateModuleSubsections<DebugStringTableSubsectionRef>(
+  iterateModuleSubsections<DebugStringTableSubsectionRef>(
       File, PrintScope{P, 4},
       [&](uint32_t Modi, const SymbolGroup &Strings,
-          DebugStringTableSubsectionRef &Strings2) -> Error {
+          DebugStringTableSubsectionRef &Strings2) {
         BinaryStreamRef StringTableBuffer = Strings2.getBuffer();
         BinaryStreamReader Reader(StringTableBuffer);
         while (Reader.bytesRemaining() > 0) {
@@ -1145,8 +1248,8 @@ Error DumpOutputStyle::dumpStringTableFromObj() {
           P.formatLine("{0} | {1}", fmt_align(Offset, AlignStyle::Right, 4),
                        Str);
         }
-        return Error::success();
       });
+  return Error::success();
 }
 
 Error DumpOutputStyle::dumpNamedStreams() {
@@ -1249,16 +1352,10 @@ static void dumpPartialTypeStream(LinePrinter &Printer,
 
     for (const auto &I : TiList) {
       TypeIndex TI(I);
-      if (TI.isSimple()) {
-        Printer.formatLine("{0} | {1}", fmt_align(I, AlignStyle::Right, Width),
-                           Types.getTypeName(TI));
-      } else if (std::optional<CVType> Type = Types.tryGetType(TI)) {
-        if (auto EC = codeview::visitTypeRecord(*Type, TI, V))
-          Printer.formatLine("An error occurred dumping type record {0}: {1}",
-                             TI, toString(std::move(EC)));
-      } else {
-        Printer.formatLine("Type {0} doesn't exist in TPI stream", TI);
-      }
+      CVType Type = Types.getType(TI);
+      if (auto EC = codeview::visitTypeRecord(Type, TI, V))
+        Printer.formatLine("An error occurred dumping type record {0}: {1}", TI,
+                           toString(std::move(EC)));
     }
   }
 }
@@ -1286,7 +1383,7 @@ Error DumpOutputStyle::dumpTypesFromObjectFile() {
       return ContentsOrErr.takeError();
 
     uint32_t Magic;
-    BinaryStreamReader Reader(*ContentsOrErr, llvm::endianness::little);
+    BinaryStreamReader Reader(*ContentsOrErr, llvm::support::little);
     if (auto EC = Reader.readInteger(Magic))
       return EC;
     if (Magic != COFF::DEBUG_SECTION_MAGIC)
@@ -1429,6 +1526,8 @@ Error DumpOutputStyle::dumpModuleSymsForObj() {
 
   AutoIndent Indent(P);
 
+  ExitOnError Err("Unexpected error processing symbols: ");
+
   auto &Types = File.types();
 
   SymbolVisitorCallbackPipeline Pipeline;
@@ -1439,18 +1538,25 @@ Error DumpOutputStyle::dumpModuleSymsForObj() {
   Pipeline.addCallbackToPipeline(Dumper);
   CVSymbolVisitor Visitor(Pipeline);
 
-  return iterateModuleSubsections<DebugSymbolsSubsectionRef>(
+  std::unique_ptr<llvm::Error> SymbolError;
+
+  iterateModuleSubsections<DebugSymbolsSubsectionRef>(
       File, PrintScope{P, 2},
       [&](uint32_t Modi, const SymbolGroup &Strings,
-          DebugSymbolsSubsectionRef &Symbols) -> Error {
+          DebugSymbolsSubsectionRef &Symbols) {
         Dumper.setSymbolGroup(&Strings);
         for (auto Symbol : Symbols) {
           if (auto EC = Visitor.visitSymbolRecord(Symbol)) {
-            return EC;
+            SymbolError = std::make_unique<Error>(std::move(EC));
+            return;
           }
         }
-        return Error::success();
       });
+
+  if (SymbolError)
+    return std::move(*SymbolError);
+
+  return Error::success();
 }
 
 Error DumpOutputStyle::dumpModuleSymsForPdb() {
@@ -1462,18 +1568,18 @@ Error DumpOutputStyle::dumpModuleSymsForPdb() {
   }
 
   AutoIndent Indent(P);
+  ExitOnError Err("Unexpected error processing symbols: ");
 
   auto &Ids = File.ids();
   auto &Types = File.types();
 
-  return iterateSymbolGroups(
-      File, PrintScope{P, 2},
-      [&](uint32_t I, const SymbolGroup &Strings) -> Error {
+  iterateSymbolGroups(
+      File, PrintScope{P, 2}, [&](uint32_t I, const SymbolGroup &Strings) {
         auto ExpectedModS = getModuleDebugStream(File.pdb(), I);
         if (!ExpectedModS) {
           P.formatLine("Error loading module stream {0}.  {1}", I,
                        toString(ExpectedModS.takeError()));
-          return Error::success();
+          return;
         }
 
         ModuleDebugStreamRef &ModS = *ExpectedModS;
@@ -1487,25 +1593,14 @@ Error DumpOutputStyle::dumpModuleSymsForPdb() {
         Pipeline.addCallbackToPipeline(Dumper);
         CVSymbolVisitor Visitor(Pipeline);
         auto SS = ModS.getSymbolsSubstream();
-        if (opts::Filters.SymbolOffset) {
-          CVSymbolVisitor::FilterOptions Filter;
-          Filter.SymbolOffset = opts::Filters.SymbolOffset;
-          Filter.ParentRecursiveDepth = opts::Filters.ParentRecurseDepth;
-          Filter.ChildRecursiveDepth = opts::Filters.ChildrenRecurseDepth;
-          if (auto EC = Visitor.visitSymbolStreamFiltered(ModS.getSymbolArray(),
-                                                          Filter)) {
-            P.formatLine("Error while processing symbol records.  {0}",
-                         toString(std::move(EC)));
-            return EC;
-          }
-        } else if (auto EC = Visitor.visitSymbolStream(ModS.getSymbolArray(),
-                                                       SS.Offset)) {
+        if (auto EC =
+                Visitor.visitSymbolStream(ModS.getSymbolArray(), SS.Offset)) {
           P.formatLine("Error while processing symbol records.  {0}",
                        toString(std::move(EC)));
-          return EC;
+          return;
         }
-        return Error::success();
       });
+  return Error::success();
 }
 
 Error DumpOutputStyle::dumpTypeRefStats() {
@@ -1519,8 +1614,7 @@ Error DumpOutputStyle::dumpTypeRefStats() {
   size_t TotalBytes = 0;
   size_t RefBytes = 0;
   auto &Types = File.types();
-  for (std::optional<TypeIndex> TI = Types.getFirst(); TI;
-       TI = Types.getNext(*TI)) {
+  for (Optional<TypeIndex> TI = Types.getFirst(); TI; TI = Types.getNext(*TI)) {
     CVType Type = File.types().getType(*TI);
     TotalBytes += Type.length();
     if (RefTracker->isTypeReferenced(*TI)) {
@@ -1831,7 +1925,7 @@ Error DumpOutputStyle::dumpSectionContribs() {
   AutoIndent Indent(P);
   ExitOnError Err("Error dumping section contributions: ");
 
-  DbiStream &Dbi = Err(getPdb().getPDBDbiStream());
+  auto &Dbi = Err(getPdb().getPDBDbiStream());
 
   class Visitor : public ISectionContribVisitor {
   public:
@@ -1854,11 +1948,8 @@ Error DumpOutputStyle::dumpSectionContribs() {
     ArrayRef<std::string> Names;
   };
 
-  auto NamesOrErr = getSectionNames(getPdb());
-  if (!NamesOrErr)
-    return NamesOrErr.takeError();
-  ArrayRef<std::string> Names = *NamesOrErr;
-  Visitor V(P, Names);
+  std::vector<std::string> Names = getSectionNames(getPdb());
+  Visitor V(P, makeArrayRef(Names));
   Dbi.visitSectionContributions(V);
   return Error::success();
 }
@@ -1879,7 +1970,7 @@ Error DumpOutputStyle::dumpSectionMap() {
   AutoIndent Indent(P);
   ExitOnError Err("Error dumping section map: ");
 
-  DbiStream &Dbi = Err(getPdb().getPDBDbiStream());
+  auto &Dbi = Err(getPdb().getPDBDbiStream());
 
   uint32_t I = 0;
   for (auto &M : Dbi.getSectionMap()) {

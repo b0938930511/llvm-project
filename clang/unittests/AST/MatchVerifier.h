@@ -120,10 +120,6 @@ MatchVerifier<NodeType>::match(const std::string &Code,
     Args.push_back("-cl-no-stdinc");
     FileName = "input.cl";
     break;
-  case Lang_OBJC:
-    Args.push_back("-fobjc-nonfragile-abi");
-    FileName = "input.m";
-    break;
   case Lang_OBJCXX:
     FileName = "input.mm";
     break;

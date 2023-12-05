@@ -7,6 +7,9 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
+// UNSUPPORTED: libcpp-no-concepts
+// UNSUPPORTED: gcc-10
+// UNSUPPORTED: libcpp-has-no-incomplete-ranges
 
 // If we have a copy-propagating cache, when we copy ZeroOnDestroy, we will get a
 // dangling reference to the copied-from object. This test ensures that we do not
@@ -29,11 +32,8 @@ struct ZeroOnDestroy : std::ranges::view_base {
   constexpr ForwardIter end() { return ForwardIter(buff + 8); }
   constexpr ForwardIter end() const { return ForwardIter(); }
 
-  ZeroOnDestroy() = default;
-  ZeroOnDestroy(const ZeroOnDestroy&) = default;
-  ZeroOnDestroy& operator=(const ZeroOnDestroy&) = default;
   ~ZeroOnDestroy() {
-    std::memset(buff, 0, sizeof(buff));
+    memset(buff, 0, sizeof(buff));
   }
 
   static auto dropFirstFour() {
@@ -48,10 +48,10 @@ struct ZeroOnDestroy : std::ranges::view_base {
 };
 
 int main(int, char**) {
-  auto noDanglingCache = ZeroOnDestroy::dropFirstFour();
+  auto noDanlingCache = ZeroOnDestroy::dropFirstFour();
   // If we use the cached version, it will reference the copied-from view.
   // Worst case this is a segfault, best case it's an assertion fired.
-  assert(*noDanglingCache.begin() == 5);
+  assert(*noDanlingCache.begin() == 5);
 
   return 0;
 }

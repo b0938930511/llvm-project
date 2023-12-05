@@ -12,6 +12,8 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstddef>
 #include <iterator>
@@ -392,9 +394,6 @@ void Paragraph::renderPlainText(llvm::raw_ostream &OS) const {
   }
   OS << '\n';
 }
-
-BulletList::BulletList() = default;
-BulletList::~BulletList() = default;
 
 void BulletList::renderMarkdown(llvm::raw_ostream &OS) const {
   for (auto &D : Items) {

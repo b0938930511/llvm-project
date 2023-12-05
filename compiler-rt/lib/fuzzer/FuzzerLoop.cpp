@@ -136,7 +136,7 @@ void Fuzzer::HandleMalloc(size_t Size) {
 }
 
 Fuzzer::Fuzzer(UserCallback CB, InputCorpus &Corpus, MutationDispatcher &MD,
-               const FuzzingOptions &Options)
+               FuzzingOptions Options)
     : CB(CB), Corpus(Corpus), MD(MD), Options(Options) {
   if (EF->__sanitizer_set_death_callback)
     EF->__sanitizer_set_death_callback(StaticDeathCallback);
@@ -159,6 +159,8 @@ Fuzzer::Fuzzer(UserCallback CB, InputCorpus &Corpus, MutationDispatcher &MD,
   CurrentUnitSize = 0;
   memset(BaseSha1, 0, sizeof(BaseSha1));
 }
+
+Fuzzer::~Fuzzer() {}
 
 void Fuzzer::AllocateCurrentUnitData() {
   if (CurrentUnitData || MaxInputLen == 0)
@@ -260,11 +262,6 @@ void Fuzzer::MaybeExitGracefully() {
   _Exit(0);
 }
 
-int Fuzzer::InterruptExitCode() {
-  assert(F);
-  return F->Options.InterruptExitCode;
-}
-
 void Fuzzer::InterruptCallback() {
   Printf("==%lu== libFuzzer: run interrupted; exiting\n", GetPid());
   PrintFinalStats();
@@ -299,7 +296,7 @@ void Fuzzer::AlarmCallback() {
     Printf("       and the timeout value is %d (use -timeout=N to change)\n",
            Options.UnitTimeoutSec);
     DumpCurrentUnit("timeout-");
-    Printf("==%lu== ERROR: libFuzzer: timeout after %zu seconds\n", GetPid(),
+    Printf("==%lu== ERROR: libFuzzer: timeout after %d seconds\n", GetPid(),
            Seconds);
     PrintStackTrace();
     Printf("SUMMARY: libFuzzer: timeout\n");
@@ -312,8 +309,9 @@ void Fuzzer::RssLimitCallback() {
   if (EF->__sanitizer_acquire_crash_state &&
       !EF->__sanitizer_acquire_crash_state())
     return;
-  Printf("==%lu== ERROR: libFuzzer: out-of-memory (used: %zdMb; limit: %dMb)\n",
-         GetPid(), GetPeakRSSMb(), Options.RssLimitMb);
+  Printf(
+      "==%lu== ERROR: libFuzzer: out-of-memory (used: %zdMb; limit: %zdMb)\n",
+      GetPid(), GetPeakRSSMb(), Options.RssLimitMb);
   Printf("   To change the out-of-memory limit use -rss_limit_mb=<N>\n\n");
   PrintMemoryProfile();
   DumpCurrentUnit("oom-");
@@ -368,7 +366,7 @@ void Fuzzer::PrintFinalStats() {
   Printf("stat::number_of_executed_units: %zd\n", TotalNumberOfRuns);
   Printf("stat::average_exec_per_sec:     %zd\n", ExecPerSec);
   Printf("stat::new_units_added:          %zd\n", NumberOfNewUnitsAdded);
-  Printf("stat::slowest_unit_time_sec:    %ld\n", TimeOfLongestUnitInSeconds);
+  Printf("stat::slowest_unit_time_sec:    %zd\n", TimeOfLongestUnitInSeconds);
   Printf("stat::peak_rss_mb:              %zd\n", GetPeakRSSMb());
 }
 
@@ -452,7 +450,7 @@ void Fuzzer::PrintPulseAndReportSlowInput(const uint8_t *Data, size_t Size) {
       static_cast<long>(static_cast<double>(TimeOfLongestUnitInSeconds) * 1.1);
   if (TimeOfUnit > Threshhold && TimeOfUnit >= Options.ReportSlowUnits) {
     TimeOfLongestUnitInSeconds = TimeOfUnit;
-    Printf("Slowest unit: %ld s:\n", TimeOfLongestUnitInSeconds);
+    Printf("Slowest unit: %zd s:\n", TimeOfLongestUnitInSeconds);
     WriteUnitToFileWithPrefix({Data, Data + Size}, "slow-unit-");
   }
 }
@@ -513,7 +511,7 @@ bool Fuzzer::RunOne(const uint8_t *Data, size_t Size, bool MayDeleteFile,
   // Largest input length should be INT_MAX.
   assert(Size < std::numeric_limits<uint32_t>::max());
 
-  if(!ExecuteCallback(Data, Size)) return false;
+  ExecuteCallback(Data, Size);
   auto TimeOfUnit = duration_cast<microseconds>(UnitStopTime - UnitStartTime);
 
   UniqFeatureSetTmp.clear();
@@ -550,7 +548,7 @@ bool Fuzzer::RunOne(const uint8_t *Data, size_t Size, bool MayDeleteFile,
       FoundUniqFeaturesOfII == II->UniqFeatureSet.size() &&
       II->U.size() > Size) {
     auto OldFeaturesFile = Sha1ToString(II->Sha1);
-    Corpus.Replace(II, {Data, Data + Size}, TimeOfUnit);
+    Corpus.Replace(II, {Data, Data + Size});
     RenameFeatureSetFile(Options.FeaturesDir, OldFeaturesFile,
                          Sha1ToString(II->Sha1));
     return true;
@@ -588,7 +586,7 @@ static bool LooseMemeq(const uint8_t *A, const uint8_t *B, size_t Size) {
 
 // This method is not inlined because it would cause a test to fail where it
 // is part of the stack unwinding. See D97975 for details.
-ATTRIBUTE_NOINLINE bool Fuzzer::ExecuteCallback(const uint8_t *Data,
+ATTRIBUTE_NOINLINE void Fuzzer::ExecuteCallback(const uint8_t *Data,
                                                 size_t Size) {
   TPC.RecordInitialStack();
   TotalNumberOfRuns++;
@@ -604,24 +602,23 @@ ATTRIBUTE_NOINLINE bool Fuzzer::ExecuteCallback(const uint8_t *Data,
   if (CurrentUnitData && CurrentUnitData != Data)
     memcpy(CurrentUnitData, Data, Size);
   CurrentUnitSize = Size;
-  int CBRes = 0;
   {
     ScopedEnableMsanInterceptorChecks S;
     AllocTracer.Start(Options.TraceMalloc);
     UnitStartTime = system_clock::now();
     TPC.ResetMaps();
     RunningUserCallback = true;
-    CBRes = CB(DataCopy, Size);
+    int Res = CB(DataCopy, Size);
     RunningUserCallback = false;
     UnitStopTime = system_clock::now();
-    assert(CBRes == 0 || CBRes == -1);
+    (void)Res;
+    assert(Res == 0);
     HasMoreMallocsThanFrees = AllocTracer.Stop();
   }
   if (!LooseMemeq(DataCopy, Data, Size))
     CrashOnOverwrittenData();
   CurrentUnitSize = 0;
   delete[] DataCopy;
-  return CBRes == 0;
 }
 
 std::string Fuzzer::WriteToOutputCorpus(const Unit &U) {
@@ -799,7 +796,7 @@ void Fuzzer::ReadAndExecuteSeedCorpora(std::vector<SizedFile> &CorporaFiles) {
     TotalSize += File.Size;
   }
   if (Options.MaxLen == 0)
-    SetMaxInputLen(std::clamp(MaxSize, kMinDefaultLen, kMaxSaneLen));
+    SetMaxInputLen(std::min(std::max(kMinDefaultLen, MaxSize), kMaxSaneLen));
   assert(MaxInputLen > 0);
 
   // Test the callback with empty input and never try it again.
@@ -846,16 +843,9 @@ void Fuzzer::ReadAndExecuteSeedCorpora(std::vector<SizedFile> &CorporaFiles) {
   }
 
   if (Corpus.empty() && Options.MaxNumberOfRuns) {
-    Printf("WARNING: no interesting inputs were found so far. "
-           "Is the code instrumented for coverage?\n"
-           "This may also happen if the target rejected all inputs we tried so "
-           "far\n");
-    // The remaining logic requires that the corpus is not empty,
-    // so we add one fake input to the in-memory corpus.
-    Corpus.AddToCorpus({'\n'}, /*NumFeatures=*/1, /*MayDeleteFile=*/true,
-                       /*HasFocusFunction=*/false, /*NeverReduce=*/false,
-                       /*TimeOfUnit=*/duration_cast<microseconds>(0s), {0}, DFT,
-                       /*BaseII*/ nullptr);
+    Printf("ERROR: no interesting inputs were found. "
+           "Is the code instrumented for coverage? Exiting.\n");
+    exit(1);
   }
 }
 

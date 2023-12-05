@@ -32,15 +32,18 @@
 #include "llvm/CodeGen/TargetPassConfig.h"
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
 #include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/Constants.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/InstIterator.h"
+#include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Pass.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetMachine.h"
-#include <optional>
 
 using namespace llvm;
 
@@ -91,7 +94,7 @@ bool IndirectBrExpandPass::runOnFunction(Function &F) {
     return false;
   TLI = STI.getTargetLowering();
 
-  std::optional<DomTreeUpdater> DTU;
+  Optional<DomTreeUpdater> DTU;
   if (auto *DTWP = getAnalysisIfAvailable<DominatorTreeWrapperPass>())
     DTU.emplace(DTWP->getDomTree(), DomTreeUpdater::UpdateStrategy::Lazy);
 
@@ -199,7 +202,7 @@ bool IndirectBrExpandPass::runOnFunction(Function &F) {
       CommonITy = ITy;
   }
 
-  auto GetSwitchValue = [CommonITy](IndirectBrInst *IBr) {
+  auto GetSwitchValue = [DL, CommonITy](IndirectBrInst *IBr) {
     return CastInst::CreatePointerCast(
         IBr->getAddress(), CommonITy,
         Twine(IBr->getAddress()->getName()) + ".switch_cast", IBr);
@@ -257,12 +260,10 @@ bool IndirectBrExpandPass::runOnFunction(Function &F) {
   if (DTU) {
     // If there were multiple indirectbr's, they may have common successors,
     // but in the dominator tree, we only track unique edges.
-    SmallPtrSet<BasicBlock *, 8> UniqueSuccessors;
-    Updates.reserve(Updates.size() + BBs.size());
-    for (BasicBlock *BB : BBs) {
-      if (UniqueSuccessors.insert(BB).second)
-        Updates.push_back({DominatorTree::Insert, SwitchBB, BB});
-    }
+    SmallPtrSet<BasicBlock *, 8> UniqueSuccessors(BBs.begin(), BBs.end());
+    Updates.reserve(Updates.size() + UniqueSuccessors.size());
+    for (BasicBlock *BB : UniqueSuccessors)
+      Updates.push_back({DominatorTree::Insert, SwitchBB, BB});
     DTU->applyUpdates(Updates);
   }
 

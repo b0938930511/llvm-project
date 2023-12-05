@@ -18,13 +18,15 @@
 #include "ResourceScriptToken.h"
 
 #include "llvm/Support/Compiler.h"
-#include "llvm/Support/StringSaver.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <system_error>
 #include <vector>
 
 namespace llvm {
+namespace opt {
+class InputArgList;
+}
 namespace rc {
 
 class RCParser {
@@ -144,7 +146,6 @@ private:
   ParseType parseIconResource();
   ParseType parseHTMLResource();
   ParseType parseMenuResource();
-  ParseType parseMenuExResource();
   ParseType parseStringTableResource();
   ParseType parseUserDefinedResource(IntOrString Type);
   ParseType parseVersionInfoResource();
@@ -154,9 +155,6 @@ private:
 
   // Helper MENU parser.
   Expected<MenuDefinitionList> parseMenuItemsList();
-
-  // Helper MENUEX parser.
-  Expected<MenuDefinitionList> parseMenuExItemsList();
 
   // Helper VERSIONINFO parser - read the contents of a single BLOCK statement,
   // from BEGIN to END.
@@ -186,9 +184,6 @@ private:
   std::vector<RCToken> Tokens;
   LocIter CurLoc;
   const LocIter End;
-
-  BumpPtrAllocator Alloc;
-  StringSaver Saver{Alloc};
 };
 
 } // namespace rc

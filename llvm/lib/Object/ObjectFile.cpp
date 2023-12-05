@@ -21,9 +21,10 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/ErrorOr.h"
-#include "llvm/Support/Format.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <system_error>
@@ -54,15 +55,14 @@ bool SectionRef::containsSymbol(SymbolRef S) const {
 }
 
 Expected<uint64_t> ObjectFile::getSymbolValue(DataRefImpl Ref) const {
-  uint32_t Flags;
-  if (Error E = getSymbolFlags(Ref).moveInto(Flags))
+  if (Expected<uint32_t> FlagsOrErr = getSymbolFlags(Ref)) {
+    if (*FlagsOrErr & SymbolRef::SF_Undefined)
+      return 0;
+    if (*FlagsOrErr & SymbolRef::SF_Common)
+      return getCommonSymbolSize(Ref);
+  } else
     // TODO: Test this error.
-    return std::move(E);
-
-  if (Flags & SymbolRef::SF_Undefined)
-    return 0;
-  if (Flags & SymbolRef::SF_Common)
-    return getCommonSymbolSize(Ref);
+    return FlagsOrErr.takeError();
   return getSymbolValueImpl(Ref);
 }
 
@@ -79,7 +79,7 @@ uint32_t ObjectFile::getSymbolAlignment(DataRefImpl DRI) const { return 0; }
 bool ObjectFile::isSectionBitcode(DataRefImpl Sec) const {
   Expected<StringRef> NameOrErr = getSectionName(Sec);
   if (NameOrErr)
-    return *NameOrErr == ".llvm.lto";
+    return *NameOrErr == ".llvmbc";
   consumeError(NameOrErr.takeError());
   return false;
 }
@@ -95,11 +95,6 @@ bool ObjectFile::isBerkeleyData(DataRefImpl Sec) const {
 }
 
 bool ObjectFile::isDebugSection(DataRefImpl Sec) const { return false; }
-
-bool ObjectFile::hasDebugInfo() const {
-  return any_of(sections(),
-                [](SectionRef Sec) { return Sec.isDebugSection(); });
-}
 
 Expected<section_iterator>
 ObjectFile::getRelocatedSection(DataRefImpl Sec) const {
@@ -130,10 +125,6 @@ Triple ObjectFile::makeTriple() const {
     TheTriple.setOS(Triple::AIX);
     TheTriple.setObjectFormat(Triple::XCOFF);
   }
-  else if (isGOFF()) {
-    TheTriple.setOS(Triple::ZOS);
-    TheTriple.setObjectFormat(Triple::GOFF);
-  }
 
   return TheTriple;
 }
@@ -155,11 +146,6 @@ ObjectFile::createObjectFile(MemoryBufferRef Object, file_magic Type,
   case file_magic::pdb:
   case file_magic::minidump:
   case file_magic::goff_object:
-  case file_magic::cuda_fatbinary:
-  case file_magic::offload_binary:
-  case file_magic::dxcontainer_object:
-  case file_magic::offload_bundle:
-  case file_magic::offload_bundle_compressed:
     return errorCodeToError(object_error::invalid_file_type);
   case file_magic::tapi_file:
     return errorCodeToError(object_error::invalid_file_type);
@@ -180,7 +166,6 @@ ObjectFile::createObjectFile(MemoryBufferRef Object, file_magic Type,
   case file_magic::macho_dynamically_linked_shared_lib_stub:
   case file_magic::macho_dsym_companion:
   case file_magic::macho_kext_bundle:
-  case file_magic::macho_file_set:
     return createMachOObjectFile(Object);
   case file_magic::coff_object:
   case file_magic::coff_import_library:
@@ -211,13 +196,4 @@ ObjectFile::createObjectFile(StringRef ObjectPath) {
   std::unique_ptr<ObjectFile> Obj = std::move(ObjOrErr.get());
 
   return OwningBinary<ObjectFile>(std::move(Obj), std::move(Buffer));
-}
-
-bool ObjectFile::isReflectionSectionStrippable(
-    llvm::binaryformat::Swift5ReflectionSectionKind ReflectionSectionKind)
-    const {
-  using llvm::binaryformat::Swift5ReflectionSectionKind;
-  return ReflectionSectionKind == Swift5ReflectionSectionKind::fieldmd ||
-         ReflectionSectionKind == Swift5ReflectionSectionKind::reflstr ||
-         ReflectionSectionKind == Swift5ReflectionSectionKind::assocty;
 }

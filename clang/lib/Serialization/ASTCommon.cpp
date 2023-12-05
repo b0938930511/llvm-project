@@ -168,9 +168,6 @@ serialization::TypeIdxFromBuiltin(const BuiltinType *BT) {
   case BuiltinType::Float128:
     ID = PREDEF_TYPE_FLOAT128_ID;
     break;
-  case BuiltinType::Ibm128:
-    ID = PREDEF_TYPE_IBM128_ID;
-    break;
   case BuiltinType::NullPtr:
     ID = PREDEF_TYPE_NULLPTR_ID;
     break;
@@ -250,11 +247,6 @@ serialization::TypeIdxFromBuiltin(const BuiltinType *BT) {
     ID = PREDEF_TYPE_##Id##_ID;                                                \
     break;
 #include "clang/Basic/RISCVVTypes.def"
-#define WASM_TYPE(Name, Id, SingletonId)                                       \
-  case BuiltinType::Id:                                                        \
-    ID = PREDEF_TYPE_##Id##_ID;                                                \
-    break;
-#include "clang/Basic/WebAssemblyReferenceTypes.def"
   case BuiltinType::BuiltinFn:
     ID = PREDEF_TYPE_BUILTIN_FN;
     break;
@@ -396,7 +388,6 @@ bool serialization::isRedeclarableDeclKind(unsigned Kind) {
   case Decl::Field:
   case Decl::MSProperty:
   case Decl::MSGuid:
-  case Decl::UnnamedGlobalConstant:
   case Decl::TemplateParamObject:
   case Decl::ObjCIvar:
   case Decl::ObjCAtDefsField:
@@ -417,13 +408,13 @@ bool serialization::isRedeclarableDeclKind(unsigned Kind) {
   case Decl::PragmaComment:
   case Decl::PragmaDetectMismatch:
   case Decl::FileScopeAsm:
-  case Decl::TopLevelStmt:
   case Decl::AccessSpec:
   case Decl::Friend:
   case Decl::FriendTemplate:
   case Decl::StaticAssert:
   case Decl::Block:
   case Decl::Captured:
+  case Decl::ClassScopeFunctionSpecialization:
   case Decl::Import:
   case Decl::OMPThreadPrivate:
   case Decl::OMPAllocate:
@@ -435,11 +426,9 @@ bool serialization::isRedeclarableDeclKind(unsigned Kind) {
   case Decl::Decomposition:
   case Decl::Binding:
   case Decl::Concept:
-  case Decl::ImplicitConceptSpecialization:
   case Decl::LifetimeExtendedTemporary:
   case Decl::RequiresExprBody:
   case Decl::UnresolvedUsingIfExists:
-  case Decl::HLSLBuffer:
     return false;
 
   // These indirectly derive from Redeclarable<T> but are not actually
@@ -479,14 +468,13 @@ bool serialization::needsAnonymousDeclarationNumber(const NamedDecl *D) {
     if (auto *VD = dyn_cast<VarDecl>(D))
       return VD->isStaticLocal();
     // FIXME: What about CapturedDecls (and declarations nested within them)?
-    return isa<TagDecl, BlockDecl>(D);
+    return isa<TagDecl>(D) || isa<BlockDecl>(D);
   }
 
   // Otherwise, we only care about anonymous class members / block-scope decls.
-  // FIXME: We need to handle blocks within inline / templated variables too.
-  if (D->getDeclName())
+  // FIXME: We need to handle lambdas and blocks within inline / templated
+  // variables too.
+  if (D->getDeclName() || !isa<CXXRecordDecl>(D->getLexicalDeclContext()))
     return false;
-  if (!isa<RecordDecl, ObjCInterfaceDecl>(D->getLexicalDeclContext()))
-    return false;
-  return isa<TagDecl, FieldDecl>(D);
+  return isa<TagDecl>(D) || isa<FieldDecl>(D);
 }

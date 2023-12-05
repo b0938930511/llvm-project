@@ -5,10 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-//
-// Coding style: https://mlir.llvm.org/getting_started/DeveloperGuide/
-//
-//===----------------------------------------------------------------------===//
 
 #include "flang/Frontend/TextDiagnostic.h"
 #include "clang/Basic/DiagnosticOptions.h"
@@ -34,10 +30,8 @@ TextDiagnostic::TextDiagnostic() {}
 
 TextDiagnostic::~TextDiagnostic() {}
 
-/*static*/ void
-TextDiagnostic::printDiagnosticLevel(llvm::raw_ostream &os,
-                                     clang::DiagnosticsEngine::Level level,
-                                     bool showColors) {
+/*static*/ void TextDiagnostic::PrintDiagnosticLevel(llvm::raw_ostream &os,
+    clang::DiagnosticsEngine::Level level, bool showColors) {
   if (showColors) {
     // Print diagnostic category in bold and color
     switch (level) {
@@ -88,10 +82,8 @@ TextDiagnostic::printDiagnosticLevel(llvm::raw_ostream &os,
 }
 
 /*static*/
-void TextDiagnostic::printDiagnosticMessage(llvm::raw_ostream &os,
-                                            bool isSupplemental,
-                                            llvm::StringRef message,
-                                            bool showColors) {
+void TextDiagnostic::PrintDiagnosticMessage(llvm::raw_ostream &os,
+    bool isSupplemental, llvm::StringRef message, bool showColors) {
   if (showColors && !isSupplemental) {
     // Print primary diagnostic messages in bold and without color.
     os.changeColor(savedColor, true);

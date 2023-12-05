@@ -10,13 +10,9 @@
 /// Defines the flang::FrontendAction interface.
 ///
 //===----------------------------------------------------------------------===//
-//
-// Coding style: https://mlir.llvm.org/getting_started/DeveloperGuide/
-//
-//===----------------------------------------------------------------------===//
 
-#ifndef FORTRAN_FRONTEND_FRONTENDACTION_H
-#define FORTRAN_FRONTEND_FRONTENDACTION_H
+#ifndef LLVM_FLANG_FRONTEND_FRONTENDACTION_H
+#define LLVM_FLANG_FRONTEND_FRONTENDACTION_H
 
 #include "flang/Frontend/FrontendOptions.h"
 #include "llvm/Support/Error.h"
@@ -26,8 +22,8 @@ class CompilerInstance;
 
 /// Abstract base class for actions which can be performed by the frontend.
 class FrontendAction {
-  FrontendInputFile currentInput;
-  CompilerInstance *instance;
+  FrontendInputFile currentInput_;
+  CompilerInstance *instance_;
 
 protected:
   /// @name Implementation Action Interface
@@ -35,54 +31,54 @@ protected:
 
   /// Callback to run the program action, using the initialized
   /// compiler instance.
-  virtual void executeAction() = 0;
+  virtual void ExecuteAction() = 0;
 
   /// Callback at the end of processing a single input, to determine
   /// if the output files should be erased or not.
   ///
   /// By default it returns true if a compiler error occurred.
-  virtual bool shouldEraseOutputFiles();
+  virtual bool ShouldEraseOutputFiles();
 
   /// Callback at the start of processing a single input.
   ///
   /// \return True on success; on failure ExecutionAction() and
   /// EndSourceFileAction() will not be called.
-  virtual bool beginSourceFileAction() { return true; }
+  virtual bool BeginSourceFileAction(CompilerInstance &ci) { return true; }
 
   /// @}
 
 public:
-  FrontendAction() : instance(nullptr) {}
+  FrontendAction() : instance_(nullptr) {}
   virtual ~FrontendAction() = default;
 
   /// @name Compiler Instance Access
   /// @{
 
-  CompilerInstance &getInstance() const {
-    assert(instance && "Compiler instance not registered!");
-    return *instance;
+  CompilerInstance &instance() const {
+    assert(instance_ && "Compiler instance not registered!");
+    return *instance_;
   }
 
-  void setInstance(CompilerInstance *value) { instance = value; }
+  void set_instance(CompilerInstance *value) { instance_ = value; }
 
   /// @}
   /// @name Current File Information
   /// @{
 
-  const FrontendInputFile &getCurrentInput() const { return currentInput; }
+  const FrontendInputFile &currentInput() const { return currentInput_; }
 
-  llvm::StringRef getCurrentFile() const {
-    assert(!currentInput.isEmpty() && "No current file!");
-    return currentInput.getFile();
+  llvm::StringRef GetCurrentFile() const {
+    assert(!currentInput_.IsEmpty() && "No current file!");
+    return currentInput_.file();
   }
 
-  llvm::StringRef getCurrentFileOrBufferName() const {
-    assert(!currentInput.isEmpty() && "No current file!");
-    return currentInput.isFile()
-               ? currentInput.getFile()
-               : currentInput.getBuffer()->getBufferIdentifier();
+  llvm::StringRef GetCurrentFileOrBufferName() const {
+    assert(!currentInput_.IsEmpty() && "No current file!");
+    return currentInput_.IsFile()
+        ? currentInput_.file()
+        : currentInput_.buffer()->getBufferIdentifier();
   }
-  void setCurrentInput(const FrontendInputFile &currentIntput);
+  void set_currentInput(const FrontendInputFile &currentInput);
 
   /// @}
   /// @name Public Action Interface
@@ -96,49 +92,16 @@ public:
   /// action may store and use this object.
   /// \param input - The input filename and kind.
   /// \return True on success; on failure the compilation of this file should
-  bool beginSourceFile(CompilerInstance &ci, const FrontendInputFile &input);
+  bool BeginSourceFile(CompilerInstance &ci, const FrontendInputFile &input);
 
   /// Run the action.
-  llvm::Error execute();
+  llvm::Error Execute();
 
   /// Perform any per-file post processing, deallocate per-file
   /// objects, and run statistics and output file cleanup code.
-  void endSourceFile();
-
-  /// @}
-protected:
-  // Prescan the current input file. Return False if fatal errors are reported,
-  // True otherwise.
-  bool runPrescan();
-  // Parse the current input file. Return False if fatal errors are reported,
-  // True otherwise.
-  bool runParse();
-  // Run semantic checks for the current input file. Return False if fatal
-  // errors are reported, True otherwise.
-  bool runSemanticChecks();
-  // Generate run-time type information for derived types. This may lead to new
-  // semantic errors. Return False if fatal errors are reported, True
-  // otherwise.
-  bool generateRtTypeTables();
-
-  // Report fatal semantic errors. Return True if present, false otherwise.
-  bool reportFatalSemanticErrors();
-
-  // Report fatal scanning errors. Return True if present, false otherwise.
-  inline bool reportFatalScanningErrors() {
-    return reportFatalErrors("Could not scan %0");
-  }
-
-  // Report fatal parsing errors. Return True if present, false otherwise
-  inline bool reportFatalParsingErrors() {
-    return reportFatalErrors("Could not parse %0");
-  }
-
-private:
-  template <unsigned N>
-  bool reportFatalErrors(const char (&message)[N]);
+  void EndSourceFile();
 };
 
 } // namespace Fortran::frontend
 
-#endif // FORTRAN_FRONTEND_FRONTENDACTION_H
+#endif // LLVM_FLANG_FRONTEND_FRONTENDACTION_H

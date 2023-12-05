@@ -1,4 +1,4 @@
-//===----------------------------------------------------------------------===//
+//===------------------------- future.cpp ---------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,8 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <future>
-#include <string>
+#include "__config"
+
+#ifndef _LIBCPP_HAS_NO_THREADS
+
+#include "future"
+#include "string"
 
 _LIBCPP_BEGIN_NAMESPACE_STD
 
@@ -25,9 +29,13 @@ __future_error_category::name() const noexcept
     return "future";
 }
 
-_LIBCPP_DIAGNOSTIC_PUSH
-_LIBCPP_CLANG_DIAGNOSTIC_IGNORED("-Wswitch")
-_LIBCPP_GCC_DIAGNOSTIC_IGNORED("-Wswitch")
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wswitch"
+#elif defined(__GNUC__) || defined(__GNUG__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch"
+#endif
 
 string
 __future_error_category::message(int ev) const
@@ -50,18 +58,17 @@ __future_error_category::message(int ev) const
     return string("unspecified future_errc value\n");
 }
 
-_LIBCPP_DIAGNOSTIC_POP
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#elif defined(__GNUC__) || defined(__GNUG__)
+#pragma GCC diagnostic pop
+#endif
 
 const error_category&
 future_category() noexcept
 {
-    union AvoidDestroyingFutureCategory {
-        __future_error_category future_error_category;
-        constexpr explicit AvoidDestroyingFutureCategory() : future_error_category() {}
-        ~AvoidDestroyingFutureCategory() {}
-    };
-    constinit static AvoidDestroyingFutureCategory helper;
-    return helper.future_error_category;
+    static __future_error_category __f;
+    return __f;
 }
 
 future_error::future_error(error_code __ec)
@@ -198,10 +205,12 @@ promise<void>::~promise()
 {
     if (__state_)
     {
-#ifndef _LIBCPP_HAS_NO_EXCEPTIONS
+#ifndef _LIBCPP_NO_EXCEPTIONS
         if (!__state_->__has_value() && __state_->use_count() > 1)
-            __state_->set_exception(make_exception_ptr(future_error(future_errc::broken_promise)));
-#endif // _LIBCPP_HAS_NO_EXCEPTIONS
+            __state_->set_exception(make_exception_ptr(
+                      future_error(make_error_code(future_errc::broken_promise))
+                                                      ));
+#endif // _LIBCPP_NO_EXCEPTIONS
         __state_->__release_shared();
     }
 }
@@ -264,3 +273,5 @@ shared_future<void>::operator=(const shared_future& __rhs)
 }
 
 _LIBCPP_END_NAMESPACE_STD
+
+#endif // !_LIBCPP_HAS_NO_THREADS

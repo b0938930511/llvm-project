@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Support/ToolOutputFile.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Signals.h"
 using namespace llvm;
@@ -46,7 +47,7 @@ ToolOutputFile::ToolOutputFile(StringRef Filename, std::error_code &EC,
     return;
   }
   OSHolder.emplace(Filename, EC, Flags);
-  OS = &*OSHolder;
+  OS = OSHolder.getPointer();
   // If open fails, no cleanup is needed.
   if (EC)
     Installer.Keep = true;
@@ -55,5 +56,5 @@ ToolOutputFile::ToolOutputFile(StringRef Filename, std::error_code &EC,
 ToolOutputFile::ToolOutputFile(StringRef Filename, int FD)
     : Installer(Filename) {
   OSHolder.emplace(FD, true);
-  OS = &*OSHolder;
+  OS = OSHolder.getPointer();
 }

@@ -18,10 +18,10 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/None.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/iterator.h"
 #include "llvm/ADT/iterator_range.h"
-#include "llvm/Object/BuildID.h"
 #include "llvm/ProfileData/InstrProf.h"
 #include "llvm/Support/Alignment.h"
 #include "llvm/Support/Compiler.h"
@@ -42,14 +42,6 @@
 namespace llvm {
 
 class IndexedInstrProfReader;
-
-namespace object {
-class BuildIDFetcher;
-} // namespace object
-
-namespace vfs {
-class FileSystem;
-} // namespace vfs
 
 namespace coverage {
 
@@ -75,8 +67,7 @@ inline std::error_code make_error_code(coveragemap_error E) {
 
 class CoverageMapError : public ErrorInfo<CoverageMapError> {
 public:
-  CoverageMapError(coveragemap_error Err, const Twine &ErrStr = Twine())
-      : Err(Err), Msg(ErrStr.str()) {
+  CoverageMapError(coveragemap_error Err) : Err(Err) {
     assert(Err != coveragemap_error::success && "Not an error");
   }
 
@@ -89,13 +80,11 @@ public:
   }
 
   coveragemap_error get() const { return Err; }
-  const std::string &getMessage() const { return Msg; }
 
   static char ID;
 
 private:
   coveragemap_error Err;
-  std::string Msg;
 };
 
 /// A Counter is an abstract value that describes how to compute the
@@ -206,11 +195,11 @@ public:
   ArrayRef<CounterExpression> getExpressions() const { return Expressions; }
 
   /// Return a counter that represents the expression that adds LHS and RHS.
-  Counter add(Counter LHS, Counter RHS, bool Simplify = true);
+  Counter add(Counter LHS, Counter RHS);
 
   /// Return a counter that represents the expression that subtracts RHS from
   /// LHS.
-  Counter subtract(Counter LHS, Counter RHS, bool Simplify = true);
+  Counter subtract(Counter LHS, Counter RHS);
 };
 
 using LineColPair = std::pair<unsigned, unsigned>;
@@ -334,7 +323,7 @@ class CounterMappingContext {
 
 public:
   CounterMappingContext(ArrayRef<CounterExpression> Expressions,
-                        ArrayRef<uint64_t> CounterValues = std::nullopt)
+                        ArrayRef<uint64_t> CounterValues = None)
       : Expressions(Expressions), CounterValues(CounterValues) {}
 
   void setCounts(ArrayRef<uint64_t> Counts) { CounterValues = Counts; }
@@ -591,13 +580,6 @@ class CoverageMapping {
       ArrayRef<std::unique_ptr<CoverageMappingReader>> CoverageReaders,
       IndexedInstrProfReader &ProfileReader, CoverageMapping &Coverage);
 
-  // Load coverage records from file.
-  static Error
-  loadFromFile(StringRef Filename, StringRef Arch, StringRef CompilationDir,
-               IndexedInstrProfReader &ProfileReader, CoverageMapping &Coverage,
-               bool &DataFound,
-               SmallVectorImpl<object::BuildID> *FoundBinaryIDs = nullptr);
-
   /// Add a function record corresponding to \p Record.
   Error loadFunctionRecord(const CoverageMappingRecord &Record,
                            IndexedInstrProfReader &ProfileReader);
@@ -623,10 +605,7 @@ public:
   /// Ignores non-instrumented object files unless all are not instrumented.
   static Expected<std::unique_ptr<CoverageMapping>>
   load(ArrayRef<StringRef> ObjectFilenames, StringRef ProfileFilename,
-       vfs::FileSystem &FS, ArrayRef<StringRef> Arches = std::nullopt,
-       StringRef CompilationDir = "",
-       const object::BuildIDFetcher *BIDFetcher = nullptr,
-       bool CheckBinaryIDs = false);
+       ArrayRef<StringRef> Arches = None, StringRef CompilationDir = "");
 
   /// The number of functions that couldn't have their profiles mapped.
   ///
@@ -714,16 +693,15 @@ public:
 /// An iterator over the \c LineCoverageStats objects for lines described by
 /// a \c CoverageData instance.
 class LineCoverageIterator
-    : public iterator_facade_base<LineCoverageIterator,
-                                  std::forward_iterator_tag,
-                                  const LineCoverageStats> {
+    : public iterator_facade_base<
+          LineCoverageIterator, std::forward_iterator_tag, LineCoverageStats> {
 public:
   LineCoverageIterator(const CoverageData &CD)
       : LineCoverageIterator(CD, CD.begin()->Line) {}
 
   LineCoverageIterator(const CoverageData &CD, unsigned Line)
       : CD(CD), WrappedSegment(nullptr), Next(CD.begin()), Ended(false),
-        Line(Line) {
+        Line(Line), Segments(), Stats() {
     this->operator++();
   }
 
@@ -732,6 +710,8 @@ public:
   }
 
   const LineCoverageStats &operator*() const { return Stats; }
+
+  LineCoverageStats &operator*() { return Stats; }
 
   LineCoverageIterator &operator++();
 
@@ -790,37 +770,37 @@ getLineCoverageStats(const coverage::CoverageData &CD) {
 namespace accessors {
 
 /// Return the structural hash associated with the function.
-template <class FuncRecordTy, llvm::endianness Endian>
+template <class FuncRecordTy, support::endianness Endian>
 uint64_t getFuncHash(const FuncRecordTy *Record) {
   return support::endian::byte_swap<uint64_t, Endian>(Record->FuncHash);
 }
 
 /// Return the coverage map data size for the function.
-template <class FuncRecordTy, llvm::endianness Endian>
+template <class FuncRecordTy, support::endianness Endian>
 uint64_t getDataSize(const FuncRecordTy *Record) {
   return support::endian::byte_swap<uint32_t, Endian>(Record->DataSize);
 }
 
 /// Return the function lookup key. The value is considered opaque.
-template <class FuncRecordTy, llvm::endianness Endian>
+template <class FuncRecordTy, support::endianness Endian>
 uint64_t getFuncNameRef(const FuncRecordTy *Record) {
   return support::endian::byte_swap<uint64_t, Endian>(Record->NameRef);
 }
 
 /// Return the PGO name of the function. Used for formats in which the name is
 /// a hash.
-template <class FuncRecordTy, llvm::endianness Endian>
+template <class FuncRecordTy, support::endianness Endian>
 Error getFuncNameViaRef(const FuncRecordTy *Record,
                         InstrProfSymtab &ProfileNames, StringRef &FuncName) {
   uint64_t NameRef = getFuncNameRef<FuncRecordTy, Endian>(Record);
-  FuncName = ProfileNames.getFuncOrVarName(NameRef);
+  FuncName = ProfileNames.getFuncName(NameRef);
   return Error::success();
 }
 
 /// Read coverage mapping out-of-line, from \p MappingBuf. This is used when the
 /// coverage mapping is attached to the file header, instead of to the function
 /// record.
-template <class FuncRecordTy, llvm::endianness Endian>
+template <class FuncRecordTy, support::endianness Endian>
 StringRef getCoverageMappingOutOfLine(const FuncRecordTy *Record,
                                       const char *MappingBuf) {
   return {MappingBuf, size_t(getDataSize<FuncRecordTy, Endian>(Record))};
@@ -828,7 +808,7 @@ StringRef getCoverageMappingOutOfLine(const FuncRecordTy *Record,
 
 /// Advance to the next out-of-line coverage mapping and its associated
 /// function record.
-template <class FuncRecordTy, llvm::endianness Endian>
+template <class FuncRecordTy, support::endianness Endian>
 std::pair<const char *, const FuncRecordTy *>
 advanceByOneOutOfLine(const FuncRecordTy *Record, const char *MappingBuf) {
   return {MappingBuf + getDataSize<FuncRecordTy, Endian>(Record), Record + 1};
@@ -847,42 +827,41 @@ struct CovMapFunctionRecordV1 {
 #undef COVMAP_V1
   CovMapFunctionRecordV1() = delete;
 
-  template <llvm::endianness Endian> uint64_t getFuncHash() const {
+  template <support::endianness Endian> uint64_t getFuncHash() const {
     return accessors::getFuncHash<ThisT, Endian>(this);
   }
 
-  template <llvm::endianness Endian> uint64_t getDataSize() const {
+  template <support::endianness Endian> uint64_t getDataSize() const {
     return accessors::getDataSize<ThisT, Endian>(this);
   }
 
   /// Return function lookup key. The value is consider opaque.
-  template <llvm::endianness Endian> IntPtrT getFuncNameRef() const {
+  template <support::endianness Endian> IntPtrT getFuncNameRef() const {
     return support::endian::byte_swap<IntPtrT, Endian>(NamePtr);
   }
 
   /// Return the PGO name of the function.
-  template <llvm::endianness Endian>
+  template <support::endianness Endian>
   Error getFuncName(InstrProfSymtab &ProfileNames, StringRef &FuncName) const {
     IntPtrT NameRef = getFuncNameRef<Endian>();
     uint32_t NameS = support::endian::byte_swap<uint32_t, Endian>(NameSize);
     FuncName = ProfileNames.getFuncName(NameRef, NameS);
     if (NameS && FuncName.empty())
-      return make_error<CoverageMapError>(coveragemap_error::malformed,
-                                          "function name is empty");
+      return make_error<CoverageMapError>(coveragemap_error::malformed);
     return Error::success();
   }
 
-  template <llvm::endianness Endian>
+  template <support::endianness Endian>
   std::pair<const char *, const ThisT *>
   advanceByOne(const char *MappingBuf) const {
     return accessors::advanceByOneOutOfLine<ThisT, Endian>(this, MappingBuf);
   }
 
-  template <llvm::endianness Endian> uint64_t getFilenamesRef() const {
+  template <support::endianness Endian> uint64_t getFilenamesRef() const {
     llvm_unreachable("V1 function format does not contain a filenames ref");
   }
 
-  template <llvm::endianness Endian>
+  template <support::endianness Endian>
   StringRef getCoverageMapping(const char *MappingBuf) const {
     return accessors::getCoverageMappingOutOfLine<ThisT, Endian>(this,
                                                                  MappingBuf);
@@ -898,35 +877,35 @@ struct CovMapFunctionRecordV2 {
 #undef COVMAP_V2
   CovMapFunctionRecordV2() = delete;
 
-  template <llvm::endianness Endian> uint64_t getFuncHash() const {
+  template <support::endianness Endian> uint64_t getFuncHash() const {
     return accessors::getFuncHash<ThisT, Endian>(this);
   }
 
-  template <llvm::endianness Endian> uint64_t getDataSize() const {
+  template <support::endianness Endian> uint64_t getDataSize() const {
     return accessors::getDataSize<ThisT, Endian>(this);
   }
 
-  template <llvm::endianness Endian> uint64_t getFuncNameRef() const {
+  template <support::endianness Endian> uint64_t getFuncNameRef() const {
     return accessors::getFuncNameRef<ThisT, Endian>(this);
   }
 
-  template <llvm::endianness Endian>
+  template <support::endianness Endian>
   Error getFuncName(InstrProfSymtab &ProfileNames, StringRef &FuncName) const {
     return accessors::getFuncNameViaRef<ThisT, Endian>(this, ProfileNames,
                                                        FuncName);
   }
 
-  template <llvm::endianness Endian>
+  template <support::endianness Endian>
   std::pair<const char *, const ThisT *>
   advanceByOne(const char *MappingBuf) const {
     return accessors::advanceByOneOutOfLine<ThisT, Endian>(this, MappingBuf);
   }
 
-  template <llvm::endianness Endian> uint64_t getFilenamesRef() const {
+  template <support::endianness Endian> uint64_t getFilenamesRef() const {
     llvm_unreachable("V2 function format does not contain a filenames ref");
   }
 
-  template <llvm::endianness Endian>
+  template <support::endianness Endian>
   StringRef getCoverageMapping(const char *MappingBuf) const {
     return accessors::getCoverageMappingOutOfLine<ThisT, Endian>(this,
                                                                  MappingBuf);
@@ -942,39 +921,39 @@ struct CovMapFunctionRecordV3 {
 #undef COVMAP_V3
   CovMapFunctionRecordV3() = delete;
 
-  template <llvm::endianness Endian> uint64_t getFuncHash() const {
+  template <support::endianness Endian> uint64_t getFuncHash() const {
     return accessors::getFuncHash<ThisT, Endian>(this);
   }
 
-  template <llvm::endianness Endian> uint64_t getDataSize() const {
+  template <support::endianness Endian> uint64_t getDataSize() const {
     return accessors::getDataSize<ThisT, Endian>(this);
   }
 
-  template <llvm::endianness Endian> uint64_t getFuncNameRef() const {
+  template <support::endianness Endian> uint64_t getFuncNameRef() const {
     return accessors::getFuncNameRef<ThisT, Endian>(this);
   }
 
-  template <llvm::endianness Endian>
+  template <support::endianness Endian>
   Error getFuncName(InstrProfSymtab &ProfileNames, StringRef &FuncName) const {
     return accessors::getFuncNameViaRef<ThisT, Endian>(this, ProfileNames,
                                                        FuncName);
   }
 
   /// Get the filename set reference.
-  template <llvm::endianness Endian> uint64_t getFilenamesRef() const {
+  template <support::endianness Endian> uint64_t getFilenamesRef() const {
     return support::endian::byte_swap<uint64_t, Endian>(FilenamesRef);
   }
 
   /// Read the inline coverage mapping. Ignore the buffer parameter, it is for
   /// out-of-line coverage mapping data only.
-  template <llvm::endianness Endian>
+  template <support::endianness Endian>
   StringRef getCoverageMapping(const char *) const {
     return StringRef(&CoverageMapping, getDataSize<Endian>());
   }
 
   // Advance to the next inline coverage mapping and its associated function
   // record. Ignore the out-of-line coverage mapping buffer.
-  template <llvm::endianness Endian>
+  template <support::endianness Endian>
   std::pair<const char *, const CovMapFunctionRecordV3 *>
   advanceByOne(const char *) const {
     assert(isAddrAligned(Align(8), this) && "Function record not aligned");
@@ -992,19 +971,19 @@ struct CovMapFunctionRecordV3 {
 struct CovMapHeader {
 #define COVMAP_HEADER(Type, LLVMType, Name, Init) Type Name;
 #include "llvm/ProfileData/InstrProfData.inc"
-  template <llvm::endianness Endian> uint32_t getNRecords() const {
+  template <support::endianness Endian> uint32_t getNRecords() const {
     return support::endian::byte_swap<uint32_t, Endian>(NRecords);
   }
 
-  template <llvm::endianness Endian> uint32_t getFilenamesSize() const {
+  template <support::endianness Endian> uint32_t getFilenamesSize() const {
     return support::endian::byte_swap<uint32_t, Endian>(FilenamesSize);
   }
 
-  template <llvm::endianness Endian> uint32_t getCoverageSize() const {
+  template <support::endianness Endian> uint32_t getCoverageSize() const {
     return support::endian::byte_swap<uint32_t, Endian>(CoverageSize);
   }
 
-  template <llvm::endianness Endian> uint32_t getVersion() const {
+  template <support::endianness Endian> uint32_t getVersion() const {
     return support::endian::byte_swap<uint32_t, Endian>(Version);
   }
 };
@@ -1027,24 +1006,8 @@ enum CovMapVersion {
   // Compilation directory is stored separately and combined with relative
   // filenames to produce an absolute file path.
   Version6 = 5,
-  // Branch regions extended and Decision Regions added for MC/DC.
-  Version7 = 6,
-  // The current version is Version7.
+  // The current version is Version6.
   CurrentVersion = INSTR_PROF_COVMAP_VERSION
-};
-
-// Correspond to "llvmcovm", in little-endian.
-constexpr uint64_t TestingFormatMagic = 0x6d766f636d766c6c;
-
-enum class TestingFormatVersion : uint64_t {
-  // The first version's number corresponds to the string "testdata" in
-  // little-endian. This is for a historical reason.
-  Version1 = 0x6174616474736574,
-  // Version1 has a defect that it can't store multiple file records. Version2
-  // fix this problem by adding a new field before the file records section.
-  Version2 = 1,
-  // The current testing format version is Version2.
-  CurrentVersion = Version2
 };
 
 template <int CovMapVersion, class IntPtrT> struct CovMapTraits {

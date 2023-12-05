@@ -1,4 +1,4 @@
-int f(void) {
+int f() {
   int zzz = 200;
   zzz += 100;
   return 0;

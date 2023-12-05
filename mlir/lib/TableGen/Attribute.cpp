@@ -31,6 +31,12 @@ static StringRef getValueAsString(const Init *init) {
   return {};
 }
 
+AttrConstraint::AttrConstraint(const Record *record)
+    : Constraint(Constraint::CK_Attr, record) {
+  assert(isSubClassOf("AttrConstraint") &&
+         "must be subclass of TableGen 'AttrConstraint' class");
+}
+
 bool AttrConstraint::isSubClassOf(StringRef className) const {
   return def->isSubClassOf(className);
 }
@@ -59,7 +65,7 @@ StringRef Attribute::getStorageType() const {
   const auto *init = def->getValueInit("storageType");
   auto type = getValueAsString(init);
   if (type.empty())
-    return "::mlir::Attribute";
+    return "Attribute";
   return type;
 }
 
@@ -69,11 +75,11 @@ StringRef Attribute::getReturnType() const {
 }
 
 // Return the type constraint corresponding to the type of this attribute, or
-// std::nullopt if this is not a TypedAttr.
-std::optional<Type> Attribute::getValueType() const {
+// None if this is not a TypedAttr.
+llvm::Optional<Type> Attribute::getValueType() const {
   if (auto *defInit = dyn_cast<llvm::DefInit>(def->getValueInit("valueType")))
     return Type(defInit->getDef());
-  return std::nullopt;
+  return llvm::None;
 }
 
 StringRef Attribute::getConvertFromStorageCall() const {
@@ -132,8 +138,6 @@ Dialect Attribute::getDialect() const {
   return Dialect(nullptr);
 }
 
-const llvm::Record &Attribute::getDef() const { return *def; }
-
 ConstantAttr::ConstantAttr(const DefInit *init) : def(init->getDef()) {
   assert(def->isSubClassOf("ConstantAttr") &&
          "must be subclass of TableGen 'ConstantAttr' class");
@@ -154,6 +158,8 @@ EnumAttrCase::EnumAttrCase(const llvm::Record *record) : Attribute(record) {
 
 EnumAttrCase::EnumAttrCase(const llvm::DefInit *init)
     : EnumAttrCase(init->getDef()) {}
+
+bool EnumAttrCase::isStrCase() const { return isSubClassOf("StrEnumAttrCase"); }
 
 StringRef EnumAttrCase::getSymbol() const {
   return def->getValueAsString("symbol");
@@ -219,7 +225,7 @@ std::vector<EnumAttrCase> EnumAttr::getAllCases() const {
   cases.reserve(inits->size());
 
   for (const llvm::Init *init : *inits) {
-    cases.emplace_back(cast<llvm::DefInit>(init));
+    cases.push_back(EnumAttrCase(cast<llvm::DefInit>(init)));
   }
 
   return cases;
@@ -237,8 +243,54 @@ StringRef EnumAttr::getSpecializedAttrClassName() const {
   return def->getValueAsString("specializedAttrClassName");
 }
 
-bool EnumAttr::printBitEnumPrimaryGroups() const {
-  return def->getValueAsBit("printBitEnumPrimaryGroups");
+StructFieldAttr::StructFieldAttr(const llvm::Record *record) : def(record) {
+  assert(def->isSubClassOf("StructFieldAttr") &&
+         "must be subclass of TableGen 'StructFieldAttr' class");
+}
+
+StructFieldAttr::StructFieldAttr(const llvm::Record &record)
+    : StructFieldAttr(&record) {}
+
+StructFieldAttr::StructFieldAttr(const llvm::DefInit *init)
+    : StructFieldAttr(init->getDef()) {}
+
+StringRef StructFieldAttr::getName() const {
+  return def->getValueAsString("name");
+}
+
+Attribute StructFieldAttr::getType() const {
+  auto init = def->getValueInit("type");
+  return Attribute(cast<llvm::DefInit>(init));
+}
+
+StructAttr::StructAttr(const llvm::Record *record) : Attribute(record) {
+  assert(isSubClassOf("StructAttr") &&
+         "must be subclass of TableGen 'StructAttr' class");
+}
+
+StructAttr::StructAttr(const llvm::DefInit *init)
+    : StructAttr(init->getDef()) {}
+
+StringRef StructAttr::getStructClassName() const {
+  return def->getValueAsString("className");
+}
+
+StringRef StructAttr::getCppNamespace() const {
+  Dialect dialect(def->getValueAsDef("dialect"));
+  return dialect.getCppNamespace();
+}
+
+std::vector<StructFieldAttr> StructAttr::getAllFields() const {
+  std::vector<StructFieldAttr> attributes;
+
+  const auto *inits = def->getValueAsListInit("fields");
+  attributes.reserve(inits->size());
+
+  for (const llvm::Init *init : *inits) {
+    attributes.emplace_back(cast<llvm::DefInit>(init));
+  }
+
+  return attributes;
 }
 
 const char * ::mlir::tblgen::inferTypeOpInterface = "InferTypeOpInterface";

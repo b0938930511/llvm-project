@@ -14,7 +14,7 @@ entry-block:
 ; CHECK: ldi    [[RET:r[0-9]+]], 1
 ; CHECK: cpi    {{.*}}[[HIGH]], 0
 ; CHECK: brne   [[LABEL:.LBB[_0-9]+]]
-; CHECK: mov    {{.*}}[[RET]], r1
+; CHECK: ldi    {{.*}}[[RET]], 0
 ; CHECK: {{.*}}[[LABEL]]
 ; CHECK: ret
 }

@@ -24,7 +24,7 @@ __attribute__((weak_import))
 + message;
 @end
 
-int main(void) {
+int main() {
      [WeakClass3 message];
 }
 

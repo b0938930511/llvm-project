@@ -23,7 +23,7 @@ typedef struct {
   int i1, i2;
 } NSRect;
 
-NSRect NSMakeRect(void);
+NSRect NSMakeRect();
 
 @interface NSWindow 
 {

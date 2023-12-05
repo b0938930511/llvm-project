@@ -45,7 +45,6 @@ SwitchCG::getJumpTableNumCases(const SmallVectorImpl<unsigned> &TotalCases,
 
 void SwitchCG::SwitchLowering::findJumpTables(CaseClusterVector &Clusters,
                                               const SwitchInst *SI,
-                                              std::optional<SDLoc> SL,
                                               MachineBasicBlock *DefaultMBB,
                                               ProfileSummaryInfo *PSI,
                                               BlockFrequencyInfo *BFI) {
@@ -88,7 +87,7 @@ void SwitchCG::SwitchLowering::findJumpTables(CaseClusterVector &Clusters,
   // Cheap case: the whole range may be suitable for jump table.
   if (TLI->isSuitableForJumpTable(SI, NumCases, Range, PSI, BFI)) {
     CaseCluster JTCluster;
-    if (buildJumpTable(Clusters, 0, N - 1, SI, SL, DefaultMBB, JTCluster)) {
+    if (buildJumpTable(Clusters, 0, N - 1, SI, DefaultMBB, JTCluster)) {
       Clusters[0] = JTCluster;
       Clusters.resize(1);
       return;
@@ -96,7 +95,7 @@ void SwitchCG::SwitchLowering::findJumpTables(CaseClusterVector &Clusters,
   }
 
   // The algorithm below is not suitable for -O0.
-  if (TM->getOptLevel() == CodeGenOptLevel::None)
+  if (TM->getOptLevel() == CodeGenOpt::None)
     return;
 
   // Split Clusters into minimum number of dense partitions. The algorithm uses
@@ -178,7 +177,7 @@ void SwitchCG::SwitchLowering::findJumpTables(CaseClusterVector &Clusters,
 
     CaseCluster JTCluster;
     if (NumClusters >= MinJumpTableEntries &&
-        buildJumpTable(Clusters, First, Last, SI, SL, DefaultMBB, JTCluster)) {
+        buildJumpTable(Clusters, First, Last, SI, DefaultMBB, JTCluster)) {
       Clusters[DstIndex++] = JTCluster;
     } else {
       for (unsigned I = First; I <= Last; ++I)
@@ -191,7 +190,6 @@ void SwitchCG::SwitchLowering::findJumpTables(CaseClusterVector &Clusters,
 bool SwitchCG::SwitchLowering::buildJumpTable(const CaseClusterVector &Clusters,
                                               unsigned First, unsigned Last,
                                               const SwitchInst *SI,
-                                              const std::optional<SDLoc> &SL,
                                               MachineBasicBlock *DefaultMBB,
                                               CaseCluster &JTCluster) {
   assert(First <= Last);
@@ -253,7 +251,7 @@ bool SwitchCG::SwitchLowering::buildJumpTable(const CaseClusterVector &Clusters,
                      ->createJumpTableIndex(Table);
 
   // Set up the jump table info.
-  JumpTable JT(-1U, JTI, JumpTableMBB, nullptr, SL);
+  JumpTable JT(-1U, JTI, JumpTableMBB, nullptr);
   JumpTableHeader JTH(Clusters[First].Low->getValue(),
                       Clusters[Last].High->getValue(), SI->getCondition(),
                       nullptr, false);
@@ -280,7 +278,7 @@ void SwitchCG::SwitchLowering::findBitTestClusters(CaseClusterVector &Clusters,
 #endif
 
   // The algorithm below is not suitable for -O0.
-  if (TM->getOptLevel() == CodeGenOptLevel::None)
+  if (TM->getOptLevel() == CodeGenOpt::None)
     return;
 
   // If target does not have legal shift left, do not emit bit tests at all.
@@ -407,7 +405,7 @@ bool SwitchCG::SwitchLowering::buildBitTests(CaseClusterVector &Clusters,
   if (Low.isStrictlyPositive() && High.slt(BitWidth)) {
     // Optimize the case where all the case values fit in a word without having
     // to subtract minValue. In this case, we can optimize away the subtraction.
-    LowBound = APInt::getZero(Low.getBitWidth());
+    LowBound = APInt::getNullValue(Low.getBitWidth());
     CmpRange = High;
     ContiguousRange = false;
   } else {

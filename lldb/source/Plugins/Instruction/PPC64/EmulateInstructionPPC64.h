@@ -12,7 +12,6 @@
 #include "lldb/Core/EmulateInstruction.h"
 #include "lldb/Interpreter/OptionValue.h"
 #include "lldb/Utility/Log.h"
-#include <optional>
 
 namespace lldb_private {
 
@@ -24,9 +23,9 @@ public:
 
   static void Terminate();
 
-  static llvm::StringRef GetPluginNameStatic() { return "ppc64"; }
+  static ConstString GetPluginNameStatic();
 
-  static llvm::StringRef GetPluginDescriptionStatic();
+  static const char *GetPluginDescriptionStatic();
 
   static EmulateInstruction *CreateInstance(const ArchSpec &arch,
                                             InstructionType inst_type);
@@ -45,7 +44,9 @@ public:
     return false;
   }
 
-  llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
+  ConstString GetPluginName() override;
+
+  uint32_t GetPluginVersion() override { return 1; }
 
   bool SetTargetTriple(const ArchSpec &arch) override;
 
@@ -57,13 +58,13 @@ public:
 
   bool EvaluateInstruction(uint32_t evaluate_options) override;
 
-  bool TestEmulation(Stream &out_stream, ArchSpec &arch,
+  bool TestEmulation(Stream *out_stream, ArchSpec &arch,
                      OptionValueDictionary *test_data) override {
     return false;
   }
 
-  std::optional<RegisterInfo> GetRegisterInfo(lldb::RegisterKind reg_kind,
-                                              uint32_t reg_num) override;
+  bool GetRegisterInfo(lldb::RegisterKind reg_kind, uint32_t reg_num,
+                       RegisterInfo &reg_info) override;
 
   bool CreateFunctionEntryUnwind(UnwindPlan &unwind_plan) override;
 

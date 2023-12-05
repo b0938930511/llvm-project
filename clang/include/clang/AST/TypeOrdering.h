@@ -34,6 +34,7 @@ struct QualTypeOrdering {
 }
 
 namespace llvm {
+  template<class> struct DenseMapInfo;
 
   template<> struct DenseMapInfo<clang::QualType> {
     static inline clang::QualType getEmptyKey() { return clang::QualType(); }

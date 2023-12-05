@@ -17,6 +17,25 @@
 // RUN:   -analyzer-checker=security.insecureAPI \
 // RUN:   -analyzer-checker=security.FloatLoopCounter
 
+// RUN: %clang_analyze_cc1 -triple x86_64-unknown-cloudabi %s -verify -Wno-fortify-source \
+// RUN:   -analyzer-checker=security.insecureAPI \
+// RUN:   -analyzer-checker=security.FloatLoopCounter
+
+// RUN: %clang_analyze_cc1 -triple x86_64-unknown-cloudabi %s -verify -Wno-fortify-source \
+// RUN:   -DUSE_BUILTINS \
+// RUN:   -analyzer-checker=security.insecureAPI \
+// RUN:   -analyzer-checker=security.FloatLoopCounter
+
+// RUN: %clang_analyze_cc1 -triple x86_64-unknown-cloudabi %s -verify -Wno-fortify-source \
+// RUN:   -DVARIANT \
+// RUN:   -analyzer-checker=security.insecureAPI \
+// RUN:   -analyzer-checker=security.FloatLoopCounter
+
+// RUN: %clang_analyze_cc1 -triple x86_64-unknown-cloudabi %s -verify -Wno-fortify-source \
+// RUN:   -DUSE_BUILTINS -DVARIANT \
+// RUN:   -analyzer-checker=security.insecureAPI \
+// RUN:   -analyzer-checker=security.FloatLoopCounter
+
 #ifdef USE_BUILTINS
 # define BUILTIN(f) __builtin_ ## f
 #else /* USE_BUILTINS */
@@ -29,11 +48,12 @@
 typedef typeof(sizeof(int)) size_t;
 
 
-// rule request: floating point used as loop condition (FLP30-C, FLP-30-CPP)
+// <rdar://problem/6336718> rule request: floating point used as loop 
+//  condition (FLP30-C, FLP-30-CPP)
 //
 // For reference: https://www.securecoding.cert.org/confluence/display/seccode/FLP30-C.+Do+not+use+floating+point+variables+as+loop+counters
 //
-void test_float_condition(void) {
+void test_float_condition() {
   for (float x = 0.1f; x <= 1.0f; x += 0.1f) {} // expected-warning{{Variable 'x' with floating point type 'float'}}
   for (float x = 100000001.0f; x <= 100000010.0f; x += 1.0f) {} // expected-warning{{Variable 'x' with floating point type 'float'}}
   for (float x = 100000001.0f; x <= 100000010.0f; x++ ) {} // expected-warning{{Variable 'x' with floating point type 'float'}}
@@ -57,9 +77,9 @@ int test_bcmp(void *a, void *b, size_t n) {
 }
 
 // Obsolete function bcopy
-void bcopy(const void *, void *, size_t);
+void bcopy(void *, void *, size_t);
 
-void test_bcopy(const void *a, void *b, size_t n) {
+void test_bcopy(void *a, void *b, size_t n) {
   bcopy(a, b, n); // expected-warning{{The bcopy() function is obsoleted by memcpy() or memmove(}}
 }
 
@@ -70,23 +90,24 @@ void test_bzero(void *a, size_t n) {
   bzero(a, n); // expected-warning{{The bzero() function is obsoleted by memset()}}
 }
 
-// rule request: gets() buffer overflow
+// <rdar://problem/6335715> rule request: gets() buffer overflow
 // Part of recommendation: 300-BSI (buildsecurityin.us-cert.gov)
 char* gets(char *buf);
 
-void test_gets(void) {
+void test_gets() {
   char buff[1024];
   gets(buff); // expected-warning{{Call to function 'gets' is extremely insecure as it can always result in a buffer overflow}}
 }
 
 int getpw(unsigned int uid, char *buf);
 
-void test_getpw(void) {
+void test_getpw() {
   char buff[1024];
   getpw(2, buff); // expected-warning{{The getpw() function is dangerous as it may overflow the provided buffer. It is obsoleted by getpwuid()}}
 }
 
-// CWE-273: Failure to Check Whether Privileges Were Dropped Successfully
+// <rdar://problem/6337132> CWE-273: Failure to Check Whether Privileges Were
+//  Dropped Successfully
 typedef unsigned int __uint32_t;
 typedef __uint32_t __darwin_uid_t;
 typedef __uint32_t __darwin_gid_t;
@@ -98,7 +119,7 @@ int setreuid(uid_t, uid_t);
 extern void check(int);
 void abort(void);
 
-void test_setuid(void) 
+void test_setuid() 
 {
   setuid(2); // expected-warning{{The return value from the call to 'setuid' is not checked.  If an error occurs in 'setuid', the following code may execute with unexpected privileges}}
   setuid(0); // expected-warning{{The return value from the call to 'setuid' is not checked.  If an error occurs in 'setuid', the following code may execute with unexpected privileges}}
@@ -117,7 +138,7 @@ void test_setuid(void)
   setregid(2,2); // expected-warning{{The return value from the call to 'setregid' is not checked.  If an error occurs in 'setregid', the following code may execute with unexpected privileges}}
 }
 
-// CWE-338: Use of cryptographically weak prng
+// <rdar://problem/6337100> CWE-338: Use of cryptographically weak prng
 typedef  unsigned short *ushort_ptr_t;  // Test that sugar doesn't confuse the warning.
 int      rand(void);
 double   drand48(void);
@@ -130,7 +151,7 @@ long     nrand48(unsigned short[3]);
 long     random(void);
 int      rand_r(unsigned *);
 
-void test_rand(void)
+void test_rand()
 {
   unsigned short a[7];
   unsigned b;
@@ -149,7 +170,7 @@ void test_rand(void)
 
 char *mktemp(char *buf);
 
-void test_mktemp(void) {
+void test_mktemp() {
   char *x = mktemp("/tmp/zxcv"); // expected-warning{{Call to function 'mktemp' is insecure as it always creates or uses insecure temporary file}}
 }
 
@@ -171,24 +192,24 @@ char *strcpy(char *restrict s1, const char *restrict s2);
 
 #endif /* VARIANT */
 
-void test_strcpy(void) {
+void test_strcpy() {
   char x[4];
   char *y;
 
   strcpy(x, y); //expected-warning{{Call to function 'strcpy' is insecure as it does not provide bounding of the memory buffer. Replace unbounded copy functions with analogous functions that support length arguments such as 'strlcpy'. CWE-119}}
 }
 
-void test_strcpy_2(void) {
+void test_strcpy_2() {
   char x[4];
   strcpy(x, "abcd"); //expected-warning{{Call to function 'strcpy' is insecure as it does not provide bounding of the memory buffer. Replace unbounded copy functions with analogous functions that support length arguments such as 'strlcpy'. CWE-119}}
 }
 
-void test_strcpy_safe(void) {
+void test_strcpy_safe() {
   char x[5];
   strcpy(x, "abcd");
 }
 
-void test_strcpy_safe_2(void) {
+void test_strcpy_safe_2() {
   struct {char s1[100];} s;
   strcpy(s.s1, "hello");
 }
@@ -210,7 +231,7 @@ char *strcat(char *restrict s1, const char *restrict s2);
 
 #endif /* VARIANT */
 
-void test_strcat(void) {
+void test_strcat() {
   char x[4];
   char *y;
 
@@ -224,7 +245,7 @@ typedef int __int32_t;
 typedef __int32_t pid_t;
 pid_t vfork(void);
 
-void test_vfork(void) {
+void test_vfork() {
   vfork(); //expected-warning{{Call to function 'vfork' is insecure as it can lead to denial of service situations in the parent process}}
 }
 
@@ -237,7 +258,7 @@ int mkstemps(char *template, int suffixlen);
 int mkstemp(char *template);
 char *mktemp(char *template);
 
-void test_mkstemp(void) {
+void test_mkstemp() {
   mkstemp("XX"); // expected-warning {{Call to 'mkstemp' should have at least 6 'X's in the format string to be secure (2 'X's seen)}}
   mkstemp("XXXXXX");
   mkstemp("XXXXXXX");
@@ -279,7 +300,7 @@ char *strncpy(char *destination, const char *source, size_t num);
 char *strncat(char *destination, const char *source, size_t num);
 void *memset(void *ptr, int value, size_t num);
 
-void test_deprecated_or_unsafe_buffer_handling_1(void) {
+void test_deprecated_or_unsafe_buffer_handling_1() {
   char buf [5];
   wchar_t wbuf [5];
   int a;

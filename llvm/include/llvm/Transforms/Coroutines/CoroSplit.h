@@ -22,20 +22,14 @@
 namespace llvm {
 
 struct CoroSplitPass : PassInfoMixin<CoroSplitPass> {
-  const std::function<bool(Instruction &)> MaterializableCallback;
-
-  CoroSplitPass(bool OptimizeFrame = false);
-  CoroSplitPass(std::function<bool(Instruction &)> MaterializableCallback,
-                bool OptimizeFrame = false)
-      : MaterializableCallback(MaterializableCallback),
-        OptimizeFrame(OptimizeFrame) {}
+  CoroSplitPass(bool ReuseFrameSlot = false) : ReuseFrameSlot(ReuseFrameSlot) {}
 
   PreservedAnalyses run(LazyCallGraph::SCC &C, CGSCCAnalysisManager &AM,
                         LazyCallGraph &CG, CGSCCUpdateResult &UR);
   static bool isRequired() { return true; }
 
   // Would be true if the Optimization level isn't O0.
-  bool OptimizeFrame;
+  bool ReuseFrameSlot;
 };
 } // end namespace llvm
 

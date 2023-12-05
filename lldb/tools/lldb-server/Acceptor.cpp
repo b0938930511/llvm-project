@@ -15,7 +15,6 @@
 #include "lldb/Host/common/TCPSocket.h"
 #include "lldb/Utility/StreamString.h"
 #include "lldb/Utility/UriParser.h"
-#include <optional>
 
 using namespace lldb;
 using namespace lldb_private;
@@ -85,16 +84,21 @@ std::unique_ptr<Acceptor> Acceptor::Create(StringRef name,
   error.Clear();
 
   Socket::SocketProtocol socket_protocol = Socket::ProtocolUnixDomain;
+  int port;
+  StringRef scheme, host, path;
   // Try to match socket name as URL - e.g., tcp://localhost:5555
-  if (std::optional<URI> res = URI::Parse(name)) {
-    if (!FindProtocolByScheme(res->scheme.str().c_str(), socket_protocol))
+  if (UriParser::Parse(name, scheme, host, port, path)) {
+    if (!FindProtocolByScheme(scheme.str().c_str(), socket_protocol))
       error.SetErrorStringWithFormat("Unknown protocol scheme \"%s\"",
-                                     res->scheme.str().c_str());
+                                     scheme.str().c_str());
     else
-      name = name.drop_front(res->scheme.size() + strlen("://"));
+      name = name.drop_front(scheme.size() + strlen("://"));
   } else {
+    std::string host_str;
+    std::string port_str;
+    int32_t port = INT32_MIN;
     // Try to match socket name as $host:port - e.g., localhost:5555
-    if (!llvm::errorToBool(Socket::DecodeHostAndPort(name).takeError()))
+    if (Socket::DecodeHostAndPort(name, host_str, port_str, port, nullptr))
       socket_protocol = Socket::ProtocolTcp;
   }
 

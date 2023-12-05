@@ -30,3 +30,4 @@ ror.b	%d0, %d1
 ; CHECK:      ror.l  %d0, %d1
 ; CHECK-SAME: encoding: [0xe0,0xb9]
 ror.l	%d0, %d1
+

@@ -29,9 +29,9 @@ void test3(void) {
               // expected-note{{put the semicolon on a separate line to silence this warning}}
 }
 
-extern int g(void);
+extern int g();
 
-void test4(void)
+void test4()
 {
   int cond;
   switch (cond) {
@@ -73,7 +73,7 @@ void test5(int z) {
   }
 } 
 
-void test6(void) {
+void test6() {
   char ch = 'a';
   switch(ch) {
     case 1234:  // expected-warning {{overflow converting case value}}
@@ -92,7 +92,7 @@ int f0(int var) {
   return 2;
 }
 
-void test7(void) {
+void test7() {
   enum {
     A = 1,
     B
@@ -139,7 +139,7 @@ void test7(void) {
 
 }
 
-void test8(void) {
+void test8() {
   enum {
     A,
     B,
@@ -161,7 +161,7 @@ void test8(void) {
   }
 }
 
-void test9(void) {
+void test9() {
   enum {
     A = 3,
     C = 1
@@ -176,7 +176,7 @@ void test9(void) {
   }
 }
 
-void test10(void) {
+void test10() {
   enum {
     A = 10,
     C = 2,
@@ -196,7 +196,7 @@ void test10(void) {
   }
 }
 
-void test11(void) {
+void test11() {
   enum {
     A = -1,
     B,
@@ -218,7 +218,7 @@ void test11(void) {
   }
 }
 
-void test12(void) {
+void test12() {
   enum {
     A = -1,
     B = 4294967286
@@ -230,6 +230,7 @@ void test12(void) {
   }
 }
 
+// <rdar://problem/7643909>
 typedef enum {
     val1,
     val2,
@@ -246,6 +247,7 @@ int test13(my_type_t t) {
   return -1;
 }
 
+// <rdar://problem/7658121>
 enum {
   EC0 = 0xFFFF0000,
   EC1 = 0xFFFF0001,
@@ -266,7 +268,7 @@ void f1(unsigned x) {
   }
 }
 
-void test15(void) {
+void test15() {
   int i = 0;
   switch (1) { // expected-warning {{no case matching constant switch condition '1'}}
   case 0: i = 0; break;
@@ -274,7 +276,7 @@ void test15(void) {
   }
 }
 
-void test16(void) {
+void test16() {
   const char c = '5';
   switch (c) { // expected-warning {{no case matching constant switch condition '53'}}
   case '6': return;
@@ -303,7 +305,7 @@ void test17(int x) {
   }
 }
 
-int test18(void) {
+int test18() {
   enum { A, B } a;
   switch (a) {
   case A: return 0;
@@ -313,6 +315,7 @@ int test18(void) {
   }
 }
 
+// rdar://110822110
 typedef enum {
         kOne = 1,
 } Ints;

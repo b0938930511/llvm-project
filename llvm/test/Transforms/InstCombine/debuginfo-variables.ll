@@ -1,5 +1,4 @@
-; RUN: opt < %s -passes=debugify,instcombine -S | FileCheck %s
-; RUN: opt < %s -passes=debugify,instcombine -S --try-experimental-debuginfo-iterators | FileCheck %s
+; RUN: opt < %s -debugify -instcombine -S | FileCheck %s
 
 declare void @escape32(i32)
 
@@ -108,10 +107,10 @@ define void @test_srem(i64 %A) {
   ret void
 }
 
-define void @test_ptrtoint(ptr %P) {
+define void @test_ptrtoint(i64* %P) {
 ; CHECK-LABEL: @test_ptrtoint
-; CHECK-NEXT:  call void @llvm.dbg.value(metadata ptr %P, {{.*}}, metadata !DIExpression())
-  %1 = ptrtoint ptr %P to i64
+; CHECK-NEXT:  call void @llvm.dbg.value(metadata i64* %P, {{.*}}, metadata !DIExpression())
+  %1 = ptrtoint i64* %P to i64
   ret void
 }
 

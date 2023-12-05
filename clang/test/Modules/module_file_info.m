@@ -1,15 +1,14 @@
-// UNSUPPORTED: target={{.*}}-zos{{.*}}, target={{.*}}-aix{{.*}}
+
 @import DependsOnModule;
 
-// RUN: rm -rf %t %t-obj %t-hash
+// RUN: rm -rf %t %t-obj
 // RUN: %clang_cc1 -w -Wunused -fmodules -fmodule-format=raw -fimplicit-module-maps -fdisable-module-hash -fmodules-cache-path=%t -F %S/Inputs -DBLARG -DWIBBLE=WOBBLE -fmodule-feature myfeature %s
-// RUN: %clang_cc1 -module-file-info %t/DependsOnModule.pcm | FileCheck %s --check-prefixes=RAW,CHECK,MACROS
+// RUN: %clang_cc1 -module-file-info %t/DependsOnModule.pcm | FileCheck %s
+// RUN: %clang_cc1 -module-file-info %t/DependsOnModule.pcm | FileCheck %s --check-prefix=RAW
 
 // RUN: %clang_cc1 -w -Wunused -fmodules -fmodule-format=obj -fimplicit-module-maps -fdisable-module-hash -fmodules-cache-path=%t-obj -F %S/Inputs -DBLARG -DWIBBLE=WOBBLE -fmodule-feature myfeature %s
-// RUN: %clang_cc1 -module-file-info %t-obj/DependsOnModule.pcm | FileCheck %s --check-prefixes=OBJ,CHECK,MACROS
-
-// RUN: %clang_cc1 -w -Wunused -fmodules -fmodule-format=obj -fimplicit-module-maps                       -fmodules-cache-path=%t-hash -F %S/Inputs -DBLARG -DWIBBLE=WOBBLE -fmodule-feature myfeature %s
-// RUN: %clang_cc1 -module-file-info %t-hash/*/DependsOnModule-*.pcm | FileCheck %s --check-prefixes=OBJ,CHECK,NO_MACROS
+// RUN: %clang_cc1 -module-file-info %t-obj/DependsOnModule.pcm | FileCheck %s
+// RUN: %clang_cc1 -module-file-info %t-obj/DependsOnModule.pcm | FileCheck %s --check-prefix=OBJ
 
 // RAW:   Module format: raw
 // OBJ:   Module format: obj
@@ -17,7 +16,7 @@
 
 // CHECK: Module name: DependsOnModule
 // CHECK: Module map file: {{.*}}DependsOnModule.framework{{[/\\]}}module.map
-// CHECK: Imports module 'Module': {{.*}}Module{{.*}}.pcm
+// CHECK: Imports module 'Module': {{.*}}Module.pcm
 
 // CHECK: Language options:
 // CHECK:   C99: Yes
@@ -43,20 +42,19 @@
 // CHECK: Preprocessor options:
 // CHECK:   Uses compiler/target-specific predefines [-undef]: Yes
 // CHECK:   Uses detailed preprocessing record (for indexing): No
-// NO_MACROS-NOT: Predefined macros:
-// MACROS:   Predefined macros:
-// MACROS-NEXT: -DBLARG
-// MACROS-NEXT: -DWIBBLE=WOBBLE
-// CHECK: Input file: {{.*}}module.map
-// CHECK-NEXT: Input file: {{.*}}module_private.map
-// CHECK-NEXT: Input file: {{.*}}DependsOnModule.h
-// CHECK-NEXT: Input file: {{.*}}module.map
-// CHECK-NEXT: Input file: {{.*}}other.h
-// CHECK-NEXT: Input file: {{.*}}not_cxx.h
-// CHECK-NEXT: Input file: {{.*}}not_coroutines.h
-// CHECK-NEXT: Input file: {{.*}}SubFramework.h
+// CHECK:   Predefined macros:
+// CHECK:     -DBLARG
+// CHECK:     -DWIBBLE=WOBBLE
+// CHECK: Input file: {{.*}}DependsOnModulePrivate.h
 // CHECK-NEXT: Input file: {{.*}}Other.h
-// CHECK-NEXT: Input file: {{.*}}DependsOnModulePrivate.h
+// CHECK-NEXT: Input file: {{.*}}SubFramework.h
+// CHECK-NEXT: Input file: {{.*}}not_coroutines.h
+// CHECK-NEXT: Input file: {{.*}}not_cxx.h
+// CHECK-NEXT: Input file: {{.*}}other.h
+// CHECK-NEXT: Input file: {{.*}}module.map
+// CHECK-NEXT: Input file: {{.*}}DependsOnModule.h
+// CHECK-NEXT: Input file: {{.*}}module_private.map
+// CHECK-NEXT: Input file: {{.*}}module.map
 
 // CHECK: Diagnostic options:
 // CHECK:   IgnoreWarnings: Yes

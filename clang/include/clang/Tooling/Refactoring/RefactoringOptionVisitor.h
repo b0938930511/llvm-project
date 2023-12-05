@@ -6,11 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_CLANG_TOOLING_REFACTORING_REFACTORINGOPTIONVISITOR_H
-#define LLVM_CLANG_TOOLING_REFACTORING_REFACTORINGOPTIONVISITOR_H
+#ifndef LLVM_CLANG_TOOLING_REFACTOR_REFACTORING_OPTION_VISITOR_H
+#define LLVM_CLANG_TOOLING_REFACTOR_REFACTORING_OPTION_VISITOR_H
 
 #include "clang/Basic/LLVM.h"
-#include <optional>
 #include <type_traits>
 
 namespace clang {
@@ -28,7 +27,7 @@ public:
   virtual ~RefactoringOptionVisitor() {}
 
   virtual void visit(const RefactoringOption &Opt,
-                     std::optional<std::string> &Value) = 0;
+                     Optional<std::string> &Value) = 0;
 };
 
 namespace traits {
@@ -39,8 +38,7 @@ private:
   template <typename ClassT>
   static auto check(ClassT *) -> typename std::is_same<
       decltype(std::declval<RefactoringOptionVisitor>().visit(
-          std::declval<RefactoringOption>(),
-          *std::declval<std::optional<T> *>())),
+          std::declval<RefactoringOption>(), *std::declval<Optional<T> *>())),
       void>::type;
 
   template <typename> static std::false_type check(...);
@@ -60,4 +58,4 @@ struct IsValidOptionType : internal::HasHandle<T>::Type {};
 } // end namespace tooling
 } // end namespace clang
 
-#endif // LLVM_CLANG_TOOLING_REFACTORING_REFACTORINGOPTIONVISITOR_H
+#endif // LLVM_CLANG_TOOLING_REFACTOR_REFACTORING_OPTION_VISITOR_H

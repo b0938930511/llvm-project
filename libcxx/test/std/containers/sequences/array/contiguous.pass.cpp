@@ -8,18 +8,20 @@
 
 // <array>
 
+// GCC 5 doesn't implement the required constexpr support
+// UNSUPPORTED: gcc-5
+
 // An array is a contiguous container
 
 #include <array>
 #include <cassert>
-#include <memory>
 
 #include "test_macros.h"
 
 template <class Container>
 TEST_CONSTEXPR_CXX14 void assert_contiguous(Container const& c)
 {
-    for (std::size_t i = 0; i < c.size(); ++i)
+    for (size_t i = 0; i < c.size(); ++i)
         assert(*(c.begin() + i) == *(std::addressof(*c.begin()) + i));
 }
 

@@ -3,6 +3,6 @@
 #error CMD_MACRO undefined
 #endif 
 
-int foo(void) {
+int foo() {
   return x;
 }

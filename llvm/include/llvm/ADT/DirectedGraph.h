@@ -5,11 +5,10 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-///
-/// \file
-/// This file defines the interface and a base class implementation for a
-/// directed graph.
-///
+//
+// This file defines the interface and a base class implementation for a
+// directed graph.
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef LLVM_ADT_DIRECTEDGRAPH_H

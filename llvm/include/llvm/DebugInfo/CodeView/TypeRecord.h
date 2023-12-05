@@ -11,6 +11,7 @@
 
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/DebugInfo/CodeView/CVRecord.h"
@@ -21,7 +22,6 @@
 #include "llvm/Support/Endian.h"
 #include <algorithm>
 #include <cstdint>
-#include <optional>
 #include <vector>
 
 namespace llvm {
@@ -111,8 +111,7 @@ public:
   }
 
   TypeIndex ContainingType;
-  PointerToMemberRepresentation Representation =
-      PointerToMemberRepresentation::Unknown;
+  PointerToMemberRepresentation Representation;
 };
 
 class TypeRecord {
@@ -161,8 +160,8 @@ public:
   TypeIndex getArgumentList() const { return ArgumentList; }
 
   TypeIndex ReturnType;
-  CallingConvention CallConv = CallingConvention::NearC;
-  FunctionOptions Options = FunctionOptions::None;
+  CallingConvention CallConv;
+  FunctionOptions Options;
   uint16_t ParameterCount = 0;
   TypeIndex ArgumentList;
 };
@@ -195,8 +194,8 @@ public:
   TypeIndex ReturnType;
   TypeIndex ClassType;
   TypeIndex ThisType;
-  CallingConvention CallConv = CallingConvention::NearC;
-  FunctionOptions Options = FunctionOptions::None;
+  CallingConvention CallConv;
+  FunctionOptions Options;
   uint16_t ParameterCount = 0;
   TypeIndex ArgumentList;
   int32_t ThisPointerAdjustment = 0;
@@ -210,7 +209,7 @@ public:
 
   LabelRecord(LabelType Mode) : TypeRecord(TypeRecordKind::Label), Mode(Mode) {}
 
-  LabelType Mode = LabelType::Near;
+  LabelType Mode;
 };
 
 // LF_MFUNC_ID
@@ -347,7 +346,7 @@ public:
 
   TypeIndex ReferentType;
   uint32_t Attrs = 0;
-  std::optional<MemberPointerInfo> MemberInfo;
+  Optional<MemberPointerInfo> MemberInfo;
 
   void setAttrs(PointerKind PK, PointerMode PM, PointerOptions PO,
                 uint8_t Size) {
@@ -455,7 +454,7 @@ public:
   StringRef getUniqueName() const { return UniqueName; }
 
   uint16_t MemberCount = 0;
-  ClassOptions Options = ClassOptions::None;
+  ClassOptions Options;
   TypeIndex FieldList;
   StringRef Name;
   StringRef UniqueName;
@@ -586,7 +585,7 @@ public:
   uint32_t getAge() const { return Age; }
   StringRef getName() const { return Name; }
 
-  GUID Guid = {};
+  GUID Guid;
   uint32_t Age = 0;
   StringRef Name;
 };
@@ -704,10 +703,10 @@ public:
   TypeIndex getCompleteClass() const { return CompleteClass; }
   TypeIndex getOverriddenVTable() const { return OverriddenVFTable; }
   uint32_t getVFPtrOffset() const { return VFPtrOffset; }
-  StringRef getName() const { return ArrayRef(MethodNames).front(); }
+  StringRef getName() const { return makeArrayRef(MethodNames).front(); }
 
   ArrayRef<StringRef> getMethodNames() const {
-    return ArrayRef(MethodNames).drop_front();
+    return makeArrayRef(MethodNames).drop_front();
   }
 
   TypeIndex CompleteClass;

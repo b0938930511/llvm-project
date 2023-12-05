@@ -10,18 +10,17 @@
 #define LLDB_SOURCE_PLUGINS_SYMBOLFILE_BREAKPAD_SYMBOLFILEBREAKPAD_H
 
 #include "Plugins/ObjectFile/Breakpad/BreakpadRecords.h"
+#include "lldb/Core/FileSpecList.h"
 #include "lldb/Symbol/LineTable.h"
 #include "lldb/Symbol/PostfixExpression.h"
 #include "lldb/Symbol/SymbolFile.h"
 #include "lldb/Symbol/UnwindPlan.h"
-#include "lldb/Utility/FileSpecList.h"
-#include <optional>
 
 namespace lldb_private {
 
 namespace breakpad {
 
-class SymbolFileBreakpad : public SymbolFileCommon {
+class SymbolFileBreakpad : public SymbolFile {
   /// LLVM RTTI support.
   static char ID;
 
@@ -29,7 +28,7 @@ public:
   /// LLVM RTTI support.
   /// \{
   bool isA(const void *ClassID) const override {
-    return ClassID == &ID || SymbolFileCommon::isA(ClassID);
+    return ClassID == &ID || SymbolFile::isA(ClassID);
   }
   static bool classof(const SymbolFile *obj) { return obj->isA(&ID); }
   /// \}
@@ -38,9 +37,9 @@ public:
   static void Initialize();
   static void Terminate();
   static void DebuggerInitialize(Debugger &debugger) {}
-  static llvm::StringRef GetPluginNameStatic() { return "breakpad"; }
+  static ConstString GetPluginNameStatic();
 
-  static llvm::StringRef GetPluginDescriptionStatic() {
+  static const char *GetPluginDescriptionStatic() {
     return "Breakpad debug symbol file reader.";
   }
 
@@ -50,7 +49,7 @@ public:
 
   // Constructors and Destructors
   SymbolFileBreakpad(lldb::ObjectFileSP objfile_sp)
-      : SymbolFileCommon(std::move(objfile_sp)) {}
+      : SymbolFile(std::move(objfile_sp)) {}
 
   ~SymbolFileBreakpad() override = default;
 
@@ -63,8 +62,6 @@ public:
   lldb::LanguageType ParseLanguage(CompileUnit &comp_unit) override {
     return lldb::eLanguageTypeUnknown;
   }
-
-  lldb::FunctionSP GetOrCreateFunction(CompileUnit &comp_unit);
 
   size_t ParseFunctions(CompileUnit &comp_unit) override;
 
@@ -82,7 +79,7 @@ public:
     return false;
   }
 
-  size_t ParseBlocksRecursive(Function &func) override;
+  size_t ParseBlocksRecursive(Function &func) override { return 0; }
 
   void FindGlobalVariables(ConstString name,
                            const CompilerDeclContext &parent_decl_ctx,
@@ -93,10 +90,10 @@ public:
     return 0;
   }
   Type *ResolveTypeUID(lldb::user_id_t type_uid) override { return nullptr; }
-  std::optional<ArrayInfo> GetDynamicArrayInfoForUID(
+  llvm::Optional<ArrayInfo> GetDynamicArrayInfoForUID(
       lldb::user_id_t type_uid,
       const lldb_private::ExecutionContext *exe_ctx) override {
-    return std::nullopt;
+    return llvm::None;
   }
 
   bool CompleteType(CompilerType &compiler_type) override { return false; }
@@ -111,8 +108,9 @@ public:
   void GetTypes(SymbolContextScope *sc_scope, lldb::TypeClass type_mask,
                 TypeList &type_list) override {}
 
-  void FindFunctions(const Module::LookupInfo &lookup_info,
+  void FindFunctions(ConstString name,
                      const CompilerDeclContext &parent_decl_ctx,
+                     lldb::FunctionNameType name_type_mask,
                      bool include_inlines, SymbolContextList &sc_list) override;
 
   void FindFunctions(const RegularExpression &regex, bool include_inlines,
@@ -127,16 +125,16 @@ public:
                  llvm::DenseSet<SymbolFile *> &searched_symbol_files,
                  TypeMap &types) override;
 
-  llvm::Expected<lldb::TypeSystemSP>
+  llvm::Expected<TypeSystem &>
   GetTypeSystemForLanguage(lldb::LanguageType language) override {
     return llvm::make_error<llvm::StringError>(
         "SymbolFileBreakpad does not support GetTypeSystemForLanguage",
         llvm::inconvertibleErrorCode());
   }
 
-  CompilerDeclContext FindNamespace(ConstString name,
-                                    const CompilerDeclContext &parent_decl_ctx,
-                                    bool only_root_namespaces) override {
+  CompilerDeclContext
+  FindNamespace(ConstString name,
+                const CompilerDeclContext &parent_decl_ctx) override {
     return CompilerDeclContext();
   }
 
@@ -148,9 +146,8 @@ public:
   GetUnwindPlan(const Address &address,
                 const RegisterInfoResolver &resolver) override;
 
-  llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
-
-  uint64_t GetDebugInfoSize() override;
+  ConstString GetPluginName() override { return GetPluginNameStatic(); }
+  uint32_t GetPluginVersion() override { return 1; }
 
 private:
   // A class representing a position in the breakpad file. Useful for
@@ -202,7 +199,7 @@ private:
     }
 
     Bookmark bookmark;
-    std::optional<FileSpecList> support_files;
+    llvm::Optional<FileSpecList> support_files;
     std::unique_ptr<LineTable> line_table_up;
 
   };
@@ -223,20 +220,18 @@ private:
                          UnwindPlan::Row &row);
   lldb::UnwindPlanSP ParseWinUnwindPlan(const Bookmark &bookmark,
                                         const RegisterInfoResolver &resolver);
-  void ParseInlineOriginRecords();
 
   using CompUnitMap = RangeDataVector<lldb::addr_t, lldb::addr_t, CompUnitData>;
 
-  std::optional<std::vector<FileSpec>> m_files;
-  std::optional<CompUnitMap> m_cu_data;
-  std::optional<std::vector<llvm::StringRef>> m_inline_origins;
+  llvm::Optional<std::vector<FileSpec>> m_files;
+  llvm::Optional<CompUnitMap> m_cu_data;
 
   using UnwindMap = RangeDataVector<lldb::addr_t, lldb::addr_t, Bookmark>;
   struct UnwindData {
     UnwindMap cfi;
     UnwindMap win;
   };
-  std::optional<UnwindData> m_unwind_data;
+  llvm::Optional<UnwindData> m_unwind_data;
   llvm::BumpPtrAllocator m_allocator;
 };
 

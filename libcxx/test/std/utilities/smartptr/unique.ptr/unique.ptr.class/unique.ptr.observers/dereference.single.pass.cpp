@@ -17,18 +17,9 @@
 
 #include "test_macros.h"
 
-TEST_CONSTEXPR_CXX23 bool test() {
+int main(int, char**) {
   std::unique_ptr<int> p(new int(3));
   assert(*p == 3);
-
-  return true;
-}
-
-int main(int, char**) {
-  test();
-#if TEST_STD_VER >= 23
-  static_assert(test());
-#endif
 
   return 0;
 }

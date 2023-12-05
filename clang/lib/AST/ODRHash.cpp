@@ -72,10 +72,7 @@ void ODRHash::AddDeclarationNameImpl(DeclarationName Name) {
     AddBoolean(S.isUnarySelector());
     unsigned NumArgs = S.getNumArgs();
     ID.AddInteger(NumArgs);
-    // Compare all selector slots. For selectors with arguments it means all arg
-    // slots. And if there are no arguments, compare the first-and-only slot.
-    unsigned SlotsToCheck = NumArgs > 0 ? NumArgs : 1;
-    for (unsigned i = 0; i < SlotsToCheck; ++i) {
+    for (unsigned i = 0; i < NumArgs; ++i) {
       const IdentifierInfo *II = S.getIdentifierInfoForSlot(i);
       AddBoolean(II);
       if (II) {
@@ -153,7 +150,6 @@ void ODRHash::AddTemplateName(TemplateName Name) {
   case TemplateName::DependentTemplate:
   case TemplateName::SubstTemplateTemplateParm:
   case TemplateName::SubstTemplateTemplateParmPack:
-  case TemplateName::UsingTemplate:
     break;
   }
 }
@@ -172,14 +168,8 @@ void ODRHash::AddTemplateArgument(TemplateArgument TA) {
       AddDecl(TA.getAsDecl());
       break;
     case TemplateArgument::NullPtr:
-      ID.AddPointer(nullptr);
+    case TemplateArgument::Integral:
       break;
-    case TemplateArgument::Integral: {
-      // There are integrals (e.g.: _BitInt(128)) that cannot be represented as
-      // any builtin integral type, so we use the hash of APSInt instead.
-      TA.getAsIntegral().Profile(ID);
-      break;
-    }
     case TemplateArgument::Template:
     case TemplateArgument::TemplateExpansion:
       AddTemplateName(TA.getAsTemplateOrTemplatePattern());
@@ -295,9 +285,9 @@ public:
   }
 
   void VisitValueDecl(const ValueDecl *D) {
-    if (auto *DD = dyn_cast<DeclaratorDecl>(D); DD && DD->getTypeSourceInfo())
-      AddQualType(DD->getTypeSourceInfo()->getType());
-
+    if (!isa<FunctionDecl>(D)) {
+      AddQualType(D->getType());
+    }
     Inherited::VisitValueDecl(D);
   }
 
@@ -343,20 +333,6 @@ public:
     Inherited::VisitFieldDecl(D);
   }
 
-  void VisitObjCIvarDecl(const ObjCIvarDecl *D) {
-    ID.AddInteger(D->getCanonicalAccessControl());
-    Inherited::VisitObjCIvarDecl(D);
-  }
-
-  void VisitObjCPropertyDecl(const ObjCPropertyDecl *D) {
-    ID.AddInteger(D->getPropertyAttributes());
-    ID.AddInteger(D->getPropertyImplementation());
-    AddQualType(D->getTypeSourceInfo()->getType());
-    AddDecl(D);
-
-    Inherited::VisitObjCPropertyDecl(D);
-  }
-
   void VisitFunctionDecl(const FunctionDecl *D) {
     // Handled by the ODRHash for FunctionDecl
     ID.AddInteger(D->getODRHash());
@@ -368,64 +344,6 @@ public:
     // Handled by the ODRHash for FunctionDecl
 
     Inherited::VisitCXXMethodDecl(D);
-  }
-
-  void VisitObjCMethodDecl(const ObjCMethodDecl *Method) {
-    ID.AddInteger(Method->getDeclKind());
-    Hash.AddBoolean(Method->isInstanceMethod()); // false if class method
-    Hash.AddBoolean(Method->isVariadic());
-    Hash.AddBoolean(Method->isSynthesizedAccessorStub());
-    Hash.AddBoolean(Method->isDefined());
-    Hash.AddBoolean(Method->isDirectMethod());
-    Hash.AddBoolean(Method->isThisDeclarationADesignatedInitializer());
-    Hash.AddBoolean(Method->hasSkippedBody());
-
-    ID.AddInteger(llvm::to_underlying(Method->getImplementationControl()));
-    ID.AddInteger(Method->getMethodFamily());
-    ImplicitParamDecl *Cmd = Method->getCmdDecl();
-    Hash.AddBoolean(Cmd);
-    if (Cmd)
-      ID.AddInteger(llvm::to_underlying(Cmd->getParameterKind()));
-
-    ImplicitParamDecl *Self = Method->getSelfDecl();
-    Hash.AddBoolean(Self);
-    if (Self)
-      ID.AddInteger(llvm::to_underlying(Self->getParameterKind()));
-
-    AddDecl(Method);
-
-    if (Method->getReturnTypeSourceInfo())
-      AddQualType(Method->getReturnTypeSourceInfo()->getType());
-
-    ID.AddInteger(Method->param_size());
-    for (auto Param : Method->parameters())
-      Hash.AddSubDecl(Param);
-
-    if (Method->hasBody()) {
-      const bool IsDefinition = Method->isThisDeclarationADefinition();
-      Hash.AddBoolean(IsDefinition);
-      if (IsDefinition) {
-        Stmt *Body = Method->getBody();
-        Hash.AddBoolean(Body);
-        if (Body)
-          AddStmt(Body);
-
-        // Filter out sub-Decls which will not be processed in order to get an
-        // accurate count of Decl's.
-        llvm::SmallVector<const Decl *, 16> Decls;
-        for (Decl *SubDecl : Method->decls())
-          if (ODRHash::isSubDeclToBeProcessed(SubDecl, Method))
-            Decls.push_back(SubDecl);
-
-        ID.AddInteger(Decls.size());
-        for (auto SubDecl : Decls)
-          Hash.AddSubDecl(SubDecl);
-      }
-    } else {
-      Hash.AddBoolean(false);
-    }
-
-    Inherited::VisitObjCMethodDecl(Method);
   }
 
   void VisitTypedefNameDecl(const TypedefNameDecl *D) {
@@ -522,7 +440,7 @@ public:
 
 // Only allow a small portion of Decl's to be processed.  Remove this once
 // all Decl's can be handled.
-bool ODRHash::isSubDeclToBeProcessed(const Decl *D, const DeclContext *Parent) {
+bool ODRHash::isDeclToBeProcessed(const Decl *D, const DeclContext *Parent) {
   if (D->isImplicit()) return false;
   if (D->getDeclContext() != Parent) return false;
 
@@ -541,9 +459,6 @@ bool ODRHash::isSubDeclToBeProcessed(const Decl *D, const DeclContext *Parent) {
     case Decl::TypeAlias:
     case Decl::Typedef:
     case Decl::Var:
-    case Decl::ObjCMethod:
-    case Decl::ObjCIvar:
-    case Decl::ObjCProperty:
       return true;
   }
 }
@@ -572,7 +487,7 @@ void ODRHash::AddCXXRecordDecl(const CXXRecordDecl *Record) {
   // accurate count of Decl's.
   llvm::SmallVector<const Decl *, 16> Decls;
   for (Decl *SubDecl : Record->decls()) {
-    if (isSubDeclToBeProcessed(SubDecl, Record)) {
+    if (isDeclToBeProcessed(SubDecl, Record)) {
       Decls.push_back(SubDecl);
       if (auto *Function = dyn_cast<FunctionDecl>(SubDecl)) {
         // Compute/Preload ODRHash into FunctionDecl.
@@ -594,56 +509,11 @@ void ODRHash::AddCXXRecordDecl(const CXXRecordDecl *Record) {
 
   ID.AddInteger(Record->getNumBases());
   auto Bases = Record->bases();
-  for (const auto &Base : Bases) {
-    AddQualType(Base.getTypeSourceInfo()->getType());
+  for (auto Base : Bases) {
+    AddQualType(Base.getType());
     ID.AddInteger(Base.isVirtual());
     ID.AddInteger(Base.getAccessSpecifierAsWritten());
   }
-}
-
-void ODRHash::AddRecordDecl(const RecordDecl *Record) {
-  assert(!isa<CXXRecordDecl>(Record) &&
-         "For CXXRecordDecl should call AddCXXRecordDecl.");
-  AddDecl(Record);
-
-  // Filter out sub-Decls which will not be processed in order to get an
-  // accurate count of Decl's.
-  llvm::SmallVector<const Decl *, 16> Decls;
-  for (Decl *SubDecl : Record->decls()) {
-    if (isSubDeclToBeProcessed(SubDecl, Record))
-      Decls.push_back(SubDecl);
-  }
-
-  ID.AddInteger(Decls.size());
-  for (const Decl *SubDecl : Decls)
-    AddSubDecl(SubDecl);
-}
-
-void ODRHash::AddObjCInterfaceDecl(const ObjCInterfaceDecl *IF) {
-  AddDecl(IF);
-
-  auto *SuperClass = IF->getSuperClass();
-  AddBoolean(SuperClass);
-  if (SuperClass)
-    ID.AddInteger(SuperClass->getODRHash());
-
-  // Hash referenced protocols.
-  ID.AddInteger(IF->getReferencedProtocols().size());
-  for (const ObjCProtocolDecl *RefP : IF->protocols()) {
-    // Hash the name only as a referenced protocol can be a forward declaration.
-    AddDeclarationName(RefP->getDeclName());
-  }
-
-  // Filter out sub-Decls which will not be processed in order to get an
-  // accurate count of Decl's.
-  llvm::SmallVector<const Decl *, 16> Decls;
-  for (Decl *SubDecl : IF->decls())
-    if (isSubDeclToBeProcessed(SubDecl, IF))
-      Decls.push_back(SubDecl);
-
-  ID.AddInteger(Decls.size());
-  for (auto *SubDecl : Decls)
-    AddSubDecl(SubDecl);
 }
 
 void ODRHash::AddFunctionDecl(const FunctionDecl *Function,
@@ -658,10 +528,6 @@ void ODRHash::AddFunctionDecl(const FunctionDecl *Function,
       if (F->isFunctionTemplateSpecialization()) {
         if (!isa<CXXMethodDecl>(DC)) return;
         if (DC->getLexicalParent()->isFileContext()) return;
-        // Skip class scope explicit function template specializations,
-        // as they have not yet been instantiated.
-        if (F->getDependentSpecializationInfo())
-          return;
         // Inline method specializations are the only supported
         // specialization for now.
       }
@@ -697,7 +563,7 @@ void ODRHash::AddFunctionDecl(const FunctionDecl *Function,
   AddQualType(Function->getReturnType());
 
   ID.AddInteger(Function->param_size());
-  for (auto *Param : Function->parameters())
+  for (auto Param : Function->parameters())
     AddSubDecl(Param);
 
   if (SkipBody) {
@@ -722,7 +588,7 @@ void ODRHash::AddFunctionDecl(const FunctionDecl *Function,
   // accurate count of Decl's.
   llvm::SmallVector<const Decl *, 16> Decls;
   for (Decl *SubDecl : Function->decls()) {
-    if (isSubDeclToBeProcessed(SubDecl, Function)) {
+    if (isDeclToBeProcessed(SubDecl, Function)) {
       Decls.push_back(SubDecl);
     }
   }
@@ -748,7 +614,7 @@ void ODRHash::AddEnumDecl(const EnumDecl *Enum) {
   // accurate count of Decl's.
   llvm::SmallVector<const Decl *, 16> Decls;
   for (Decl *SubDecl : Enum->decls()) {
-    if (isSubDeclToBeProcessed(SubDecl, Enum)) {
+    if (isDeclToBeProcessed(SubDecl, Enum)) {
       assert(isa<EnumConstantDecl>(SubDecl) && "Unexpected Decl");
       Decls.push_back(SubDecl);
     }
@@ -759,31 +625,6 @@ void ODRHash::AddEnumDecl(const EnumDecl *Enum) {
     AddSubDecl(SubDecl);
   }
 
-}
-
-void ODRHash::AddObjCProtocolDecl(const ObjCProtocolDecl *P) {
-  AddDecl(P);
-
-  // Hash referenced protocols.
-  ID.AddInteger(P->getReferencedProtocols().size());
-  for (const ObjCProtocolDecl *RefP : P->protocols()) {
-    // Hash the name only as a referenced protocol can be a forward declaration.
-    AddDeclarationName(RefP->getDeclName());
-  }
-
-  // Filter out sub-Decls which will not be processed in order to get an
-  // accurate count of Decl's.
-  llvm::SmallVector<const Decl *, 16> Decls;
-  for (Decl *SubDecl : P->decls()) {
-    if (isSubDeclToBeProcessed(SubDecl, P)) {
-      Decls.push_back(SubDecl);
-    }
-  }
-
-  ID.AddInteger(Decls.size());
-  for (auto *SubDecl : Decls) {
-    AddSubDecl(SubDecl);
-  }
 }
 
 void ODRHash::AddDecl(const Decl *D) {
@@ -829,7 +670,7 @@ public:
     }
   }
 
-  void AddDecl(const Decl *D) {
+  void AddDecl(Decl *D) {
     Hash.AddBoolean(D);
     if (D) {
       Hash.AddDecl(D);
@@ -918,7 +759,29 @@ public:
   void VisitType(const Type *T) {}
 
   void VisitAdjustedType(const AdjustedType *T) {
-    AddQualType(T->getOriginalType());
+    QualType Original = T->getOriginalType();
+    QualType Adjusted = T->getAdjustedType();
+
+    // The original type and pointee type can be the same, as in the case of
+    // function pointers decaying to themselves.  Set a bool and only process
+    // the type once, to prevent doubling the work.
+    SplitQualType split = Adjusted.split();
+    if (auto Pointer = dyn_cast<PointerType>(split.Ty)) {
+      if (Pointer->getPointeeType() == Original) {
+        Hash.AddBoolean(true);
+        ID.AddInteger(split.Quals.getAsOpaqueValue());
+        AddQualType(Original);
+        VisitType(T);
+        return;
+      }
+    }
+
+    // The original type and pointee type are different, such as in the case
+    // of a array decaying to an element pointer.  Set a bool to false and
+    // process both types.
+    Hash.AddBoolean(false);
+    AddQualType(Original);
+    AddQualType(Adjusted);
 
     VisitType(T);
   }
@@ -931,7 +794,7 @@ public:
 
   void VisitArrayType(const ArrayType *T) {
     AddQualType(T->getElementType());
-    ID.AddInteger(llvm::to_underlying(T->getSizeModifier()));
+    ID.AddInteger(T->getSizeModifier());
     VisitQualifiers(T->getIndexTypeQualifiers());
     VisitType(T);
   }
@@ -957,6 +820,7 @@ public:
   void VisitAttributedType(const AttributedType *T) {
     ID.AddInteger(T->getAttrKind());
     AddQualType(T->getModifiedType());
+    AddQualType(T->getEquivalentType());
 
     VisitType(T);
   }
@@ -978,6 +842,7 @@ public:
 
   void VisitDecltypeType(const DecltypeType *T) {
     AddStmt(T->getUnderlyingExpr());
+    AddQualType(T->getUnderlyingType());
     VisitType(T);
   }
 
@@ -995,7 +860,7 @@ public:
     ID.AddInteger(T->isConstrained());
     if (T->isConstrained()) {
       AddDecl(T->getTypeConstraintConcept());
-      ID.AddInteger(T->getTypeConstraintArguments().size());
+      ID.AddInteger(T->getNumArgs());
       for (const auto &TA : T->getTypeConstraintArguments())
         Hash.AddTemplateArgument(TA);
     }
@@ -1068,7 +933,7 @@ public:
 
     auto Protocols = T->getProtocols();
     ID.AddInteger(Protocols.size());
-    for (auto *Protocol : Protocols) {
+    for (auto Protocol : Protocols) {
       AddDecl(Protocol);
     }
 
@@ -1086,7 +951,7 @@ public:
     AddDecl(T->getDecl());
     auto Protocols = T->getProtocols();
     ID.AddInteger(Protocols.size());
-    for (auto *Protocol : Protocols) {
+    for (auto Protocol : Protocols) {
       AddDecl(Protocol);
     }
 
@@ -1129,13 +994,13 @@ public:
 
   void
   VisitSubstTemplateTypeParmPackType(const SubstTemplateTypeParmPackType *T) {
-    AddDecl(T->getAssociatedDecl());
+    AddType(T->getReplacedParameter());
     Hash.AddTemplateArgument(T->getArgumentPack());
     VisitType(T);
   }
 
   void VisitSubstTemplateTypeParmType(const SubstTemplateTypeParmType *T) {
-    AddDecl(T->getAssociatedDecl());
+    AddType(T->getReplacedParameter());
     AddQualType(T->getReplacementType());
     VisitType(T);
   }
@@ -1149,7 +1014,7 @@ public:
   void VisitEnumType(const EnumType *T) { VisitTagType(T); }
 
   void VisitTemplateSpecializationType(const TemplateSpecializationType *T) {
-    ID.AddInteger(T->template_arguments().size());
+    ID.AddInteger(T->getNumArgs());
     for (const auto &TA : T->template_arguments()) {
       Hash.AddTemplateArgument(TA);
     }
@@ -1166,22 +1031,41 @@ public:
 
   void VisitTypedefType(const TypedefType *T) {
     AddDecl(T->getDecl());
+    QualType UnderlyingType = T->getDecl()->getUnderlyingType();
+    VisitQualifiers(UnderlyingType.getQualifiers());
+    while (true) {
+      if (const TypedefType *Underlying =
+              dyn_cast<TypedefType>(UnderlyingType.getTypePtr())) {
+        UnderlyingType = Underlying->getDecl()->getUnderlyingType();
+        continue;
+      }
+      if (const ElaboratedType *Underlying =
+              dyn_cast<ElaboratedType>(UnderlyingType.getTypePtr())) {
+        UnderlyingType = Underlying->getNamedType();
+        continue;
+      }
+
+      break;
+    }
+    AddType(UnderlyingType.getTypePtr());
     VisitType(T);
   }
 
   void VisitTypeOfExprType(const TypeOfExprType *T) {
     AddStmt(T->getUnderlyingExpr());
     Hash.AddBoolean(T->isSugared());
+    if (T->isSugared())
+      AddQualType(T->desugar());
 
     VisitType(T);
   }
   void VisitTypeOfType(const TypeOfType *T) {
-    AddQualType(T->getUnmodifiedType());
+    AddQualType(T->getUnderlyingType());
     VisitType(T);
   }
 
   void VisitTypeWithKeyword(const TypeWithKeyword *T) {
-    ID.AddInteger(llvm::to_underlying(T->getKeyword()));
+    ID.AddInteger(T->getKeyword());
     VisitType(T);
   };
 
@@ -1195,7 +1079,7 @@ public:
       const DependentTemplateSpecializationType *T) {
     AddIdentifierInfo(T->getIdentifier());
     AddNestedNameSpecifier(T->getQualifier());
-    ID.AddInteger(T->template_arguments().size());
+    ID.AddInteger(T->getNumArgs());
     for (const auto &TA : T->template_arguments()) {
       Hash.AddTemplateArgument(TA);
     }
@@ -1222,7 +1106,7 @@ public:
   void VisitVectorType(const VectorType *T) {
     AddQualType(T->getElementType());
     ID.AddInteger(T->getNumElements());
-    ID.AddInteger(llvm::to_underlying(T->getVectorKind()));
+    ID.AddInteger(T->getVectorKind());
     VisitType(T);
   }
 

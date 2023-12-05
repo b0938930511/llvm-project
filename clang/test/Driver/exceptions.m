@@ -1,11 +1,11 @@
-// RUN: %clang -target x86_64-apple-darwin11 \
+// RUN: %clang -target x86_64-apple-darwin9 \
 // RUN:   -fsyntax-only -fno-exceptions %s
 
-void f1(void) {
+void f1() {
   @throw @"A";
 }
 
-void f0(void) {
+void f0() {
   @try {
     f1();
   } @catch (id x) {
@@ -13,7 +13,7 @@ void f0(void) {
   }
 }
 
-int main(void) {
+int main() {
   f0();
   return 0;
 }

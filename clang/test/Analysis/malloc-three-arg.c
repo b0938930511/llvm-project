@@ -6,14 +6,13 @@
 #define NULL ((void *)0)
 
 void *malloc(size_t, void *, int);
-void free(void *);
 
 struct test {
 };
 
 void foo(struct test *);
 
-void test_zeroed(void) {
+void test_zeroed() {
   struct test **list, *t;
   int i;
 
@@ -28,7 +27,7 @@ void test_zeroed(void) {
   free(list); // no-warning
 }
 
-void test_nonzero(void) {
+void test_nonzero() {
   struct test **list, *t;
   int i;
 

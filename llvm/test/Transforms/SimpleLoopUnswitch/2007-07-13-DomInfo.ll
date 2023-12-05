@@ -1,6 +1,7 @@
-; RUN: opt < %s -passes=simple-loop-unswitch -verify-memoryssa -disable-output
+; RUN: opt < %s -simple-loop-unswitch -disable-output
+; RUN: opt < %s -simple-loop-unswitch -enable-mssa-loop-dependency=true -verify-memoryssa -disable-output
 
-define i32 @main(i32 %argc, ptr %argv) {
+define i32 @main(i32 %argc, i8** %argv) {
 entry:
 	%tmp1785365 = icmp ult i32 0, 100		; <i1> [#uses=1]
 	br label %bb

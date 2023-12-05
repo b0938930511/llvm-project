@@ -5,6 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+//
+// UNSUPPORTED: libcpp-has-no-threads
 
 // <atomic>
 
@@ -22,44 +24,44 @@ int main(int, char**)
 {
     {
         std::atomic_flag f; // uninitialized first
-        std::atomic_flag_clear_explicit(&f, std::memory_order_relaxed);
+        atomic_flag_clear_explicit(&f, std::memory_order_relaxed);
         assert(f.test_and_set() == 0);
-        std::atomic_flag_clear_explicit(&f, std::memory_order_relaxed);
-        assert(f.test_and_set() == 0);
-    }
-    {
-        std::atomic_flag f;
-        std::atomic_flag_clear_explicit(&f, std::memory_order_release);
-        assert(f.test_and_set() == 0);
-        std::atomic_flag_clear_explicit(&f, std::memory_order_release);
+        atomic_flag_clear_explicit(&f, std::memory_order_relaxed);
         assert(f.test_and_set() == 0);
     }
     {
         std::atomic_flag f;
-        std::atomic_flag_clear_explicit(&f, std::memory_order_seq_cst);
+        atomic_flag_clear_explicit(&f, std::memory_order_release);
         assert(f.test_and_set() == 0);
-        std::atomic_flag_clear_explicit(&f, std::memory_order_seq_cst);
+        atomic_flag_clear_explicit(&f, std::memory_order_release);
+        assert(f.test_and_set() == 0);
+    }
+    {
+        std::atomic_flag f;
+        atomic_flag_clear_explicit(&f, std::memory_order_seq_cst);
+        assert(f.test_and_set() == 0);
+        atomic_flag_clear_explicit(&f, std::memory_order_seq_cst);
         assert(f.test_and_set() == 0);
     }
     {
         volatile std::atomic_flag f;
-        std::atomic_flag_clear_explicit(&f, std::memory_order_relaxed);
+        atomic_flag_clear_explicit(&f, std::memory_order_relaxed);
         assert(f.test_and_set() == 0);
-        std::atomic_flag_clear_explicit(&f, std::memory_order_relaxed);
-        assert(f.test_and_set() == 0);
-    }
-    {
-        volatile std::atomic_flag f;
-        std::atomic_flag_clear_explicit(&f, std::memory_order_release);
-        assert(f.test_and_set() == 0);
-        std::atomic_flag_clear_explicit(&f, std::memory_order_release);
+        atomic_flag_clear_explicit(&f, std::memory_order_relaxed);
         assert(f.test_and_set() == 0);
     }
     {
         volatile std::atomic_flag f;
-        std::atomic_flag_clear_explicit(&f, std::memory_order_seq_cst);
+        atomic_flag_clear_explicit(&f, std::memory_order_release);
         assert(f.test_and_set() == 0);
-        std::atomic_flag_clear_explicit(&f, std::memory_order_seq_cst);
+        atomic_flag_clear_explicit(&f, std::memory_order_release);
+        assert(f.test_and_set() == 0);
+    }
+    {
+        volatile std::atomic_flag f;
+        atomic_flag_clear_explicit(&f, std::memory_order_seq_cst);
+        assert(f.test_and_set() == 0);
+        atomic_flag_clear_explicit(&f, std::memory_order_seq_cst);
         assert(f.test_and_set() == 0);
     }
 

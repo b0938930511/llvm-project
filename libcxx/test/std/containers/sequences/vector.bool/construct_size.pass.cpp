@@ -19,8 +19,9 @@
 #include "test_allocator.h"
 
 template <class C>
-TEST_CONSTEXPR_CXX20 void test2(typename C::size_type n,
-                                typename C::allocator_type const& a = typename C::allocator_type ())
+void
+test2(typename C::size_type n,
+      typename C::allocator_type const& a = typename C::allocator_type ())
 {
 #if TEST_STD_VER >= 14
     C c(n, a);
@@ -36,7 +37,8 @@ TEST_CONSTEXPR_CXX20 void test2(typename C::size_type n,
 }
 
 template <class C>
-TEST_CONSTEXPR_CXX20 void test1(typename C::size_type n)
+void
+test1(typename C::size_type n)
 {
     C c(n);
     LIBCPP_ASSERT(c.__invariants());
@@ -47,13 +49,14 @@ TEST_CONSTEXPR_CXX20 void test1(typename C::size_type n)
 }
 
 template <class C>
-TEST_CONSTEXPR_CXX20 void test(typename C::size_type n)
+void
+test(typename C::size_type n)
 {
     test1<C> ( n );
     test2<C> ( n );
 }
 
-TEST_CONSTEXPR_CXX20 bool tests()
+int main(int, char**)
 {
     test<std::vector<bool> >(50);
 #if TEST_STD_VER >= 11
@@ -61,14 +64,5 @@ TEST_CONSTEXPR_CXX20 bool tests()
     test2<std::vector<bool, test_allocator<bool>> >( 100, test_allocator<bool>(23));
 #endif
 
-    return true;
-}
-
-int main(int, char**)
-{
-    tests();
-#if TEST_STD_VER > 17
-    static_assert(tests());
-#endif
-    return 0;
+  return 0;
 }

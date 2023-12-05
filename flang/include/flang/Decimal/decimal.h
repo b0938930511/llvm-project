@@ -43,6 +43,14 @@ struct ConversionToDecimalResult {
   enum ConversionResultFlags flags;
 };
 
+enum FortranRounding {
+  RoundNearest, /* RN and RP */
+  RoundUp, /* RU */
+  RoundDown, /* RD */
+  RoundToZero, /* RZ - no rounding */
+  RoundCompatible, /* RC: like RN, but ties go away from 0 */
+};
+
 /* The "minimize" flag causes the fewest number of output digits
  * to be emitted such that reading them back into the same binary
  * floating-point format with RoundNearest will return the same
@@ -93,21 +101,21 @@ template <int PREC> struct ConversionToBinaryResult {
 };
 
 template <int PREC>
-ConversionToBinaryResult<PREC> ConvertToBinary(const char *&,
-    enum FortranRounding = RoundNearest, const char *end = nullptr);
+ConversionToBinaryResult<PREC> ConvertToBinary(
+    const char *&, enum FortranRounding = RoundNearest);
 
 extern template ConversionToBinaryResult<8> ConvertToBinary<8>(
-    const char *&, enum FortranRounding, const char *end);
+    const char *&, enum FortranRounding);
 extern template ConversionToBinaryResult<11> ConvertToBinary<11>(
-    const char *&, enum FortranRounding, const char *end);
+    const char *&, enum FortranRounding);
 extern template ConversionToBinaryResult<24> ConvertToBinary<24>(
-    const char *&, enum FortranRounding, const char *end);
+    const char *&, enum FortranRounding);
 extern template ConversionToBinaryResult<53> ConvertToBinary<53>(
-    const char *&, enum FortranRounding, const char *end);
+    const char *&, enum FortranRounding);
 extern template ConversionToBinaryResult<64> ConvertToBinary<64>(
-    const char *&, enum FortranRounding, const char *end);
+    const char *&, enum FortranRounding);
 extern template ConversionToBinaryResult<113> ConvertToBinary<113>(
-    const char *&, enum FortranRounding, const char *end);
+    const char *&, enum FortranRounding);
 } // namespace Fortran::decimal
 extern "C" {
 #define NS(x) Fortran::decimal::x

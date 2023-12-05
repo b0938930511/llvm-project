@@ -12,12 +12,19 @@
 //===----------------------------------------------------------------------===//
 
 #include "flang/Lower/Coarray.h"
+#include "SymbolMap.h"
 #include "flang/Lower/AbstractConverter.h"
-#include "flang/Lower/SymbolMap.h"
-#include "flang/Optimizer/Builder/FIRBuilder.h"
-#include "flang/Optimizer/Builder/Todo.h"
+#include "flang/Lower/FIRBuilder.h"
 #include "flang/Parser/parse-tree.h"
 #include "flang/Semantics/expression.h"
+
+#undef TODO
+#define TODO(MSG)                                                              \
+  {                                                                            \
+    mlir::emitError(converter.getCurrentLocation(), "not yet implemented")     \
+        << MSG;                                                                \
+    exit(1);                                                                   \
+  }
 
 //===----------------------------------------------------------------------===//
 // TEAM statements and constructs
@@ -27,27 +34,27 @@ void Fortran::lower::genChangeTeamConstruct(
     Fortran::lower::AbstractConverter &converter,
     Fortran::lower::pft::Evaluation &,
     const Fortran::parser::ChangeTeamConstruct &) {
-  TODO(converter.getCurrentLocation(), "coarray: CHANGE TEAM construct");
+  TODO("CHANGE TEAM construct");
 }
 
 void Fortran::lower::genChangeTeamStmt(
     Fortran::lower::AbstractConverter &converter,
     Fortran::lower::pft::Evaluation &,
     const Fortran::parser::ChangeTeamStmt &) {
-  TODO(converter.getCurrentLocation(), "coarray: CHANGE TEAM statement");
+  TODO("CHANGE TEAM stmt");
 }
 
 void Fortran::lower::genEndChangeTeamStmt(
     Fortran::lower::AbstractConverter &converter,
     Fortran::lower::pft::Evaluation &,
     const Fortran::parser::EndChangeTeamStmt &) {
-  TODO(converter.getCurrentLocation(), "coarray: END CHANGE TEAM statement");
+  TODO("END CHANGE TEAM");
 }
 
 void Fortran::lower::genFormTeamStatement(
     Fortran::lower::AbstractConverter &converter,
     Fortran::lower::pft::Evaluation &, const Fortran::parser::FormTeamStmt &) {
-  TODO(converter.getCurrentLocation(), "coarray: FORM TEAM statement");
+  TODO("FORM TEAM");
 }
 
 //===----------------------------------------------------------------------===//
@@ -57,10 +64,10 @@ void Fortran::lower::genFormTeamStatement(
 fir::ExtendedValue Fortran::lower::CoarrayExprHelper::genAddr(
     const Fortran::evaluate::CoarrayRef &expr) {
   (void)symMap;
-  TODO(converter.getCurrentLocation(), "co-array address");
+  TODO("co-array address");
 }
 
 fir::ExtendedValue Fortran::lower::CoarrayExprHelper::genValue(
     const Fortran::evaluate::CoarrayRef &expr) {
-  TODO(converter.getCurrentLocation(), "co-array value");
+  TODO("co-array value");
 }

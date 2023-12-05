@@ -6,82 +6,45 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef FORTRAN_OPTIMIZER_TRANSFORMS_PASSES_H
-#define FORTRAN_OPTIMIZER_TRANSFORMS_PASSES_H
+#ifndef OPTIMIZER_TRANSFORMS_PASSES_H
+#define OPTIMIZER_TRANSFORMS_PASSES_H
 
-#include "flang/Optimizer/Dialect/FIROps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 #include <memory>
 
 namespace mlir {
-class IRMapping;
-class GreedyRewriteConfig;
+class BlockAndValueMapping;
 class Operation;
 class Pass;
 class Region;
-class ModuleOp;
 } // namespace mlir
 
 namespace fir {
 
-//===----------------------------------------------------------------------===//
-// Passes defined in Passes.td
-//===----------------------------------------------------------------------===//
+/// Convert fir.select_type to the standard dialect
+std::unique_ptr<mlir::Pass> createControlFlowLoweringPass();
 
-#define GEN_PASS_DECL_ABSTRACTRESULTONFUNCOPT
-#define GEN_PASS_DECL_ABSTRACTRESULTONGLOBALOPT
-#define GEN_PASS_DECL_AFFINEDIALECTPROMOTION
-#define GEN_PASS_DECL_AFFINEDIALECTDEMOTION
-#define GEN_PASS_DECL_ANNOTATECONSTANTOPERANDS
-#define GEN_PASS_DECL_ARRAYVALUECOPY
-#define GEN_PASS_DECL_CHARACTERCONVERSION
-#define GEN_PASS_DECL_CFGCONVERSION
-#define GEN_PASS_DECL_EXTERNALNAMECONVERSION
-#define GEN_PASS_DECL_MEMREFDATAFLOWOPT
-#define GEN_PASS_DECL_SIMPLIFYINTRINSICS
-#define GEN_PASS_DECL_MEMORYALLOCATIONOPT
-#define GEN_PASS_DECL_SIMPLIFYREGIONLITE
-#define GEN_PASS_DECL_ALGEBRAICSIMPLIFICATION
-#define GEN_PASS_DECL_POLYMORPHICOPCONVERSION
-#define GEN_PASS_DECL_OPENACCDATAOPERANDCONVERSION
-#include "flang/Optimizer/Transforms/Passes.h.inc"
+/// Effects aware CSE pass
+std::unique_ptr<mlir::Pass> createCSEPass();
 
-std::unique_ptr<mlir::Pass> createAbstractResultOnFuncOptPass();
-std::unique_ptr<mlir::Pass> createAbstractResultOnGlobalOptPass();
-std::unique_ptr<mlir::Pass> createAffineDemotionPass();
-std::unique_ptr<mlir::Pass>
-createArrayValueCopyPass(fir::ArrayValueCopyOptions options = {});
-std::unique_ptr<mlir::Pass> createFirToCfgPass();
-std::unique_ptr<mlir::Pass> createCharacterConversionPass();
-std::unique_ptr<mlir::Pass> createExternalNameConversionPass();
-std::unique_ptr<mlir::Pass>
-createExternalNameConversionPass(bool appendUnderscore);
-std::unique_ptr<mlir::Pass> createMemDataFlowOptPass();
+/// Convert FIR loop constructs to the Affine dialect
 std::unique_ptr<mlir::Pass> createPromoteToAffinePass();
-std::unique_ptr<mlir::Pass> createMemoryAllocationPass();
-std::unique_ptr<mlir::Pass> createStackArraysPass();
-std::unique_ptr<mlir::Pass> createAliasTagsPass();
-std::unique_ptr<mlir::Pass> createSimplifyIntrinsicsPass();
-std::unique_ptr<mlir::Pass> createAddDebugFoundationPass();
-std::unique_ptr<mlir::Pass> createLoopVersioningPass();
 
-std::unique_ptr<mlir::Pass>
-createMemoryAllocationPass(bool dynOnHeap, std::size_t maxStackSize);
-std::unique_ptr<mlir::Pass> createAnnotateConstantOperandsPass();
-std::unique_ptr<mlir::Pass> createSimplifyRegionLitePass();
-std::unique_ptr<mlir::Pass> createAlgebraicSimplificationPass();
-std::unique_ptr<mlir::Pass>
-createAlgebraicSimplificationPass(const mlir::GreedyRewriteConfig &config);
-std::unique_ptr<mlir::Pass> createPolymorphicOpConversionPass();
+/// Convert `fir.do_loop` and `fir.if` to a CFG.  This
+/// conversion enables the `createLowerToCFGPass` to transform these to CFG
+/// form.
+std::unique_ptr<mlir::Pass> createFirToCfgPass();
 
-std::unique_ptr<mlir::Pass> createOMPFunctionFilteringPass();
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-createOMPMarkDeclareTargetPass();
+/// A pass to convert the FIR dialect from "Mem-SSA" form to "Reg-SSA"
+/// form. This pass is a port of LLVM's mem2reg pass, but modified for the FIR
+/// dialect as well as the restructuring of MLIR's representation to present PHI
+/// nodes as block arguments.
+std::unique_ptr<mlir::Pass> createMemToRegPass();
 
-std::unique_ptr<mlir::Pass> createVScaleAttrPass();
-std::unique_ptr<mlir::Pass>
-createVScaleAttrPass(std::pair<unsigned, unsigned> vscaleAttr);
+/// Support for inlining on FIR.
+bool canLegallyInline(mlir::Operation *op, mlir::Region *reg,
+                      mlir::BlockAndValueMapping &map);
 
 // declarative passes
 #define GEN_PASS_REGISTRATION
@@ -89,4 +52,4 @@ createVScaleAttrPass(std::pair<unsigned, unsigned> vscaleAttr);
 
 } // namespace fir
 
-#endif // FORTRAN_OPTIMIZER_TRANSFORMS_PASSES_H
+#endif // OPTIMIZER_TRANSFORMS_PASSES_H

@@ -1,4 +1,4 @@
-; RUN: opt -passes=instsimplify < %s
+; RUN: opt -instsimplify < %s
 
 ; Make sure we don't crash on this one
 

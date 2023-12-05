@@ -7,9 +7,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "Annotations.h"
+#include "ClangdLSPServer.h"
 #include "ClangdServer.h"
 #include "CodeComplete.h"
-#include "CompileCommands.h"
 #include "ConfigFragment.h"
 #include "GlobalCompilationDatabase.h"
 #include "Matchers.h"
@@ -17,6 +17,7 @@
 #include "TestFS.h"
 #include "TestTU.h"
 #include "TidyProvider.h"
+#include "URI.h"
 #include "refactor/Tweak.h"
 #include "support/MemoryTree.h"
 #include "support/Path.h"
@@ -25,11 +26,13 @@
 #include "clang/Sema/CodeCompleteConsumer.h"
 #include "clang/Tooling/ArgumentsAdjusters.h"
 #include "clang/Tooling/Core/Replacement.h"
-#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/None.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/Errc.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Regex.h"
@@ -40,7 +43,6 @@
 #include <algorithm>
 #include <chrono>
 #include <iostream>
-#include <optional>
 #include <random>
 #include <string>
 #include <thread>
@@ -52,8 +54,10 @@ namespace clangd {
 namespace {
 
 using ::testing::AllOf;
+using ::testing::Contains;
 using ::testing::ElementsAre;
 using ::testing::Field;
+using ::testing::Gt;
 using ::testing::IsEmpty;
 using ::testing::Pair;
 using ::testing::SizeIs;
@@ -76,7 +80,7 @@ bool diagsContainErrors(const std::vector<Diag> &Diagnostics) {
 class ErrorCheckingCallbacks : public ClangdServer::Callbacks {
 public:
   void onDiagnosticsReady(PathRef File, llvm::StringRef Version,
-                          llvm::ArrayRef<Diag> Diagnostics) override {
+                          std::vector<Diag> Diagnostics) override {
     bool HadError = diagsContainErrors(Diagnostics);
     std::lock_guard<std::mutex> Lock(Mutex);
     HadErrorInLastDiags = HadError;
@@ -97,7 +101,7 @@ private:
 class MultipleErrorCheckingCallbacks : public ClangdServer::Callbacks {
 public:
   void onDiagnosticsReady(PathRef File, llvm::StringRef Version,
-                          llvm::ArrayRef<Diag> Diagnostics) override {
+                          std::vector<Diag> Diagnostics) override {
     bool HadError = diagsContainErrors(Diagnostics);
 
     std::lock_guard<std::mutex> Lock(Mutex);
@@ -210,7 +214,7 @@ TEST(ClangdServerTest, ParseWithHeader) {
   parseSourceAndDumpAST("foo.cpp", "#include \"foo.h\"", {{"foo.h", ""}},
                         /*ExpectErrors=*/false);
 
-  const auto *SourceContents = R"cpp(
+  const auto SourceContents = R"cpp(
 #include "foo.h"
 int b = a;
 )cpp";
@@ -226,7 +230,7 @@ TEST(ClangdServerTest, Reparse) {
   MockCompilationDatabase CDB;
   ClangdServer Server(CDB, FS, ClangdServer::optsForTest(), &DiagConsumer);
 
-  const auto *SourceContents = R"cpp(
+  const auto SourceContents = R"cpp(
 #include "foo.h"
 int b = a;
 )cpp";
@@ -261,7 +265,7 @@ TEST(ClangdServerTest, ReparseOnHeaderChange) {
   MockCompilationDatabase CDB;
   ClangdServer Server(CDB, FS, ClangdServer::optsForTest(), &DiagConsumer);
 
-  const auto *SourceContents = R"cpp(
+  const auto SourceContents = R"cpp(
 #include "foo.h"
 int b = a;
 )cpp";
@@ -306,7 +310,7 @@ TEST(ClangdServerTest, PropagatesContexts) {
   } FS;
   struct Callbacks : public ClangdServer::Callbacks {
     void onDiagnosticsReady(PathRef File, llvm::StringRef Version,
-                            llvm::ArrayRef<Diag> Diagnostics) override {
+                            std::vector<Diag> Diagnostics) override {
       Got = Context::current().getExisting(Secret);
     }
     int Got;
@@ -350,7 +354,7 @@ TEST(ClangdServerTest, RespectsConfig) {
   Opts.ContextProvider =
       ClangdServer::createConfiguredContextProvider(&CfgProvider, nullptr);
   OverlayCDB CDB(/*Base=*/nullptr, /*FallbackFlags=*/{},
-                 CommandMangler::forTests());
+                 tooling::ArgumentsAdjuster(CommandMangler::forTests()));
   MockFS FS;
   ClangdServer Server(CDB, FS, Opts);
   // foo.cc sees the expected definition, as FOO is defined.
@@ -372,7 +376,7 @@ TEST(ClangdServerTest, PropagatesVersion) {
   MockFS FS;
   struct Callbacks : public ClangdServer::Callbacks {
     void onDiagnosticsReady(PathRef File, llvm::StringRef Version,
-                            llvm::ArrayRef<Diag> Diagnostics) override {
+                            std::vector<Diag> Diagnostics) override {
       Got = Version.str();
     }
     std::string Got = "";
@@ -418,7 +422,7 @@ TEST(ClangdServerTest, SearchLibDir) {
   FS.Files[StringPath] = "class mock_string {};";
 
   auto FooCpp = testPath("foo.cpp");
-  const auto *SourceContents = R"cpp(
+  const auto SourceContents = R"cpp(
 #include <string>
 mock_string x;
 )cpp";
@@ -427,7 +431,7 @@ mock_string x;
   runAddDocument(Server, FooCpp, SourceContents);
   EXPECT_FALSE(DiagConsumer.hadErrorInLastDiags());
 
-  const auto *SourceContentsWithError = R"cpp(
+  const auto SourceContentsWithError = R"cpp(
 #include <string>
 std::string x;
 )cpp";
@@ -443,11 +447,11 @@ TEST(ClangdServerTest, ForceReparseCompileCommand) {
   ClangdServer Server(CDB, FS, ClangdServer::optsForTest(), &DiagConsumer);
 
   auto FooCpp = testPath("foo.cpp");
-  const auto *SourceContents1 = R"cpp(
+  const auto SourceContents1 = R"cpp(
 template <class T>
 struct foo { T x; };
 )cpp";
-  const auto *SourceContents2 = R"cpp(
+  const auto SourceContents2 = R"cpp(
 template <class T>
 struct bar { T x; };
 )cpp";
@@ -479,7 +483,7 @@ TEST(ClangdServerTest, ForceReparseCompileCommandDefines) {
   ClangdServer Server(CDB, FS, ClangdServer::optsForTest(), &DiagConsumer);
 
   auto FooCpp = testPath("foo.cpp");
-  const auto *SourceContents = R"cpp(
+  const auto SourceContents = R"cpp(
 #ifdef WITH_ERROR
 this
 #endif
@@ -583,7 +587,7 @@ TEST(ClangdServerTest, FileStats) {
   ClangdServer Server(CDB, FS, ClangdServer::optsForTest(), &DiagConsumer);
 
   Path FooCpp = testPath("foo.cpp");
-  const auto *SourceContents = R"cpp(
+  const auto SourceContents = R"cpp(
 struct Something {
   int method();
 };
@@ -620,8 +624,10 @@ TEST(ClangdServerTest, InvalidCompileCommand) {
   ClangdServer Server(CDB, FS, ClangdServer::optsForTest(), &DiagConsumer);
 
   auto FooCpp = testPath("foo.cpp");
-  // clang cannot create CompilerInvocation in this case.
-  CDB.ExtraClangFlags.push_back("-###");
+  // clang cannot create CompilerInvocation if we pass two files in the
+  // CompileCommand. We pass the file in ExtraFlags once and CDB adds another
+  // one in getCompileCommand().
+  CDB.ExtraClangFlags.push_back(FooCpp);
 
   // Clang can't parse command args in that case, but we shouldn't crash.
   runAddDocument(Server, FooCpp, "int main() {}");
@@ -631,8 +637,7 @@ TEST(ClangdServerTest, InvalidCompileCommand) {
   EXPECT_ERROR(runFindDocumentHighlights(Server, FooCpp, Position()));
   EXPECT_ERROR(runRename(Server, FooCpp, Position(), "new_name",
                          clangd::RenameOptions()));
-  EXPECT_ERROR(
-      runSignatureHelp(Server, FooCpp, Position(), MarkupKind::PlainText));
+  EXPECT_ERROR(runSignatureHelp(Server, FooCpp, Position()));
   // Identifier-based fallback completion.
   EXPECT_THAT(cantFail(runCodeComplete(Server, FooCpp, Position(),
                                        clangd::CodeCompleteOptions()))
@@ -650,14 +655,14 @@ TEST(ClangdThreadingTest, StressTest) {
   // BlockingRequestInterval-request will be a blocking one.
   const unsigned BlockingRequestInterval = 40;
 
-  const auto *SourceContentsWithoutErrors = R"cpp(
+  const auto SourceContentsWithoutErrors = R"cpp(
 int a;
 int b;
 int c;
 int d;
 )cpp";
 
-  const auto *SourceContentsWithErrors = R"cpp(
+  const auto SourceContentsWithErrors = R"cpp(
 int a = x;
 int b;
 int c;
@@ -689,7 +694,7 @@ int d;
     TestDiagConsumer() : Stats(FilesCount, FileStat()) {}
 
     void onDiagnosticsReady(PathRef File, llvm::StringRef Version,
-                            llvm::ArrayRef<Diag> Diagnostics) override {
+                            std::vector<Diag> Diagnostics) override {
       StringRef FileIndexStr = llvm::sys::path::stem(File);
       ASSERT_TRUE(FileIndexStr.consume_front("Foo"));
 
@@ -868,7 +873,7 @@ TEST(ClangdThreadingTest, NoConcurrentDiagnostics) {
         : StartSecondReparse(std::move(StartSecondReparse)) {}
 
     void onDiagnosticsReady(PathRef, llvm::StringRef,
-                            llvm::ArrayRef<Diag>) override {
+                            std::vector<Diag>) override {
       ++Count;
       std::unique_lock<std::mutex> Lock(Mutex, std::try_to_lock_t());
       ASSERT_TRUE(Lock.owns_lock())
@@ -890,14 +895,14 @@ TEST(ClangdThreadingTest, NoConcurrentDiagnostics) {
     std::promise<void> StartSecondReparse;
   };
 
-  const auto *SourceContentsWithoutErrors = R"cpp(
+  const auto SourceContentsWithoutErrors = R"cpp(
 int a;
 int b;
 int c;
 int d;
 )cpp";
 
-  const auto *SourceContentsWithErrors = R"cpp(
+  const auto SourceContentsWithErrors = R"cpp(
 int a = x;
 int b;
 int c;
@@ -943,7 +948,7 @@ void f() {}
   FS.Files[Path] = Code;
   runAddDocument(Server, Path, Code);
 
-  auto Replaces = runFormatFile(Server, Path, /*Rng=*/std::nullopt);
+  auto Replaces = runFormatFile(Server, Path, /*Rng=*/llvm::None);
   EXPECT_TRUE(static_cast<bool>(Replaces));
   auto Changed = tooling::applyAllReplacements(Code, *Replaces);
   EXPECT_TRUE(static_cast<bool>(Changed));
@@ -1075,7 +1080,7 @@ TEST(ClangdServerTest, FallbackWhenPreambleIsNotReady) {
   Opts.RunParser = CodeCompleteOptions::ParseIfReady;
 
   // This will make compile command broken and preamble absent.
-  CDB.ExtraClangFlags = {"-###"};
+  CDB.ExtraClangFlags = {"yolo.cc"};
   Server.addDocument(FooCpp, Code.code());
   ASSERT_TRUE(Server.blockUntilIdleForTest());
   auto Res = cantFail(runCodeComplete(Server, FooCpp, Code.point(), Opts));
@@ -1111,7 +1116,7 @@ TEST(ClangdServerTest, FallbackWhenWaitingForCompileCommand) {
     DelayedCompilationDatabase(Notification &CanReturnCommand)
         : CanReturnCommand(CanReturnCommand) {}
 
-    std::optional<tooling::CompileCommand>
+    llvm::Optional<tooling::CompileCommand>
     getCompileCommand(PathRef File) const override {
       // FIXME: make this timeout and fail instead of waiting forever in case
       // something goes wrong.
@@ -1205,7 +1210,7 @@ TEST(ClangdServer, TidyOverrideTest) {
   struct DiagsCheckingCallback : public ClangdServer::Callbacks {
   public:
     void onDiagnosticsReady(PathRef File, llvm::StringRef Version,
-                            llvm::ArrayRef<Diag> Diagnostics) override {
+                            std::vector<Diag> Diagnostics) override {
       std::lock_guard<std::mutex> Lock(Mutex);
       HadDiagsInLastCallback = !Diagnostics.empty();
     }
@@ -1311,55 +1316,6 @@ TEST(ClangdServer, RespectsTweakFormatting) {
   });
   N.wait();
 }
-
-TEST(ClangdServer, InactiveRegions) {
-  struct InactiveRegionsCallback : ClangdServer::Callbacks {
-    std::vector<std::vector<Range>> FoundInactiveRegions;
-
-    void onInactiveRegionsReady(PathRef FIle,
-                                std::vector<Range> InactiveRegions) override {
-      FoundInactiveRegions.push_back(std::move(InactiveRegions));
-    }
-  };
-
-  MockFS FS;
-  MockCompilationDatabase CDB;
-  CDB.ExtraClangFlags.push_back("-DCMDMACRO");
-  auto Opts = ClangdServer::optsForTest();
-  Opts.PublishInactiveRegions = true;
-  InactiveRegionsCallback Callback;
-  ClangdServer Server(CDB, FS, Opts, &Callback);
-  Annotations Source(R"cpp(
-#define PREAMBLEMACRO 42
-#if PREAMBLEMACRO > 40
-  #define ACTIVE
-#else
-$inactive1[[  #define INACTIVE]]
-#endif
-int endPreamble;
-#ifndef CMDMACRO
-$inactive2[[    int inactiveInt;]]
-#endif
-#undef CMDMACRO
-#ifdef CMDMACRO
-$inactive3[[  int inactiveInt2;]]
-#elif PREAMBLEMACRO > 0
-  int activeInt1;
-  int activeInt2;
-#else
-$inactive4[[  int inactiveInt3;]]
-#endif
-#ifdef CMDMACRO
-#endif  // empty inactive range, gets dropped
-  )cpp");
-  Server.addDocument(testPath("foo.cpp"), Source.code());
-  ASSERT_TRUE(Server.blockUntilIdleForTest());
-  EXPECT_THAT(Callback.FoundInactiveRegions,
-              ElementsAre(ElementsAre(
-                  Source.range("inactive1"), Source.range("inactive2"),
-                  Source.range("inactive3"), Source.range("inactive4"))));
-}
-
 } // namespace
 } // namespace clangd
 } // namespace clang

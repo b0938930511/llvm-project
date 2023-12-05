@@ -86,7 +86,9 @@ macro(add_ubsan_device_testsuite test_mode sanitizer platform arch)
     ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py.in
     ${CMAKE_CURRENT_BINARY_DIR}/${CONFIG_NAME}/lit.site.cfg.py)
   #list(APPEND UBSAN_TESTSUITES ${CMAKE_CURRENT_BINARY_DIR}/${CONFIG_NAME})
-  list(APPEND UBSAN_TEST_DEPS ${sanitizer})
+  if(NOT COMPILER_RT_STANDALONE_BUILD)
+    list(APPEND UBSAN_TEST_DEPS ${sanitizer})
+  endif()
   add_lit_testsuite(check-ubsan-${test_mode}-${platform}-${arch}
     "UBSan ${CONFIG_NAME} tests"
     ${CMAKE_CURRENT_BINARY_DIR}/${CONFIG_NAME}/
@@ -99,6 +101,7 @@ if(APPLE)
     set(UBSAN_TEST_TARGET_ARCH ${arch})
     get_test_cc_for_arch(${arch} UBSAN_TEST_TARGET_CC UBSAN_TEST_TARGET_CFLAGS)
     set(UBSAN_TEST_TARGET_CFLAGS "${UBSAN_TEST_TARGET_CFLAGS} -lc++abi")
+    add_ubsan_testsuites("StandaloneStatic" ubsan ${arch})
   endforeach()
 
   # Device and simulator test suites.
@@ -106,7 +109,7 @@ if(APPLE)
   # "check-asan-iossim-x86_64" and similar. They also require that an extra env
   # variable to select which iOS device or simulator to use, e.g.:
   # SANITIZER_IOSSIM_TEST_DEVICE_IDENTIFIER="iPhone 6"
-  set(UBSAN_APPLE_PLATFORMS ${UBSAN_SUPPORTED_OS})
+  set(UBSAN_APPLE_PLATFORMS ${SANITIZER_COMMON_SUPPORTED_OS})
   foreach(platform ${UBSAN_APPLE_PLATFORMS})
     list_intersect(
       UBSAN_TEST_${platform}_ARCHS

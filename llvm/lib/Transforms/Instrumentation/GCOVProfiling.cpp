@@ -13,22 +13,29 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "CFGMST.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Sequence.h"
+#include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Analysis/BlockFrequencyInfo.h"
 #include "llvm/Analysis/BranchProbabilityInfo.h"
+#include "llvm/Analysis/EHPersonalities.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
+#include "llvm/IR/CFG.h"
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/DebugLoc.h"
-#include "llvm/IR/EHPersonalities.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Module.h"
+#include "llvm/InitializePasses.h"
+#include "llvm/Pass.h"
 #include "llvm/Support/CRC.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -37,7 +44,6 @@
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Instrumentation.h"
-#include "llvm/Transforms/Instrumentation/CFGMST.h"
 #include "llvm/Transforms/Instrumentation/GCOVProfiler.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 #include <algorithm>
@@ -80,8 +86,8 @@ GCOVOptions GCOVOptions::getDefault() {
   Options.Atomic = AtomicCounter;
 
   if (DefaultGCOVVersion.size() != 4) {
-    llvm::report_fatal_error(Twine("Invalid -default-gcov-version: ") +
-                             DefaultGCOVVersion, /*GenCrashDiag=*/false);
+    llvm::report_fatal_error(std::string("Invalid -default-gcov-version: ") +
+                             DefaultGCOVVersion);
   }
   memcpy(Options.Version, DefaultGCOVVersion.c_str(), 4);
   return Options;
@@ -119,8 +125,7 @@ private:
                    function_ref<BranchProbabilityInfo *(Function &F)> GetBPI,
                    function_ref<const TargetLibraryInfo &(Function &F)> GetTLI);
 
-  Function *createInternalFunction(FunctionType *FTy, StringRef Name,
-                                   StringRef MangledType = "");
+  Function *createInternalFunction(FunctionType *FTy, StringRef Name);
   void emitGlobalConstructor(
       SmallVectorImpl<std::pair<GlobalVariable *, MDNode *>> &CountersBySP);
 
@@ -148,7 +153,7 @@ private:
   std::string mangleName(const DICompileUnit *CU, GCovFileType FileType);
 
   GCOVOptions Options;
-  llvm::endianness Endian;
+  support::endianness Endian;
   raw_ostream *os;
 
   // Checksum, produced by hash of EdgeDestinations
@@ -162,6 +167,39 @@ private:
   std::vector<Regex> ExcludeRe;
   DenseSet<const BasicBlock *> ExecBlocks;
   StringMap<bool> InstrumentedFiles;
+};
+
+class GCOVProfilerLegacyPass : public ModulePass {
+public:
+  static char ID;
+  GCOVProfilerLegacyPass()
+      : GCOVProfilerLegacyPass(GCOVOptions::getDefault()) {}
+  GCOVProfilerLegacyPass(const GCOVOptions &Opts)
+      : ModulePass(ID), Profiler(Opts) {
+    initializeGCOVProfilerLegacyPassPass(*PassRegistry::getPassRegistry());
+  }
+  StringRef getPassName() const override { return "GCOV Profiler"; }
+
+  bool runOnModule(Module &M) override {
+    auto GetBFI = [this](Function &F) {
+      return &this->getAnalysis<BlockFrequencyInfoWrapperPass>(F).getBFI();
+    };
+    auto GetBPI = [this](Function &F) {
+      return &this->getAnalysis<BranchProbabilityInfoWrapperPass>(F).getBPI();
+    };
+    auto GetTLI = [this](Function &F) -> const TargetLibraryInfo & {
+      return this->getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(F);
+    };
+    return Profiler.runOnModule(M, GetBFI, GetBPI, GetTLI);
+  }
+
+  void getAnalysisUsage(AnalysisUsage &AU) const override {
+    AU.addRequired<BlockFrequencyInfoWrapperPass>();
+    AU.addRequired<TargetLibraryInfoWrapperPass>();
+  }
+
+private:
+  GCOVProfiler Profiler;
 };
 
 struct BBInfo {
@@ -197,6 +235,21 @@ struct Edge {
         .str();
   }
 };
+}
+
+char GCOVProfilerLegacyPass::ID = 0;
+INITIALIZE_PASS_BEGIN(
+    GCOVProfilerLegacyPass, "insert-gcov-profiling",
+    "Insert instrumentation for GCOV profiling", false, false)
+INITIALIZE_PASS_DEPENDENCY(BlockFrequencyInfoWrapperPass)
+INITIALIZE_PASS_DEPENDENCY(BranchProbabilityInfoWrapperPass)
+INITIALIZE_PASS_DEPENDENCY(TargetLibraryInfoWrapperPass)
+INITIALIZE_PASS_END(
+    GCOVProfilerLegacyPass, "insert-gcov-profiling",
+    "Insert instrumentation for GCOV profiling", false, false)
+
+ModulePass *llvm::createGCOVProfilerPass(const GCOVOptions &Options) {
+  return new GCOVProfilerLegacyPass(Options);
 }
 
 static StringRef getFunctionName(const DISubprogram *SP) {
@@ -252,8 +305,8 @@ namespace {
     void writeOut() {
       write(0);
       writeString(Filename);
-      for (uint32_t L : Lines)
-        write(L);
+      for (int i = 0, e = Lines.size(); i != e; ++i)
+        write(Lines[i]);
     }
 
     GCOVLines(GCOVProfiler *P, StringRef F)
@@ -596,8 +649,8 @@ static bool functionHasLines(const Function &F, unsigned &EndLine) {
   // Check whether this function actually has any source lines. Not only
   // do these waste space, they also can crash gcov.
   EndLine = 0;
-  for (const auto &BB : F) {
-    for (const auto &I : BB) {
+  for (auto &BB : F) {
+    for (auto &I : BB) {
       // Debug intrinsic locations correspond to the location of the
       // declaration, not necessarily any statements or expressions.
       if (isa<DbgInfoIntrinsic>(&I)) continue;
@@ -624,11 +677,10 @@ static bool isUsingScopeBasedEH(Function &F) {
 }
 
 bool GCOVProfiler::AddFlushBeforeForkAndExec() {
-  const TargetLibraryInfo *TLI = nullptr;
   SmallVector<CallInst *, 2> Forks;
   SmallVector<CallInst *, 2> Execs;
   for (auto &F : M->functions()) {
-    TLI = TLI == nullptr ? &GetTLI(F) : TLI;
+    auto *TLI = &GetTLI(F);
     for (auto &I : instructions(F)) {
       if (CallInst *CI = dyn_cast<CallInst>(&I)) {
         if (Function *Callee = CI->getCalledFunction()) {
@@ -650,16 +702,14 @@ bool GCOVProfiler::AddFlushBeforeForkAndExec() {
     }
   }
 
-  for (auto *F : Forks) {
+  for (auto F : Forks) {
     IRBuilder<> Builder(F);
     BasicBlock *Parent = F->getParent();
     auto NextInst = ++F->getIterator();
 
     // We've a fork so just reset the counters in the child process
     FunctionType *FTy = FunctionType::get(Builder.getInt32Ty(), {}, false);
-    FunctionCallee GCOVFork = M->getOrInsertFunction(
-        "__gcov_fork", FTy,
-        TLI->getAttrList(Ctx, {}, /*Signed=*/true, /*Ret=*/true));
+    FunctionCallee GCOVFork = M->getOrInsertFunction("__gcov_fork", FTy);
     F->setCalledFunction(GCOVFork);
 
     // We split just after the fork to have a counter for the lines after
@@ -677,7 +727,7 @@ bool GCOVProfiler::AddFlushBeforeForkAndExec() {
     Parent->back().setDebugLoc(Loc);
   }
 
-  for (auto *E : Execs) {
+  for (auto E : Execs) {
     IRBuilder<> Builder(E);
     BasicBlock *Parent = E->getParent();
     auto NextInst = ++E->getIterator();
@@ -750,7 +800,7 @@ static BasicBlock *getInstrBB(CFGMST<Edge, BBInfo> &MST, Edge &E,
 #ifndef NDEBUG
 static void dumpEdges(CFGMST<Edge, BBInfo> &MST, GCOVFunction &GF) {
   size_t ID = 0;
-  for (const auto &E : make_pointee_range(MST.allEdges())) {
+  for (auto &E : make_pointee_range(MST.AllEdges)) {
     GCOVBlock &Src = E.SrcBB ? GF.getBlock(E.SrcBB) : GF.getEntryBlock();
     GCOVBlock &Dst = E.DestBB ? GF.getBlock(E.DestBB) : GF.getReturnBlock();
     dbgs() << "  Edge " << ID++ << ": " << Src.Number << "->" << Dst.Number
@@ -788,8 +838,8 @@ bool GCOVProfiler::emitProfileNotes(
     std::vector<uint8_t> EdgeDestinations;
     SmallVector<std::pair<GlobalVariable *, MDNode *>, 8> CountersBySP;
 
-    Endian = M->getDataLayout().isLittleEndian() ? llvm::endianness::little
-                                                 : llvm::endianness::big;
+    Endian = M->getDataLayout().isLittleEndian() ? support::endianness::little
+                                                 : support::endianness::big;
     unsigned FunctionIdent = 0;
     for (auto &F : M->functions()) {
       DISubprogram *SP = F.getSubprogram();
@@ -800,8 +850,6 @@ bool GCOVProfiler::emitProfileNotes(
       // TODO: Functions using scope-based EH are currently not supported.
       if (isUsingScopeBasedEH(F)) continue;
       if (F.hasFnAttribute(llvm::Attribute::NoProfile))
-        continue;
-      if (F.hasFnAttribute(llvm::Attribute::SkipProfile))
         continue;
 
       // Add the function line number to the lines of the entry block
@@ -814,14 +862,13 @@ bool GCOVProfiler::emitProfileNotes(
 
       // Split indirectbr critical edges here before computing the MST rather
       // than later in getInstrBB() to avoid invalidating it.
-      SplitIndirectBrCriticalEdges(F, /*IgnoreBlocksWithoutPHI=*/false, BPI,
-                                   BFI);
+      SplitIndirectBrCriticalEdges(F, BPI, BFI);
 
       CFGMST<Edge, BBInfo> MST(F, /*InstrumentFuncEntry_=*/false, BPI, BFI);
 
       // getInstrBB can split basic blocks and push elements to AllEdges.
-      for (size_t I : llvm::seq<size_t>(0, MST.numEdges())) {
-        auto &E = *MST.allEdges()[I];
+      for (size_t I : llvm::seq<size_t>(0, MST.AllEdges.size())) {
+        auto &E = *MST.AllEdges[I];
         // For now, disable spanning tree optimization when fork or exec* is
         // used.
         if (HasExecOrFork)
@@ -836,16 +883,16 @@ bool GCOVProfiler::emitProfileNotes(
 
       // Some non-tree edges are IndirectBr which cannot be split. Ignore them
       // as well.
-      llvm::erase_if(MST.allEdges(), [](std::unique_ptr<Edge> &E) {
+      llvm::erase_if(MST.AllEdges, [](std::unique_ptr<Edge> &E) {
         return E->Removed || (!E->InMST && !E->Place);
       });
       const size_t Measured =
           std::stable_partition(
-              MST.allEdges().begin(), MST.allEdges().end(),
+              MST.AllEdges.begin(), MST.AllEdges.end(),
               [](std::unique_ptr<Edge> &E) { return E->Place; }) -
-          MST.allEdges().begin();
+          MST.AllEdges.begin();
       for (size_t I : llvm::seq<size_t>(0, Measured)) {
-        Edge &E = *MST.allEdges()[I];
+        Edge &E = *MST.AllEdges[I];
         GCOVBlock &Src =
             E.SrcBB ? Func.getBlock(E.SrcBB) : Func.getEntryBlock();
         GCOVBlock &Dst =
@@ -854,13 +901,13 @@ bool GCOVProfiler::emitProfileNotes(
         E.DstNumber = Dst.Number;
       }
       std::stable_sort(
-          MST.allEdges().begin(), MST.allEdges().begin() + Measured,
+          MST.AllEdges.begin(), MST.AllEdges.begin() + Measured,
           [](const std::unique_ptr<Edge> &L, const std::unique_ptr<Edge> &R) {
             return L->SrcNumber != R->SrcNumber ? L->SrcNumber < R->SrcNumber
                                                 : L->DstNumber < R->DstNumber;
           });
 
-      for (const Edge &E : make_pointee_range(MST.allEdges())) {
+      for (const Edge &E : make_pointee_range(MST.AllEdges)) {
         GCOVBlock &Src =
             E.SrcBB ? Func.getBlock(E.SrcBB) : Func.getEntryBlock();
         GCOVBlock &Dst =
@@ -883,7 +930,7 @@ bool GCOVProfiler::emitProfileNotes(
           while ((Idx >>= 8) > 0);
         }
 
-        for (const auto &I : BB) {
+        for (auto &I : BB) {
           // Debug intrinsic locations correspond to the location of the
           // declaration, not necessarily any statements or expressions.
           if (isa<DbgInfoIntrinsic>(&I)) continue;
@@ -898,9 +945,7 @@ bool GCOVProfiler::emitProfileNotes(
 
           if (Line == Loc.getLine()) continue;
           Line = Loc.getLine();
-          MDNode *Scope = Loc.getScope();
-          // TODO: Handle blocks from another file due to #line, #include, etc.
-          if (isa<DILexicalBlockFile>(Scope) || SP != getDISubprogram(Scope))
+          if (SP != getDISubprogram(Loc.getScope()))
             continue;
 
           GCOVLines &Lines = Block.getFile(Filename);
@@ -917,25 +962,19 @@ bool GCOVProfiler::emitProfileNotes(
         CountersBySP.emplace_back(Counters, SP);
 
         for (size_t I : llvm::seq<size_t>(0, Measured)) {
-          const Edge &E = *MST.allEdges()[I];
+          const Edge &E = *MST.AllEdges[I];
           IRBuilder<> Builder(E.Place, E.Place->getFirstInsertionPt());
           Value *V = Builder.CreateConstInBoundsGEP2_64(
               Counters->getValueType(), Counters, 0, I);
-          // Disable sanitizers to decrease size bloat. We don't expect
-          // sanitizers to catch interesting issues.
-          Instruction *Inst;
           if (Options.Atomic) {
-            Inst = Builder.CreateAtomicRMW(AtomicRMWInst::Add, V,
-                                           Builder.getInt64(1), MaybeAlign(),
-                                           AtomicOrdering::Monotonic);
+            Builder.CreateAtomicRMW(AtomicRMWInst::Add, V, Builder.getInt64(1),
+                                    MaybeAlign(), AtomicOrdering::Monotonic);
           } else {
-            LoadInst *OldCount =
+            Value *Count =
                 Builder.CreateLoad(Builder.getInt64Ty(), V, "gcov_ctr");
-            OldCount->setNoSanitizeMetadata();
-            Value *NewCount = Builder.CreateAdd(OldCount, Builder.getInt64(1));
-            Inst = Builder.CreateStore(NewCount, V);
+            Count = Builder.CreateAdd(Count, Builder.getInt64(1));
+            Builder.CreateStore(Count, V);
           }
-          Inst->setNoSanitizeMetadata();
         }
       }
     }
@@ -957,7 +996,7 @@ bool GCOVProfiler::emitProfileNotes(
         continue;
       }
       os = &out;
-      if (Endian == llvm::endianness::big) {
+      if (Endian == support::endianness::big) {
         out.write("gcno", 4);
         out.write(Options.Version, 4);
       } else {
@@ -988,16 +1027,13 @@ bool GCOVProfiler::emitProfileNotes(
 }
 
 Function *GCOVProfiler::createInternalFunction(FunctionType *FTy,
-                                               StringRef Name,
-                                               StringRef MangledType /*=""*/) {
+                                               StringRef Name) {
   Function *F = Function::createWithDefaultAttr(
       FTy, GlobalValue::InternalLinkage, 0, Name, M);
   F->setUnnamedAddr(GlobalValue::UnnamedAddr::Global);
   F->addFnAttr(Attribute::NoUnwind);
   if (Options.NoRedZone)
     F->addFnAttr(Attribute::NoRedZone);
-  if (!MangledType.empty())
-    setKCFIType(*M, *F, MangledType);
   return F;
 }
 
@@ -1010,7 +1046,7 @@ void GCOVProfiler::emitGlobalConstructor(
   // be executed at exit and the "__llvm_gcov_reset" function to be executed
   // when "__gcov_flush" is called.
   FunctionType *FTy = FunctionType::get(Type::getVoidTy(*Ctx), false);
-  Function *F = createInternalFunction(FTy, "__llvm_gcov_init", "_ZTSFvvE");
+  Function *F = createInternalFunction(FTy, "__llvm_gcov_init");
   F->addFnAttr(Attribute::NoInline);
 
   BasicBlock *BB = BasicBlock::Create(*Ctx, "entry", F);
@@ -1031,13 +1067,16 @@ void GCOVProfiler::emitGlobalConstructor(
 
 FunctionCallee GCOVProfiler::getStartFileFunc(const TargetLibraryInfo *TLI) {
   Type *Args[] = {
-      PointerType::getUnqual(*Ctx), // const char *orig_filename
-      Type::getInt32Ty(*Ctx),       // uint32_t version
-      Type::getInt32Ty(*Ctx),       // uint32_t checksum
+      Type::getInt8PtrTy(*Ctx), // const char *orig_filename
+      Type::getInt32Ty(*Ctx),   // uint32_t version
+      Type::getInt32Ty(*Ctx),   // uint32_t checksum
   };
   FunctionType *FTy = FunctionType::get(Type::getVoidTy(*Ctx), Args, false);
-  return M->getOrInsertFunction("llvm_gcda_start_file", FTy,
-                                TLI->getAttrList(Ctx, {1, 2}, /*Signed=*/false));
+  AttributeList AL;
+  if (auto AK = TLI->getExtAttrForI32Param(false))
+    AL = AL.addParamAttribute(*Ctx, 2, AK);
+  FunctionCallee Res = M->getOrInsertFunction("llvm_gcda_start_file", FTy, AL);
+  return Res;
 }
 
 FunctionCallee GCOVProfiler::getEmitFunctionFunc(const TargetLibraryInfo *TLI) {
@@ -1047,18 +1086,25 @@ FunctionCallee GCOVProfiler::getEmitFunctionFunc(const TargetLibraryInfo *TLI) {
     Type::getInt32Ty(*Ctx),    // uint32_t cfg_checksum
   };
   FunctionType *FTy = FunctionType::get(Type::getVoidTy(*Ctx), Args, false);
-  return M->getOrInsertFunction("llvm_gcda_emit_function", FTy,
-                             TLI->getAttrList(Ctx, {0, 1, 2}, /*Signed=*/false));
+  AttributeList AL;
+  if (auto AK = TLI->getExtAttrForI32Param(false)) {
+    AL = AL.addParamAttribute(*Ctx, 0, AK);
+    AL = AL.addParamAttribute(*Ctx, 1, AK);
+    AL = AL.addParamAttribute(*Ctx, 2, AK);
+  }
+  return M->getOrInsertFunction("llvm_gcda_emit_function", FTy);
 }
 
 FunctionCallee GCOVProfiler::getEmitArcsFunc(const TargetLibraryInfo *TLI) {
   Type *Args[] = {
-      Type::getInt32Ty(*Ctx),       // uint32_t num_counters
-      PointerType::getUnqual(*Ctx), // uint64_t *counters
+    Type::getInt32Ty(*Ctx),     // uint32_t num_counters
+    Type::getInt64PtrTy(*Ctx),  // uint64_t *counters
   };
   FunctionType *FTy = FunctionType::get(Type::getVoidTy(*Ctx), Args, false);
-  return M->getOrInsertFunction("llvm_gcda_emit_arcs", FTy,
-                                TLI->getAttrList(Ctx, {0}, /*Signed=*/false));
+  AttributeList AL;
+  if (auto AK = TLI->getExtAttrForI32Param(false))
+    AL = AL.addParamAttribute(*Ctx, 0, AK);
+  return M->getOrInsertFunction("llvm_gcda_emit_arcs", FTy, AL);
 }
 
 FunctionCallee GCOVProfiler::getSummaryInfoFunc() {
@@ -1076,8 +1122,7 @@ Function *GCOVProfiler::insertCounterWriteout(
   FunctionType *WriteoutFTy = FunctionType::get(Type::getVoidTy(*Ctx), false);
   Function *WriteoutF = M->getFunction("__llvm_gcov_writeout");
   if (!WriteoutF)
-    WriteoutF =
-        createInternalFunction(WriteoutFTy, "__llvm_gcov_writeout", "_ZTSFvvE");
+    WriteoutF = createInternalFunction(WriteoutFTy, "__llvm_gcov_writeout");
   WriteoutF->addFnAttr(Attribute::NoInline);
 
   BasicBlock *BB = BasicBlock::Create(*Ctx, "entry", WriteoutF);
@@ -1100,16 +1145,19 @@ Function *GCOVProfiler::insertCounterWriteout(
   // Collect the relevant data into a large constant data structure that we can
   // walk to write out everything.
   StructType *StartFileCallArgsTy = StructType::create(
-      {Builder.getPtrTy(), Builder.getInt32Ty(), Builder.getInt32Ty()},
+      {Builder.getInt8PtrTy(), Builder.getInt32Ty(), Builder.getInt32Ty()},
       "start_file_args_ty");
   StructType *EmitFunctionCallArgsTy = StructType::create(
       {Builder.getInt32Ty(), Builder.getInt32Ty(), Builder.getInt32Ty()},
       "emit_function_args_ty");
-  auto *PtrTy = Builder.getPtrTy();
-  StructType *EmitArcsCallArgsTy =
-      StructType::create({Builder.getInt32Ty(), PtrTy}, "emit_arcs_args_ty");
-  StructType *FileInfoTy = StructType::create(
-      {StartFileCallArgsTy, Builder.getInt32Ty(), PtrTy, PtrTy}, "file_info");
+  StructType *EmitArcsCallArgsTy = StructType::create(
+      {Builder.getInt32Ty(), Builder.getInt64Ty()->getPointerTo()},
+      "emit_arcs_args_ty");
+  StructType *FileInfoTy =
+      StructType::create({StartFileCallArgsTy, Builder.getInt32Ty(),
+                          EmitFunctionCallArgsTy->getPointerTo(),
+                          EmitArcsCallArgsTy->getPointerTo()},
+                         "file_info");
 
   Constant *Zero32 = Builder.getInt32(0);
   // Build an explicit array of two zeros for use in ConstantExpr GEP building.
@@ -1320,7 +1368,7 @@ Function *GCOVProfiler::insertReset(
   FunctionType *FTy = FunctionType::get(Type::getVoidTy(*Ctx), false);
   Function *ResetF = M->getFunction("__llvm_gcov_reset");
   if (!ResetF)
-    ResetF = createInternalFunction(FTy, "__llvm_gcov_reset", "_ZTSFvvE");
+    ResetF = createInternalFunction(FTy, "__llvm_gcov_reset");
   ResetF->addFnAttr(Attribute::NoInline);
 
   BasicBlock *Entry = BasicBlock::Create(*Ctx, "entry", ResetF);

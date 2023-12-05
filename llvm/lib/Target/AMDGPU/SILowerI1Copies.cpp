@@ -39,15 +39,6 @@ static unsigned insertUndefLaneMask(MachineBasicBlock &MBB);
 
 namespace {
 
-struct Incoming {
-  Register Reg;
-  MachineBasicBlock *Block;
-  Register UpdatedReg;
-
-  Incoming(Register Reg, MachineBasicBlock *Block, Register UpdatedReg)
-      : Reg(Reg), Block(Block), UpdatedReg(UpdatedReg) {}
-};
-
 class SILowerI1Copies : public MachineFunctionPass {
 public:
   static char ID;
@@ -88,9 +79,9 @@ public:
   }
 
 private:
-  bool lowerCopiesFromI1();
-  bool lowerPhis();
-  bool lowerCopiesToI1();
+  void lowerCopiesFromI1();
+  void lowerPhis();
+  void lowerCopiesToI1();
   bool isConstantLaneMask(Register Reg, bool &Val) const;
   void buildMergeLaneMasks(MachineBasicBlock &MBB,
                            MachineBasicBlock::iterator I, const DebugLoc &DL,
@@ -133,7 +124,6 @@ private:
 ///
 class PhiIncomingAnalysis {
   MachinePostDominatorTree &PDT;
-  const SIInstrInfo *TII;
 
   // For each reachable basic block, whether it is a source in the induced
   // subgraph of the CFG.
@@ -143,8 +133,7 @@ class PhiIncomingAnalysis {
   SmallVector<MachineBasicBlock *, 4> Predecessors;
 
 public:
-  PhiIncomingAnalysis(MachinePostDominatorTree &PDT, const SIInstrInfo *TII)
-      : PDT(PDT), TII(TII) {}
+  PhiIncomingAnalysis(MachinePostDominatorTree &PDT) : PDT(PDT) {}
 
   /// Returns whether \p MBB is a source in the induced subgraph of reachable
   /// blocks.
@@ -154,7 +143,8 @@ public:
 
   ArrayRef<MachineBasicBlock *> predecessors() const { return Predecessors; }
 
-  void analyze(MachineBasicBlock &DefBlock, ArrayRef<Incoming> Incomings) {
+  void analyze(MachineBasicBlock &DefBlock,
+               ArrayRef<MachineBasicBlock *> IncomingBlocks) {
     assert(Stack.empty());
     ReachableMap.clear();
     ReachableOrdered.clear();
@@ -165,8 +155,7 @@ public:
     ReachableMap.try_emplace(&DefBlock, false);
     ReachableOrdered.push_back(&DefBlock);
 
-    for (auto Incoming : Incomings) {
-      MachineBasicBlock *MBB = Incoming.Block;
+    for (MachineBasicBlock *MBB : IncomingBlocks) {
       if (MBB == &DefBlock) {
         ReachableMap[&DefBlock] = true; // self-loop on DefBlock
         continue;
@@ -177,7 +166,18 @@ public:
 
       // If this block has a divergent terminator and the def block is its
       // post-dominator, the wave may first visit the other successors.
-      if (TII->hasDivergentBranch(MBB) && PDT.dominates(&DefBlock, MBB))
+      bool Divergent = false;
+      for (MachineInstr &MI : MBB->terminators()) {
+        if (MI.getOpcode() == AMDGPU::SI_NON_UNIFORM_BRCOND_PSEUDO ||
+            MI.getOpcode() == AMDGPU::SI_IF ||
+            MI.getOpcode() == AMDGPU::SI_ELSE ||
+            MI.getOpcode() == AMDGPU::SI_LOOP) {
+          Divergent = true;
+          break;
+        }
+      }
+
+      if (Divergent && PDT.dominates(&DefBlock, MBB))
         append_range(Stack, MBB->successors());
     }
 
@@ -311,20 +311,20 @@ public:
   /// blocks, so that the SSA updater doesn't have to search all the way to the
   /// function entry.
   void addLoopEntries(unsigned LoopLevel, MachineSSAUpdater &SSAUpdater,
-                      ArrayRef<Incoming> Incomings = {}) {
+                      ArrayRef<MachineBasicBlock *> Blocks = {}) {
     assert(LoopLevel < CommonDominators.size());
 
     MachineBasicBlock *Dom = CommonDominators[LoopLevel];
-    for (auto &Incoming : Incomings)
-      Dom = DT.findNearestCommonDominator(Dom, Incoming.Block);
+    for (MachineBasicBlock *MBB : Blocks)
+      Dom = DT.findNearestCommonDominator(Dom, MBB);
 
-    if (!inLoopLevel(*Dom, LoopLevel, Incomings)) {
+    if (!inLoopLevel(*Dom, LoopLevel, Blocks)) {
       SSAUpdater.AddAvailableValue(Dom, insertUndefLaneMask(*Dom));
     } else {
       // The dominator is part of the loop or the given blocks, so add the
       // undef value to unreachable predecessors instead.
       for (MachineBasicBlock *Pred : Dom->predecessors()) {
-        if (!inLoopLevel(*Pred, LoopLevel, Incomings))
+        if (!inLoopLevel(*Pred, LoopLevel, Blocks))
           SSAUpdater.AddAvailableValue(Pred, insertUndefLaneMask(*Pred));
       }
     }
@@ -332,14 +332,13 @@ public:
 
 private:
   bool inLoopLevel(MachineBasicBlock &MBB, unsigned LoopLevel,
-                   ArrayRef<Incoming> Incomings) const {
+                   ArrayRef<MachineBasicBlock *> Blocks) const {
     auto DomIt = Visited.find(&MBB);
     if (DomIt != Visited.end() && DomIt->second <= LoopLevel)
       return true;
 
-    for (auto &Incoming : Incomings)
-      if (Incoming.Block == &MBB)
-        return true;
+    if (llvm::is_contained(Blocks, &MBB))
+      return true;
 
     return false;
   }
@@ -474,17 +473,15 @@ bool SILowerI1Copies::runOnMachineFunction(MachineFunction &TheMF) {
     OrN2Op = AMDGPU::S_ORN2_B64;
   }
 
-  bool Changed = false;
-  Changed |= lowerCopiesFromI1();
-  Changed |= lowerPhis();
-  Changed |= lowerCopiesToI1();
+  lowerCopiesFromI1();
+  lowerPhis();
+  lowerCopiesToI1();
 
-  assert(Changed || ConstrainRegs.empty());
   for (unsigned Reg : ConstrainRegs)
     MRI->constrainRegClass(Reg, &AMDGPU::SReg_1_XEXECRegClass);
   ConstrainRegs.clear();
 
-  return Changed;
+  return true;
 }
 
 #ifndef NDEBUG
@@ -496,8 +493,7 @@ static bool isVRegCompatibleReg(const SIRegisterInfo &TRI,
 }
 #endif
 
-bool SILowerI1Copies::lowerCopiesFromI1() {
-  bool Changed = false;
+void SILowerI1Copies::lowerCopiesFromI1() {
   SmallVector<MachineInstr *, 4> DeadCopies;
 
   for (MachineBasicBlock &MBB : *MF) {
@@ -512,8 +508,6 @@ bool SILowerI1Copies::lowerCopiesFromI1() {
 
       if (isLaneMaskReg(DstReg) || isVreg1(DstReg))
         continue;
-
-      Changed = true;
 
       // Copy into a 32-bit vector register.
       LLVM_DEBUG(dbgs() << "Lower copy from i1: " << MI);
@@ -536,16 +530,16 @@ bool SILowerI1Copies::lowerCopiesFromI1() {
       MI->eraseFromParent();
     DeadCopies.clear();
   }
-  return Changed;
 }
 
-bool SILowerI1Copies::lowerPhis() {
+void SILowerI1Copies::lowerPhis() {
   MachineSSAUpdater SSAUpdater(*MF);
   LoopFinder LF(*DT, *PDT);
-  PhiIncomingAnalysis PIA(*PDT, TII);
+  PhiIncomingAnalysis PIA(*PDT);
   SmallVector<MachineInstr *, 4> Vreg1Phis;
-  SmallVector<Incoming, 4> Incomings;
-
+  SmallVector<MachineBasicBlock *, 4> IncomingBlocks;
+  SmallVector<unsigned, 4> IncomingRegs;
+  SmallVector<unsigned, 4> IncomingUpdated;
 #ifndef NDEBUG
   DenseSet<unsigned> PhiRegisters;
 #endif
@@ -556,10 +550,7 @@ bool SILowerI1Copies::lowerPhis() {
         Vreg1Phis.push_back(&MI);
     }
   }
-  if (Vreg1Phis.empty())
-    return false;
 
-  DT->getBase().updateDFSNumbers();
   MachineBasicBlock *PrevMBB = nullptr;
   for (MachineInstr *MI : Vreg1Phis) {
     MachineBasicBlock &MBB = *MI->getParent();
@@ -591,17 +582,9 @@ bool SILowerI1Copies::lowerPhis() {
         assert(IncomingDef->isPHI() || PhiRegisters.count(IncomingReg));
       }
 
-      Incomings.emplace_back(IncomingReg, IncomingMBB, Register{});
+      IncomingBlocks.push_back(IncomingMBB);
+      IncomingRegs.push_back(IncomingReg);
     }
-
-    // Sort the incomings such that incoming values that dominate other incoming
-    // values are sorted earlier. This allows us to do some amount of on-the-fly
-    // constant folding.
-    // Incoming with smaller DFSNumIn goes first, DFSNumIn is 0 for entry block.
-    llvm::sort(Incomings, [this](Incoming LHS, Incoming RHS) {
-      return DT->getNode(LHS.Block)->getDFSNumIn() <
-             DT->getNode(RHS.Block)->getDFSNumIn();
-    });
 
 #ifndef NDEBUG
     PhiRegisters.insert(DstReg);
@@ -625,45 +608,47 @@ bool SILowerI1Copies::lowerPhis() {
     SSAUpdater.Initialize(DstReg);
 
     if (FoundLoopLevel) {
-      LF.addLoopEntries(FoundLoopLevel, SSAUpdater, Incomings);
+      LF.addLoopEntries(FoundLoopLevel, SSAUpdater, IncomingBlocks);
 
-      for (auto &Incoming : Incomings) {
-        Incoming.UpdatedReg = createLaneMaskReg(*MF);
-        SSAUpdater.AddAvailableValue(Incoming.Block, Incoming.UpdatedReg);
+      for (unsigned i = 0; i < IncomingRegs.size(); ++i) {
+        IncomingUpdated.push_back(createLaneMaskReg(*MF));
+        SSAUpdater.AddAvailableValue(IncomingBlocks[i],
+                                     IncomingUpdated.back());
       }
 
-      for (auto &Incoming : Incomings) {
-        MachineBasicBlock &IMBB = *Incoming.Block;
+      for (unsigned i = 0; i < IncomingRegs.size(); ++i) {
+        MachineBasicBlock &IMBB = *IncomingBlocks[i];
         buildMergeLaneMasks(
-            IMBB, getSaluInsertionAtEnd(IMBB), {}, Incoming.UpdatedReg,
-            SSAUpdater.GetValueInMiddleOfBlock(&IMBB), Incoming.Reg);
+            IMBB, getSaluInsertionAtEnd(IMBB), {}, IncomingUpdated[i],
+            SSAUpdater.GetValueInMiddleOfBlock(&IMBB), IncomingRegs[i]);
       }
     } else {
       // The phi is not observed from outside a loop. Use a more accurate
       // lowering.
-      PIA.analyze(MBB, Incomings);
+      PIA.analyze(MBB, IncomingBlocks);
 
       for (MachineBasicBlock *MBB : PIA.predecessors())
         SSAUpdater.AddAvailableValue(MBB, insertUndefLaneMask(*MBB));
 
-      for (auto &Incoming : Incomings) {
-        MachineBasicBlock &IMBB = *Incoming.Block;
+      for (unsigned i = 0; i < IncomingRegs.size(); ++i) {
+        MachineBasicBlock &IMBB = *IncomingBlocks[i];
         if (PIA.isSource(IMBB)) {
-          SSAUpdater.AddAvailableValue(&IMBB, Incoming.Reg);
+          IncomingUpdated.push_back(0);
+          SSAUpdater.AddAvailableValue(&IMBB, IncomingRegs[i]);
         } else {
-          Incoming.UpdatedReg = createLaneMaskReg(*MF);
-          SSAUpdater.AddAvailableValue(&IMBB, Incoming.UpdatedReg);
+          IncomingUpdated.push_back(createLaneMaskReg(*MF));
+          SSAUpdater.AddAvailableValue(&IMBB, IncomingUpdated.back());
         }
       }
 
-      for (auto &Incoming : Incomings) {
-        if (!Incoming.UpdatedReg.isValid())
+      for (unsigned i = 0; i < IncomingRegs.size(); ++i) {
+        if (!IncomingUpdated[i])
           continue;
 
-        MachineBasicBlock &IMBB = *Incoming.Block;
+        MachineBasicBlock &IMBB = *IncomingBlocks[i];
         buildMergeLaneMasks(
-            IMBB, getSaluInsertionAtEnd(IMBB), {}, Incoming.UpdatedReg,
-            SSAUpdater.GetValueInMiddleOfBlock(&IMBB), Incoming.Reg);
+            IMBB, getSaluInsertionAtEnd(IMBB), {}, IncomingUpdated[i],
+            SSAUpdater.GetValueInMiddleOfBlock(&IMBB), IncomingRegs[i]);
       }
     }
 
@@ -673,13 +658,13 @@ bool SILowerI1Copies::lowerPhis() {
       MI->eraseFromParent();
     }
 
-    Incomings.clear();
+    IncomingBlocks.clear();
+    IncomingRegs.clear();
+    IncomingUpdated.clear();
   }
-  return true;
 }
 
-bool SILowerI1Copies::lowerCopiesToI1() {
-  bool Changed = false;
+void SILowerI1Copies::lowerCopiesToI1() {
   MachineSSAUpdater SSAUpdater(*MF);
   LoopFinder LF(*DT, *PDT);
   SmallVector<MachineInstr *, 4> DeadCopies;
@@ -695,8 +680,6 @@ bool SILowerI1Copies::lowerCopiesToI1() {
       Register DstReg = MI.getOperand(0).getReg();
       if (!isVreg1(DstReg))
         continue;
-
-      Changed = true;
 
       if (MRI->use_empty(DstReg)) {
         DeadCopies.push_back(&MI);
@@ -722,9 +705,6 @@ bool SILowerI1Copies::lowerCopiesToI1() {
             .addImm(0);
         MI.getOperand(1).setReg(TmpReg);
         SrcReg = TmpReg;
-      } else {
-        // SrcReg needs to be live beyond copy.
-        MI.getOperand(1).setIsKill(false);
       }
 
       // Defs in a loop that are observed outside the loop must be transformed
@@ -751,7 +731,6 @@ bool SILowerI1Copies::lowerCopiesToI1() {
       MI->eraseFromParent();
     DeadCopies.clear();
   }
-  return Changed;
 }
 
 bool SILowerI1Copies::isConstantLaneMask(Register Reg, bool &Val) const {

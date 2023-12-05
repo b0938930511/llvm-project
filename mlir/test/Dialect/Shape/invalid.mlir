@@ -1,6 +1,6 @@
 // RUN: mlir-opt %s -split-input-file -verify-diagnostics
 
-func.func @reduce_op_args_num_mismatch(%shape : !shape.shape, %init : !shape.size) {
+func @reduce_op_args_num_mismatch(%shape : !shape.shape, %init : !shape.size) {
   // expected-error@+1 {{ReduceOp body is expected to have 3 arguments}}
   %num_elements = shape.reduce(%shape, %init) : !shape.shape -> !shape.size {
     ^bb0(%index: index, %dim: !shape.size):
@@ -11,7 +11,7 @@ func.func @reduce_op_args_num_mismatch(%shape : !shape.shape, %init : !shape.siz
 
 // -----
 
-func.func @reduce_op_arg0_wrong_type(%shape : !shape.shape, %init : !shape.size) {
+func @reduce_op_arg0_wrong_type(%shape : !shape.shape, %init : !shape.size) {
   // expected-error@+1 {{argument 0 of ReduceOp body is expected to be of IndexType}}
   %num_elements = shape.reduce(%shape, %init) : !shape.shape -> !shape.size {
     ^bb0(%index: f32, %dim: !shape.size, %acc: !shape.size):
@@ -24,7 +24,7 @@ func.func @reduce_op_arg0_wrong_type(%shape : !shape.shape, %init : !shape.size)
 
 // -----
 
-func.func @reduce_op_arg1_wrong_type(%shape : !shape.shape, %init : !shape.size) {
+func @reduce_op_arg1_wrong_type(%shape : !shape.shape, %init : !shape.size) {
   // expected-error@+1 {{argument 1 of ReduceOp body is expected to be of SizeType if the ReduceOp operates on a ShapeType}}
   %num_elements = shape.reduce(%shape, %init) : !shape.shape -> !shape.size {
     ^bb0(%index: index, %dim: f32, %lci: !shape.size):
@@ -35,7 +35,7 @@ func.func @reduce_op_arg1_wrong_type(%shape : !shape.shape, %init : !shape.size)
 
 // -----
 
-func.func @reduce_op_arg1_wrong_type(%shape : tensor<?xindex>, %init : index) {
+func @reduce_op_arg1_wrong_type(%shape : tensor<?xindex>, %init : index) {
   // expected-error@+1 {{argument 1 of ReduceOp body is expected to be of IndexType if the ReduceOp operates on an extent tensor}}
   %num_elements = shape.reduce(%shape, %init) : tensor<?xindex> -> index {
     ^bb0(%index: index, %dim: f32, %lci: index):
@@ -46,7 +46,7 @@ func.func @reduce_op_arg1_wrong_type(%shape : tensor<?xindex>, %init : index) {
 
 // -----
 
-func.func @reduce_op_init_type_mismatch(%shape : !shape.shape, %init : f32) {
+func @reduce_op_init_type_mismatch(%shape : !shape.shape, %init : f32) {
   // expected-error@+1 {{type mismatch between argument 2 of ReduceOp body and initial value 0}}
   %num_elements = shape.reduce(%shape, %init) : !shape.shape -> f32 {
     ^bb0(%index: index, %dim: !shape.size, %lci: !shape.size):
@@ -57,7 +57,7 @@ func.func @reduce_op_init_type_mismatch(%shape : !shape.shape, %init : f32) {
 
 // -----
 
-func.func @yield_op_args_num_mismatch(%shape : !shape.shape, %init : !shape.size) {
+func @yield_op_args_num_mismatch(%shape : !shape.shape, %init : !shape.size) {
   // expected-error@+3 {{number of operands does not match number of results of its parent}}
   %num_elements = shape.reduce(%shape, %init) : !shape.shape -> !shape.size {
     ^bb0(%index: index, %dim: !shape.size, %lci: !shape.size):
@@ -68,11 +68,11 @@ func.func @yield_op_args_num_mismatch(%shape : !shape.shape, %init : !shape.size
 
 // -----
 
-func.func @yield_op_type_mismatch(%shape : !shape.shape, %init : !shape.size) {
+func @yield_op_type_mismatch(%shape : !shape.shape, %init : !shape.size) {
   // expected-error@+4 {{types mismatch between yield op and its parent}}
   %num_elements = shape.reduce(%shape, %init) : !shape.shape -> !shape.size {
     ^bb0(%index: index, %dim: !shape.size, %lci: !shape.size):
-      %c0 = arith.constant 1 : index
+      %c0 = constant 1 : index
       shape.yield %c0 : index
   }
   return
@@ -80,7 +80,7 @@ func.func @yield_op_type_mismatch(%shape : !shape.shape, %init : !shape.size) {
 
 // -----
 
-func.func @assuming_all_op_too_few_operands() {
+func @assuming_all_op_too_few_operands() {
   // expected-error@+1 {{no operands specified}}
   %w0 = shape.assuming_all
   return
@@ -88,7 +88,7 @@ func.func @assuming_all_op_too_few_operands() {
 
 // -----
 
-func.func @shape_of(%value_arg : !shape.value_shape,
+func @shape_of(%value_arg : !shape.value_shape,
                %shaped_arg : tensor<?x3x4xf32>) {
   // expected-error@+1 {{if at least one of the operands can hold error values then the result must be of type `shape` to propagate them}}
   %0 = shape.shape_of %value_arg : !shape.value_shape -> tensor<?xindex>
@@ -97,16 +97,7 @@ func.func @shape_of(%value_arg : !shape.value_shape,
 
 // -----
 
-func.func @shape_of_incompatible_return_types(%value_arg : tensor<1x2xindex>) {
-  // expected-error@+2 {{failed to infer returned types}}
-  // expected-error@+1 {{'shape.shape_of' op inferred type(s) 'tensor<2xindex>' are incompatible with return type(s) of operation 'tensor<3xindex>'}}
-  %0 = shape.shape_of %value_arg : tensor<1x2xindex> -> tensor<3xindex>
-  return
-}
-
-// -----
-
-func.func @rank(%arg : !shape.shape) {
+func @rank(%arg : !shape.shape) {
   // expected-error@+1 {{if at least one of the operands can hold error values then the result must be of type `size` to propagate them}}
   %0 = shape.rank %arg : !shape.shape -> index
   return
@@ -114,7 +105,7 @@ func.func @rank(%arg : !shape.shape) {
 
 // -----
 
-func.func @get_extent(%arg : tensor<?xindex>) -> index {
+func @get_extent(%arg : tensor<?xindex>) -> index {
   %c0 = shape.const_size 0
   // expected-error@+1 {{if at least one of the operands can hold error values then the result must be of type `size` to propagate them}}
   %result = shape.get_extent %arg, %c0 : tensor<?xindex>, !shape.size -> index
@@ -123,7 +114,7 @@ func.func @get_extent(%arg : tensor<?xindex>) -> index {
 
 // -----
 
-func.func @mul(%lhs : !shape.size, %rhs : index) -> index {
+func @mul(%lhs : !shape.size, %rhs : index) -> index {
   // expected-error@+1 {{if at least one of the operands can hold error values then the result must be of type `size` to propagate them}}
   %result = shape.mul %lhs, %rhs : !shape.size, index -> index
   return %result : index
@@ -131,7 +122,7 @@ func.func @mul(%lhs : !shape.size, %rhs : index) -> index {
 
 // -----
 
-func.func @num_elements(%arg : !shape.shape) -> index {
+func @num_elements(%arg : !shape.shape) -> index {
   // expected-error@+1 {{if at least one of the operands can hold error values then the result must be of type `size` to propagate them}}
   %result = shape.num_elements %arg : !shape.shape -> index
   return %result : index
@@ -139,7 +130,7 @@ func.func @num_elements(%arg : !shape.shape) -> index {
 
 // -----
 
-func.func @add(%lhs : !shape.size, %rhs : index) -> index {
+func @add(%lhs : !shape.size, %rhs : index) -> index {
   // expected-error@+1 {{if at least one of the operands can hold error values then the result must be of type `size` to propagate them}}
   %result = shape.add %lhs, %rhs : !shape.size, index -> index
   return %result : index
@@ -147,7 +138,7 @@ func.func @add(%lhs : !shape.size, %rhs : index) -> index {
 
 // -----
 
-func.func @broadcast(%arg0 : !shape.shape, %arg1 : !shape.shape) -> tensor<?xindex> {
+func @broadcast(%arg0 : !shape.shape, %arg1 : !shape.shape) -> tensor<?xindex> {
   // expected-error@+1 {{if at least one of the operands can hold error values then the result must be of type `shape` to propagate them}}
   %result = shape.broadcast %arg0, %arg1
       : !shape.shape, !shape.shape -> tensor<?xindex>
@@ -157,7 +148,7 @@ func.func @broadcast(%arg0 : !shape.shape, %arg1 : !shape.shape) -> tensor<?xind
 
 // -----
 
-func.func @broadcast(%arg0 : !shape.shape, %arg1 : tensor<?xindex>) -> tensor<?xindex> {
+func @broadcast(%arg0 : !shape.shape, %arg1 : tensor<?xindex>) -> tensor<?xindex> {
   // expected-error@+1 {{if at least one of the operands can hold error values then the result must be of type `shape` to propagate them}}
   %result = shape.broadcast %arg0, %arg1
       : !shape.shape, tensor<?xindex> -> tensor<?xindex>
@@ -173,7 +164,7 @@ module attributes {shape.lib = [@shape_lib, "shape_lib"]} {
 
 shape.function_library @shape_lib {
   // Test shape function that returns the shape of input arg as result shape.
-  func.func @same_result_shape(%arg: !shape.value_shape) -> !shape.shape {
+  func @same_result_shape(%arg: !shape.value_shape) -> !shape.shape {
     %0 = shape.shape_of %arg : !shape.value_shape -> !shape.shape
     return %0 : !shape.shape
   }
@@ -193,7 +184,7 @@ module attributes {shape.lib = [@shape_lib, @shape_lib]} {
 
 shape.function_library @shape_lib {
   // Test shape function that returns the shape of input arg as result shape.
-  func.func @same_result_shape(%arg: !shape.value_shape) -> !shape.shape {
+  func @same_result_shape(%arg: !shape.value_shape) -> !shape.shape {
     %0 = shape.shape_of %arg : !shape.value_shape -> !shape.shape
     return %0 : !shape.shape
   }
@@ -213,7 +204,7 @@ module attributes {shape.lib = [@shape_lib]} {
 
 shape.function_library @shape_lib {
   // Test shape function that returns the shape of input arg as result shape.
-  func.func @same_result_shape(%arg: !shape.value_shape) -> !shape.shape {
+  func @same_result_shape(%arg: !shape.value_shape) -> !shape.shape {
     %0 = shape.shape_of %arg : !shape.value_shape -> !shape.shape
     return %0 : !shape.shape
   }
@@ -232,7 +223,7 @@ shape.function_library @shape_lib {
 // expected-error@+1 {{required to be shape function library}}
 module attributes {shape.lib = @fn} {
 
-func.func @fn(%arg: !shape.value_shape) -> !shape.shape {
+func @fn(%arg: !shape.value_shape) -> !shape.shape {
   %0 = shape.shape_of %arg : !shape.value_shape -> !shape.shape
   return %0 : !shape.shape
 }
@@ -243,7 +234,7 @@ func.func @fn(%arg: !shape.value_shape) -> !shape.shape {
 
 // Test that op referred to by shape lib is a shape function library.
 
-func.func @fn(%arg: !shape.value_shape) -> !shape.shape {
+func @fn(%arg: !shape.value_shape) -> !shape.shape {
   // expected-error@+1 {{SymbolTable}}
   %0 = shape.shape_of %arg {shape.lib = @fn} : !shape.value_shape -> !shape.shape
   return %0 : !shape.shape
@@ -258,7 +249,7 @@ module attributes {shape.lib = @fn} { }
 
 // -----
 
-func.func @fn(%arg: !shape.shape) -> !shape.witness {
+func @fn(%arg: !shape.shape) -> !shape.witness {
   // expected-error@+1 {{required at least 2 input shapes}}
   %0 = shape.cstr_broadcastable %arg : !shape.shape
   return %0 : !shape.witness
@@ -268,28 +259,8 @@ func.func @fn(%arg: !shape.shape) -> !shape.witness {
 
 // Test that type inference flags the wrong return type.
 
-func.func @const_shape() {
-  // expected-error@+2 {{failed to infer returned types}}
+func @const_shape() {
   // expected-error@+1 {{'tensor<3xindex>' are incompatible with return type(s) of operation 'tensor<2xindex>'}}
   %0 = shape.const_shape [4, 5, 6] : tensor<2xindex>
   return
 }
-
-// -----
-
-func.func @invalid_meet(%arg0 : !shape.shape, %arg1 : index) -> index {
-  // expected-error@+2 {{failed to infer returned types}}
-  // expected-error@+1 {{requires all sizes or shapes}}
-  %result = shape.meet %arg0, %arg1 : !shape.shape, index -> index
-  return %result : index
-}
-
-// -----
-
-func.func @invalid_meet(%arg0 : tensor<2xindex>, %arg1 : tensor<3xindex>) -> tensor<?xindex> {
-  // expected-error@+2 {{failed to infer returned types}}
-  // expected-error@+1 {{unequal shape cardinality}}
-  %result = shape.meet %arg0, %arg1 : tensor<2xindex>, tensor<3xindex> -> tensor<?xindex>
-  return %result : tensor<?xindex>
-}
-

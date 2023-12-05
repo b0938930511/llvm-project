@@ -6,7 +6,7 @@ typedef unsigned long int A;
 
 extern int fill(A **values, int *nvalues);
 
-void foo(void) {
+void foo() {
   A *values;
   int nvalues;
   fill(&values, &nvalues);

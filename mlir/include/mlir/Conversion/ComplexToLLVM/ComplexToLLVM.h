@@ -11,13 +11,11 @@
 #include "mlir/Conversion/LLVMCommon/StructBuilder.h"
 
 namespace mlir {
-class DialectRegistry;
 class LLVMTypeConverter;
-class Pass;
+class ModuleOp;
+template <typename T>
+class OperationPass;
 class RewritePatternSet;
-
-#define GEN_PASS_DECL_CONVERTCOMPLEXTOLLVMPASS
-#include "mlir/Conversion/Passes.h.inc"
 
 class ComplexStructBuilder : public StructBuilder {
 public:
@@ -42,7 +40,8 @@ public:
 void populateComplexToLLVMConversionPatterns(LLVMTypeConverter &converter,
                                              RewritePatternSet &patterns);
 
-void registerConvertComplexToLLVMInterface(DialectRegistry &registry);
+/// Create a pass to convert Complex operations to the LLVMIR dialect.
+std::unique_ptr<OperationPass<ModuleOp>> createConvertComplexToLLVMPass();
 
 } // namespace mlir
 

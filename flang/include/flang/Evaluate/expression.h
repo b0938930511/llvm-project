@@ -93,9 +93,6 @@ public:
   std::optional<DynamicType> GetType() const;
   int Rank() const;
   std::string AsFortran() const;
-#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
-  LLVM_DUMP_METHOD void dump() const;
-#endif
   llvm::raw_ostream &AsFortran(llvm::raw_ostream &) const;
   static Derived Rewrite(FoldingContext &, Derived &&);
 };
@@ -119,10 +116,8 @@ class Operation {
 public:
   using Derived = DERIVED;
   using Result = RESULT;
+  static_assert(IsSpecificIntrinsicType<Result>);
   static constexpr std::size_t operands{sizeof...(OPERANDS)};
-  // Allow specific intrinsic types and Parentheses<SomeDerived>
-  static_assert(IsSpecificIntrinsicType<Result> ||
-      (operands == 1 && std::is_same_v<Result, SomeDerived>));
   template <int J> using Operand = std::tuple_element_t<J, OperandTypes>;
 
   // Unary operations wrap a single Expr with a CopyableIndirection.
@@ -177,9 +172,7 @@ public:
     }
   }
 
-  static constexpr std::conditional_t<Result::category != TypeCategory::Derived,
-      std::optional<DynamicType>, void>
-  GetType() {
+  static constexpr std::optional<DynamicType> GetType() {
     return Result::GetType();
   }
   int Rank() const {
@@ -227,17 +220,6 @@ struct Parentheses : public Operation<Parentheses<A>, A, A> {
   using Operand = A;
   using Base = Operation<Parentheses, A, A>;
   using Base::Base;
-};
-
-template <>
-struct Parentheses<SomeDerived>
-    : public Operation<Parentheses<SomeDerived>, SomeDerived, SomeDerived> {
-public:
-  using Result = SomeDerived;
-  using Operand = SomeDerived;
-  using Base = Operation<Parentheses, SomeDerived, SomeDerived>;
-  using Base::Base;
-  DynamicType GetType() const;
 };
 
 template <typename A> struct Negate : public Operation<Negate<A>, A, A> {
@@ -473,20 +455,20 @@ class ArrayConstructor<Type<TypeCategory::Character, KIND>>
 public:
   using Result = Type<TypeCategory::Character, KIND>;
   using Base = ArrayConstructorValues<Result>;
-  DEFAULT_CONSTRUCTORS_AND_ASSIGNMENTS(ArrayConstructor)
-  explicit ArrayConstructor(Base &&values) : Base{std::move(values)} {}
-  template <typename T> explicit ArrayConstructor(const Expr<T> &) {}
-  ArrayConstructor &set_LEN(Expr<SubscriptInteger> &&);
+  CLASS_BOILERPLATE(ArrayConstructor)
+  ArrayConstructor(Expr<SubscriptInteger> &&len, Base &&v)
+      : Base{std::move(v)}, length_{std::move(len)} {}
+  template <typename A>
+  explicit ArrayConstructor(const A &prototype)
+      : length_{prototype.LEN().value()} {}
   bool operator==(const ArrayConstructor &) const;
   static constexpr Result result() { return Result{}; }
   static constexpr DynamicType GetType() { return Result::GetType(); }
   llvm::raw_ostream &AsFortran(llvm::raw_ostream &) const;
-  const Expr<SubscriptInteger> *LEN() const {
-    return length_ ? &length_->value() : nullptr;
-  }
+  const Expr<SubscriptInteger> &LEN() const { return length_.value(); }
 
 private:
-  std::optional<common::CopyableIndirection<Expr<SubscriptInteger>>> length_;
+  common::CopyableIndirection<Expr<SubscriptInteger>> length_;
 };
 
 template <>
@@ -619,8 +601,7 @@ FOR_EACH_CHARACTER_KIND(extern template class Expr, )
 // There are no relations between LOGICAL values.
 
 template <typename T>
-class Relational : public Operation<Relational<T>, LogicalResult, T, T> {
-public:
+struct Relational : public Operation<Relational<T>, LogicalResult, T, T> {
   using Result = LogicalResult;
   using Base = Operation<Relational, LogicalResult, T, T>;
   using Operand = typename Base::template Operand<0>;
@@ -646,16 +627,16 @@ public:
   EVALUATE_UNION_CLASS_BOILERPLATE(Relational)
   static constexpr DynamicType GetType() { return Result::GetType(); }
   int Rank() const {
-    return common::visit([](const auto &x) { return x.Rank(); }, u);
+    return std::visit([](const auto &x) { return x.Rank(); }, u);
   }
   llvm::raw_ostream &AsFortran(llvm::raw_ostream &o) const;
   common::MapTemplate<Relational, DirectlyComparableTypes> u;
 };
 
-FOR_EACH_INTEGER_KIND(extern template class Relational, )
-FOR_EACH_REAL_KIND(extern template class Relational, )
-FOR_EACH_CHARACTER_KIND(extern template class Relational, )
-extern template class Relational<SomeType>;
+FOR_EACH_INTEGER_KIND(extern template struct Relational, )
+FOR_EACH_REAL_KIND(extern template struct Relational, )
+FOR_EACH_CHARACTER_KIND(extern template struct Relational, )
+extern template struct Relational<SomeType>;
 
 // Logical expressions of a kind bigger than LogicalResult
 // do not include Relational<> operations as possibilities,
@@ -735,8 +716,7 @@ public:
   StructureConstructor &Add(const semantics::Symbol &, Expr<SomeType> &&);
   int Rank() const { return 0; }
   DynamicType GetType() const;
-  llvm::raw_ostream &AsFortran(llvm::raw_ostream &,
-      const parser::CharBlock *derivedTypeRename = nullptr) const;
+  llvm::raw_ostream &AsFortran(llvm::raw_ostream &) const;
 
 private:
   std::optional<Expr<SomeType>> CreateParentComponent(const Symbol &) const;
@@ -750,7 +730,7 @@ public:
   using Result = SomeDerived;
   EVALUATE_UNION_CLASS_BOILERPLATE(Expr)
   std::variant<Constant<Result>, ArrayConstructor<Result>, StructureConstructor,
-      Designator<Result>, FunctionRef<Result>, Parentheses<Result>>
+      Designator<Result>, FunctionRef<Result>>
       u;
 };
 
@@ -867,8 +847,6 @@ struct GenericExprWrapper {
 struct GenericAssignmentWrapper {
   GenericAssignmentWrapper() {}
   explicit GenericAssignmentWrapper(Assignment &&x) : v{std::move(x)} {}
-  explicit GenericAssignmentWrapper(std::optional<Assignment> &&x)
-      : v{std::move(x)} {}
   ~GenericAssignmentWrapper();
   static void Deleter(GenericAssignmentWrapper *);
   std::optional<Assignment> v; // vacant if error
@@ -883,10 +861,10 @@ FOR_EACH_INTRINSIC_KIND(extern template class ArrayConstructor, )
 #define INSTANTIATE_EXPRESSION_TEMPLATES \
   FOR_EACH_INTRINSIC_KIND(template class Expr, ) \
   FOR_EACH_CATEGORY_TYPE(template class Expr, ) \
-  FOR_EACH_INTEGER_KIND(template class Relational, ) \
-  FOR_EACH_REAL_KIND(template class Relational, ) \
-  FOR_EACH_CHARACTER_KIND(template class Relational, ) \
-  template class Relational<SomeType>; \
+  FOR_EACH_INTEGER_KIND(template struct Relational, ) \
+  FOR_EACH_REAL_KIND(template struct Relational, ) \
+  FOR_EACH_CHARACTER_KIND(template struct Relational, ) \
+  template struct Relational<SomeType>; \
   FOR_EACH_TYPE_AND_KIND(template class ExpressionBase, ) \
   FOR_EACH_INTRINSIC_KIND(template class ArrayConstructorValues, ) \
   FOR_EACH_INTRINSIC_KIND(template class ArrayConstructor, )

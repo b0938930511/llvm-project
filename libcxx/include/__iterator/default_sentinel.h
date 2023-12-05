@@ -13,18 +13,23 @@
 #include <__config>
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
-#  pragma GCC system_header
+#pragma GCC system_header
 #endif
+
+_LIBCPP_PUSH_MACROS
+#include <__undef_macros>
 
 _LIBCPP_BEGIN_NAMESPACE_STD
 
-#if _LIBCPP_STD_VER >= 20
+#if !defined(_LIBCPP_HAS_NO_RANGES)
 
 struct default_sentinel_t { };
 inline constexpr default_sentinel_t default_sentinel{};
 
-#endif // _LIBCPP_STD_VER >= 20
+#endif // !defined(_LIBCPP_HAS_NO_RANGES)
 
 _LIBCPP_END_NAMESPACE_STD
+
+_LIBCPP_POP_MACROS
 
 #endif // _LIBCPP___ITERATOR_DEFAULT_SENTINEL_H

@@ -17,7 +17,6 @@
 #include "clang/StaticAnalyzer/Core/PathSensitive/CallEvent.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CheckerContext.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/LoopUnrolling.h"
-#include <optional>
 
 using namespace clang;
 using namespace ento;
@@ -25,7 +24,6 @@ using namespace clang::ast_matchers;
 
 static const int MAXIMUM_STEP_UNROLLED = 128;
 
-namespace {
 struct LoopState {
 private:
   enum Kind { Normal, Unrolled } K;
@@ -58,7 +56,6 @@ public:
     ID.AddInteger(maxStep);
   }
 };
-} // namespace
 
 // The tracked stack of loops. The stack indicates that which loops the
 // simulated element contained by. The loops are marked depending if we decided
@@ -72,7 +69,7 @@ namespace clang {
 namespace ento {
 
 static bool isLoopStmt(const Stmt *S) {
-  return isa_and_nonnull<ForStmt, WhileStmt, DoStmt>(S);
+  return S && (isa<ForStmt>(S) || isa<WhileStmt>(S) || isa<DoStmt>(S));
 }
 
 ProgramStateRef processLoopEnd(const Stmt *LoopStmt, ProgramStateRef State) {
@@ -178,7 +175,7 @@ static bool isCapturedByReference(ExplodedNode *N, const DeclRefExpr *DR) {
   const CXXRecordDecl *LambdaCXXRec = MD->getParent();
 
   // Lookup the fields of the lambda
-  llvm::DenseMap<const ValueDecl *, FieldDecl *> LambdaCaptureFields;
+  llvm::DenseMap<const VarDecl *, FieldDecl *> LambdaCaptureFields;
   FieldDecl *LambdaThisCaptureField;
   LambdaCXXRec->getCaptureFields(LambdaCaptureFields, LambdaThisCaptureField);
 
@@ -267,8 +264,8 @@ bool shouldCompletelyUnroll(const Stmt *LoopStmt, ASTContext &ASTCtx,
       Matches[0].getNodeAs<IntegerLiteral>("initNum")->getValue();
   auto CondOp = Matches[0].getNodeAs<BinaryOperator>("conditionOperator");
   if (InitNum.getBitWidth() != BoundNum.getBitWidth()) {
-    InitNum = InitNum.zext(BoundNum.getBitWidth());
-    BoundNum = BoundNum.zext(InitNum.getBitWidth());
+    InitNum = InitNum.zextOrSelf(BoundNum.getBitWidth());
+    BoundNum = BoundNum.zextOrSelf(InitNum.getBitWidth());
   }
 
   if (CondOp->getOpcode() == BO_GE || CondOp->getOpcode() == BO_LE)
@@ -287,7 +284,7 @@ bool madeNewBranch(ExplodedNode *N, const Stmt *LoopStmt) {
       return true;
 
     ProgramPoint P = N->getLocation();
-    if (std::optional<BlockEntrance> BE = P.getAs<BlockEntrance>())
+    if (Optional<BlockEntrance> BE = P.getAs<BlockEntrance>())
       S = BE->getBlock()->getTerminatorStmt();
 
     if (S == LoopStmt)

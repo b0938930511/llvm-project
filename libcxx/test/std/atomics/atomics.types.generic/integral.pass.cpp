@@ -5,8 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-
-// XFAIL: !has-64-bit-atomics
+//
+// UNSUPPORTED: libcpp-has-no-threads
 
 // <atomic>
 
@@ -86,9 +86,8 @@
 // };
 
 #include <atomic>
-#include <cassert>
-#include <cstdint>
 #include <new>
+#include <cassert>
 
 #include <cmpxchg_loop.h>
 
@@ -100,14 +99,8 @@ do_test()
 {
     A obj(T(0));
     assert(obj == T(0));
-    {
-        bool lockfree = obj.is_lock_free();
-        (void)lockfree;
-#if TEST_STD_VER >= 17
-        if (A::is_always_lock_free)
-            assert(lockfree);
-#endif
-    }
+    bool b0 = obj.is_lock_free();
+    ((void)b0); // mark as unused
     obj.store(T(0));
     assert(obj == T(0));
     obj.store(T(1), std::memory_order_release);
@@ -186,11 +179,11 @@ int main(int, char**)
 #if TEST_STD_VER > 17 && defined(__cpp_char8_t)
     test<std::atomic_char8_t, char8_t>();
 #endif
+#ifndef _LIBCPP_HAS_NO_UNICODE_CHARS
     test<std::atomic_char16_t, char16_t>();
     test<std::atomic_char32_t, char32_t>();
-#ifndef TEST_HAS_NO_WIDE_CHARACTERS
+#endif // _LIBCPP_HAS_NO_UNICODE_CHARS
     test<std::atomic_wchar_t, wchar_t>();
-#endif
 
     test<std::atomic_int8_t,    int8_t>();
     test<std::atomic_uint8_t,  uint8_t>();
@@ -212,11 +205,11 @@ int main(int, char**)
     test<volatile std::atomic_ulong, unsigned long>();
     test<volatile std::atomic_llong, long long>();
     test<volatile std::atomic_ullong, unsigned long long>();
+#ifndef _LIBCPP_HAS_NO_UNICODE_CHARS
     test<volatile std::atomic_char16_t, char16_t>();
     test<volatile std::atomic_char32_t, char32_t>();
-#ifndef TEST_HAS_NO_WIDE_CHARACTERS
+#endif // _LIBCPP_HAS_NO_UNICODE_CHARS
     test<volatile std::atomic_wchar_t, wchar_t>();
-#endif
 
     test<volatile std::atomic_int8_t,    int8_t>();
     test<volatile std::atomic_uint8_t,  uint8_t>();

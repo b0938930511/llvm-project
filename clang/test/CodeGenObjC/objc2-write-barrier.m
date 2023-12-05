@@ -56,7 +56,7 @@ void* rhs = 0;
 
 #define ASSIGNTEST(expr, global) expr = (typeof(expr))rhs
 
-int testGlobals(void) {
+int testGlobals() {
   // Everything in this function generates assign_global intercepts
   int counter = 0;
 
@@ -97,7 +97,7 @@ int testGlobals(void) {
 }
 
 
-int testIvars(void) {
+int testIvars() {
   Foo *foo;
   int counter = 0;
 

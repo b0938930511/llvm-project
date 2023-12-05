@@ -16,8 +16,6 @@
 #include "llvm/Support/MemoryBufferRef.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/YAMLTraits.h"
-#include <algorithm>
-#include <optional>
 #include <utility>
 
 #define DEBUG_TYPE "clang-tidy-options"
@@ -29,7 +27,8 @@ using OptionsSource = clang::tidy::ClangTidyOptionsProvider::OptionsSource;
 LLVM_YAML_IS_FLOW_SEQUENCE_VECTOR(FileFilter)
 LLVM_YAML_IS_FLOW_SEQUENCE_VECTOR(FileFilter::LineRange)
 
-namespace llvm::yaml {
+namespace llvm {
+namespace yaml {
 
 // Map std::pair<int, int> to a JSON array of size 2.
 template <> struct SequenceTraits<FileFilter::LineRange> {
@@ -82,119 +81,39 @@ struct NOptionMap {
   std::vector<ClangTidyOptions::StringPair> Options;
 };
 
-template <>
-void yamlize(IO &IO, ClangTidyOptions::OptionMap &Val, bool,
-             EmptyContext &Ctx) {
-  if (IO.outputting()) {
-    // Ensure check options are sorted
-    std::vector<std::pair<StringRef, StringRef>> SortedOptions;
-    SortedOptions.reserve(Val.size());
-    for (auto &Key : Val) {
-      SortedOptions.emplace_back(Key.getKey(), Key.getValue().Value);
-    }
-    std::sort(SortedOptions.begin(), SortedOptions.end());
-
-    IO.beginMapping();
-    // Only output as a map
-    for (auto &Option : SortedOptions) {
-      bool UseDefault = false;
-      void *SaveInfo = nullptr;
-      IO.preflightKey(Option.first.data(), true, false, UseDefault, SaveInfo);
-      IO.scalarString(Option.second, needsQuotes(Option.second));
-      IO.postflightKey(SaveInfo);
-    }
-    IO.endMapping();
-  } else {
-    // We need custom logic here to support the old method of specifying check
-    // options using a list of maps containing key and value keys.
-    auto &I = reinterpret_cast<Input &>(IO);
-    if (isa<SequenceNode>(I.getCurrentNode())) {
-      MappingNormalization<NOptionMap, ClangTidyOptions::OptionMap> NOpts(IO,
-                                                                          Val);
-      EmptyContext Ctx;
-      yamlize(IO, NOpts->Options, true, Ctx);
-    } else if (isa<MappingNode>(I.getCurrentNode())) {
-      IO.beginMapping();
-      for (StringRef Key : IO.keys()) {
-        IO.mapRequired(Key.data(), Val[Key].Value);
-      }
-      IO.endMapping();
-    } else {
-      IO.setError("expected a sequence or map");
-    }
-  }
-}
-
-struct ChecksVariant {
-  std::optional<std::string> AsString;
-  std::optional<std::vector<std::string>> AsVector;
-};
-
-template <> void yamlize(IO &IO, ChecksVariant &Val, bool, EmptyContext &Ctx) {
-  if (!IO.outputting()) {
-    // Special case for reading from YAML
-    // Must support reading from both a string or a list
-    auto &I = reinterpret_cast<Input &>(IO);
-    if (isa<ScalarNode, BlockScalarNode>(I.getCurrentNode())) {
-      Val.AsString = std::string();
-      yamlize(IO, *Val.AsString, true, Ctx);
-    } else if (isa<SequenceNode>(I.getCurrentNode())) {
-      Val.AsVector = std::vector<std::string>();
-      yamlize(IO, *Val.AsVector, true, Ctx);
-    } else {
-      IO.setError("expected string or sequence");
-    }
-  }
-}
-
-static void mapChecks(IO &IO, std::optional<std::string> &Checks) {
-  if (IO.outputting()) {
-    // Output always a string
-    IO.mapOptional("Checks", Checks);
-  } else {
-    // Input as either a string or a list
-    ChecksVariant ChecksAsVariant;
-    IO.mapOptional("Checks", ChecksAsVariant);
-    if (ChecksAsVariant.AsString)
-      Checks = ChecksAsVariant.AsString;
-    else if (ChecksAsVariant.AsVector)
-      Checks = llvm::join(*ChecksAsVariant.AsVector, ",");
-  }
-}
-
 template <> struct MappingTraits<ClangTidyOptions> {
   static void mapping(IO &IO, ClangTidyOptions &Options) {
-    mapChecks(IO, Options.Checks);
+    MappingNormalization<NOptionMap, ClangTidyOptions::OptionMap> NOpts(
+        IO, Options.CheckOptions);
+    bool Ignored = false;
+    IO.mapOptional("Checks", Options.Checks);
     IO.mapOptional("WarningsAsErrors", Options.WarningsAsErrors);
-    IO.mapOptional("HeaderFileExtensions", Options.HeaderFileExtensions);
-    IO.mapOptional("ImplementationFileExtensions",
-                   Options.ImplementationFileExtensions);
     IO.mapOptional("HeaderFilterRegex", Options.HeaderFilterRegex);
+    IO.mapOptional("AnalyzeTemporaryDtors", Ignored); // legacy compatibility
     IO.mapOptional("FormatStyle", Options.FormatStyle);
     IO.mapOptional("User", Options.User);
-    IO.mapOptional("CheckOptions", Options.CheckOptions);
+    IO.mapOptional("CheckOptions", NOpts->Options);
     IO.mapOptional("ExtraArgs", Options.ExtraArgs);
     IO.mapOptional("ExtraArgsBefore", Options.ExtraArgsBefore);
     IO.mapOptional("InheritParentConfig", Options.InheritParentConfig);
     IO.mapOptional("UseColor", Options.UseColor);
-    IO.mapOptional("SystemHeaders", Options.SystemHeaders);
   }
 };
 
-} // namespace llvm::yaml
+} // namespace yaml
+} // namespace llvm
 
-namespace clang::tidy {
+namespace clang {
+namespace tidy {
 
 ClangTidyOptions ClangTidyOptions::getDefaults() {
   ClangTidyOptions Options;
   Options.Checks = "";
   Options.WarningsAsErrors = "";
-  Options.HeaderFileExtensions = {"", "h", "hh", "hpp", "hxx"};
-  Options.ImplementationFileExtensions = {"c", "cc", "cpp", "cxx"};
   Options.HeaderFilterRegex = "";
   Options.SystemHeaders = false;
   Options.FormatStyle = "none";
-  Options.User = std::nullopt;
+  Options.User = llvm::None;
   for (const ClangTidyModuleRegistry::entry &Module :
        ClangTidyModuleRegistry::entries())
     Options.mergeWith(Module.instantiate()->getModuleOptions(), 0);
@@ -202,7 +121,7 @@ ClangTidyOptions ClangTidyOptions::getDefaults() {
 }
 
 template <typename T>
-static void mergeVectors(std::optional<T> &Dest, const std::optional<T> &Src) {
+static void mergeVectors(Optional<T> &Dest, const Optional<T> &Src) {
   if (Src) {
     if (Dest)
       Dest->insert(Dest->end(), Src->begin(), Src->end());
@@ -211,14 +130,14 @@ static void mergeVectors(std::optional<T> &Dest, const std::optional<T> &Src) {
   }
 }
 
-static void mergeCommaSeparatedLists(std::optional<std::string> &Dest,
-                                     const std::optional<std::string> &Src) {
+static void mergeCommaSeparatedLists(Optional<std::string> &Dest,
+                                     const Optional<std::string> &Src) {
   if (Src)
     Dest = (Dest && !Dest->empty() ? *Dest + "," : "") + *Src;
 }
 
 template <typename T>
-static void overrideValue(std::optional<T> &Dest, const std::optional<T> &Src) {
+static void overrideValue(Optional<T> &Dest, const Optional<T> &Src) {
   if (Src)
     Dest = Src;
 }
@@ -227,9 +146,6 @@ ClangTidyOptions &ClangTidyOptions::mergeWith(const ClangTidyOptions &Other,
                                               unsigned Order) {
   mergeCommaSeparatedLists(Checks, Other.Checks);
   mergeCommaSeparatedLists(WarningsAsErrors, Other.WarningsAsErrors);
-  overrideValue(HeaderFileExtensions, Other.HeaderFileExtensions);
-  overrideValue(ImplementationFileExtensions,
-                Other.ImplementationFileExtensions);
   overrideValue(HeaderFilterRegex, Other.HeaderFilterRegex);
   overrideValue(SystemHeaders, Other.SystemHeaders);
   overrideValue(FormatStyle, Other.FormatStyle);
@@ -291,7 +207,7 @@ std::vector<OptionsSource>
 ConfigOptionsProvider::getRawOptions(llvm::StringRef FileName) {
   std::vector<OptionsSource> RawOptions =
       DefaultOptionsProvider::getRawOptions(FileName);
-  if (ConfigOptions.InheritParentConfig.value_or(false)) {
+  if (ConfigOptions.InheritParentConfig.getValueOr(false)) {
     LLVM_DEBUG(llvm::dbgs()
                << "Getting options for file " << FileName << "...\n");
     assert(FS && "FS must be set.");
@@ -339,7 +255,7 @@ void FileOptionsBaseProvider::addRawFileOptions(
   StringRef Path = llvm::sys::path::parent_path(AbsolutePath);
   for (StringRef CurrentPath = Path; !CurrentPath.empty();
        CurrentPath = llvm::sys::path::parent_path(CurrentPath)) {
-    std::optional<OptionsSource> Result;
+    llvm::Optional<OptionsSource> Result;
 
     auto Iter = CachedOptions.find(CurrentPath);
     if (Iter != CachedOptions.end())
@@ -360,7 +276,7 @@ void FileOptionsBaseProvider::addRawFileOptions(
       CachedOptions[Path] = *Result;
 
       CurOptions.push_back(*Result);
-      if (!Result->first.InheritParentConfig.value_or(false))
+      if (!Result->first.InheritParentConfig.getValueOr(false))
         break;
     }
   }
@@ -409,7 +325,7 @@ FileOptionsProvider::getRawOptions(StringRef FileName) {
   return RawOptions;
 }
 
-std::optional<OptionsSource>
+llvm::Optional<OptionsSource>
 FileOptionsBaseProvider::tryReadConfigFile(StringRef Directory) {
   assert(!Directory.empty());
 
@@ -418,7 +334,7 @@ FileOptionsBaseProvider::tryReadConfigFile(StringRef Directory) {
   if (!DirectoryStatus || !DirectoryStatus->isDirectory()) {
     llvm::errs() << "Error reading configuration from " << Directory
                  << ": directory doesn't exist.\n";
-    return std::nullopt;
+    return llvm::None;
   }
 
   for (const ConfigFileHandler &ConfigHandler : ConfigHandlers) {
@@ -453,7 +369,7 @@ FileOptionsBaseProvider::tryReadConfigFile(StringRef Directory) {
     }
     return OptionsSource(*ParsedOptions, std::string(ConfigFile));
   }
-  return std::nullopt;
+  return llvm::None;
 }
 
 /// Parses -line-filter option and stores it to the \c Options.
@@ -501,4 +417,5 @@ std::string configurationAsText(const ClangTidyOptions &Options) {
   return Stream.str();
 }
 
-} // namespace clang::tidy
+} // namespace tidy
+} // namespace clang

@@ -8,11 +8,18 @@
 
 #include "llvm/DebugInfo/CodeView/AppendingTypeTableBuilder.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/DebugInfo/CodeView/CodeView.h"
 #include "llvm/DebugInfo/CodeView/ContinuationRecordBuilder.h"
+#include "llvm/DebugInfo/CodeView/RecordSerialization.h"
 #include "llvm/DebugInfo/CodeView/TypeIndex.h"
 #include "llvm/Support/Allocator.h"
-#include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/BinaryByteStream.h"
+#include "llvm/Support/BinaryStreamWriter.h"
+#include "llvm/Support/Endian.h"
+#include "llvm/Support/Error.h"
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <cstring>
@@ -29,16 +36,16 @@ AppendingTypeTableBuilder::AppendingTypeTableBuilder(BumpPtrAllocator &Storage)
 
 AppendingTypeTableBuilder::~AppendingTypeTableBuilder() = default;
 
-std::optional<TypeIndex> AppendingTypeTableBuilder::getFirst() {
+Optional<TypeIndex> AppendingTypeTableBuilder::getFirst() {
   if (empty())
-    return std::nullopt;
+    return None;
 
   return TypeIndex(TypeIndex::FirstNonSimpleIndex);
 }
 
-std::optional<TypeIndex> AppendingTypeTableBuilder::getNext(TypeIndex Prev) {
+Optional<TypeIndex> AppendingTypeTableBuilder::getNext(TypeIndex Prev) {
   if (++Prev == nextTypeIndex())
-    return std::nullopt;
+    return None;
   return Prev;
 }
 

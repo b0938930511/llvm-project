@@ -12,8 +12,6 @@
 
 // explicit codecvt(size_t refs = 0);
 
-// XFAIL: no-wide-characters
-
 #include <locale>
 #include <cassert>
 

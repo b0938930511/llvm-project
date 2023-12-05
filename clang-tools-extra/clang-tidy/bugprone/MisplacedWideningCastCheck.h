@@ -11,7 +11,9 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::bugprone {
+namespace clang {
+namespace tidy {
+namespace bugprone {
 
 /// Find casts of calculation results to bigger type. Typically from int to
 /// long. If the intention of the cast is to avoid loss of precision then
@@ -24,7 +26,7 @@ namespace clang::tidy::bugprone {
 //      be the most common case. Enabled by default.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/bugprone/misplaced-widening-cast.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/bugprone-misplaced-widening-cast.html
 class MisplacedWideningCastCheck : public ClangTidyCheck {
 public:
   MisplacedWideningCastCheck(StringRef Name, ClangTidyContext *Context);
@@ -36,6 +38,8 @@ private:
   const bool CheckImplicitCasts;
 };
 
-} // namespace clang::tidy::bugprone
+} // namespace bugprone
+} // namespace tidy
+} // namespace clang
 
 #endif

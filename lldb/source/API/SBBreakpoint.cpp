@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "lldb/API/SBBreakpoint.h"
+#include "SBReproducerPrivate.h"
 #include "lldb/API/SBBreakpointLocation.h"
 #include "lldb/API/SBDebugger.h"
 #include "lldb/API/SBEvent.h"
@@ -15,7 +16,6 @@
 #include "lldb/API/SBStringList.h"
 #include "lldb/API/SBStructuredData.h"
 #include "lldb/API/SBThread.h"
-#include "lldb/Utility/Instrumentation.h"
 
 #include "lldb/Breakpoint/Breakpoint.h"
 #include "lldb/Breakpoint/BreakpointIDList.h"
@@ -25,6 +25,7 @@
 #include "lldb/Breakpoint/StoppointCallbackContext.h"
 #include "lldb/Core/Address.h"
 #include "lldb/Core/Debugger.h"
+#include "lldb/Core/StreamFile.h"
 #include "lldb/Core/StructuredDataImpl.h"
 #include "lldb/Interpreter/CommandInterpreter.h"
 #include "lldb/Interpreter/ScriptInterpreter.h"
@@ -44,51 +45,54 @@
 using namespace lldb;
 using namespace lldb_private;
 
-SBBreakpoint::SBBreakpoint() { LLDB_INSTRUMENT_VA(this); }
+SBBreakpoint::SBBreakpoint() { LLDB_RECORD_CONSTRUCTOR_NO_ARGS(SBBreakpoint); }
 
 SBBreakpoint::SBBreakpoint(const SBBreakpoint &rhs)
     : m_opaque_wp(rhs.m_opaque_wp) {
-  LLDB_INSTRUMENT_VA(this, rhs);
+  LLDB_RECORD_CONSTRUCTOR(SBBreakpoint, (const lldb::SBBreakpoint &), rhs);
 }
 
 SBBreakpoint::SBBreakpoint(const lldb::BreakpointSP &bp_sp)
     : m_opaque_wp(bp_sp) {
-  LLDB_INSTRUMENT_VA(this, bp_sp);
+  LLDB_RECORD_CONSTRUCTOR(SBBreakpoint, (const lldb::BreakpointSP &), bp_sp);
 }
 
 SBBreakpoint::~SBBreakpoint() = default;
 
 const SBBreakpoint &SBBreakpoint::operator=(const SBBreakpoint &rhs) {
-  LLDB_INSTRUMENT_VA(this, rhs);
+  LLDB_RECORD_METHOD(const lldb::SBBreakpoint &,
+                     SBBreakpoint, operator=,(const lldb::SBBreakpoint &), rhs);
 
   m_opaque_wp = rhs.m_opaque_wp;
-  return *this;
+  return LLDB_RECORD_RESULT(*this);
 }
 
 bool SBBreakpoint::operator==(const lldb::SBBreakpoint &rhs) {
-  LLDB_INSTRUMENT_VA(this, rhs);
+  LLDB_RECORD_METHOD(
+      bool, SBBreakpoint, operator==,(const lldb::SBBreakpoint &), rhs);
 
   return m_opaque_wp.lock() == rhs.m_opaque_wp.lock();
 }
 
 bool SBBreakpoint::operator!=(const lldb::SBBreakpoint &rhs) {
-  LLDB_INSTRUMENT_VA(this, rhs);
+  LLDB_RECORD_METHOD(
+      bool, SBBreakpoint, operator!=,(const lldb::SBBreakpoint &), rhs);
 
   return m_opaque_wp.lock() != rhs.m_opaque_wp.lock();
 }
 
 SBTarget SBBreakpoint::GetTarget() const {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_CONST_NO_ARGS(lldb::SBTarget, SBBreakpoint, GetTarget);
 
   BreakpointSP bkpt_sp = GetSP();
   if (bkpt_sp)
-    return SBTarget(bkpt_sp->GetTargetSP());
+    return LLDB_RECORD_RESULT(SBTarget(bkpt_sp->GetTargetSP()));
 
-  return SBTarget();
+  return LLDB_RECORD_RESULT(SBTarget());
 }
 
 break_id_t SBBreakpoint::GetID() const {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_CONST_NO_ARGS(lldb::break_id_t, SBBreakpoint, GetID);
 
   break_id_t break_id = LLDB_INVALID_BREAK_ID;
   BreakpointSP bkpt_sp = GetSP();
@@ -99,11 +103,11 @@ break_id_t SBBreakpoint::GetID() const {
 }
 
 bool SBBreakpoint::IsValid() const {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_CONST_NO_ARGS(bool, SBBreakpoint, IsValid);
   return this->operator bool();
 }
 SBBreakpoint::operator bool() const {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_CONST_NO_ARGS(bool, SBBreakpoint, operator bool);
 
   BreakpointSP bkpt_sp = GetSP();
   if (!bkpt_sp)
@@ -115,7 +119,7 @@ SBBreakpoint::operator bool() const {
 }
 
 void SBBreakpoint::ClearAllBreakpointSites() {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_NO_ARGS(void, SBBreakpoint, ClearAllBreakpointSites);
 
   BreakpointSP bkpt_sp = GetSP();
   if (bkpt_sp) {
@@ -126,7 +130,8 @@ void SBBreakpoint::ClearAllBreakpointSites() {
 }
 
 SBBreakpointLocation SBBreakpoint::FindLocationByAddress(addr_t vm_addr) {
-  LLDB_INSTRUMENT_VA(this, vm_addr);
+  LLDB_RECORD_METHOD(lldb::SBBreakpointLocation, SBBreakpoint,
+                     FindLocationByAddress, (lldb::addr_t), vm_addr);
 
   SBBreakpointLocation sb_bp_location;
 
@@ -143,11 +148,12 @@ SBBreakpointLocation SBBreakpoint::FindLocationByAddress(addr_t vm_addr) {
       sb_bp_location.SetLocation(bkpt_sp->FindLocationByAddress(address));
     }
   }
-  return sb_bp_location;
+  return LLDB_RECORD_RESULT(sb_bp_location);
 }
 
 break_id_t SBBreakpoint::FindLocationIDByAddress(addr_t vm_addr) {
-  LLDB_INSTRUMENT_VA(this, vm_addr);
+  LLDB_RECORD_METHOD(lldb::break_id_t, SBBreakpoint, FindLocationIDByAddress,
+                     (lldb::addr_t), vm_addr);
 
   break_id_t break_id = LLDB_INVALID_BREAK_ID;
   BreakpointSP bkpt_sp = GetSP();
@@ -167,7 +173,8 @@ break_id_t SBBreakpoint::FindLocationIDByAddress(addr_t vm_addr) {
 }
 
 SBBreakpointLocation SBBreakpoint::FindLocationByID(break_id_t bp_loc_id) {
-  LLDB_INSTRUMENT_VA(this, bp_loc_id);
+  LLDB_RECORD_METHOD(lldb::SBBreakpointLocation, SBBreakpoint, FindLocationByID,
+                     (lldb::break_id_t), bp_loc_id);
 
   SBBreakpointLocation sb_bp_location;
   BreakpointSP bkpt_sp = GetSP();
@@ -178,11 +185,12 @@ SBBreakpointLocation SBBreakpoint::FindLocationByID(break_id_t bp_loc_id) {
     sb_bp_location.SetLocation(bkpt_sp->FindLocationByID(bp_loc_id));
   }
 
-  return sb_bp_location;
+  return LLDB_RECORD_RESULT(sb_bp_location);
 }
 
 SBBreakpointLocation SBBreakpoint::GetLocationAtIndex(uint32_t index) {
-  LLDB_INSTRUMENT_VA(this, index);
+  LLDB_RECORD_METHOD(lldb::SBBreakpointLocation, SBBreakpoint,
+                     GetLocationAtIndex, (uint32_t), index);
 
   SBBreakpointLocation sb_bp_location;
   BreakpointSP bkpt_sp = GetSP();
@@ -193,11 +201,11 @@ SBBreakpointLocation SBBreakpoint::GetLocationAtIndex(uint32_t index) {
     sb_bp_location.SetLocation(bkpt_sp->GetLocationAtIndex(index));
   }
 
-  return sb_bp_location;
+  return LLDB_RECORD_RESULT(sb_bp_location);
 }
 
 void SBBreakpoint::SetEnabled(bool enable) {
-  LLDB_INSTRUMENT_VA(this, enable);
+  LLDB_RECORD_METHOD(void, SBBreakpoint, SetEnabled, (bool), enable);
 
   BreakpointSP bkpt_sp = GetSP();
 
@@ -209,7 +217,7 @@ void SBBreakpoint::SetEnabled(bool enable) {
 }
 
 bool SBBreakpoint::IsEnabled() {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_NO_ARGS(bool, SBBreakpoint, IsEnabled);
 
   BreakpointSP bkpt_sp = GetSP();
   if (bkpt_sp) {
@@ -221,7 +229,7 @@ bool SBBreakpoint::IsEnabled() {
 }
 
 void SBBreakpoint::SetOneShot(bool one_shot) {
-  LLDB_INSTRUMENT_VA(this, one_shot);
+  LLDB_RECORD_METHOD(void, SBBreakpoint, SetOneShot, (bool), one_shot);
 
   BreakpointSP bkpt_sp = GetSP();
 
@@ -233,7 +241,7 @@ void SBBreakpoint::SetOneShot(bool one_shot) {
 }
 
 bool SBBreakpoint::IsOneShot() const {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_CONST_NO_ARGS(bool, SBBreakpoint, IsOneShot);
 
   BreakpointSP bkpt_sp = GetSP();
   if (bkpt_sp) {
@@ -245,7 +253,7 @@ bool SBBreakpoint::IsOneShot() const {
 }
 
 bool SBBreakpoint::IsInternal() {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_NO_ARGS(bool, SBBreakpoint, IsInternal);
 
   BreakpointSP bkpt_sp = GetSP();
   if (bkpt_sp) {
@@ -257,7 +265,7 @@ bool SBBreakpoint::IsInternal() {
 }
 
 void SBBreakpoint::SetIgnoreCount(uint32_t count) {
-  LLDB_INSTRUMENT_VA(this, count);
+  LLDB_RECORD_METHOD(void, SBBreakpoint, SetIgnoreCount, (uint32_t), count);
 
   BreakpointSP bkpt_sp = GetSP();
 
@@ -269,7 +277,8 @@ void SBBreakpoint::SetIgnoreCount(uint32_t count) {
 }
 
 void SBBreakpoint::SetCondition(const char *condition) {
-  LLDB_INSTRUMENT_VA(this, condition);
+  LLDB_RECORD_METHOD(void, SBBreakpoint, SetCondition, (const char *),
+                     condition);
 
   BreakpointSP bkpt_sp = GetSP();
   if (bkpt_sp) {
@@ -280,19 +289,20 @@ void SBBreakpoint::SetCondition(const char *condition) {
 }
 
 const char *SBBreakpoint::GetCondition() {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_NO_ARGS(const char *, SBBreakpoint, GetCondition);
 
   BreakpointSP bkpt_sp = GetSP();
-  if (!bkpt_sp)
-    return nullptr;
-
-  std::lock_guard<std::recursive_mutex> guard(
-      bkpt_sp->GetTarget().GetAPIMutex());
-  return ConstString(bkpt_sp->GetConditionText()).GetCString();
+  if (bkpt_sp) {
+    std::lock_guard<std::recursive_mutex> guard(
+        bkpt_sp->GetTarget().GetAPIMutex());
+    return bkpt_sp->GetConditionText();
+  }
+  return nullptr;
 }
 
 void SBBreakpoint::SetAutoContinue(bool auto_continue) {
-  LLDB_INSTRUMENT_VA(this, auto_continue);
+  LLDB_RECORD_METHOD(void, SBBreakpoint, SetAutoContinue, (bool),
+                     auto_continue);
 
   BreakpointSP bkpt_sp = GetSP();
   if (bkpt_sp) {
@@ -303,7 +313,7 @@ void SBBreakpoint::SetAutoContinue(bool auto_continue) {
 }
 
 bool SBBreakpoint::GetAutoContinue() {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_NO_ARGS(bool, SBBreakpoint, GetAutoContinue);
 
   BreakpointSP bkpt_sp = GetSP();
   if (bkpt_sp) {
@@ -315,7 +325,7 @@ bool SBBreakpoint::GetAutoContinue() {
 }
 
 uint32_t SBBreakpoint::GetHitCount() const {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_CONST_NO_ARGS(uint32_t, SBBreakpoint, GetHitCount);
 
   uint32_t count = 0;
   BreakpointSP bkpt_sp = GetSP();
@@ -329,7 +339,7 @@ uint32_t SBBreakpoint::GetHitCount() const {
 }
 
 uint32_t SBBreakpoint::GetIgnoreCount() const {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_CONST_NO_ARGS(uint32_t, SBBreakpoint, GetIgnoreCount);
 
   uint32_t count = 0;
   BreakpointSP bkpt_sp = GetSP();
@@ -343,7 +353,7 @@ uint32_t SBBreakpoint::GetIgnoreCount() const {
 }
 
 void SBBreakpoint::SetThreadID(tid_t tid) {
-  LLDB_INSTRUMENT_VA(this, tid);
+  LLDB_RECORD_METHOD(void, SBBreakpoint, SetThreadID, (lldb::tid_t), tid);
 
   BreakpointSP bkpt_sp = GetSP();
   if (bkpt_sp) {
@@ -354,7 +364,7 @@ void SBBreakpoint::SetThreadID(tid_t tid) {
 }
 
 tid_t SBBreakpoint::GetThreadID() {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_NO_ARGS(lldb::tid_t, SBBreakpoint, GetThreadID);
 
   tid_t tid = LLDB_INVALID_THREAD_ID;
   BreakpointSP bkpt_sp = GetSP();
@@ -368,7 +378,7 @@ tid_t SBBreakpoint::GetThreadID() {
 }
 
 void SBBreakpoint::SetThreadIndex(uint32_t index) {
-  LLDB_INSTRUMENT_VA(this, index);
+  LLDB_RECORD_METHOD(void, SBBreakpoint, SetThreadIndex, (uint32_t), index);
 
   BreakpointSP bkpt_sp = GetSP();
   if (bkpt_sp) {
@@ -379,7 +389,7 @@ void SBBreakpoint::SetThreadIndex(uint32_t index) {
 }
 
 uint32_t SBBreakpoint::GetThreadIndex() const {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_CONST_NO_ARGS(uint32_t, SBBreakpoint, GetThreadIndex);
 
   uint32_t thread_idx = UINT32_MAX;
   BreakpointSP bkpt_sp = GetSP();
@@ -396,7 +406,8 @@ uint32_t SBBreakpoint::GetThreadIndex() const {
 }
 
 void SBBreakpoint::SetThreadName(const char *thread_name) {
-  LLDB_INSTRUMENT_VA(this, thread_name);
+  LLDB_RECORD_METHOD(void, SBBreakpoint, SetThreadName, (const char *),
+                     thread_name);
 
   BreakpointSP bkpt_sp = GetSP();
 
@@ -408,23 +419,25 @@ void SBBreakpoint::SetThreadName(const char *thread_name) {
 }
 
 const char *SBBreakpoint::GetThreadName() const {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_CONST_NO_ARGS(const char *, SBBreakpoint, GetThreadName);
 
+  const char *name = nullptr;
   BreakpointSP bkpt_sp = GetSP();
-  if (!bkpt_sp)
-    return nullptr;
+  if (bkpt_sp) {
+    std::lock_guard<std::recursive_mutex> guard(
+        bkpt_sp->GetTarget().GetAPIMutex());
+    const ThreadSpec *thread_spec =
+        bkpt_sp->GetOptions().GetThreadSpecNoCreate();
+    if (thread_spec != nullptr)
+      name = thread_spec->GetName();
+  }
 
-  std::lock_guard<std::recursive_mutex> guard(
-      bkpt_sp->GetTarget().GetAPIMutex());
-  if (const ThreadSpec *thread_spec =
-          bkpt_sp->GetOptions().GetThreadSpecNoCreate())
-    return ConstString(thread_spec->GetName()).GetCString();
-
-  return nullptr;
+  return name;
 }
 
 void SBBreakpoint::SetQueueName(const char *queue_name) {
-  LLDB_INSTRUMENT_VA(this, queue_name);
+  LLDB_RECORD_METHOD(void, SBBreakpoint, SetQueueName, (const char *),
+                     queue_name);
 
   BreakpointSP bkpt_sp = GetSP();
   if (bkpt_sp) {
@@ -435,23 +448,25 @@ void SBBreakpoint::SetQueueName(const char *queue_name) {
 }
 
 const char *SBBreakpoint::GetQueueName() const {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_CONST_NO_ARGS(const char *, SBBreakpoint, GetQueueName);
 
+  const char *name = nullptr;
   BreakpointSP bkpt_sp = GetSP();
-  if (!bkpt_sp)
-    return nullptr;
+  if (bkpt_sp) {
+    std::lock_guard<std::recursive_mutex> guard(
+        bkpt_sp->GetTarget().GetAPIMutex());
+    const ThreadSpec *thread_spec =
+        bkpt_sp->GetOptions().GetThreadSpecNoCreate();
+    if (thread_spec)
+      name = thread_spec->GetQueueName();
+  }
 
-  std::lock_guard<std::recursive_mutex> guard(
-      bkpt_sp->GetTarget().GetAPIMutex());
-  if (const ThreadSpec *thread_spec =
-          bkpt_sp->GetOptions().GetThreadSpecNoCreate())
-    return ConstString(thread_spec->GetQueueName()).GetCString();
-
-  return nullptr;
+  return name;
 }
 
 size_t SBBreakpoint::GetNumResolvedLocations() const {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_CONST_NO_ARGS(size_t, SBBreakpoint,
+                                   GetNumResolvedLocations);
 
   size_t num_resolved = 0;
   BreakpointSP bkpt_sp = GetSP();
@@ -464,7 +479,7 @@ size_t SBBreakpoint::GetNumResolvedLocations() const {
 }
 
 size_t SBBreakpoint::GetNumLocations() const {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_CONST_NO_ARGS(size_t, SBBreakpoint, GetNumLocations);
 
   BreakpointSP bkpt_sp = GetSP();
   size_t num_locs = 0;
@@ -477,7 +492,8 @@ size_t SBBreakpoint::GetNumLocations() const {
 }
 
 void SBBreakpoint::SetCommandLineCommands(SBStringList &commands) {
-  LLDB_INSTRUMENT_VA(this, commands);
+  LLDB_RECORD_METHOD(void, SBBreakpoint, SetCommandLineCommands,
+                     (lldb::SBStringList &), commands);
 
   BreakpointSP bkpt_sp = GetSP();
   if (!bkpt_sp)
@@ -494,7 +510,8 @@ void SBBreakpoint::SetCommandLineCommands(SBStringList &commands) {
 }
 
 bool SBBreakpoint::GetCommandLineCommands(SBStringList &commands) {
-  LLDB_INSTRUMENT_VA(this, commands);
+  LLDB_RECORD_METHOD(bool, SBBreakpoint, GetCommandLineCommands,
+                     (lldb::SBStringList &), commands);
 
   BreakpointSP bkpt_sp = GetSP();
   if (!bkpt_sp)
@@ -508,13 +525,14 @@ bool SBBreakpoint::GetCommandLineCommands(SBStringList &commands) {
 }
 
 bool SBBreakpoint::GetDescription(SBStream &s) {
-  LLDB_INSTRUMENT_VA(this, s);
+  LLDB_RECORD_METHOD(bool, SBBreakpoint, GetDescription, (lldb::SBStream &), s);
 
   return GetDescription(s, true);
 }
 
 bool SBBreakpoint::GetDescription(SBStream &s, bool include_locations) {
-  LLDB_INSTRUMENT_VA(this, s, include_locations);
+  LLDB_RECORD_METHOD(bool, SBBreakpoint, GetDescription,
+                     (lldb::SBStream &, bool), s, include_locations);
 
   BreakpointSP bkpt_sp = GetSP();
   if (bkpt_sp) {
@@ -534,24 +552,25 @@ bool SBBreakpoint::GetDescription(SBStream &s, bool include_locations) {
 }
 
 SBError SBBreakpoint::AddLocation(SBAddress &address) {
-  LLDB_INSTRUMENT_VA(this, address);
+  LLDB_RECORD_METHOD(lldb::SBError, SBBreakpoint, AddLocation,
+                     (lldb::SBAddress &), address);
 
   BreakpointSP bkpt_sp = GetSP();
   SBError error;
 
   if (!address.IsValid()) {
     error.SetErrorString("Can't add an invalid address.");
-    return error;
+    return LLDB_RECORD_RESULT(error);
   }
 
   if (!bkpt_sp) {
     error.SetErrorString("No breakpoint to add a location to.");
-    return error;
+    return LLDB_RECORD_RESULT(error);
   }
 
   if (!llvm::isa<BreakpointResolverScripted>(bkpt_sp->GetResolver().get())) {
     error.SetErrorString("Only a scripted resolver can add locations.");
-    return error;
+    return LLDB_RECORD_RESULT(error);
   }
 
   if (bkpt_sp->GetSearchFilter()->AddressPasses(address.ref()))
@@ -563,25 +582,27 @@ SBError SBBreakpoint::AddLocation(SBAddress &address) {
     error.SetErrorStringWithFormat("Address: %s didn't pass the filter.",
                                    s.GetData());
   }
-  return error;
+  return LLDB_RECORD_RESULT(error);
 }
 
 SBStructuredData SBBreakpoint::SerializeToStructuredData() {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_NO_ARGS(lldb::SBStructuredData, SBBreakpoint,
+                             SerializeToStructuredData);
 
   SBStructuredData data;
   BreakpointSP bkpt_sp = GetSP();
 
   if (!bkpt_sp)
-    return data;
+    return LLDB_RECORD_RESULT(data);
 
   StructuredData::ObjectSP bkpt_dict = bkpt_sp->SerializeToStructuredData();
   data.m_impl_up->SetObjectSP(bkpt_dict);
-  return data;
+  return LLDB_RECORD_RESULT(data);
 }
 
 void SBBreakpoint::SetCallback(SBBreakpointHitCallback callback, void *baton) {
-  LLDB_INSTRUMENT_VA(this, callback, baton);
+  LLDB_RECORD_DUMMY(void, SBBreakpoint, SetCallback,
+                    (lldb::SBBreakpointHitCallback, void *), callback, baton);
 
   BreakpointSP bkpt_sp = GetSP();
 
@@ -597,7 +618,8 @@ void SBBreakpoint::SetCallback(SBBreakpointHitCallback callback, void *baton) {
 
 void SBBreakpoint::SetScriptCallbackFunction(
   const char *callback_function_name) {
-  LLDB_INSTRUMENT_VA(this, callback_function_name);
+LLDB_RECORD_METHOD(void, SBBreakpoint, SetScriptCallbackFunction,
+                   (const char *), callback_function_name);
   SBStructuredData empty_args;
   SetScriptCallbackFunction(callback_function_name, empty_args);
 }
@@ -605,7 +627,8 @@ void SBBreakpoint::SetScriptCallbackFunction(
 SBError SBBreakpoint::SetScriptCallbackFunction(
     const char *callback_function_name,
     SBStructuredData &extra_args) {
-  LLDB_INSTRUMENT_VA(this, callback_function_name, extra_args);
+  LLDB_RECORD_METHOD(SBError, SBBreakpoint, SetScriptCallbackFunction,
+  (const char *, SBStructuredData &), callback_function_name, extra_args);
   SBError sb_error;
   BreakpointSP bkpt_sp = GetSP();
 
@@ -624,12 +647,13 @@ SBError SBBreakpoint::SetScriptCallbackFunction(
     sb_error.SetError(error);
   } else
     sb_error.SetErrorString("invalid breakpoint");
-
-  return sb_error;
+  
+  return LLDB_RECORD_RESULT(sb_error);
 }
 
 SBError SBBreakpoint::SetScriptCallbackBody(const char *callback_body_text) {
-  LLDB_INSTRUMENT_VA(this, callback_body_text);
+  LLDB_RECORD_METHOD(lldb::SBError, SBBreakpoint, SetScriptCallbackBody,
+                     (const char *), callback_body_text);
 
   BreakpointSP bkpt_sp = GetSP();
 
@@ -642,24 +666,24 @@ SBError SBBreakpoint::SetScriptCallbackBody(const char *callback_body_text) {
         bkpt_sp->GetTarget()
             .GetDebugger()
             .GetScriptInterpreter()
-            ->SetBreakpointCommandCallback(bp_options, callback_body_text,
-                                           /*is_callback=*/false);
+            ->SetBreakpointCommandCallback(bp_options, callback_body_text);
     sb_error.SetError(error);
   } else
     sb_error.SetErrorString("invalid breakpoint");
 
-  return sb_error;
+  return LLDB_RECORD_RESULT(sb_error);
 }
 
 bool SBBreakpoint::AddName(const char *new_name) {
-  LLDB_INSTRUMENT_VA(this, new_name);
+  LLDB_RECORD_METHOD(bool, SBBreakpoint, AddName, (const char *), new_name);
 
   SBError status = AddNameWithErrorHandling(new_name);
   return status.Success();
 }
 
 SBError SBBreakpoint::AddNameWithErrorHandling(const char *new_name) {
-  LLDB_INSTRUMENT_VA(this, new_name);
+  LLDB_RECORD_METHOD(SBError, SBBreakpoint, AddNameWithErrorHandling,
+                     (const char *), new_name);
 
   BreakpointSP bkpt_sp = GetSP();
 
@@ -674,11 +698,12 @@ SBError SBBreakpoint::AddNameWithErrorHandling(const char *new_name) {
     status.SetErrorString("invalid breakpoint");
   }
 
-  return status;
+  return LLDB_RECORD_RESULT(status);
 }
 
 void SBBreakpoint::RemoveName(const char *name_to_remove) {
-  LLDB_INSTRUMENT_VA(this, name_to_remove);
+  LLDB_RECORD_METHOD(void, SBBreakpoint, RemoveName, (const char *),
+                     name_to_remove);
 
   BreakpointSP bkpt_sp = GetSP();
 
@@ -691,7 +716,7 @@ void SBBreakpoint::RemoveName(const char *name_to_remove) {
 }
 
 bool SBBreakpoint::MatchesName(const char *name) {
-  LLDB_INSTRUMENT_VA(this, name);
+  LLDB_RECORD_METHOD(bool, SBBreakpoint, MatchesName, (const char *), name);
 
   BreakpointSP bkpt_sp = GetSP();
 
@@ -705,7 +730,8 @@ bool SBBreakpoint::MatchesName(const char *name) {
 }
 
 void SBBreakpoint::GetNames(SBStringList &names) {
-  LLDB_INSTRUMENT_VA(this, names);
+  LLDB_RECORD_METHOD(void, SBBreakpoint, GetNames, (lldb::SBStringList &),
+                     names);
 
   BreakpointSP bkpt_sp = GetSP();
 
@@ -721,7 +747,8 @@ void SBBreakpoint::GetNames(SBStringList &names) {
 }
 
 bool SBBreakpoint::EventIsBreakpointEvent(const lldb::SBEvent &event) {
-  LLDB_INSTRUMENT_VA(event);
+  LLDB_RECORD_STATIC_METHOD(bool, SBBreakpoint, EventIsBreakpointEvent,
+                            (const lldb::SBEvent &), event);
 
   return Breakpoint::BreakpointEventData::GetEventDataFromEvent(event.get()) !=
          nullptr;
@@ -729,7 +756,9 @@ bool SBBreakpoint::EventIsBreakpointEvent(const lldb::SBEvent &event) {
 
 BreakpointEventType
 SBBreakpoint::GetBreakpointEventTypeFromEvent(const SBEvent &event) {
-  LLDB_INSTRUMENT_VA(event);
+  LLDB_RECORD_STATIC_METHOD(lldb::BreakpointEventType, SBBreakpoint,
+                            GetBreakpointEventTypeFromEvent,
+                            (const lldb::SBEvent &), event);
 
   if (event.IsValid())
     return Breakpoint::BreakpointEventData::GetBreakpointEventTypeFromEvent(
@@ -738,30 +767,37 @@ SBBreakpoint::GetBreakpointEventTypeFromEvent(const SBEvent &event) {
 }
 
 SBBreakpoint SBBreakpoint::GetBreakpointFromEvent(const lldb::SBEvent &event) {
-  LLDB_INSTRUMENT_VA(event);
+  LLDB_RECORD_STATIC_METHOD(lldb::SBBreakpoint, SBBreakpoint,
+                            GetBreakpointFromEvent, (const lldb::SBEvent &),
+                            event);
 
   if (event.IsValid())
-    return SBBreakpoint(
-        Breakpoint::BreakpointEventData::GetBreakpointFromEvent(event.GetSP()));
-  return SBBreakpoint();
+    return LLDB_RECORD_RESULT(
+        SBBreakpoint(Breakpoint::BreakpointEventData::GetBreakpointFromEvent(
+            event.GetSP())));
+  return LLDB_RECORD_RESULT(SBBreakpoint());
 }
 
 SBBreakpointLocation
 SBBreakpoint::GetBreakpointLocationAtIndexFromEvent(const lldb::SBEvent &event,
                                                     uint32_t loc_idx) {
-  LLDB_INSTRUMENT_VA(event, loc_idx);
+  LLDB_RECORD_STATIC_METHOD(lldb::SBBreakpointLocation, SBBreakpoint,
+                            GetBreakpointLocationAtIndexFromEvent,
+                            (const lldb::SBEvent &, uint32_t), event, loc_idx);
 
   SBBreakpointLocation sb_breakpoint_loc;
   if (event.IsValid())
     sb_breakpoint_loc.SetLocation(
         Breakpoint::BreakpointEventData::GetBreakpointLocationAtIndexFromEvent(
             event.GetSP(), loc_idx));
-  return sb_breakpoint_loc;
+  return LLDB_RECORD_RESULT(sb_breakpoint_loc);
 }
 
 uint32_t
 SBBreakpoint::GetNumBreakpointLocationsFromEvent(const lldb::SBEvent &event) {
-  LLDB_INSTRUMENT_VA(event);
+  LLDB_RECORD_STATIC_METHOD(uint32_t, SBBreakpoint,
+                            GetNumBreakpointLocationsFromEvent,
+                            (const lldb::SBEvent &), event);
 
   uint32_t num_locations = 0;
   if (event.IsValid())
@@ -772,7 +808,7 @@ SBBreakpoint::GetNumBreakpointLocationsFromEvent(const lldb::SBEvent &event) {
 }
 
 bool SBBreakpoint::IsHardware() const {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_CONST_NO_ARGS(bool, SBBreakpoint, IsHardware);
 
   BreakpointSP bkpt_sp = GetSP();
   if (bkpt_sp)
@@ -785,7 +821,7 @@ BreakpointSP SBBreakpoint::GetSP() const { return m_opaque_wp.lock(); }
 // This is simple collection of breakpoint id's and their target.
 class SBBreakpointListImpl {
 public:
-  SBBreakpointListImpl(lldb::TargetSP target_sp) {
+  SBBreakpointListImpl(lldb::TargetSP target_sp) : m_target_wp() {
     if (target_sp && target_sp->IsValid())
       m_target_wp = target_sp;
   }
@@ -833,7 +869,8 @@ public:
     if (bkpt->GetTargetSP() != target_sp)
       return false;
     lldb::break_id_t bp_id = bkpt->GetID();
-    if (!llvm::is_contained(m_break_ids, bp_id))
+    if (find(m_break_ids.begin(), m_break_ids.end(), bp_id) ==
+        m_break_ids.end())
       return false;
 
     m_break_ids.push_back(bkpt->GetID());
@@ -867,13 +904,13 @@ private:
 
 SBBreakpointList::SBBreakpointList(SBTarget &target)
     : m_opaque_sp(new SBBreakpointListImpl(target.GetSP())) {
-  LLDB_INSTRUMENT_VA(this, target);
+  LLDB_RECORD_CONSTRUCTOR(SBBreakpointList, (lldb::SBTarget &), target);
 }
 
 SBBreakpointList::~SBBreakpointList() = default;
 
 size_t SBBreakpointList::GetSize() const {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_CONST_NO_ARGS(size_t, SBBreakpointList, GetSize);
 
   if (!m_opaque_sp)
     return 0;
@@ -882,26 +919,29 @@ size_t SBBreakpointList::GetSize() const {
 }
 
 SBBreakpoint SBBreakpointList::GetBreakpointAtIndex(size_t idx) {
-  LLDB_INSTRUMENT_VA(this, idx);
+  LLDB_RECORD_METHOD(lldb::SBBreakpoint, SBBreakpointList, GetBreakpointAtIndex,
+                     (size_t), idx);
 
   if (!m_opaque_sp)
-    return SBBreakpoint();
+    return LLDB_RECORD_RESULT(SBBreakpoint());
 
   BreakpointSP bkpt_sp = m_opaque_sp->GetBreakpointAtIndex(idx);
-  return SBBreakpoint(bkpt_sp);
+  return LLDB_RECORD_RESULT(SBBreakpoint(bkpt_sp));
 }
 
 SBBreakpoint SBBreakpointList::FindBreakpointByID(lldb::break_id_t id) {
-  LLDB_INSTRUMENT_VA(this, id);
+  LLDB_RECORD_METHOD(lldb::SBBreakpoint, SBBreakpointList, FindBreakpointByID,
+                     (lldb::break_id_t), id);
 
   if (!m_opaque_sp)
-    return SBBreakpoint();
+    return LLDB_RECORD_RESULT(SBBreakpoint());
   BreakpointSP bkpt_sp = m_opaque_sp->FindBreakpointByID(id);
-  return SBBreakpoint(bkpt_sp);
+  return LLDB_RECORD_RESULT(SBBreakpoint(bkpt_sp));
 }
 
 void SBBreakpointList::Append(const SBBreakpoint &sb_bkpt) {
-  LLDB_INSTRUMENT_VA(this, sb_bkpt);
+  LLDB_RECORD_METHOD(void, SBBreakpointList, Append,
+                     (const lldb::SBBreakpoint &), sb_bkpt);
 
   if (!sb_bkpt.IsValid())
     return;
@@ -911,7 +951,8 @@ void SBBreakpointList::Append(const SBBreakpoint &sb_bkpt) {
 }
 
 void SBBreakpointList::AppendByID(lldb::break_id_t id) {
-  LLDB_INSTRUMENT_VA(this, id);
+  LLDB_RECORD_METHOD(void, SBBreakpointList, AppendByID, (lldb::break_id_t),
+                     id);
 
   if (!m_opaque_sp)
     return;
@@ -919,7 +960,8 @@ void SBBreakpointList::AppendByID(lldb::break_id_t id) {
 }
 
 bool SBBreakpointList::AppendIfUnique(const SBBreakpoint &sb_bkpt) {
-  LLDB_INSTRUMENT_VA(this, sb_bkpt);
+  LLDB_RECORD_METHOD(bool, SBBreakpointList, AppendIfUnique,
+                     (const lldb::SBBreakpoint &), sb_bkpt);
 
   if (!sb_bkpt.IsValid())
     return false;
@@ -929,7 +971,7 @@ bool SBBreakpointList::AppendIfUnique(const SBBreakpoint &sb_bkpt) {
 }
 
 void SBBreakpointList::Clear() {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_NO_ARGS(void, SBBreakpointList, Clear);
 
   if (m_opaque_sp)
     m_opaque_sp->Clear();
@@ -939,4 +981,115 @@ void SBBreakpointList::CopyToBreakpointIDList(
     lldb_private::BreakpointIDList &bp_id_list) {
   if (m_opaque_sp)
     m_opaque_sp->CopyToBreakpointIDList(bp_id_list);
+}
+
+namespace lldb_private {
+namespace repro {
+
+template <>
+void RegisterMethods<SBBreakpoint>(Registry &R) {
+  LLDB_REGISTER_CONSTRUCTOR(SBBreakpoint, ());
+  LLDB_REGISTER_CONSTRUCTOR(SBBreakpoint, (const lldb::SBBreakpoint &));
+  LLDB_REGISTER_CONSTRUCTOR(SBBreakpoint, (const lldb::BreakpointSP &));
+  LLDB_REGISTER_METHOD(const lldb::SBBreakpoint &,
+                       SBBreakpoint, operator=,(const lldb::SBBreakpoint &));
+  LLDB_REGISTER_METHOD(bool,
+                       SBBreakpoint, operator==,(const lldb::SBBreakpoint &));
+  LLDB_REGISTER_METHOD(bool,
+                       SBBreakpoint, operator!=,(const lldb::SBBreakpoint &));
+  LLDB_REGISTER_METHOD_CONST(lldb::SBTarget, SBBreakpoint, GetTarget, ());
+  LLDB_REGISTER_METHOD_CONST(lldb::break_id_t, SBBreakpoint, GetID, ());
+  LLDB_REGISTER_METHOD_CONST(bool, SBBreakpoint, IsValid, ());
+  LLDB_REGISTER_METHOD_CONST(bool, SBBreakpoint, operator bool, ());
+  LLDB_REGISTER_METHOD(void, SBBreakpoint, ClearAllBreakpointSites, ());
+  LLDB_REGISTER_METHOD(lldb::SBBreakpointLocation, SBBreakpoint,
+                       FindLocationByAddress, (lldb::addr_t));
+  LLDB_REGISTER_METHOD(lldb::break_id_t, SBBreakpoint,
+                       FindLocationIDByAddress, (lldb::addr_t));
+  LLDB_REGISTER_METHOD(lldb::SBBreakpointLocation, SBBreakpoint,
+                       FindLocationByID, (lldb::break_id_t));
+  LLDB_REGISTER_METHOD(lldb::SBBreakpointLocation, SBBreakpoint,
+                       GetLocationAtIndex, (uint32_t));
+  LLDB_REGISTER_METHOD(void, SBBreakpoint, SetEnabled, (bool));
+  LLDB_REGISTER_METHOD(bool, SBBreakpoint, IsEnabled, ());
+  LLDB_REGISTER_METHOD(void, SBBreakpoint, SetOneShot, (bool));
+  LLDB_REGISTER_METHOD_CONST(bool, SBBreakpoint, IsOneShot, ());
+  LLDB_REGISTER_METHOD(bool, SBBreakpoint, IsInternal, ());
+  LLDB_REGISTER_METHOD(void, SBBreakpoint, SetIgnoreCount, (uint32_t));
+  LLDB_REGISTER_METHOD(void, SBBreakpoint, SetCondition, (const char *));
+  LLDB_REGISTER_METHOD(const char *, SBBreakpoint, GetCondition, ());
+  LLDB_REGISTER_METHOD(void, SBBreakpoint, SetAutoContinue, (bool));
+  LLDB_REGISTER_METHOD(bool, SBBreakpoint, GetAutoContinue, ());
+  LLDB_REGISTER_METHOD_CONST(uint32_t, SBBreakpoint, GetHitCount, ());
+  LLDB_REGISTER_METHOD_CONST(uint32_t, SBBreakpoint, GetIgnoreCount, ());
+  LLDB_REGISTER_METHOD(void, SBBreakpoint, SetThreadID, (lldb::tid_t));
+  LLDB_REGISTER_METHOD(lldb::tid_t, SBBreakpoint, GetThreadID, ());
+  LLDB_REGISTER_METHOD(void, SBBreakpoint, SetThreadIndex, (uint32_t));
+  LLDB_REGISTER_METHOD_CONST(uint32_t, SBBreakpoint, GetThreadIndex, ());
+  LLDB_REGISTER_METHOD(void, SBBreakpoint, SetThreadName, (const char *));
+  LLDB_REGISTER_METHOD_CONST(const char *, SBBreakpoint, GetThreadName, ());
+  LLDB_REGISTER_METHOD(void, SBBreakpoint, SetQueueName, (const char *));
+  LLDB_REGISTER_METHOD_CONST(const char *, SBBreakpoint, GetQueueName, ());
+  LLDB_REGISTER_METHOD_CONST(size_t, SBBreakpoint, GetNumResolvedLocations,
+                             ());
+  LLDB_REGISTER_METHOD_CONST(size_t, SBBreakpoint, GetNumLocations, ());
+  LLDB_REGISTER_METHOD(void, SBBreakpoint, SetCommandLineCommands,
+                       (lldb::SBStringList &));
+  LLDB_REGISTER_METHOD(bool, SBBreakpoint, GetCommandLineCommands,
+                       (lldb::SBStringList &));
+  LLDB_REGISTER_METHOD(bool, SBBreakpoint, GetDescription,
+                       (lldb::SBStream &));
+  LLDB_REGISTER_METHOD(bool, SBBreakpoint, GetDescription,
+                       (lldb::SBStream &, bool));
+  LLDB_REGISTER_METHOD(lldb::SBError, SBBreakpoint, AddLocation,
+                       (lldb::SBAddress &));
+  LLDB_REGISTER_METHOD(lldb::SBStructuredData, SBBreakpoint,
+                       SerializeToStructuredData, ());
+  LLDB_REGISTER_METHOD(void, SBBreakpoint, SetScriptCallbackFunction,
+                       (const char *));
+  LLDB_REGISTER_METHOD(lldb::SBError, SBBreakpoint, SetScriptCallbackFunction,
+                       (const char *, SBStructuredData &));
+  LLDB_REGISTER_METHOD(lldb::SBError, SBBreakpoint, SetScriptCallbackBody,
+                       (const char *));
+  LLDB_REGISTER_METHOD(bool, SBBreakpoint, AddName, (const char *));
+  LLDB_REGISTER_METHOD(lldb::SBError, SBBreakpoint, AddNameWithErrorHandling,
+                       (const char *));
+  LLDB_REGISTER_METHOD(void, SBBreakpoint, RemoveName, (const char *));
+  LLDB_REGISTER_METHOD(bool, SBBreakpoint, MatchesName, (const char *));
+  LLDB_REGISTER_METHOD(void, SBBreakpoint, GetNames, (lldb::SBStringList &));
+  LLDB_REGISTER_STATIC_METHOD(bool, SBBreakpoint, EventIsBreakpointEvent,
+                              (const lldb::SBEvent &));
+  LLDB_REGISTER_STATIC_METHOD(lldb::BreakpointEventType, SBBreakpoint,
+                              GetBreakpointEventTypeFromEvent,
+                              (const lldb::SBEvent &));
+  LLDB_REGISTER_STATIC_METHOD(lldb::SBBreakpoint, SBBreakpoint,
+                              GetBreakpointFromEvent,
+                              (const lldb::SBEvent &));
+  LLDB_REGISTER_STATIC_METHOD(lldb::SBBreakpointLocation, SBBreakpoint,
+                              GetBreakpointLocationAtIndexFromEvent,
+                              (const lldb::SBEvent &, uint32_t));
+  LLDB_REGISTER_STATIC_METHOD(uint32_t, SBBreakpoint,
+                              GetNumBreakpointLocationsFromEvent,
+                              (const lldb::SBEvent &));
+  LLDB_REGISTER_METHOD_CONST(bool, SBBreakpoint, IsHardware, ());
+}
+
+template <>
+void RegisterMethods<SBBreakpointList>(Registry &R) {
+  LLDB_REGISTER_CONSTRUCTOR(SBBreakpointList, (lldb::SBTarget &));
+  LLDB_REGISTER_METHOD_CONST(size_t, SBBreakpointList, GetSize, ());
+  LLDB_REGISTER_METHOD(lldb::SBBreakpoint, SBBreakpointList,
+                       GetBreakpointAtIndex, (size_t));
+  LLDB_REGISTER_METHOD(lldb::SBBreakpoint, SBBreakpointList,
+                       FindBreakpointByID, (lldb::break_id_t));
+  LLDB_REGISTER_METHOD(void, SBBreakpointList, Append,
+                       (const lldb::SBBreakpoint &));
+  LLDB_REGISTER_METHOD(void, SBBreakpointList, AppendByID,
+                       (lldb::break_id_t));
+  LLDB_REGISTER_METHOD(bool, SBBreakpointList, AppendIfUnique,
+                       (const lldb::SBBreakpoint &));
+  LLDB_REGISTER_METHOD(void, SBBreakpointList, Clear, ());
+}
+
+}
 }

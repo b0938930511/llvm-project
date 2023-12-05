@@ -41,8 +41,12 @@ bool TargetSubtargetInfo::enableJoinGlobalCopies() const {
 }
 
 bool TargetSubtargetInfo::enableRALocalReassignment(
-    CodeGenOptLevel OptLevel) const {
+    CodeGenOpt::Level OptLevel) const {
   return true;
+}
+
+bool TargetSubtargetInfo::enableAdvancedRASplitCost() const {
+  return false;
 }
 
 bool TargetSubtargetInfo::enablePostRAScheduler() const {

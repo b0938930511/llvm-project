@@ -28,7 +28,7 @@ struct A
     int second;
 };
 
-TEST_CONSTEXPR_CXX20 bool tests()
+int main(int, char**)
 {
     {
         typedef int T;
@@ -167,14 +167,5 @@ TEST_CONSTEXPR_CXX20 bool tests()
     }
 #endif
 
-    return true;
-}
-
-int main(int, char**)
-{
-    tests();
-#if TEST_STD_VER > 17
-    static_assert(tests());
-#endif
-    return 0;
+  return 0;
 }

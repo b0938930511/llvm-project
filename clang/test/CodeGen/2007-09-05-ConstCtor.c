@@ -7,7 +7,7 @@ struct A {
 
 void bar(struct A *a);
 
-void bork(void) {
+void bork() {
   const unsigned long vcgt = 1234;
   struct A a = { vcgt };
   bar(&a);

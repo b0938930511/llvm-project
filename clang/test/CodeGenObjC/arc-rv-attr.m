@@ -1,152 +1,173 @@
 // RUN: %clang_cc1 -triple arm64-apple-ios9 -fobjc-runtime=ios-9.0 -fobjc-arc -O -disable-llvm-passes -emit-llvm -o - %s | FileCheck %s -check-prefix=CHECK
-// RUN: %clang_cc1 -triple x86_64-apple-macosx10 -fobjc-runtime=ios-9.0 -fobjc-arc -O -disable-llvm-passes -emit-llvm -o - %s | FileCheck %s -check-prefix=CHECK
 
 @class A;
 
 A *makeA(void);
 
-void test_assign(void) {
+void test_assign() {
   __unsafe_unretained id x;
   x = makeA();
 }
 // CHECK-LABEL: define{{.*}} void @test_assign()
-// CHECK:         [[X:%.*]] = alloca ptr
-// CHECK:         [[T0:%.*]] = call ptr @makeA() [ "clang.arc.attachedcall"(ptr @llvm.objc.unsafeClaimAutoreleasedReturnValue) ]
+// CHECK:         [[X:%.*]] = alloca i8*
+// CHECK:         [[T0:%.*]] = call [[A:.*]]* @makeA() [ "clang.arc.attachedcall"(i64 1) ]
 // CHECK-NEXT:    call void (...) @llvm.objc.clang.arc.noop.use({{.*}} [[T0]])
-// CHECK-NEXT:    store ptr [[T0]], ptr [[X]]
+// CHECK-NEXT:    [[T1:%.*]] = bitcast [[A]]* [[T0]] to i8*
+// CHECK-NEXT:    store i8* [[T1]], i8** [[X]]
+// CHECK-NEXT:    bitcast
 // CHECK-NEXT:    lifetime.end
 // CHECK-NEXT:    ret void
 
-void test_assign_assign(void) {
+void test_assign_assign() {
   __unsafe_unretained id x, y;
   x = y = makeA();
 }
 // CHECK-LABEL: define{{.*}} void @test_assign_assign()
-// CHECK:         [[X:%.*]] = alloca ptr
-// CHECK:         [[Y:%.*]] = alloca ptr
-// CHECK:         [[T0:%.*]] = call ptr @makeA() [ "clang.arc.attachedcall"(ptr @llvm.objc.unsafeClaimAutoreleasedReturnValue) ]
+// CHECK:         [[X:%.*]] = alloca i8*
+// CHECK:         [[Y:%.*]] = alloca i8*
+// CHECK:         [[T0:%.*]] = call [[A]]* @makeA() [ "clang.arc.attachedcall"(i64 1) ]
 // CHECK-NEXT:    call void (...) @llvm.objc.clang.arc.noop.use({{.*}} [[T0]])
-// CHECK-NEXT:    store ptr [[T0]], ptr [[Y]]
-// CHECK-NEXT:    store ptr [[T0]], ptr [[X]]
+// CHECK-NEXT:    [[T1:%.*]] = bitcast [[A]]* [[T0]] to i8*
+// CHECK-NEXT:    store i8* [[T1]], i8** [[Y]]
+// CHECK-NEXT:    store i8* [[T1]], i8** [[X]]
+// CHECK-NEXT:    bitcast
 // CHECK-NEXT:    lifetime.end
+// CHECK-NEXT:    bitcast
 // CHECK-NEXT:    lifetime.end
 // CHECK-NEXT:    ret void
 
-void test_strong_assign_assign(void) {
+void test_strong_assign_assign() {
   __strong id x;
   __unsafe_unretained id y;
   x = y = makeA();
 }
 // CHECK-LABEL: define{{.*}} void @test_strong_assign_assign()
-// CHECK:         [[X:%.*]] = alloca ptr
-// CHECK:         [[Y:%.*]] = alloca ptr
-// CHECK:         [[T0:%.*]] = call ptr @makeA() [ "clang.arc.attachedcall"(ptr @llvm.objc.retainAutoreleasedReturnValue) ]
+// CHECK:         [[X:%.*]] = alloca i8*
+// CHECK:         [[Y:%.*]] = alloca i8*
+// CHECK:         [[T0:%.*]] = call [[A]]* @makeA() [ "clang.arc.attachedcall"(i64 0) ]
 // CHECK-NEXT:    call void (...) @llvm.objc.clang.arc.noop.use({{.*}} [[T0]])
-// CHECK-NEXT:    store ptr [[T0]], ptr [[Y]]
-// CHECK-NEXT:    [[OLD:%.*]] = load ptr, ptr [[X]]
-// CHECK-NEXT:    store ptr [[T0]], ptr [[X]]
-// CHECK-NEXT:    call void @llvm.objc.release(ptr [[OLD]]
+// CHECK-NEXT:    [[T1:%.*]] = bitcast [[A]]* [[T0]] to i8*
+// CHECK-NEXT:    store i8* [[T1]], i8** [[Y]]
+// CHECK-NEXT:    [[OLD:%.*]] = load i8*, i8** [[X]]
+// CHECK-NEXT:    store i8* [[T1]], i8** [[X]]
+// CHECK-NEXT:    call void @llvm.objc.release(i8* [[OLD]]
+// CHECK-NEXT:    bitcast
 // CHECK-NEXT:    lifetime.end
-// CHECK-NEXT:    [[T0:%.*]] = load ptr, ptr [[X]]
-// CHECK-NEXT:    call void @llvm.objc.release(ptr [[T0]])
+// CHECK-NEXT:    [[T0:%.*]] = load i8*, i8** [[X]]
+// CHECK-NEXT:    call void @llvm.objc.release(i8* [[T0]])
+// CHECK-NEXT:    bitcast
 // CHECK-NEXT:    lifetime.end
 // CHECK-NEXT:    ret void
 
-void test_assign_strong_assign(void) {
+void test_assign_strong_assign() {
   __unsafe_unretained id x;
   __strong id y;
   x = y = makeA();
 }
 // CHECK-LABEL: define{{.*}} void @test_assign_strong_assign()
-// CHECK:         [[X:%.*]] = alloca ptr
-// CHECK:         [[Y:%.*]] = alloca ptr
-// CHECK:         [[T0:%.*]] = call ptr @makeA() [ "clang.arc.attachedcall"(ptr @llvm.objc.retainAutoreleasedReturnValue) ]
+// CHECK:         [[X:%.*]] = alloca i8*
+// CHECK:         [[Y:%.*]] = alloca i8*
+// CHECK:         [[T0:%.*]] = call [[A]]* @makeA() [ "clang.arc.attachedcall"(i64 0) ]
 // CHECK-NEXT:    call void (...) @llvm.objc.clang.arc.noop.use({{.*}} [[T0]])
-// CHECK-NEXT:    [[OLD:%.*]] = load ptr, ptr [[Y]]
-// CHECK-NEXT:    store ptr [[T0]], ptr [[Y]]
-// CHECK-NEXT:    call void @llvm.objc.release(ptr [[OLD]]
-// CHECK-NEXT:    store ptr [[T0]], ptr [[X]]
-// CHECK-NEXT:    [[T0:%.*]] = load ptr, ptr [[Y]]
-// CHECK-NEXT:    call void @llvm.objc.release(ptr [[T0]])
+// CHECK-NEXT:    [[T1:%.*]] = bitcast [[A]]* [[T0]] to i8*
+// CHECK-NEXT:    [[OLD:%.*]] = load i8*, i8** [[Y]]
+// CHECK-NEXT:    store i8* [[T1]], i8** [[Y]]
+// CHECK-NEXT:    call void @llvm.objc.release(i8* [[OLD]]
+// CHECK-NEXT:    store i8* [[T1]], i8** [[X]]
+// CHECK-NEXT:    [[T0:%.*]] = load i8*, i8** [[Y]]
+// CHECK-NEXT:    call void @llvm.objc.release(i8* [[T0]])
+// CHECK-NEXT:    bitcast
 // CHECK-NEXT:    lifetime.end
+// CHECK-NEXT:    bitcast
 // CHECK-NEXT:    lifetime.end
 // CHECK-NEXT:    ret void
 
-void test_init(void) {
+void test_init() {
   __unsafe_unretained id x = makeA();
 }
 // CHECK-LABEL: define{{.*}} void @test_init()
-// CHECK:         [[X:%.*]] = alloca ptr
-// CHECK:         [[T0:%.*]] = call ptr @makeA() [ "clang.arc.attachedcall"(ptr @llvm.objc.unsafeClaimAutoreleasedReturnValue) ]
+// CHECK:         [[X:%.*]] = alloca i8*
+// CHECK:         [[T0:%.*]] = call [[A]]* @makeA() [ "clang.arc.attachedcall"(i64 1) ]
 // CHECK-NEXT:    call void (...) @llvm.objc.clang.arc.noop.use({{.*}} [[T0]])
-// CHECK-NEXT:    store ptr [[T0]], ptr [[X]]
+// CHECK-NEXT:    [[T1:%.*]] = bitcast [[A]]* [[T0]] to i8*
+// CHECK-NEXT:    store i8* [[T1]], i8** [[X]]
+// CHECK-NEXT:    bitcast
 // CHECK-NEXT:    lifetime.end
 // CHECK-NEXT:    ret void
 
-void test_init_assignment(void) {
+void test_init_assignment() {
   __unsafe_unretained id x;
   __unsafe_unretained id y = x = makeA();
 }
 // CHECK-LABEL: define{{.*}} void @test_init_assignment()
-// CHECK:         [[X:%.*]] = alloca ptr
-// CHECK:         [[Y:%.*]] = alloca ptr
-// CHECK:         [[T0:%.*]] = call ptr @makeA() [ "clang.arc.attachedcall"(ptr @llvm.objc.unsafeClaimAutoreleasedReturnValue) ]
+// CHECK:         [[X:%.*]] = alloca i8*
+// CHECK:         [[Y:%.*]] = alloca i8*
+// CHECK:         [[T0:%.*]] = call [[A]]* @makeA() [ "clang.arc.attachedcall"(i64 1) ]
 // CHECK-NEXT:    call void (...) @llvm.objc.clang.arc.noop.use({{.*}} [[T0]])
-// CHECK-NEXT:    store ptr [[T0]], ptr [[X]]
-// CHECK-NEXT:    store ptr [[T0]], ptr [[Y]]
+// CHECK-NEXT:    [[T1:%.*]] = bitcast [[A]]* [[T0]] to i8*
+// CHECK-NEXT:    store i8* [[T1]], i8** [[X]]
+// CHECK-NEXT:    store i8* [[T1]], i8** [[Y]]
+// CHECK-NEXT:    bitcast
 // CHECK-NEXT:    lifetime.end
+// CHECK-NEXT:    bitcast
 // CHECK-NEXT:    lifetime.end
 // CHECK-NEXT:    ret void
 
-void test_strong_init_assignment(void) {
+void test_strong_init_assignment() {
   __unsafe_unretained id x;
   __strong id y = x = makeA();
 }
 // CHECK-LABEL: define{{.*}} void @test_strong_init_assignment()
-// CHECK:         [[X:%.*]] = alloca ptr
-// CHECK:         [[Y:%.*]] = alloca ptr
-// CHECK:         [[T0:%.*]] = call ptr @makeA() [ "clang.arc.attachedcall"(ptr @llvm.objc.retainAutoreleasedReturnValue) ]
+// CHECK:         [[X:%.*]] = alloca i8*
+// CHECK:         [[Y:%.*]] = alloca i8*
+// CHECK:         [[T0:%.*]] = call [[A]]* @makeA() [ "clang.arc.attachedcall"(i64 0) ]
 // CHECK-NEXT:    call void (...) @llvm.objc.clang.arc.noop.use({{.*}} [[T0]])
-// CHECK-NEXT:    store ptr [[T0]], ptr [[X]]
-// CHECK-NEXT:    store ptr [[T0]], ptr [[Y]]
-// CHECK-NEXT:    [[T0:%.*]] = load ptr, ptr [[Y]]
-// CHECK-NEXT:    call void @llvm.objc.release(ptr [[T0]])
+// CHECK-NEXT:    [[T1:%.*]] = bitcast [[A]]* [[T0]] to i8*
+// CHECK-NEXT:    store i8* [[T1]], i8** [[X]]
+// CHECK-NEXT:    store i8* [[T1]], i8** [[Y]]
+// CHECK-NEXT:    [[T0:%.*]] = load i8*, i8** [[Y]]
+// CHECK-NEXT:    call void @llvm.objc.release(i8* [[T0]])
+// CHECK-NEXT:    bitcast
 // CHECK-NEXT:    lifetime.end
+// CHECK-NEXT:    bitcast
 // CHECK-NEXT:    lifetime.end
 // CHECK-NEXT:    ret void
 
-void test_init_strong_assignment(void) {
+void test_init_strong_assignment() {
   __strong id x;
   __unsafe_unretained id y = x = makeA();
 }
 // CHECK-LABEL: define{{.*}} void @test_init_strong_assignment()
-// CHECK:         [[X:%.*]] = alloca ptr
-// CHECK:         [[Y:%.*]] = alloca ptr
-// CHECK:         [[T0:%.*]] = call ptr @makeA() [ "clang.arc.attachedcall"(ptr @llvm.objc.retainAutoreleasedReturnValue) ]
+// CHECK:         [[X:%.*]] = alloca i8*
+// CHECK:         [[Y:%.*]] = alloca i8*
+// CHECK:         [[T0:%.*]] = call [[A]]* @makeA() [ "clang.arc.attachedcall"(i64 0) ]
 // CHECK-NEXT:    call void (...) @llvm.objc.clang.arc.noop.use({{.*}} [[T0]])
-// CHECK-NEXT:    [[OLD:%.*]] = load ptr, ptr [[X]]
-// CHECK-NEXT:    store ptr [[T0]], ptr [[X]]
-// CHECK-NEXT:    call void @llvm.objc.release(ptr [[OLD]])
-// CHECK-NEXT:    store ptr [[T0]], ptr [[Y]]
+// CHECK-NEXT:    [[T1:%.*]] = bitcast [[A]]* [[T0]] to i8*
+// CHECK-NEXT:    [[OLD:%.*]] = load i8*, i8** [[X]]
+// CHECK-NEXT:    store i8* [[T1]], i8** [[X]]
+// CHECK-NEXT:    call void @llvm.objc.release(i8* [[OLD]])
+// CHECK-NEXT:    store i8* [[T1]], i8** [[Y]]
+// CHECK-NEXT:    bitcast
 // CHECK-NEXT:    lifetime.end
-// CHECK-NEXT:    [[T0:%.*]] = load ptr, ptr [[X]]
-// CHECK-NEXT:    call void @llvm.objc.release(ptr [[T0]])
+// CHECK-NEXT:    [[T0:%.*]] = load i8*, i8** [[X]]
+// CHECK-NEXT:    call void @llvm.objc.release(i8* [[T0]])
+// CHECK-NEXT:    bitcast
 // CHECK-NEXT:    lifetime.end
 // CHECK-NEXT:    ret void
 
-void test_ignored(void) {
+void test_ignored() {
   makeA();
 }
 // CHECK-LABEL: define{{.*}} void @test_ignored()
-// CHECK:         [[T0:%.*]] = call ptr @makeA() [ "clang.arc.attachedcall"(ptr @llvm.objc.unsafeClaimAutoreleasedReturnValue) ]
+// CHECK:         [[T0:%.*]] = call [[A]]* @makeA() [ "clang.arc.attachedcall"(i64 1) ]
 // CHECK-NEXT:    call void (...) @llvm.objc.clang.arc.noop.use({{.*}} [[T0]])
 // CHECK-NEXT:    ret void
 
-void test_cast_to_void(void) {
+void test_cast_to_void() {
   (void) makeA();
 }
 // CHECK-LABEL: define{{.*}} void @test_cast_to_void()
-// CHECK:         [[T0:%.*]] = call ptr @makeA() [ "clang.arc.attachedcall"(ptr @llvm.objc.unsafeClaimAutoreleasedReturnValue) ]
+// CHECK:         [[T0:%.*]] = call [[A]]* @makeA() [ "clang.arc.attachedcall"(i64 1) ]
 // CHECK-NEXT:    call void (...) @llvm.objc.clang.arc.noop.use({{.*}} [[T0]])
 // CHECK-NEXT:    ret void
 

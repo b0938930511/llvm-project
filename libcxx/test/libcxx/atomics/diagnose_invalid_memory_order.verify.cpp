@@ -6,12 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-// This test fails with Clang <18 because diagnose_if doesn't emit all of the
-// diagnostics when -fdelayed-template-parsing is enabled, like it is in MSVC
-// mode.
-// XFAIL: msvc && (clang-16 || clang-17)
+// This test fails because diagnose_if doesn't emit all of the diagnostics
+// when -fdelayed-template-parsing is enabled, like it is on Windows.
+// XFAIL: LIBCXX-WINDOWS-FIXME
 
 // REQUIRES: diagnose-if-support
+// UNSUPPORTED: libcpp-has-no-threads
 
 // <atomic>
 
@@ -19,7 +19,7 @@
 
 #include <atomic>
 
-void f() {
+int main(int, char**) {
     std::atomic<int> x(42);
     volatile std::atomic<int>& vx = x;
     int val1 = 1; ((void)val1);
@@ -124,4 +124,6 @@ void f() {
         std::atomic_compare_exchange_strong_explicit(&x, &val1, val2, std::memory_order_seq_cst, std::memory_order_acquire);
         std::atomic_compare_exchange_strong_explicit(&x, &val1, val2, std::memory_order_seq_cst, std::memory_order_seq_cst);
     }
+
+  return 0;
 }

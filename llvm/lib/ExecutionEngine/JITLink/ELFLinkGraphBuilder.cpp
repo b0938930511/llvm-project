@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Generic ELF LinkGraph building code.
+// Generic ELF LinkGraph buliding code.
 //
 //===----------------------------------------------------------------------===//
 
@@ -27,7 +27,7 @@ namespace jitlink {
 StringRef ELFLinkGraphBuilderBase::CommonSectionName(".common");
 ArrayRef<const char *> ELFLinkGraphBuilderBase::DwarfSectionNames = DWSecNames;
 
-ELFLinkGraphBuilderBase::~ELFLinkGraphBuilderBase() = default;
+ELFLinkGraphBuilderBase::~ELFLinkGraphBuilderBase() {}
 
 } // end namespace jitlink
 } // end namespace llvm

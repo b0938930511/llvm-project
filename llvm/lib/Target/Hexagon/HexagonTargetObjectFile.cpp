@@ -41,9 +41,9 @@ static cl::opt<unsigned> SmallDataThreshold("hexagon-small-data-threshold",
 static cl::opt<bool> NoSmallDataSorting("mno-sort-sda", cl::init(false),
   cl::Hidden, cl::desc("Disable small data sections sorting"));
 
-static cl::opt<bool>
-    StaticsInSData("hexagon-statics-in-small-data", cl::Hidden,
-                   cl::desc("Allow static variables in .sdata"));
+static cl::opt<bool> StaticsInSData("hexagon-statics-in-small-data",
+  cl::init(false), cl::Hidden, cl::ZeroOrMore,
+  cl::desc("Allow static variables in .sdata"));
 
 static cl::opt<bool> TraceGVPlacement("trace-gv-placement",
   cl::Hidden, cl::init(false),
@@ -90,8 +90,9 @@ static bool isSmallDataSection(StringRef Sec) {
     return true;
   // If either ".sdata." or ".sbss." is a substring of the section name
   // then put the symbol in small data.
-  return Sec.contains(".sdata.") || Sec.contains(".sbss.") ||
-         Sec.contains(".scommon.");
+  return Sec.find(".sdata.") != StringRef::npos ||
+         Sec.find(".sbss.") != StringRef::npos ||
+         Sec.find(".scommon.") != StringRef::npos;
 }
 
 static const char *getSectionSuffixForSize(unsigned Size) {
@@ -177,10 +178,10 @@ MCSection *HexagonTargetObjectFile::getExplicitSectionGlobal(
 
   if (GO->hasSection()) {
     StringRef Section = GO->getSection();
-    if (Section.contains(".access.text.group"))
+    if (Section.find(".access.text.group") != StringRef::npos)
       return getContext().getELFSection(GO->getSection(), ELF::SHT_PROGBITS,
                                         ELF::SHF_ALLOC | ELF::SHF_EXECINSTR);
-    if (Section.contains(".access.data.group"))
+    if (Section.find(".access.data.group") != StringRef::npos)
       return getContext().getELFSection(GO->getSection(), ELF::SHT_PROGBITS,
                                         ELF::SHF_WRITE | ELF::SHF_ALLOC);
   }
@@ -332,8 +333,6 @@ unsigned HexagonTargetObjectFile::getSmallestAddressableSize(const Type *Ty,
   case Type::X86_MMXTyID:
   case Type::X86_AMXTyID:
   case Type::TokenTyID:
-  case Type::TypedPointerTyID:
-  case Type::TargetExtTyID:
     return 0;
   }
 
@@ -431,7 +430,7 @@ MCSection *HexagonTargetObjectFile::selectSmallSectionForGlobal(
 const Function *
 HexagonTargetObjectFile::getLutUsedFunction(const GlobalObject *GO) const {
   const Function *ReturnFn = nullptr;
-  for (const auto *U : GO->users()) {
+  for (auto U : GO->users()) {
     // validate each instance of user to be a live function.
     auto *I = dyn_cast<Instruction>(U);
     if (!I)

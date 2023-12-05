@@ -25,9 +25,7 @@ bool lldb_private::formatters::CMTimeSummaryProvider(
   if (!type.IsValid())
     return false;
 
-  auto type_system = type.GetTypeSystem();
-  if (!type_system)
-    return false;
+  TypeSystem *type_system = type.GetTypeSystem();
   // fetch children by offset to compensate for potential lack of debug info
   auto int64_ty =
       type_system->GetBuiltinTypeForEncodingAndBitSize(eEncodingSint, 64);
@@ -66,6 +64,9 @@ bool lldb_private::formatters::CMTimeSummaryProvider(
     stream.Printf("-oo");
     return true;
   }
+
+  if (timescale == 0)
+    return false;
 
   switch (timescale) {
   case 0:

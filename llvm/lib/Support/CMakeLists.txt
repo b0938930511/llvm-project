@@ -22,19 +22,7 @@ if (HAS_WERROR_GLOBAL_CTORS)
 endif()
 
 if(LLVM_ENABLE_ZLIB)
-  list(APPEND imported_libs ZLIB::ZLIB)
-endif()
-
-if(LLVM_ENABLE_ZSTD)
-  if(TARGET zstd::libzstd_shared AND NOT LLVM_USE_STATIC_ZSTD)
-    set(zstd_target zstd::libzstd_shared)
-  else()
-    set(zstd_target zstd::libzstd_static)
-  endif()
-endif()
-
-if(LLVM_ENABLE_ZSTD)
-  list(APPEND imported_libs ${zstd_target})
+  set(imported_libs ZLIB::ZLIB)
 endif()
 
 if( MSVC OR MINGW )
@@ -57,21 +45,20 @@ elseif( CMAKE_HOST_UNIX )
     set(system_libs ${system_libs} ${Backtrace_LIBFILE})
   endif()
   if( LLVM_ENABLE_TERMINFO )
-    set(imported_libs ${imported_libs} Terminfo::terminfo)
+    set(imported_libs ${imported_libs} "${TERMINFO_LIB}")
   endif()
-  set(system_libs ${system_libs} ${LLVM_ATOMIC_LIB})
+  if( LLVM_ENABLE_THREADS AND (HAVE_LIBATOMIC OR HAVE_CXX_LIBATOMICS64) )
+    set(system_libs ${system_libs} atomic)
+  endif()
   set(system_libs ${system_libs} ${LLVM_PTHREAD_LIB})
   if( UNIX AND NOT (BEOS OR HAIKU) )
     set(system_libs ${system_libs} m)
-  endif()
-  if( UNIX AND ${CMAKE_SYSTEM_NAME} MATCHES "SunOS" )
-    set(system_libs ${system_libs} kstat)
   endif()
   if( FUCHSIA )
     set(system_libs ${system_libs} zircon)
   endif()
   if ( HAIKU )
-    add_compile_definitions(_BSD_SOURCE)
+    add_definitions(-D_BSD_SOURCE)
     set(system_libs ${system_libs} bsd)
   endif()
 endif( MSVC OR MINGW )
@@ -79,11 +66,7 @@ endif( MSVC OR MINGW )
 # Delay load shell32.dll if possible to speed up process startup.
 set (delayload_flags)
 if (MSVC)
-  # When linking with Swift, `swiftc.exe` is used as the linker drive rather
-  # than invoking `link.exe` directly.  In such a case, the flags should be
-  # marked as `-Xlinker` to pass them directly to the linker.  As a temporary
-  # workaround simply elide the delay loading.
-  set (delayload_flags $<$<NOT:$<LINK_LANGUAGE:Swift>>:delayimp -delayload:shell32.dll -delayload:ole32.dll>)
+  set (delayload_flags delayimp -delayload:shell32.dll -delayload:ole32.dll)
 endif()
 
 # Link Z3 if the user wants to build it.
@@ -93,8 +76,8 @@ endif()
 
 # Override the C runtime allocator on Windows and embed it into LLVM tools & libraries
 if(LLVM_INTEGRATED_CRT_ALLOC)
-  if (NOT CMAKE_MSVC_RUNTIME_LIBRARY OR CMAKE_MSVC_RUNTIME_LIBRARY MATCHES "DLL$")
-    message(FATAL_ERROR "LLVM_INTEGRATED_CRT_ALLOC only works with CMAKE_MSVC_RUNTIME_LIBRARY set to MultiThreaded or MultiThreadedDebug.")
+  if (CMAKE_BUILD_TYPE AND NOT ${LLVM_USE_CRT_${uppercase_CMAKE_BUILD_TYPE}} MATCHES "^(MT|MTd)$")
+    message(FATAL_ERROR "LLVM_INTEGRATED_CRT_ALLOC only works with /MT or /MTd. Use LLVM_USE_CRT_${uppercase_CMAKE_BUILD_TYPE} to set the appropriate option.")
   endif()
 
   string(REGEX REPLACE "(/|\\\\)$" "" LLVM_INTEGRATED_CRT_ALLOC "${LLVM_INTEGRATED_CRT_ALLOC}")
@@ -104,10 +87,10 @@ if(LLVM_INTEGRATED_CRT_ALLOC)
   endif()
 
   if(LLVM_INTEGRATED_CRT_ALLOC MATCHES "rpmalloc$")
-    add_compile_definitions(ENABLE_OVERRIDE ENABLE_PRELOAD)
+    add_definitions(-DENABLE_OVERRIDE -DENABLE_PRELOAD)
     set(ALLOCATOR_FILES "${LLVM_INTEGRATED_CRT_ALLOC}/rpmalloc/rpmalloc.c")
   elseif(LLVM_INTEGRATED_CRT_ALLOC MATCHES "snmalloc$")
-    set(ALLOCATOR_FILES "${LLVM_INTEGRATED_CRT_ALLOC}/src/snmalloc/override/new.cc")
+    set(ALLOCATOR_FILES "${LLVM_INTEGRATED_CRT_ALLOC}/src/override/malloc.cc" "${LLVM_INTEGRATED_CRT_ALLOC}/src/override/new.cc")
     set(system_libs ${system_libs} "mincore.lib" "-INCLUDE:malloc")
   elseif(LLVM_INTEGRATED_CRT_ALLOC MATCHES "mimalloc$")
     set(MIMALLOC_LIB "${LLVM_INTEGRATED_CRT_ALLOC}/out/msvc-x64/Release/mimalloc-static.lib")
@@ -118,19 +101,10 @@ if(LLVM_INTEGRATED_CRT_ALLOC)
   endif()
 endif()
 
-# FIXME: We are currently guarding AIX headers with _XOPEN_SOURCE=700.
-# See llvm/CMakeLists.txt. However, we need _SC_NPROCESSORS_ONLN in
-# unistd.h and it is guarded by _ALL_SOURCE, so we remove the _XOPEN_SOURCE
-# guard here. We should remove the guards all together once AIX cleans up
-# the system headers.
-if (UNIX AND ${CMAKE_SYSTEM_NAME} MATCHES "AIX")
-  remove_definitions("-D_XOPEN_SOURCE=700")
-endif()
-
-add_subdirectory(BLAKE3)
-
 add_llvm_component_library(LLVMSupport
+  AArch64TargetParser.cpp
   ABIBreak.cpp
+  ARMTargetParser.cpp
   AMDGPUMetadata.cpp
   APFixedPoint.cpp
   APFloat.cpp
@@ -141,8 +115,6 @@ add_llvm_component_library(LLVMSupport
   ARMWinEH.cpp
   Allocator.cpp
   AutoConvert.cpp
-  Base64.cpp
-  BalancedPartitioning.cpp
   BinaryStreamError.cpp
   BinaryStreamReader.cpp
   BinaryStreamRef.cpp
@@ -151,7 +123,6 @@ add_llvm_component_library(LLVMSupport
   BranchProbability.cpp
   BuryPointer.cpp
   CachePruning.cpp
-  Caching.cpp
   circular_raw_ostream.cpp
   Chrono.cpp
   COM.cpp
@@ -160,16 +131,12 @@ add_llvm_component_library(LLVMSupport
   Compression.cpp
   CRC.cpp
   ConvertUTF.cpp
-  ConvertEBCDIC.cpp
   ConvertUTFWrapper.cpp
   CrashRecoveryContext.cpp
-  CSKYAttributes.cpp
-  CSKYAttributeParser.cpp
   DataExtractor.cpp
   Debug.cpp
   DebugCounter.cpp
   DeltaAlgorithm.cpp
-  DivisionByConstantInfo.cpp
   DAGDeltaAlgorithm.cpp
   DJB.cpp
   ELFAttributeParser.cpp
@@ -180,7 +147,6 @@ add_llvm_component_library(LLVMSupport
   FileCollector.cpp
   FileUtilities.cpp
   FileOutputBuffer.cpp
-  FloatingPointMode.cpp
   FoldingSet.cpp
   FormattedStream.cpp
   FormatVariadic.cpp
@@ -191,24 +157,23 @@ add_llvm_component_library(LLVMSupport
   InstructionCost.cpp
   IntEqClasses.cpp
   IntervalMap.cpp
+  ItaniumManglingCanonicalizer.cpp
   JSON.cpp
   KnownBits.cpp
   LEB128.cpp
   LineIterator.cpp
   Locale.cpp
   LockFileManager.cpp
+  LowLevelType.cpp
   ManagedStatic.cpp
   MathExtras.cpp
   MemAlloc.cpp
   MemoryBuffer.cpp
   MemoryBufferRef.cpp
   MD5.cpp
-  MSP430Attributes.cpp
-  MSP430AttributeParser.cpp
   NativeFormatting.cpp
   OptimizedStructLayout.cpp
   Optional.cpp
-  PGOOptions.cpp
   Parallel.cpp
   PluginLoader.cpp
   PrettyStackTrace.cpp
@@ -216,7 +181,6 @@ add_llvm_component_library(LLVMSupport
   Regex.cpp
   RISCVAttributes.cpp
   RISCVAttributeParser.cpp
-  RISCVISAInfo.cpp
   ScaledNumber.cpp
   ScopedPrinter.cpp
   SHA1.cpp
@@ -231,23 +195,25 @@ add_llvm_component_library(LLVMSupport
   StringMap.cpp
   StringSaver.cpp
   StringRef.cpp
-  SuffixTreeNode.cpp
   SuffixTree.cpp
+  SymbolRemappingReader.cpp
   SystemUtils.cpp
   TarWriter.cpp
+  TargetParser.cpp
   ThreadPool.cpp
   TimeProfiler.cpp
   Timer.cpp
   ToolOutputFile.cpp
+  TrigramIndex.cpp
+  Triple.cpp
   Twine.cpp
   TypeSize.cpp
   Unicode.cpp
   UnicodeCaseFold.cpp
-  UnicodeNameToCodepoint.cpp
-  UnicodeNameToCodepointGenerated.cpp
   VersionTuple.cpp
   VirtualFileSystem.cpp
   WithColor.cpp
+  X86TargetParser.cpp
   YAMLParser.cpp
   YAMLTraits.cpp
   raw_os_ostream.cpp
@@ -261,18 +227,20 @@ add_llvm_component_library(LLVMSupport
   Z3Solver.cpp
 
   ${ALLOCATOR_FILES}
-  $<TARGET_OBJECTS:LLVMSupportBlake3>
 
 # System
   Atomic.cpp
   DynamicLibrary.cpp
   Errno.cpp
+  Host.cpp
   Memory.cpp
   Path.cpp
   Process.cpp
   Program.cpp
   RWMutex.cpp
   Signals.cpp
+  TargetRegistry.cpp
+  ThreadLocal.cpp
   Threading.cpp
   Valgrind.cpp
   Watchdog.cpp
@@ -308,24 +276,8 @@ if(LLVM_ENABLE_ZLIB)
   set(llvm_system_libs ${llvm_system_libs} "${zlib_library}")
 endif()
 
-if(LLVM_ENABLE_ZSTD)
-  # CMAKE_BUILD_TYPE is only meaningful to single-configuration generators.
-  if(CMAKE_BUILD_TYPE)
-    string(TOUPPER ${CMAKE_BUILD_TYPE} build_type)
-    get_property(zstd_library TARGET ${zstd_target} PROPERTY LOCATION_${build_type})
-  endif()
-  if(NOT zstd_library)
-    get_property(zstd_library TARGET ${zstd_target} PROPERTY LOCATION)
-  endif()
-  get_library_name(${zstd_library} zstd_library)
-  set(llvm_system_libs ${llvm_system_libs} "${zstd_library}")
-endif()
-
 if(LLVM_ENABLE_TERMINFO)
-  if(NOT terminfo_library)
-    get_property(terminfo_library TARGET Terminfo::terminfo PROPERTY LOCATION)
-  endif()
-  get_library_name(${terminfo_library} terminfo_library)
+  get_library_name(${TERMINFO_LIB} terminfo_library)
   set(llvm_system_libs ${llvm_system_libs} "${terminfo_library}")
 endif()
 
@@ -335,7 +287,7 @@ set_property(TARGET LLVMSupport PROPERTY LLVM_SYSTEM_LIBS "${llvm_system_libs}")
 if(LLVM_INTEGRATED_CRT_ALLOC)
   if(LLVM_INTEGRATED_CRT_ALLOC MATCHES "snmalloc$")
     set_property(TARGET LLVMSupport PROPERTY CXX_STANDARD 17)
-    add_compile_definitions(_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
+    add_definitions(-D_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
     if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang" AND
         "${CMAKE_SYSTEM_PROCESSOR}" MATCHES "x86_64")
       set_property(TARGET LLVMSupport PROPERTY COMPILE_FLAGS "-mcx16")

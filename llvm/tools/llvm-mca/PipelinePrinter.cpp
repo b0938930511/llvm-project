@@ -14,6 +14,7 @@
 #include "PipelinePrinter.h"
 #include "CodeRegion.h"
 #include "Views/InstructionView.h"
+#include "Views/View.h"
 
 namespace llvm {
 namespace mca {

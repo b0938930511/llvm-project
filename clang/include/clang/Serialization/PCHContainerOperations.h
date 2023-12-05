@@ -22,6 +22,8 @@ class raw_pwrite_stream;
 namespace clang {
 
 class ASTConsumer;
+class CodeGenOptions;
+class DiagnosticsEngine;
 class CompilerInstance;
 
 struct PCHBuffer {
@@ -56,7 +58,7 @@ class PCHContainerReader {
 public:
   virtual ~PCHContainerReader() = 0;
   /// Equivalent to the format passed to -fmodule-format=
-  virtual llvm::ArrayRef<llvm::StringRef> getFormats() const = 0;
+  virtual llvm::StringRef getFormat() const = 0;
 
   /// Returns the serialized AST inside the PCH container Buffer.
   virtual llvm::StringRef ExtractPCH(llvm::MemoryBufferRef Buffer) const = 0;
@@ -78,7 +80,8 @@ class RawPCHContainerWriter : public PCHContainerWriter {
 
 /// Implements read operations for a raw pass-through PCH container.
 class RawPCHContainerReader : public PCHContainerReader {
-  llvm::ArrayRef<llvm::StringRef> getFormats() const override;
+  llvm::StringRef getFormat() const override { return "raw"; }
+
   /// Simply returns the buffer contained in Buffer.
   llvm::StringRef ExtractPCH(llvm::MemoryBufferRef Buffer) const override;
 };
@@ -86,9 +89,7 @@ class RawPCHContainerReader : public PCHContainerReader {
 /// A registry of PCHContainerWriter and -Reader objects for different formats.
 class PCHContainerOperations {
   llvm::StringMap<std::unique_ptr<PCHContainerWriter>> Writers;
-  llvm::StringMap<PCHContainerReader *> Readers;
-  llvm::SmallVector<std::unique_ptr<PCHContainerReader>> OwnedReaders;
-
+  llvm::StringMap<std::unique_ptr<PCHContainerReader>> Readers;
 public:
   /// Automatically registers a RawPCHContainerWriter and
   /// RawPCHContainerReader.
@@ -97,17 +98,13 @@ public:
     Writers[Writer->getFormat()] = std::move(Writer);
   }
   void registerReader(std::unique_ptr<PCHContainerReader> Reader) {
-    assert(!Reader->getFormats().empty() &&
-           "PCHContainerReader must handle >=1 format");
-    for (llvm::StringRef Fmt : Reader->getFormats())
-      Readers[Fmt] = Reader.get();
-    OwnedReaders.push_back(std::move(Reader));
+    Readers[Reader->getFormat()] = std::move(Reader);
   }
   const PCHContainerWriter *getWriterOrNull(llvm::StringRef Format) {
     return Writers[Format].get();
   }
   const PCHContainerReader *getReaderOrNull(llvm::StringRef Format) {
-    return Readers[Format];
+    return Readers[Format].get();
   }
   const PCHContainerReader &getRawReader() {
     return *getReaderOrNull("raw");

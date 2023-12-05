@@ -1,4 +1,4 @@
-; RUN: opt %loadPolly -polly-detect -disable-output < %s
+; RUN: opt %loadPolly -polly-detect -analyze < %s
 
 ; Verify that the scop detection does not crash on inputs with unreachable
 ; blocks. Earlier we crashed when detecting error blocks.

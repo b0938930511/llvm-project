@@ -1,4 +1,5 @@
 // RUN: %clang_cc1 -emit-llvm -o - -triple x86_64-apple-darwin %s | FileCheck %s
+// <rdar://problem/11043589>
 
 struct Length {
   Length(double v) {
@@ -27,7 +28,7 @@ struct Foo {
 };
 
 // CHECK: @_ZZN3Foo19getPageSizeFromNameERK6LengthE10legalWidth = linkonce_odr global %struct.Length zeroinitializer, align 4
-// CHECK: store float %{{.*}}, ptr @_ZZN3Foo19getPageSizeFromNameERK6LengthE10legalWidth, align 4
+// CHECK: store float %{{.*}}, float* getelementptr inbounds (%struct.Length, %struct.Length* @_ZZN3Foo19getPageSizeFromNameERK6LengthE10legalWidth, i32 0, i32 0), align 4
 
 bool bar(Length &b) {
   Foo f;

@@ -14,7 +14,7 @@
 
 #else
 
-void f(void) {
+void f() {
   int a = 0;
   int b = a==a;
 }

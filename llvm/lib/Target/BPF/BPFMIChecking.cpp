@@ -17,7 +17,6 @@
 #include "BPF.h"
 #include "BPFInstrInfo.h"
 #include "BPFTargetMachine.h"
-#include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/Support/Debug.h"
@@ -42,7 +41,7 @@ private:
   // Initialize class variables.
   void initialize(MachineFunction &MFParm);
 
-  bool processAtomicInsts();
+  bool processAtomicInsts(void);
 
 public:
 
@@ -145,14 +144,14 @@ static bool hasLiveDefs(const MachineInstr &MI, const TargetRegisterInfo *TRI) {
 
   // Otherwise, return true if any aliased SuperReg of GPR32 is not dead.
   for (auto I : GPR32LiveDefs)
-    for (MCPhysReg SR : TRI->superregs(I))
-      if (!llvm::is_contained(GPR64DeadDefs, SR))
+    for (MCSuperRegIterator SR(I, TRI); SR.isValid(); ++SR)
+      if (!llvm::is_contained(GPR64DeadDefs, *SR))
         return true;
 
   return false;
 }
 
-bool BPFMIPreEmitChecking::processAtomicInsts() {
+bool BPFMIPreEmitChecking::processAtomicInsts(void) {
   for (MachineBasicBlock &MBB : *MF) {
     for (MachineInstr &MI : MBB) {
       if (MI.getOpcode() != BPF::XADDW &&
@@ -165,7 +164,7 @@ bool BPFMIPreEmitChecking::processAtomicInsts() {
         DebugLoc Empty;
         const DebugLoc &DL = MI.getDebugLoc();
         if (DL != Empty)
-          report_fatal_error(Twine("line ") + std::to_string(DL.getLine()) +
+          report_fatal_error("line " + std::to_string(DL.getLine()) +
                              ": Invalid usage of the XADD return value", false);
         else
           report_fatal_error("Invalid usage of the XADD return value", false);

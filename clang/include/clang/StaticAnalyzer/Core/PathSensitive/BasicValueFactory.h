@@ -34,6 +34,7 @@
 namespace clang {
 
 class CXXBaseSpecifier;
+class DeclaratorDecl;
 
 namespace ento {
 
@@ -66,14 +67,10 @@ class LazyCompoundValData : public llvm::FoldingSetNode {
 public:
   LazyCompoundValData(const StoreRef &st, const TypedValueRegion *r)
       : store(st), region(r) {
-    assert(r);
     assert(NonLoc::isCompoundType(r->getValueType()));
   }
 
-  /// It might return null.
   const void *getStore() const { return store.getStore(); }
-
-  LLVM_ATTRIBUTE_RETURNS_NONNULL
   const TypedValueRegion *getRegion() const { return region; }
 
   static void Profile(llvm::FoldingSetNodeID& ID,
@@ -101,8 +98,6 @@ public:
                       llvm::ImmutableList<const CXXBaseSpecifier *> L);
 
   void Profile(llvm::FoldingSetNodeID &ID) { Profile(ID, D, L); }
-
-  /// It might return null.
   const NamedDecl *getDeclaratorDecl() const { return D; }
 
   llvm::ImmutableList<const CXXBaseSpecifier *> getCXXBaseList() const {
@@ -152,15 +147,9 @@ public:
       T = AT->getValueType();
     }
 
-    if (T->isIntegralOrEnumerationType() || Loc::isLocType(T)) {
-      return APSIntType(Ctx.getIntWidth(T),
-                        !T->isSignedIntegerOrEnumerationType());
-    } else {
-      // implicitly handle case of T->isFixedPointType()
-      return APSIntType(Ctx.getIntWidth(T), T->isUnsignedFixedPointType());
-    }
-
-    llvm_unreachable("Unsupported type in getAPSIntType!");
+    assert(T->isIntegralOrEnumerationType() || Loc::isLocType(T));
+    return APSIntType(Ctx.getIntWidth(T),
+                      !T->isSignedIntegerOrEnumerationType());
   }
 
   /// Convert - Create a new persistent APSInt with the same value as 'From'
@@ -230,6 +219,14 @@ public:
   const llvm::APSInt &getZeroWithTypeSize(QualType T) {
     assert(T->isScalarType());
     return getValue(0, Ctx.getTypeSize(T), true);
+  }
+
+  const llvm::APSInt &getZeroWithPtrWidth(bool isUnsigned = true) {
+    return getValue(0, Ctx.getTypeSize(Ctx.VoidPtrTy), isUnsigned);
+  }
+
+  const llvm::APSInt &getIntWithPtrWidth(uint64_t X, bool isUnsigned) {
+    return getValue(X, Ctx.getTypeSize(Ctx.VoidPtrTy), isUnsigned);
   }
 
   const llvm::APSInt &getTruthValue(bool b, QualType T) {

@@ -27,15 +27,15 @@
 using namespace clang;
 
 namespace {
-class ChainedIncludesSource : public ExternalSemaSource {
+class ChainedIncludesSourceImpl : public ExternalSemaSource {
 public:
-  ChainedIncludesSource(std::vector<std::unique_ptr<CompilerInstance>> CIs)
+  ChainedIncludesSourceImpl(std::vector<std::unique_ptr<CompilerInstance>> CIs)
       : CIs(std::move(CIs)) {}
 
 protected:
-  //===--------------------------------------------------------------------===//
+  //===----------------------------------------------------------------------===//
   // ExternalASTSource interface.
-  //===--------------------------------------------------------------------===//
+  //===----------------------------------------------------------------------===//
 
   /// Return the amount of memory used by memory buffers, breaking down
   /// by heap-backed versus mmap'ed memory.
@@ -51,7 +51,30 @@ protected:
 private:
   std::vector<std::unique_ptr<CompilerInstance>> CIs;
 };
-} // end anonymous namespace
+
+/// Members of ChainedIncludesSource, factored out so we can initialize
+/// them before we initialize the ExternalSemaSource base class.
+struct ChainedIncludesSourceMembers {
+  ChainedIncludesSourceMembers(
+      std::vector<std::unique_ptr<CompilerInstance>> CIs,
+      IntrusiveRefCntPtr<ExternalSemaSource> FinalReader)
+      : Impl(std::move(CIs)), FinalReader(std::move(FinalReader)) {}
+  ChainedIncludesSourceImpl Impl;
+  IntrusiveRefCntPtr<ExternalSemaSource> FinalReader;
+};
+
+/// Use MultiplexExternalSemaSource to dispatch all ExternalSemaSource
+/// calls to the final reader.
+class ChainedIncludesSource
+    : private ChainedIncludesSourceMembers,
+      public MultiplexExternalSemaSource {
+public:
+  ChainedIncludesSource(std::vector<std::unique_ptr<CompilerInstance>> CIs,
+                        IntrusiveRefCntPtr<ExternalSemaSource> FinalReader)
+      : ChainedIncludesSourceMembers(std::move(CIs), std::move(FinalReader)),
+        MultiplexExternalSemaSource(Impl, *this->FinalReader) {}
+};
+}
 
 static ASTReader *
 createASTReader(CompilerInstance &CI, StringRef pchFile,
@@ -191,8 +214,6 @@ IntrusiveRefCntPtr<ExternalSemaSource> clang::createChainedIncludesSource(
   if (!Reader)
     return nullptr;
 
-  auto ChainedSrc =
-      llvm::makeIntrusiveRefCnt<ChainedIncludesSource>(std::move(CIs));
-  return llvm::makeIntrusiveRefCnt<MultiplexExternalSemaSource>(
-      ChainedSrc.get(), Reader.get());
+  return IntrusiveRefCntPtr<ChainedIncludesSource>(
+      new ChainedIncludesSource(std::move(CIs), Reader));
 }

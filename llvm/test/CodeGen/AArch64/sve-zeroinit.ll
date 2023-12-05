@@ -52,44 +52,30 @@ define <vscale x 8 x half> @test_zeroinit_8xf16() {
   ret <vscale x 8 x half> zeroinitializer
 }
 
-define <vscale x 1 x i1> @test_zeroinit_1xi1() {
-; CHECK-LABEL: test_zeroinit_1xi1
-; CHECK:       pfalse p0.b
-; CHECK-NEXT:  ret
-  ret <vscale x 1 x i1> zeroinitializer
-}
-
 define <vscale x 2 x i1> @test_zeroinit_2xi1() {
 ; CHECK-LABEL: test_zeroinit_2xi1
-; CHECK:       pfalse p0.b
+; CHECK:       whilelo p0.d, xzr, xzr
 ; CHECK-NEXT:  ret
   ret <vscale x 2 x i1> zeroinitializer
 }
 
 define <vscale x 4 x i1> @test_zeroinit_4xi1() {
 ; CHECK-LABEL: test_zeroinit_4xi1
-; CHECK:       pfalse p0.b
+; CHECK:       whilelo p0.s, xzr, xzr
 ; CHECK-NEXT:  ret
   ret <vscale x 4 x i1> zeroinitializer
 }
 
 define <vscale x 8 x i1> @test_zeroinit_8xi1() {
 ; CHECK-LABEL: test_zeroinit_8xi1
-; CHECK:       pfalse p0.b
+; CHECK:       whilelo p0.h, xzr, xzr
 ; CHECK-NEXT:  ret
   ret <vscale x 8 x i1> zeroinitializer
 }
 
 define <vscale x 16 x i1> @test_zeroinit_16xi1() {
 ; CHECK-LABEL: test_zeroinit_16xi1
-; CHECK:       pfalse p0.b
+; CHECK:       whilelo p0.b, xzr, xzr
 ; CHECK-NEXT:  ret
   ret <vscale x 16 x i1> zeroinitializer
-}
-
-define target("aarch64.svcount") @test_zeroinit_svcount() "target-features"="+sme2" {
-; CHECK-LABEL: test_zeroinit_svcount
-; CHECK:       pfalse p0.b
-; CHECK-NEXT:  ret
-  ret target("aarch64.svcount") zeroinitializer
 }

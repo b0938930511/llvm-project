@@ -1,8 +1,9 @@
 //===-- SemaConcept.h - Semantic Analysis for Constraints and Concepts ----===//
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//                     The LLVM Compiler Infrastructure
+//
+// This file is distributed under the University of Illinois Open Source
+// License. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -18,8 +19,8 @@
 #include "clang/AST/DeclTemplate.h"
 #include "clang/Basic/SourceLocation.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
-#include <optional>
 #include <string>
 #include <utility>
 
@@ -28,7 +29,7 @@ class Sema;
 
 struct AtomicConstraint {
   const Expr *ConstraintExpr;
-  std::optional<ArrayRef<TemplateArgumentLoc>> ParameterMapping;
+  Optional<MutableArrayRef<TemplateArgumentLoc>> ParameterMapping;
 
   AtomicConstraint(Sema &S, const Expr *ConstraintExpr) :
       ConstraintExpr(ConstraintExpr) { };
@@ -144,12 +145,12 @@ struct NormalizedConstraint {
   }
 
 private:
-  static std::optional<NormalizedConstraint>
+  static Optional<NormalizedConstraint>
   fromConstraintExprs(Sema &S, NamedDecl *D, ArrayRef<const Expr *> E);
-  static std::optional<NormalizedConstraint>
+  static Optional<NormalizedConstraint>
   fromConstraintExpr(Sema &S, NamedDecl *D, const Expr *E);
 };
 
 } // clang
 
-#endif // LLVM_CLANG_SEMA_SEMACONCEPT_H
+#endif //LLVM_CLANG_SEMA_SEMACONCEPT_H

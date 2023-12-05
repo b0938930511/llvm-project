@@ -7,16 +7,16 @@
 //===----------------------------------------------------------------------===//
 
 #include "src/ctype/isspace.h"
-#include "src/__support/ctype_utils.h"
 
 #include "src/__support/common.h"
 
-namespace LIBC_NAMESPACE {
+namespace __llvm_libc {
 
 // TODO: Currently restricted to default locale.
 // These should be extended using locale information.
 LLVM_LIBC_FUNCTION(int, isspace, (int c)) {
-  return static_cast<int>(internal::isspace(static_cast<unsigned>(c)));
+  const unsigned ch = c;
+  return ch == ' ' || (ch - '\t') < 5;
 }
 
-} // namespace LIBC_NAMESPACE
+} // namespace __llvm_libc

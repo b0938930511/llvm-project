@@ -18,8 +18,6 @@ struct wibble {
   @defs(TestObject)
 };
 
-extern void *malloc(__typeof__(sizeof(0)));
-extern int printf(const char *, ...);
 
 int main(void)
 {

@@ -1,5 +1,5 @@
 @import macro1;
 
-void foo(void) {
+void foo() {
   maybeNull(0, 0);
 }

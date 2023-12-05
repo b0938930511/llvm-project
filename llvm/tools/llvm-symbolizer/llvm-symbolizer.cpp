@@ -15,35 +15,24 @@
 //===----------------------------------------------------------------------===//
 
 #include "Opts.inc"
-#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Config/config.h"
 #include "llvm/DebugInfo/Symbolize/DIPrinter.h"
-#include "llvm/DebugInfo/Symbolize/Markup.h"
-#include "llvm/DebugInfo/Symbolize/MarkupFilter.h"
-#include "llvm/DebugInfo/Symbolize/SymbolizableModule.h"
 #include "llvm/DebugInfo/Symbolize/Symbolize.h"
-#include "llvm/Debuginfod/BuildIDFetcher.h"
-#include "llvm/Debuginfod/Debuginfod.h"
-#include "llvm/Debuginfod/HTTPClient.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Support/COM.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/Errc.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/InitLLVM.h"
-#include "llvm/Support/LLVMDriver.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/StringSaver.h"
-#include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
-#include <iostream>
 #include <string>
 
 using namespace llvm;
@@ -52,42 +41,36 @@ using namespace symbolize;
 namespace {
 enum ID {
   OPT_INVALID = 0, // This is not an option ID.
-#define OPTION(...) LLVM_MAKE_OPT_ID(__VA_ARGS__),
+#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
+               HELPTEXT, METAVAR, VALUES)                                      \
+  OPT_##ID,
 #include "Opts.inc"
 #undef OPTION
 };
 
-#define PREFIX(NAME, VALUE)                                                    \
-  static constexpr StringLiteral NAME##_init[] = VALUE;                        \
-  static constexpr ArrayRef<StringLiteral> NAME(NAME##_init,                   \
-                                                std::size(NAME##_init) - 1);
+#define PREFIX(NAME, VALUE) const char *const NAME[] = VALUE;
 #include "Opts.inc"
 #undef PREFIX
 
-using namespace llvm::opt;
-static constexpr opt::OptTable::Info InfoTable[] = {
-#define OPTION(...) LLVM_CONSTRUCT_OPT_INFO(__VA_ARGS__),
+static const opt::OptTable::Info InfoTable[] = {
+#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
+               HELPTEXT, METAVAR, VALUES)                                      \
+  {                                                                            \
+      PREFIX,      NAME,      HELPTEXT,                                        \
+      METAVAR,     OPT_##ID,  opt::Option::KIND##Class,                        \
+      PARAM,       FLAGS,     OPT_##GROUP,                                     \
+      OPT_##ALIAS, ALIASARGS, VALUES},
 #include "Opts.inc"
 #undef OPTION
 };
 
-class SymbolizerOptTable : public opt::GenericOptTable {
+class SymbolizerOptTable : public opt::OptTable {
 public:
-  SymbolizerOptTable() : GenericOptTable(InfoTable) {
+  SymbolizerOptTable() : OptTable(InfoTable) {
     setGroupedShortOptions(true);
   }
 };
 } // namespace
-
-static std::string ToolName;
-
-static void printError(const ErrorInfoBase &EI, StringRef AuxInfo) {
-  WithColor::error(errs(), ToolName);
-  if (!AuxInfo.empty())
-    errs() << "'" << AuxInfo << "': ";
-  EI.log(errs());
-  errs() << '\n';
-}
 
 template <typename T>
 static void print(const Request &Request, Expected<T> &ResOrErr,
@@ -102,7 +85,8 @@ static void print(const Request &Request, Expected<T> &ResOrErr,
   bool PrintEmpty = true;
   handleAllErrors(std::move(ResOrErr.takeError()),
                   [&](const ErrorInfoBase &EI) {
-                    PrintEmpty = Printer.printError(Request, EI);
+                    PrintEmpty = Printer.printError(
+                        Request, EI, "LLVMSymbolizer: error reading file: ");
                   });
 
   if (PrintEmpty)
@@ -117,50 +101,11 @@ enum class Command {
   Frame,
 };
 
-static void enableDebuginfod(LLVMSymbolizer &Symbolizer,
-                             const opt::ArgList &Args) {
-  static bool IsEnabled = false;
-  if (IsEnabled)
-    return;
-  IsEnabled = true;
-  // Look up symbols using the debuginfod client.
-  Symbolizer.setBuildIDFetcher(std::make_unique<DebuginfodFetcher>(
-      Args.getAllArgValues(OPT_debug_file_directory_EQ)));
-  // The HTTPClient must be initialized for use by the debuginfod client.
-  HTTPClient::initialize();
-}
-
-static StringRef getSpaceDelimitedWord(StringRef &Source) {
+static bool parseCommand(StringRef BinaryName, bool IsAddr2Line,
+                         StringRef InputString, Command &Cmd,
+                         std::string &ModuleName, uint64_t &ModuleOffset) {
   const char kDelimiters[] = " \n\r";
-  const char *Pos = Source.data();
-  StringRef Result;
-  Pos += strspn(Pos, kDelimiters);
-  if (*Pos == '"' || *Pos == '\'') {
-    char Quote = *Pos;
-    Pos++;
-    const char *End = strchr(Pos, Quote);
-    if (!End)
-      return StringRef();
-    Result = StringRef(Pos, End - Pos);
-    Pos = End + 1;
-  } else {
-    int NameLength = strcspn(Pos, kDelimiters);
-    Result = StringRef(Pos, NameLength);
-    Pos += NameLength;
-  }
-  Source = StringRef(Pos, Source.end() - Pos);
-  return Result;
-}
-
-static Error makeStringError(StringRef Msg) {
-  return make_error<StringError>(Msg, inconvertibleErrorCode());
-}
-
-static Error parseCommand(StringRef BinaryName, bool IsAddr2Line,
-                          StringRef InputString, Command &Cmd,
-                          std::string &ModuleName, object::BuildID &BuildID,
-                          StringRef &Symbol, uint64_t &ModuleOffset) {
-  ModuleName = BinaryName;
+  ModuleName = "";
   if (InputString.consume_front("CODE ")) {
     Cmd = Command::Code;
   } else if (InputString.consume_front("DATA ")) {
@@ -171,109 +116,63 @@ static Error parseCommand(StringRef BinaryName, bool IsAddr2Line,
     // If no cmd, assume it's CODE.
     Cmd = Command::Code;
   }
-
-  // Parse optional input file specification.
-  bool HasFilePrefix = false;
-  bool HasBuildIDPrefix = false;
-  while (!InputString.empty()) {
-    InputString = InputString.ltrim();
-    if (InputString.consume_front("FILE:")) {
-      if (HasFilePrefix || HasBuildIDPrefix)
-        return makeStringError("duplicate input file specification prefix");
-      HasFilePrefix = true;
-      continue;
-    }
-    if (InputString.consume_front("BUILDID:")) {
-      if (HasBuildIDPrefix || HasFilePrefix)
-        return makeStringError("duplicate input file specification prefix");
-      HasBuildIDPrefix = true;
-      continue;
-    }
-    break;
-  }
-
-  // If an input file is not specified on the command line, try to extract it
-  // from the command.
-  if (HasBuildIDPrefix || HasFilePrefix) {
-    InputString = InputString.ltrim();
-    if (InputString.empty()) {
-      if (HasFilePrefix)
-        return makeStringError("must be followed by an input file");
-      else
-        return makeStringError("must be followed by a hash");
-    }
-
-    if (!BinaryName.empty() || !BuildID.empty())
-      return makeStringError("input file has already been specified");
-
-    StringRef Name = getSpaceDelimitedWord(InputString);
-    if (Name.empty())
-      return makeStringError("unbalanced quotes in input file name");
-    if (HasBuildIDPrefix) {
-      BuildID = parseBuildID(Name);
-      if (BuildID.empty())
-        return makeStringError("wrong format of build-id");
+  const char *Pos = InputString.data();
+  // Skip delimiters and parse input filename (if needed).
+  if (BinaryName.empty()) {
+    Pos += strspn(Pos, kDelimiters);
+    if (*Pos == '"' || *Pos == '\'') {
+      char Quote = *Pos;
+      Pos++;
+      const char *End = strchr(Pos, Quote);
+      if (!End)
+        return false;
+      ModuleName = std::string(Pos, End - Pos);
+      Pos = End + 1;
     } else {
-      ModuleName = Name;
+      int NameLength = strcspn(Pos, kDelimiters);
+      ModuleName = std::string(Pos, NameLength);
+      Pos += NameLength;
     }
-  } else if (BinaryName.empty() && BuildID.empty()) {
-    // No input file has been specified. If the input string contains at least
-    // two items, assume that the first item is a file name.
-    ModuleName = getSpaceDelimitedWord(InputString);
-    if (ModuleName.empty())
-      return makeStringError("no input filename has been specified");
+  } else {
+    ModuleName = BinaryName.str();
   }
-
-  // Parse module offset, which can be specified as a number or as a symbol.
-  InputString = InputString.ltrim();
-  if (InputString.empty())
-    return makeStringError("no module offset has been specified");
-
-  // If input string contains a space, ignore everything after it. This behavior
-  // is consistent with GNU addr2line.
-  int OffsetLength = InputString.find_first_of(" \n\r");
-  StringRef Offset = InputString.substr(0, OffsetLength);
-
+  // Skip delimiters and parse module offset.
+  Pos += strspn(Pos, kDelimiters);
+  int OffsetLength = strcspn(Pos, kDelimiters);
+  StringRef Offset(Pos, OffsetLength);
   // GNU addr2line assumes the offset is hexadecimal and allows a redundant
   // "0x" or "0X" prefix; do the same for compatibility.
   if (IsAddr2Line)
     Offset.consume_front("0x") || Offset.consume_front("0X");
-
-  // If the input is not a number, treat it is a symbol.
-  if (Offset.getAsInteger(IsAddr2Line ? 16 : 0, ModuleOffset)) {
-    Symbol = Offset;
-    ModuleOffset = 0;
-  }
-
-  return Error::success();
+  return !Offset.getAsInteger(IsAddr2Line ? 16 : 0, ModuleOffset);
 }
 
-template <typename T>
-void executeCommand(StringRef ModuleName, const T &ModuleSpec, Command Cmd,
-                    StringRef Symbol, uint64_t Offset, uint64_t AdjustVMA,
-                    bool ShouldInline, OutputStyle Style,
-                    LLVMSymbolizer &Symbolizer, DIPrinter &Printer) {
+static void symbolizeInput(const opt::InputArgList &Args, uint64_t AdjustVMA,
+                           bool IsAddr2Line, OutputStyle Style,
+                           StringRef InputString, LLVMSymbolizer &Symbolizer,
+                           DIPrinter &Printer) {
+  Command Cmd;
+  std::string ModuleName;
+  uint64_t Offset = 0;
+  if (!parseCommand(Args.getLastArgValue(OPT_obj_EQ), IsAddr2Line,
+                    StringRef(InputString), Cmd, ModuleName, Offset)) {
+    Printer.printInvalidCommand({ModuleName, None}, InputString);
+    return;
+  }
+
   uint64_t AdjustedOffset = Offset - AdjustVMA;
-  object::SectionedAddress Address = {AdjustedOffset,
-                                      object::SectionedAddress::UndefSection};
-  Request SymRequest = {
-      ModuleName, Symbol.empty() ? std::make_optional(Offset) : std::nullopt,
-      Symbol};
   if (Cmd == Command::Data) {
-    Expected<DIGlobal> ResOrErr = Symbolizer.symbolizeData(ModuleSpec, Address);
-    print(SymRequest, ResOrErr, Printer);
+    Expected<DIGlobal> ResOrErr = Symbolizer.symbolizeData(
+        ModuleName, {AdjustedOffset, object::SectionedAddress::UndefSection});
+    print({ModuleName, Offset}, ResOrErr, Printer);
   } else if (Cmd == Command::Frame) {
-    Expected<std::vector<DILocal>> ResOrErr =
-        Symbolizer.symbolizeFrame(ModuleSpec, Address);
-    print(SymRequest, ResOrErr, Printer);
-  } else if (!Symbol.empty()) {
-    Expected<std::vector<DILineInfo>> ResOrErr =
-        Symbolizer.findSymbol(ModuleSpec, Symbol);
-    print(SymRequest, ResOrErr, Printer);
-  } else if (ShouldInline) {
-    Expected<DIInliningInfo> ResOrErr =
-        Symbolizer.symbolizeInlinedCode(ModuleSpec, Address);
-    print(SymRequest, ResOrErr, Printer);
+    Expected<std::vector<DILocal>> ResOrErr = Symbolizer.symbolizeFrame(
+        ModuleName, {AdjustedOffset, object::SectionedAddress::UndefSection});
+    print({ModuleName, Offset}, ResOrErr, Printer);
+  } else if (Args.hasFlag(OPT_inlines, OPT_no_inlines, !IsAddr2Line)) {
+    Expected<DIInliningInfo> ResOrErr = Symbolizer.symbolizeInlinedCode(
+        ModuleName, {AdjustedOffset, object::SectionedAddress::UndefSection});
+    print({ModuleName, Offset}, ResOrErr, Printer);
   } else if (Style == OutputStyle::GNU) {
     // With PrintFunctions == FunctionNameKind::LinkageName (default)
     // and UseSymbolTable == true (also default), Symbolizer.symbolizeCode()
@@ -281,57 +180,18 @@ void executeCommand(StringRef ModuleName, const T &ModuleSpec, Command Cmd,
     // caller function in the inlining chain. This contradicts the existing
     // behavior of addr2line. Symbolizer.symbolizeInlinedCode() overrides only
     // the topmost function, which suits our needs better.
-    Expected<DIInliningInfo> ResOrErr =
-        Symbolizer.symbolizeInlinedCode(ModuleSpec, Address);
+    Expected<DIInliningInfo> ResOrErr = Symbolizer.symbolizeInlinedCode(
+        ModuleName, {AdjustedOffset, object::SectionedAddress::UndefSection});
     Expected<DILineInfo> Res0OrErr =
         !ResOrErr
             ? Expected<DILineInfo>(ResOrErr.takeError())
             : ((ResOrErr->getNumberOfFrames() == 0) ? DILineInfo()
                                                     : ResOrErr->getFrame(0));
-    print(SymRequest, Res0OrErr, Printer);
+    print({ModuleName, Offset}, Res0OrErr, Printer);
   } else {
-    Expected<DILineInfo> ResOrErr =
-        Symbolizer.symbolizeCode(ModuleSpec, Address);
-    print(SymRequest, ResOrErr, Printer);
-  }
-  Symbolizer.pruneCache();
-}
-
-static void printUnknownLineInfo(std::string ModuleName, DIPrinter &Printer) {
-  Request SymRequest = {ModuleName, std::nullopt, StringRef()};
-  Printer.print(SymRequest, DILineInfo());
-}
-
-static void symbolizeInput(const opt::InputArgList &Args,
-                           object::BuildIDRef IncomingBuildID,
-                           uint64_t AdjustVMA, bool IsAddr2Line,
-                           OutputStyle Style, StringRef InputString,
-                           LLVMSymbolizer &Symbolizer, DIPrinter &Printer) {
-  Command Cmd;
-  std::string ModuleName;
-  object::BuildID BuildID(IncomingBuildID.begin(), IncomingBuildID.end());
-  uint64_t Offset = 0;
-  StringRef Symbol;
-  if (Error E = parseCommand(Args.getLastArgValue(OPT_obj_EQ), IsAddr2Line,
-                             StringRef(InputString), Cmd, ModuleName, BuildID,
-                             Symbol, Offset)) {
-    handleAllErrors(std::move(E), [&](const StringError &EI) {
-      printError(EI, InputString);
-      printUnknownLineInfo(ModuleName, Printer);
-    });
-    return;
-  }
-  bool ShouldInline = Args.hasFlag(OPT_inlines, OPT_no_inlines, !IsAddr2Line);
-  if (!BuildID.empty()) {
-    assert(ModuleName.empty());
-    if (!Args.hasArg(OPT_no_debuginfod))
-      enableDebuginfod(Symbolizer, Args);
-    std::string BuildIDStr = toHex(BuildID);
-    executeCommand(BuildIDStr, BuildID, Cmd, Symbol, Offset, AdjustVMA,
-                   ShouldInline, Style, Symbolizer, Printer);
-  } else {
-    executeCommand(ModuleName, ModuleName, Cmd, Symbol, Offset, AdjustVMA,
-                   ShouldInline, Style, Symbolizer, Printer);
+    Expected<DILineInfo> ResOrErr = Symbolizer.symbolizeCode(
+        ModuleName, {AdjustedOffset, object::SectionedAddress::UndefSection});
+    print({ModuleName, Offset}, ResOrErr, Printer);
   }
 }
 
@@ -399,48 +259,11 @@ static FunctionNameKind decideHowToPrintFunctions(const opt::InputArgList &Args,
   return IsAddr2Line ? FunctionNameKind::None : FunctionNameKind::LinkageName;
 }
 
-static std::optional<bool> parseColorArg(const opt::InputArgList &Args) {
-  if (Args.hasArg(OPT_color))
-    return true;
-  if (const opt::Arg *A = Args.getLastArg(OPT_color_EQ))
-    return StringSwitch<std::optional<bool>>(A->getValue())
-        .Case("always", true)
-        .Case("never", false)
-        .Case("auto", std::nullopt);
-  return std::nullopt;
-}
-
-static object::BuildID parseBuildIDArg(const opt::InputArgList &Args, int ID) {
-  const opt::Arg *A = Args.getLastArg(ID);
-  if (!A)
-    return {};
-
-  StringRef V(A->getValue());
-  object::BuildID BuildID = parseBuildID(V);
-  if (BuildID.empty()) {
-    errs() << A->getSpelling() + ": expected a build ID, but got '" + V + "'\n";
-    exit(1);
-  }
-  return BuildID;
-}
-
-// Symbolize markup from stdin and write the result to stdout.
-static void filterMarkup(const opt::InputArgList &Args, LLVMSymbolizer &Symbolizer) {
-  MarkupFilter Filter(outs(), Symbolizer, parseColorArg(Args));
-  std::string InputString;
-  while (std::getline(std::cin, InputString)) {
-    InputString += '\n';
-    Filter.filter(InputString);
-  }
-  Filter.finish();
-}
-
-int llvm_symbolizer_main(int argc, char **argv, const llvm::ToolContext &) {
+int main(int argc, char **argv) {
   InitLLVM X(argc, argv);
   sys::InitializeCOMRAII COM(sys::COMThreadingMode::MultiThreaded);
 
-  ToolName = argv[0];
-  bool IsAddr2Line = sys::path::stem(ToolName).contains("addr2line");
+  bool IsAddr2Line = sys::path::stem(argv[0]).contains("addr2line");
   BumpPtrAllocator A;
   StringSaver Saver(A);
   SymbolizerOptTable Tbl;
@@ -478,8 +301,6 @@ int llvm_symbolizer_main(int argc, char **argv, const llvm::ToolContext &) {
   }
 #endif
   Opts.UseSymbolTable = true;
-  if (Args.hasArg(OPT_cache_size_EQ))
-    parseIntArg(Args, OPT_cache_size_EQ, Opts.MaxCacheSize);
   Config.PrintAddress = Args.hasArg(OPT_addresses);
   Config.PrintFunctions = Opts.PrintFunctions != FunctionNameKind::None;
   Config.Pretty = Args.hasArg(OPT_pretty_print);
@@ -495,16 +316,6 @@ int llvm_symbolizer_main(int argc, char **argv, const llvm::ToolContext &) {
     }
   }
 
-  LLVMSymbolizer Symbolizer(Opts);
-
-  if (Args.hasFlag(OPT_debuginfod, OPT_no_debuginfod, canUseDebuginfod()))
-    enableDebuginfod(Symbolizer, Args);
-
-  if (Args.hasArg(OPT_filter_markup)) {
-    filterMarkup(Args, Symbolizer);
-    return 0;
-  }
-
   auto Style = IsAddr2Line ? OutputStyle::GNU : OutputStyle::LLVM;
   if (const opt::Arg *A = Args.getLastArg(OPT_output_style_EQ)) {
     if (strcmp(A->getValue(), "GNU") == 0)
@@ -515,33 +326,14 @@ int llvm_symbolizer_main(int argc, char **argv, const llvm::ToolContext &) {
       Style = OutputStyle::LLVM;
   }
 
-  if (Args.hasArg(OPT_build_id_EQ) && Args.hasArg(OPT_obj_EQ)) {
-    errs() << "error: cannot specify both --build-id and --obj\n";
-    return EXIT_FAILURE;
-  }
-  object::BuildID BuildID = parseBuildIDArg(Args, OPT_build_id_EQ);
-
+  LLVMSymbolizer Symbolizer(Opts);
   std::unique_ptr<DIPrinter> Printer;
   if (Style == OutputStyle::GNU)
-    Printer = std::make_unique<GNUPrinter>(outs(), printError, Config);
+    Printer = std::make_unique<GNUPrinter>(outs(), errs(), Config);
   else if (Style == OutputStyle::JSON)
     Printer = std::make_unique<JSONPrinter>(outs(), Config);
   else
-    Printer = std::make_unique<LLVMPrinter>(outs(), printError, Config);
-
-  // When an input file is specified, exit immediately if the file cannot be
-  // read. If getOrCreateModuleInfo succeeds, symbolizeInput will reuse the
-  // cached file handle.
-  if (auto *Arg = Args.getLastArg(OPT_obj_EQ); Arg) {
-    auto Status = Symbolizer.getOrCreateModuleInfo(Arg->getValue());
-    if (!Status) {
-      Request SymRequest = {Arg->getValue(), 0, StringRef()};
-      handleAllErrors(Status.takeError(), [&](const ErrorInfoBase &EI) {
-        Printer->printError(SymRequest, EI);
-      });
-      return EXIT_FAILURE;
-    }
-  }
+    Printer = std::make_unique<LLVMPrinter>(outs(), errs(), Config);
 
   std::vector<std::string> InputAddresses = Args.getAllArgValues(OPT_INPUT);
   if (InputAddresses.empty()) {
@@ -553,15 +345,15 @@ int llvm_symbolizer_main(int argc, char **argv, const llvm::ToolContext &) {
       std::string StrippedInputString(InputString);
       llvm::erase_if(StrippedInputString,
                      [](char c) { return c == '\r' || c == '\n'; });
-      symbolizeInput(Args, BuildID, AdjustVMA, IsAddr2Line, Style,
-                     StrippedInputString, Symbolizer, *Printer);
+      symbolizeInput(Args, AdjustVMA, IsAddr2Line, Style, StrippedInputString,
+                     Symbolizer, *Printer);
       outs().flush();
     }
   } else {
     Printer->listBegin();
     for (StringRef Address : InputAddresses)
-      symbolizeInput(Args, BuildID, AdjustVMA, IsAddr2Line, Style, Address,
-                     Symbolizer, *Printer);
+      symbolizeInput(Args, AdjustVMA, IsAddr2Line, Style, Address, Symbolizer,
+                     *Printer);
     Printer->listEnd();
   }
 

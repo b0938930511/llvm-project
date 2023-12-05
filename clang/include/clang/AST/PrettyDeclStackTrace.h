@@ -22,6 +22,7 @@ namespace clang {
 
 class ASTContext;
 class Decl;
+class SourceManager;
 
 /// PrettyDeclStackTraceEntry - If a crash occurs in the parser while
 /// parsing something related to a declaration, include that

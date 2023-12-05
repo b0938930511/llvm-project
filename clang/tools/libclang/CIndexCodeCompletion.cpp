@@ -11,8 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CIndexDiagnostic.h"
 #include "CIndexer.h"
+#include "CIndexDiagnostic.h"
 #include "CLog.h"
 #include "CXCursor.h"
 #include "CXSourceLocation.h"
@@ -25,7 +25,6 @@
 #include "clang/Basic/SourceManager.h"
 #include "clang/Frontend/ASTUnit.h"
 #include "clang/Frontend/CompilerInstance.h"
-#include "clang/Frontend/FrontendActions.h"
 #include "clang/Sema/CodeCompleteConsumer.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/SmallString.h"
@@ -41,6 +40,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+
 
 #ifdef UDP_CODE_COMPLETION_LOGGER
 #include "clang/Basic/Version.h"
@@ -537,13 +537,10 @@ static unsigned long long getContextsForContextKind(
     case CodeCompletionContext::CCC_Other:
     case CodeCompletionContext::CCC_ObjCInterface:
     case CodeCompletionContext::CCC_ObjCImplementation:
-    case CodeCompletionContext::CCC_ObjCClassForwardDecl:
     case CodeCompletionContext::CCC_NewName:
     case CodeCompletionContext::CCC_MacroName:
     case CodeCompletionContext::CCC_PreprocessorExpression:
     case CodeCompletionContext::CCC_PreprocessorDirective:
-    case CodeCompletionContext::CCC_Attribute:
-    case CodeCompletionContext::CCC_TopLevelOrExpression:
     case CodeCompletionContext::CCC_TypeQualifiers: {
       //Only Clang results should be accepted, so we'll set all of the other
       //context bits to 0 (i.e. the empty set)
@@ -658,15 +655,14 @@ namespace {
     void ProcessOverloadCandidates(Sema &S, unsigned CurrentArg,
                                    OverloadCandidate *Candidates,
                                    unsigned NumCandidates,
-                                   SourceLocation OpenParLoc,
-                                   bool Braced) override {
+                                   SourceLocation OpenParLoc) override {
       StoredResults.reserve(StoredResults.size() + NumCandidates);
       for (unsigned I = 0; I != NumCandidates; ++I) {
-        CodeCompletionString *StoredCompletion =
-            Candidates[I].CreateSignatureString(CurrentArg, S, getAllocator(),
+        CodeCompletionString *StoredCompletion
+          = Candidates[I].CreateSignatureString(CurrentArg, S, getAllocator(),
                                                 getCodeCompletionTUInfo(),
-                                                includeBriefComments(), Braced);
-
+                                                includeBriefComments());
+        
         CXCompletionResult R;
         R.CursorKind = CXCursor_OverloadCandidate;
         R.CompletionString = StoredCompletion;
@@ -871,7 +867,7 @@ CXCodeCompleteResults *clang_codeCompleteAt(CXTranslationUnit TU,
   auto CodeCompleteAtImpl = [=, &result]() {
     result = clang_codeCompleteAt_Impl(
         TU, complete_filename, complete_line, complete_column,
-        llvm::ArrayRef(unsaved_files, num_unsaved_files), options);
+        llvm::makeArrayRef(unsaved_files, num_unsaved_files), options);
   };
 
   llvm::CrashRecoveryContext CRC;

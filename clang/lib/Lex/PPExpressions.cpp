@@ -44,7 +44,7 @@ namespace {
 /// conditional and the source range covered by it.
 class PPValue {
   SourceRange Range;
-  IdentifierInfo *II = nullptr;
+  IdentifierInfo *II;
 
 public:
   llvm::APSInt Val;
@@ -323,21 +323,13 @@ static bool EvaluateValue(PPValue &Result, Token &PeekTok, DefinedTracker &DT,
         PP.Diag(PeekTok, diag::ext_c99_longlong);
     }
 
-    // 'z/uz' literals are a C++23 feature.
+    // 'z/uz' literals are a C++2b feature.
     if (Literal.isSizeT)
       PP.Diag(PeekTok, PP.getLangOpts().CPlusPlus
-                           ? PP.getLangOpts().CPlusPlus23
+                           ? PP.getLangOpts().CPlusPlus2b
                                  ? diag::warn_cxx20_compat_size_t_suffix
-                                 : diag::ext_cxx23_size_t_suffix
-                           : diag::err_cxx23_size_t_suffix);
-
-    // 'wb/uwb' literals are a C23 feature. We explicitly do not support the
-    // suffix in C++ as an extension because a library-based UDL that resolves
-    // to a library type may be more appropriate there.
-    if (Literal.isBitInt)
-      PP.Diag(PeekTok, PP.getLangOpts().C23
-                           ? diag::warn_c23_compat_bitint_suffix
-                           : diag::ext_c23_bitint_suffix);
+                                 : diag::ext_cxx2b_size_t_suffix
+                           : diag::err_cxx2b_size_t_suffix);
 
     // Parse the integer literal into Result.
     if (Literal.GetIntegerValue(Result.Val)) {
@@ -408,18 +400,9 @@ static bool EvaluateValue(PPValue &Result, Token &PeekTok, DefinedTracker &DT,
     // Set the value.
     Val = Literal.getValue();
     // Set the signedness. UTF-16 and UTF-32 are always unsigned
-    // UTF-8 is unsigned if -fchar8_t is specified.
     if (Literal.isWide())
       Val.setIsUnsigned(!TargetInfo::isTypeSigned(TI.getWCharType()));
-    else if (Literal.isUTF16() || Literal.isUTF32())
-      Val.setIsUnsigned(true);
-    else if (Literal.isUTF8()) {
-      if (PP.getLangOpts().CPlusPlus)
-        Val.setIsUnsigned(
-            PP.getLangOpts().Char8 ? true : !PP.getLangOpts().CharIsSigned);
-      else
-        Val.setIsUnsigned(true);
-    } else
+    else if (!Literal.isUTF16() && !Literal.isUTF32())
       Val.setIsUnsigned(!PP.getLangOpts().CharIsSigned);
 
     if (Result.Val.getBitWidth() > Val.getBitWidth()) {
@@ -679,7 +662,7 @@ static bool EvaluateDirectiveSubExpr(PPValue &LHS, unsigned MinPrec,
     case tok::ampamp:         // Logical && does not do UACs.
       break;                  // No UAC
     default:
-      Res.setIsUnsigned(LHS.isUnsigned() || RHS.isUnsigned());
+      Res.setIsUnsigned(LHS.isUnsigned()|RHS.isUnsigned());
       // If this just promoted something from signed to unsigned, and if the
       // value was negative, warn about it.
       if (ValueLive && Res.isUnsigned()) {
@@ -839,7 +822,7 @@ static bool EvaluateDirectiveSubExpr(PPValue &LHS, unsigned MinPrec,
 
       // Usual arithmetic conversions (C99 6.3.1.8p1): result is unsigned if
       // either operand is unsigned.
-      Res.setIsUnsigned(RHS.isUnsigned() || AfterColonVal.isUnsigned());
+      Res.setIsUnsigned(RHS.isUnsigned() | AfterColonVal.isUnsigned());
 
       // Figure out the precedence of the token after the : part.
       PeekPrec = getPrecedence(PeekTok.getKind());
@@ -869,7 +852,7 @@ static bool EvaluateDirectiveSubExpr(PPValue &LHS, unsigned MinPrec,
 /// to "!defined(X)" return X in IfNDefMacro.
 Preprocessor::DirectiveEvalResult
 Preprocessor::EvaluateDirectiveExpression(IdentifierInfo *&IfNDefMacro) {
-  SaveAndRestore PPDir(ParsingIfOrElifDirective, true);
+  SaveAndRestore<bool> PPDir(ParsingIfOrElifDirective, true);
   // Save the current state of 'DisableMacroExpansion' and reset it to false. If
   // 'DisableMacroExpansion' is true, then we must be in a macro argument list
   // in which case a directive is undefined behavior.  We want macros to be able

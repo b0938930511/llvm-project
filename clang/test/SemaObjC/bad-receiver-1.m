@@ -6,13 +6,13 @@
 
 int objc_lookUpClass(const char*);
 
-void __raiseExc1(void) {
+void __raiseExc1() {
  [objc_lookUpClass("NSString") retain]; // expected-warning {{receiver type 'int' is not 'id'}}
 }
 
 typedef const struct __CFString * CFStringRef;
 
-void func(void) {
+void func() {
   CFStringRef obj;
 
   [obj self]; // expected-warning {{receiver type 'CFStringRef' (aka 'const struct __CFString *') is not 'id'}} \\

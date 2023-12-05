@@ -7,5 +7,5 @@
 
 // CHECK: Invocation
 // CHECK-NOT: {{ -v}}
-// CHECK: a type specifier is required
+// CHECK: C++ requires
 invalid;

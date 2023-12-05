@@ -128,28 +128,23 @@ bool canonicalizePacketImpl(MCInstrInfo const &MCII, MCSubtargetInfo const &STI,
   bool CheckOk = Check ? Check->check(false) : true;
   if (!CheckOk)
     return false;
-
-  MCInst OrigMCB = MCB;
-
   // Examine the packet and convert pairs of instructions to compound
   // instructions when possible.
   if (!HexagonDisableCompound)
     HexagonMCInstrInfo::tryCompound(MCII, STI, Context, MCB);
   HexagonMCShuffle(Context, false, MCII, STI, MCB);
 
-  const SmallVector<DuplexCandidate, 8> possibleDuplexes =
-      (STI.hasFeature(Hexagon::FeatureDuplex))
-          ? HexagonMCInstrInfo::getDuplexPossibilties(MCII, STI, MCB)
-          : SmallVector<DuplexCandidate, 8>();
-
   // Examine the packet and convert pairs of instructions to duplex
   // instructions when possible.
-  HexagonMCShuffle(Context, MCII, STI, MCB, possibleDuplexes);
-
+  if (STI.getFeatureBits() [Hexagon::FeatureDuplex]) {
+    SmallVector<DuplexCandidate, 8> possibleDuplexes;
+    possibleDuplexes =
+        HexagonMCInstrInfo::getDuplexPossibilties(MCII, STI, MCB);
+    HexagonMCShuffle(Context, MCII, STI, MCB, possibleDuplexes);
+  }
   // Examines packet and pad the packet, if needed, when an
   // end-loop is in the bundle.
   HexagonMCInstrInfo::padEndloop(MCB, Context);
-
   // If compounding and duplexing didn't reduce the size below
   // 4 or less we have a packet that is too big.
   if (HexagonMCInstrInfo::bundleSize(MCB) > HEXAGON_PACKET_SIZE) {
@@ -161,9 +156,7 @@ bool canonicalizePacketImpl(MCInstrInfo const &MCII, MCSubtargetInfo const &STI,
   CheckOk = Check ? Check->check(true) : true;
   if (!CheckOk)
     return false;
-
   HexagonMCShuffle(Context, true, MCII, STI, MCB);
-
   return true;
 }
 } // namespace
@@ -568,20 +561,12 @@ bool HexagonMCInstrInfo::isConstExtended(MCInstrInfo const &MCII,
   if (isa<HexagonMCExpr>(MO.getExpr()) &&
       HexagonMCInstrInfo::mustNotExtend(*MO.getExpr()))
     return false;
-
   int64_t Value;
   if (!MO.getExpr()->evaluateAsAbsolute(Value))
     return true;
-  if (HexagonMCInstrInfo::isExtentSigned(MCII, MCI)) {
-    int32_t SValue = Value;
-    int32_t MinValue = HexagonMCInstrInfo::getMinValue(MCII, MCI);
-    int32_t MaxValue = HexagonMCInstrInfo::getMaxValue(MCII, MCI);
-    return SValue < MinValue || SValue > MaxValue;
-  }
-  uint32_t UValue = Value;
-  uint32_t MinValue = HexagonMCInstrInfo::getMinValue(MCII, MCI);
-  uint32_t MaxValue = HexagonMCInstrInfo::getMaxValue(MCII, MCI);
-  return UValue < MinValue || UValue > MaxValue;
+  int MinValue = HexagonMCInstrInfo::getMinValue(MCII, MCI);
+  int MaxValue = HexagonMCInstrInfo::getMaxValue(MCII, MCI);
+  return (MinValue > Value || Value > MaxValue);
 }
 
 bool HexagonMCInstrInfo::isCanon(MCInstrInfo const &MCII, MCInst const &MCI) {
@@ -770,7 +755,7 @@ bool HexagonMCInstrInfo::isPredRegister(MCInstrInfo const &MCII,
   MCInstrDesc const &Desc = HexagonMCInstrInfo::getDesc(MCII, Inst);
 
   return Inst.getOperand(I).isReg() &&
-         Desc.operands()[I].RegClass == Hexagon::PredRegsRegClassID;
+         Desc.OpInfo[I].RegClass == Hexagon::PredRegsRegClassID;
 }
 
 /// Return whether the insn can be packaged only with A and X-type insns.
@@ -872,16 +857,16 @@ bool HexagonMCInstrInfo::isVector(MCInstrInfo const &MCII, MCInst const &MCI) {
 }
 
 int64_t HexagonMCInstrInfo::minConstant(MCInst const &MCI, size_t Index) {
-  auto Sentinel = static_cast<int64_t>(std::numeric_limits<uint32_t>::max())
+  auto Sentinal = static_cast<int64_t>(std::numeric_limits<uint32_t>::max())
                   << 8;
   if (MCI.size() <= Index)
-    return Sentinel;
+    return Sentinal;
   MCOperand const &MCO = MCI.getOperand(Index);
   if (!MCO.isExpr())
-    return Sentinel;
+    return Sentinal;
   int64_t Value;
   if (!MCO.getExpr()->evaluateAsAbsolute(Value))
-    return Sentinel;
+    return Sentinal;
   return Value;
 }
 
@@ -915,7 +900,7 @@ bool HexagonMCInstrInfo::s27_2_reloc(MCExpr const &Expr) {
 }
 
 unsigned HexagonMCInstrInfo::packetSizeSlots(MCSubtargetInfo const &STI) {
-  const bool IsTiny = STI.hasFeature(Hexagon::ProcTinyCore);
+  const bool IsTiny = STI.getFeatureBits()[Hexagon::ProcTinyCore];
 
   return IsTiny ? (HEXAGON_PACKET_SIZE - 1) : HEXAGON_PACKET_SIZE;
 }
@@ -930,7 +915,10 @@ void HexagonMCInstrInfo::padEndloop(MCInst &MCB, MCContext &Context) {
   MCInst Nop;
   Nop.setOpcode(Hexagon::A2_nop);
   assert(isBundle(MCB));
-  while (LoopNeedsPadding(MCB))
+  while ((HexagonMCInstrInfo::isInnerLoop(MCB) &&
+          (HexagonMCInstrInfo::bundleSize(MCB) < HEXAGON_PACKET_INNER_SIZE)) ||
+         ((HexagonMCInstrInfo::isOuterLoop(MCB) &&
+           (HexagonMCInstrInfo::bundleSize(MCB) < HEXAGON_PACKET_OUTER_SIZE))))
     MCB.addOperand(MCOperand::createInst(new (Context) MCInst(Nop)));
 }
 
@@ -940,7 +928,7 @@ HexagonMCInstrInfo::predicateInfo(MCInstrInfo const &MCII, MCInst const &MCI) {
     return {0, 0, false};
   MCInstrDesc const &Desc = getDesc(MCII, MCI);
   for (auto I = Desc.getNumDefs(), N = Desc.getNumOperands(); I != N; ++I)
-    if (Desc.operands()[I].RegClass == Hexagon::PredRegsRegClassID)
+    if (Desc.OpInfo[I].RegClass == Hexagon::PredRegsRegClassID)
       return {MCI.getOperand(I).getReg(), I, isPredicatedTrue(MCII, MCI)};
   return {0, 0, false};
 }
@@ -951,24 +939,10 @@ bool HexagonMCInstrInfo::prefersSlot3(MCInstrInfo const &MCII,
   return (F >> HexagonII::PrefersSlot3Pos) & HexagonII::PrefersSlot3Mask;
 }
 
+/// return true if instruction has hasTmpDst attribute.
 bool HexagonMCInstrInfo::hasTmpDst(MCInstrInfo const &MCII, MCInst const &MCI) {
-  switch (MCI.getOpcode()) {
-  default:
-    return false;
-  case Hexagon::V6_vgathermh:
-  case Hexagon::V6_vgathermhq:
-  case Hexagon::V6_vgathermhw:
-  case Hexagon::V6_vgathermhwq:
-  case Hexagon::V6_vgathermw:
-  case Hexagon::V6_vgathermwq:
-    return true;
-  }
-  return false;
-}
-
-bool HexagonMCInstrInfo::hasHvxTmp(MCInstrInfo const &MCII, MCInst const &MCI) {
   const uint64_t F = HexagonMCInstrInfo::getDesc(MCII, MCI).TSFlags;
-  return (F >> HexagonII::HasHvxTmpPos) & HexagonII::HasHvxTmpMask;
+  return (F >> HexagonII::HasTmpDstPos) & HexagonII::HasTmpDstMask;
 }
 
 bool HexagonMCInstrInfo::requiresSlot(MCSubtargetInfo const &STI,
@@ -1041,20 +1015,4 @@ unsigned HexagonMCInstrInfo::SubregisterBit(unsigned Consumer,
   if (Producer2 != Hexagon::NoRegister)
     return Consumer == Producer;
   return 0;
-}
-
-bool HexagonMCInstrInfo::LoopNeedsPadding(MCInst const &MCB) {
-  return (
-      (HexagonMCInstrInfo::isInnerLoop(MCB) &&
-       (HexagonMCInstrInfo::bundleSize(MCB) < HEXAGON_PACKET_INNER_SIZE)) ||
-      ((HexagonMCInstrInfo::isOuterLoop(MCB) &&
-        (HexagonMCInstrInfo::bundleSize(MCB) < HEXAGON_PACKET_OUTER_SIZE))));
-}
-
-bool HexagonMCInstrInfo::IsABranchingInst(MCInstrInfo const &MCII,
-                                          MCSubtargetInfo const &STI,
-                                          MCInst const &I) {
-  assert(!HexagonMCInstrInfo::isBundle(I));
-  MCInstrDesc const &Desc = HexagonMCInstrInfo::getDesc(MCII, I);
-  return (Desc.isBranch() || Desc.isCall() || Desc.isReturn());
 }

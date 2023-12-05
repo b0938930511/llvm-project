@@ -31,6 +31,7 @@ class MCTargetStreamer;
 
 /// Creates a machine code emitter for MSP430.
 MCCodeEmitter *createMSP430MCCodeEmitter(const MCInstrInfo &MCII,
+                                         const MCRegisterInfo &MRI,
                                          MCContext &Ctx);
 
 MCAsmBackend *createMSP430MCAsmBackend(const Target &T,
@@ -53,7 +54,6 @@ createMSP430ELFObjectWriter(uint8_t OSABI);
 
 // Defines symbolic names for the MSP430 instructions.
 #define GET_INSTRINFO_ENUM
-#define GET_INSTRINFO_MC_HELPER_DECLS
 #include "MSP430GenInstrInfo.inc"
 
 #define GET_SUBTARGETINFO_ENUM

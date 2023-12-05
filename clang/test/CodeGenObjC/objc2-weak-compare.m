@@ -11,7 +11,7 @@ PBXTarget * result;
 - Meth;
 @end
 
-extern void foo(void);
+extern void foo();
 @implementation PBXTarget
 - Meth {
 	if (_lastKnownTarget != result)

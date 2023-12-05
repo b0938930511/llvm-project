@@ -10,10 +10,9 @@
 
 #include "llvm/DebugInfo/CodeView/LazyRandomTypeCollection.h"
 #include "llvm/DebugInfo/PDB/Native/NativeEnumTypes.h"
-#include "llvm/DebugInfo/PDB/Native/NativeSession.h"
+#include "llvm/DebugInfo/PDB/PDBExtras.h"
 #include "llvm/DebugInfo/PDB/Native/PDBFile.h"
 #include "llvm/DebugInfo/PDB/Native/TpiStream.h"
-#include "llvm/DebugInfo/PDB/PDBExtras.h"
 
 using namespace llvm;
 using namespace llvm::codeview;
@@ -97,7 +96,7 @@ void NativeTypeFunctionSig::initialize() {
   }
 }
 
-NativeTypeFunctionSig::~NativeTypeFunctionSig() = default;
+NativeTypeFunctionSig::~NativeTypeFunctionSig() {}
 
 void NativeTypeFunctionSig::initializeArgList(codeview::TypeIndex ArgListTI) {
   TpiStream &Tpi = cantFail(Session.getPDBFile().getPDBTpiStream());

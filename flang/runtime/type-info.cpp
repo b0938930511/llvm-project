@@ -8,14 +8,11 @@
 
 #include "type-info.h"
 #include "terminator.h"
-#include "tools.h"
 #include <cstdio>
 
 namespace Fortran::runtime::typeInfo {
 
-RT_OFFLOAD_API_GROUP_BEGIN
-
-RT_API_ATTRS std::optional<TypeParameterValue> Value::GetValue(
+std::optional<TypeParameterValue> Value::GetValue(
     const Descriptor *descriptor) const {
   switch (genre_) {
   case Genre::Explicit:
@@ -32,8 +29,7 @@ RT_API_ATTRS std::optional<TypeParameterValue> Value::GetValue(
   }
 }
 
-RT_API_ATTRS std::size_t Component::GetElementByteSize(
-    const Descriptor &instance) const {
+std::size_t Component::GetElementByteSize(const Descriptor &instance) const {
   switch (category()) {
   case TypeCategory::Integer:
   case TypeCategory::Real:
@@ -55,8 +51,7 @@ RT_API_ATTRS std::size_t Component::GetElementByteSize(
   return 0;
 }
 
-RT_API_ATTRS std::size_t Component::GetElements(
-    const Descriptor &instance) const {
+std::size_t Component::GetElements(const Descriptor &instance) const {
   std::size_t elements{1};
   if (int rank{rank_}) {
     if (const Value * boundValues{bounds()}) {
@@ -78,8 +73,7 @@ RT_API_ATTRS std::size_t Component::GetElements(
   return elements;
 }
 
-RT_API_ATTRS std::size_t Component::SizeInBytes(
-    const Descriptor &instance) const {
+std::size_t Component::SizeInBytes(const Descriptor &instance) const {
   if (genre() == Genre::Data) {
     return GetElementByteSize(instance) * GetElements(instance);
   } else if (category() == TypeCategory::Derived) {
@@ -91,34 +85,21 @@ RT_API_ATTRS std::size_t Component::SizeInBytes(
   }
 }
 
-RT_API_ATTRS void Component::EstablishDescriptor(Descriptor &descriptor,
+void Component::EstablishDescriptor(Descriptor &descriptor,
     const Descriptor &container, Terminator &terminator) const {
-  ISO::CFI_attribute_t attribute{static_cast<ISO::CFI_attribute_t>(
-      genre_ == Genre::Allocatable   ? CFI_attribute_allocatable
-          : genre_ == Genre::Pointer ? CFI_attribute_pointer
-                                     : CFI_attribute_other)};
   TypeCategory cat{category()};
   if (cat == TypeCategory::Character) {
-    std::size_t lengthInChars{0};
-    if (auto length{characterLen_.GetValue(&container)}) {
-      lengthInChars = static_cast<std::size_t>(*length);
-    } else {
-      RUNTIME_CHECK(
-          terminator, characterLen_.genre() == Value::Genre::Deferred);
-    }
-    descriptor.Establish(
-        kind_, lengthInChars, nullptr, rank_, nullptr, attribute);
+    auto length{characterLen_.GetValue(&container)};
+    RUNTIME_CHECK(terminator, length.has_value());
+    descriptor.Establish(kind_, *length / kind_, nullptr, rank_);
   } else if (cat == TypeCategory::Derived) {
-    if (const DerivedType * type{derivedType()}) {
-      descriptor.Establish(*type, nullptr, rank_, nullptr, attribute);
-    } else { // unlimited polymorphic
-      descriptor.Establish(TypeCode{TypeCategory::Derived, 0}, 0, nullptr,
-          rank_, nullptr, attribute, true);
-    }
+    const DerivedType *type{derivedType()};
+    RUNTIME_CHECK(terminator, type != nullptr);
+    descriptor.Establish(*type, nullptr, rank_);
   } else {
-    descriptor.Establish(cat, kind_, nullptr, rank_, nullptr, attribute);
+    descriptor.Establish(cat, kind_, nullptr, rank_);
   }
-  if (rank_ && genre_ != Genre::Allocatable && genre_ != Genre::Pointer) {
+  if (rank_ && genre_ != Genre::Allocatable) {
     const typeInfo::Value *boundValues{bounds()};
     RUNTIME_CHECK(terminator, boundValues != nullptr);
     auto byteStride{static_cast<SubscriptValue>(descriptor.ElementBytes())};
@@ -134,20 +115,16 @@ RT_API_ATTRS void Component::EstablishDescriptor(Descriptor &descriptor,
   }
 }
 
-RT_API_ATTRS void Component::CreatePointerDescriptor(Descriptor &descriptor,
-    const Descriptor &container, Terminator &terminator,
-    const SubscriptValue *subscripts) const {
+void Component::CreatePointerDescriptor(Descriptor &descriptor,
+    const Descriptor &container, const SubscriptValue subscripts[],
+    Terminator &terminator) const {
   RUNTIME_CHECK(terminator, genre_ == Genre::Data);
   EstablishDescriptor(descriptor, container, terminator);
-  if (subscripts) {
-    descriptor.set_base_addr(container.Element<char>(subscripts) + offset_);
-  } else {
-    descriptor.set_base_addr(container.OffsetElement<char>() + offset_);
-  }
+  descriptor.set_base_addr(container.Element<char>(subscripts) + offset_);
   descriptor.raw().attribute = CFI_attribute_pointer;
 }
 
-RT_API_ATTRS const DerivedType *DerivedType::GetParentType() const {
+const DerivedType *DerivedType::GetParentType() const {
   if (hasParent_) {
     const Descriptor &compDesc{component()};
     const Component &component{*compDesc.OffsetElement<const Component>()};
@@ -157,7 +134,7 @@ RT_API_ATTRS const DerivedType *DerivedType::GetParentType() const {
   }
 }
 
-RT_API_ATTRS const Component *DerivedType::FindDataComponent(
+const Component *DerivedType::FindDataComponent(
     const char *compName, std::size_t compNameLen) const {
   const Descriptor &compDesc{component()};
   std::size_t n{compDesc.Elements()};
@@ -168,8 +145,7 @@ RT_API_ATTRS const Component *DerivedType::FindDataComponent(
     INTERNAL_CHECK(component != nullptr);
     const Descriptor &nameDesc{component->name()};
     if (nameDesc.ElementBytes() == compNameLen &&
-        Fortran::runtime::memcmp(
-            compName, nameDesc.OffsetElement(), compNameLen) == 0) {
+        std::memcmp(compName, nameDesc.OffsetElement(), compNameLen) == 0) {
       return component;
     }
   }
@@ -177,7 +153,20 @@ RT_API_ATTRS const Component *DerivedType::FindDataComponent(
   return parent ? parent->FindDataComponent(compName, compNameLen) : nullptr;
 }
 
-RT_OFFLOAD_API_GROUP_END
+const SpecialBinding *DerivedType::FindSpecialBinding(
+    SpecialBinding::Which which) const {
+  const Descriptor &specialDesc{special()};
+  std::size_t n{specialDesc.Elements()};
+  SubscriptValue at[maxRank];
+  specialDesc.GetLowerBounds(at);
+  for (std::size_t j{0}; j < n; ++j, specialDesc.IncrementSubscripts(at)) {
+    const SpecialBinding &special{*specialDesc.Element<SpecialBinding>(at)};
+    if (special.which() == which) {
+      return &special;
+    }
+  }
+  return nullptr;
+}
 
 static void DumpScalarCharacter(
     FILE *f, const Descriptor &desc, const char *what) {
@@ -193,11 +182,12 @@ static void DumpScalarCharacter(
 }
 
 FILE *DerivedType::Dump(FILE *f) const {
-  std::fprintf(f, "DerivedType @ %p:\n", reinterpret_cast<const void *>(this));
+  std::fprintf(
+      f, "DerivedType @ 0x%p:\n", reinterpret_cast<const void *>(this));
   const std::uint64_t *uints{reinterpret_cast<const std::uint64_t *>(this)};
   for (int j{0}; j < 64; ++j) {
     int offset{j * static_cast<int>(sizeof *uints)};
-    std::fprintf(f, "    [+%3d](%p) 0x%016jx", offset,
+    std::fprintf(f, "    [+%3d](0x%p) 0x%016jx", offset,
         reinterpret_cast<const void *>(&uints[j]),
         static_cast<std::uintmax_t>(uints[j]));
     if (offset == offsetof(DerivedType, binding_)) {
@@ -208,6 +198,8 @@ FILE *DerivedType::Dump(FILE *f) const {
       std::fputs(" <-- sizeInBytes_\n", f);
     } else if (offset == offsetof(DerivedType, uninstantiated_)) {
       std::fputs(" <-- uninstantiated_\n", f);
+    } else if (offset == offsetof(DerivedType, typeHash_)) {
+      std::fputs(" <-- typeHash_\n", f);
     } else if (offset == offsetof(DerivedType, kindParameter_)) {
       std::fputs(" <-- kindParameter_\n", f);
     } else if (offset == offsetof(DerivedType, lenParameterKind_)) {
@@ -218,10 +210,12 @@ FILE *DerivedType::Dump(FILE *f) const {
       std::fputs(" <-- procPtr_\n", f);
     } else if (offset == offsetof(DerivedType, special_)) {
       std::fputs(" <-- special_\n", f);
-    } else if (offset == offsetof(DerivedType, specialBitSet_)) {
-      std::fputs(" <-- specialBitSet_\n", f);
+    } else if (offset == offsetof(DerivedType, special_)) {
+      std::fputs(" <-- special_\n", f);
     } else if (offset == offsetof(DerivedType, hasParent_)) {
-      std::fputs(" <-- (flags)\n", f);
+      std::fputs(
+          " <-- hasParent_, noInitializationNeeded_, noDestructionNeeded_\n",
+          f);
     } else {
       std::fputc('\n', f);
     }
@@ -251,18 +245,16 @@ FILE *DerivedType::Dump(FILE *f) const {
   std::fprintf(
       f, "\n  special descriptor (byteSize 0x%zx): ", special_.byteSize);
   specialDesc.Dump(f);
-  if (specialDesc.IsAllocated()) {
-    std::size_t specials{specialDesc.Elements()};
-    for (std::size_t j{0}; j < specials; ++j) {
-      std::fprintf(f, "  [%3zd] ", j);
-      specialDesc.ZeroBasedIndexedElement<SpecialBinding>(j)->Dump(f);
-    }
+  std::size_t specials{specialDesc.Elements()};
+  for (std::size_t j{0}; j < specials; ++j) {
+    std::fprintf(f, "  [%3zd] ", j);
+    specialDesc.ZeroBasedIndexedElement<SpecialBinding>(j)->Dump(f);
   }
   return f;
 }
 
 FILE *Component::Dump(FILE *f) const {
-  std::fprintf(f, "Component @ %p:\n", reinterpret_cast<const void *>(this));
+  std::fprintf(f, "Component @ 0x%p:\n", reinterpret_cast<const void *>(this));
   std::fputs("    name: ", f);
   DumpScalarCharacter(f, name(), "Component::name");
   if (genre_ == Genre::Data) {
@@ -279,7 +271,7 @@ FILE *Component::Dump(FILE *f) const {
   std::fprintf(f, " category %d  kind %d  rank %d  offset 0x%zx\n", category_,
       kind_, rank_, static_cast<std::size_t>(offset_));
   if (initialization_) {
-    std::fprintf(f, " initialization @ %p:\n",
+    std::fprintf(f, " initialization @ 0x%p:\n",
         reinterpret_cast<const void *>(initialization_));
     for (int j{0}; j < 128; j += sizeof(std::uint64_t)) {
       std::fprintf(f, " [%3d] 0x%016jx\n", j,
@@ -292,13 +284,22 @@ FILE *Component::Dump(FILE *f) const {
 
 FILE *SpecialBinding::Dump(FILE *f) const {
   std::fprintf(
-      f, "SpecialBinding @ %p:\n", reinterpret_cast<const void *>(this));
+      f, "SpecialBinding @ 0x%p:\n", reinterpret_cast<const void *>(this));
   switch (which_) {
-  case Which::ScalarAssignment:
-    std::fputs("    ScalarAssignment", f);
+  case Which::Assignment:
+    std::fputs("    Assignment", f);
     break;
   case Which::ElementalAssignment:
     std::fputs("    ElementalAssignment", f);
+    break;
+  case Which::Final:
+    std::fputs("    Final", f);
+    break;
+  case Which::ElementalFinal:
+    std::fputs("    ElementalFinal", f);
+    break;
+  case Which::AssumedRankFinal:
+    std::fputs("    AssumedRankFinal", f);
     break;
   case Which::ReadFormatted:
     std::fputs("    ReadFormatted", f);
@@ -312,21 +313,14 @@ FILE *SpecialBinding::Dump(FILE *f) const {
   case Which::WriteUnformatted:
     std::fputs("    WriteUnformatted", f);
     break;
-  case Which::ElementalFinal:
-    std::fputs("    ElementalFinal", f);
-    break;
-  case Which::AssumedRankFinal:
-    std::fputs("    AssumedRankFinal", f);
-    break;
   default:
-    std::fprintf(f, "    rank-%d final:",
-        static_cast<int>(which_) - static_cast<int>(Which::ScalarFinal));
+    std::fprintf(
+        f, "    Unknown which: 0x%x", static_cast<std::uint8_t>(which_));
     break;
   }
+  std::fprintf(f, "\n    rank: %d\n", rank_);
   std::fprintf(f, "    isArgDescriptorSet: 0x%x\n", isArgDescriptorSet_);
-  std::fprintf(f, "    isTypeBound: 0x%x\n", isTypeBound_);
-  std::fprintf(f, "    isArgContiguousSet: 0x%x\n", isArgContiguousSet_);
-  std::fprintf(f, "    proc: %p\n", reinterpret_cast<void *>(proc_));
+  std::fprintf(f, "    proc: 0x%p\n", reinterpret_cast<void *>(proc_));
   return f;
 }
 

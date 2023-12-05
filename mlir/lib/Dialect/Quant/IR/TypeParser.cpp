@@ -13,6 +13,7 @@
 #include "mlir/IR/Location.h"
 #include "mlir/IR/Types.h"
 #include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/SourceMgr.h"
@@ -28,14 +29,15 @@ static IntegerType parseStorageType(DialectAsmParser &parser, bool &isSigned) {
   // Parse storage type (alpha_ident, integer_literal).
   StringRef identifier;
   unsigned storageTypeWidth = 0;
-  OptionalParseResult result = parser.parseOptionalType(type);
-  if (result.has_value()) {
-    if (!succeeded(*result))
+  if (failed(parser.parseOptionalKeyword(&identifier))) {
+    // If we didn't parse a keyword, this must be a signed type.
+    if (parser.parseType(type))
       return nullptr;
-    isSigned = !type.isUnsigned();
+    isSigned = true;
     storageTypeWidth = type.getWidth();
-  } else if (succeeded(parser.parseKeyword(&identifier))) {
+
     // Otherwise, this must be an unsigned integer (`u` integer-literal).
+  } else {
     if (!identifier.consume_front("u")) {
       parser.emitError(typeLoc, "illegal storage type prefix");
       return nullptr;
@@ -46,8 +48,6 @@ static IntegerType parseStorageType(DialectAsmParser &parser, bool &isSigned) {
     }
     isSigned = false;
     type = parser.getBuilder().getIntegerType(storageTypeWidth);
-  } else {
-    return nullptr;
   }
 
   if (storageTypeWidth == 0 ||
@@ -75,7 +75,7 @@ static ParseResult parseStorageRange(DialectAsmParser &parser,
   }
 
   // Explicit storage min and storage max.
-  SMLoc minLoc = parser.getCurrentLocation(), maxLoc;
+  llvm::SMLoc minLoc = parser.getCurrentLocation(), maxLoc;
   if (parser.parseInteger(storageTypeMin) || parser.parseColon() ||
       parser.getCurrentLocation(&maxLoc) ||
       parser.parseInteger(storageTypeMax) || parser.parseGreater())
@@ -249,7 +249,7 @@ static Type parseUniformType(DialectAsmParser &parser) {
   }
 
   // Parse scales/zeroPoints.
-  SMLoc scaleZPLoc = parser.getCurrentLocation();
+  llvm::SMLoc scaleZPLoc = parser.getCurrentLocation();
   do {
     scales.resize(scales.size() + 1);
     zeroPoints.resize(zeroPoints.size() + 1);
@@ -420,13 +420,13 @@ static void printCalibratedQuantizedType(CalibratedQuantizedType type,
 
 /// Print a type registered to this dialect.
 void QuantizationDialect::printType(Type type, DialectAsmPrinter &os) const {
-  if (auto anyType = llvm::dyn_cast<AnyQuantizedType>(type))
+  if (auto anyType = type.dyn_cast<AnyQuantizedType>())
     printAnyQuantizedType(anyType, os);
-  else if (auto uniformType = llvm::dyn_cast<UniformQuantizedType>(type))
+  else if (auto uniformType = type.dyn_cast<UniformQuantizedType>())
     printUniformQuantizedType(uniformType, os);
-  else if (auto perAxisType = llvm::dyn_cast<UniformQuantizedPerAxisType>(type))
+  else if (auto perAxisType = type.dyn_cast<UniformQuantizedPerAxisType>())
     printUniformQuantizedPerAxisType(perAxisType, os);
-  else if (auto calibratedType = llvm::dyn_cast<CalibratedQuantizedType>(type))
+  else if (auto calibratedType = type.dyn_cast<CalibratedQuantizedType>())
     printCalibratedQuantizedType(calibratedType, os);
   else
     llvm_unreachable("Unhandled quantized type");

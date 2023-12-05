@@ -1,12 +1,10 @@
-// Location for variable "parama" optimized out.
-// Previously it would carry incorrect location
-// information in debug-info, see PR48719.
-// Now, the location is simply not emitted.
+// XFAIL: *
+// Incorrect location for variable "parama", see PR48719.
 
 // REQUIRES: lldb
 // UNSUPPORTED: system-windows
-// RUN: %clang -std=gnu11 -O3 -glldb %s -o %t
-// RUN: %dexter --fail-lt 0.1 -w --debugger lldb --binary %t -- %s
+// RUN: %dexter --fail-lt 0.1 -w --debugger lldb \
+// RUN:     --builder 'clang-c'  --cflags "-O3 -glldb" -- %s
 // See NOTE at end for more info about the RUN command.
 
 // 1. SROA/mem2reg fully promotes parama.

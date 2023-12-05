@@ -18,8 +18,8 @@
 #include "clang/Tooling/Tooling.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Host.h"
 #include "llvm/Support/JSON.h"
-#include "llvm/TargetParser/Host.h"
 
 #include "ASTSrcLocProcessor.h"
 
@@ -91,8 +91,12 @@ int main(int argc, const char **argv) {
   llvm::transform(Args, Argv.begin(),
                   [](const std::string &Arg) { return Arg.c_str(); });
 
-  IntrusiveRefCntPtr<DiagnosticOptions> DiagOpts =
-      CreateAndPopulateDiagOpts(Argv);
+  IntrusiveRefCntPtr<DiagnosticOptions> DiagOpts = new DiagnosticOptions();
+  unsigned MissingArgIndex, MissingArgCount;
+  auto Opts = driver::getDriverOptTable();
+  auto ParsedArgs = Opts.ParseArgs(llvm::makeArrayRef(Argv).slice(1),
+                                   MissingArgIndex, MissingArgCount);
+  ParseDiagnosticArgs(*DiagOpts, ParsedArgs);
 
   // Don't output diagnostics, because common scenarios such as
   // cross-compiling fail with diagnostics.  This is not fatal, but
@@ -111,24 +115,24 @@ int main(int argc, const char **argv) {
 
   auto Files = llvm::makeIntrusiveRefCnt<FileManager>(FileSystemOptions(), OFS);
 
-  auto Driver = std::make_unique<clang::driver::Driver>(
+  auto Driver = std::make_unique<driver::Driver>(
       "clang", llvm::sys::getDefaultTargetTriple(), Diagnostics,
       "ast-api-dump-tool", OFS);
 
   std::unique_ptr<clang::driver::Compilation> Comp(
-      Driver->BuildCompilation(llvm::ArrayRef(Argv)));
+      Driver->BuildCompilation(llvm::makeArrayRef(Argv)));
   if (!Comp)
     return 1;
 
   const auto &Jobs = Comp->getJobs();
-  if (Jobs.size() != 1 || !isa<clang::driver::Command>(*Jobs.begin())) {
+  if (Jobs.size() != 1 || !isa<driver::Command>(*Jobs.begin())) {
     SmallString<256> error_msg;
     llvm::raw_svector_ostream error_stream(error_msg);
     Jobs.Print(error_stream, "; ", true);
     return 1;
   }
 
-  const auto &Cmd = cast<clang::driver::Command>(*Jobs.begin());
+  const auto &Cmd = cast<driver::Command>(*Jobs.begin());
   const llvm::opt::ArgStringList &CC1Args = Cmd.getArguments();
 
   auto Invocation = std::make_unique<CompilerInvocation>();

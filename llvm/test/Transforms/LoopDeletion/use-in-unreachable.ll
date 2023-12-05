@@ -1,4 +1,4 @@
-; RUN: opt < %s -passes=loop-deletion -S | FileCheck %s
+; RUN: opt < %s -loop-deletion -S | FileCheck %s
 
 ; Checking that possible users of instruction from the loop in
 ; unreachable blocks are handled.
@@ -19,6 +19,6 @@ loopexit:
   ret i64 0
 deadcode:
 ; CHECK-LABEL: deadcode
-; CHECK: ret i64 poison
+; CHECK: ret i64 undef
   ret i64 %baddef
 }

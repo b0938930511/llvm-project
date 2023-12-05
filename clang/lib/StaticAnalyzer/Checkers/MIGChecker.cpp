@@ -27,10 +27,8 @@
 #include "clang/StaticAnalyzer/Core/BugReporter/BugType.h"
 #include "clang/StaticAnalyzer/Core/Checker.h"
 #include "clang/StaticAnalyzer/Core/CheckerManager.h"
-#include "clang/StaticAnalyzer/Core/PathSensitive/CallDescription.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CallEvent.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CheckerContext.h"
-#include <optional>
 
 using namespace clang;
 using namespace ento;
@@ -87,7 +85,7 @@ class MIGChecker : public Checker<check::PostCall, check::PreStmt<ReturnStmt>,
 #undef CALL
   };
 
-  CallDescription OsRefRetain{{"os_ref_retain"}, 1};
+  CallDescription OsRefRetain{"os_ref_retain", 1};
 
   void checkReturnAux(const ReturnStmt *RS, CheckerContext &C) const;
 
@@ -158,10 +156,10 @@ static bool isInMIGCall(CheckerContext &C) {
 
   const Decl *D = SFC->getDecl();
 
-  if (std::optional<AnyCall> AC = AnyCall::forDecl(D)) {
+  if (Optional<AnyCall> AC = AnyCall::forDecl(D)) {
     // Even though there's a Sema warning when the return type of an annotated
     // function is not a kern_return_t, this warning isn't an error, so we need
-    // an extra check here.
+    // an extra sanity check here.
     // FIXME: AnyCall doesn't support blocks yet, so they remain unchecked
     // for now.
     if (!AC->getReturnType(C.getASTContext())
@@ -182,7 +180,7 @@ static bool isInMIGCall(CheckerContext &C) {
 }
 
 void MIGChecker::checkPostCall(const CallEvent &Call, CheckerContext &C) const {
-  if (OsRefRetain.matches(Call)) {
+  if (Call.isCalled(OsRefRetain)) {
     // If the code is doing reference counting over the parameter,
     // it opens up an opportunity for safely calling a destructor function.
     // TODO: We should still check for over-releases.
@@ -200,7 +198,7 @@ void MIGChecker::checkPostCall(const CallEvent &Call, CheckerContext &C) const {
 
   auto I = llvm::find_if(Deallocators,
                          [&](const std::pair<CallDescription, unsigned> &Item) {
-                           return Item.first.matches(Call);
+                           return Call.isCalled(Item.first);
                          });
   if (I == Deallocators.end())
     return;

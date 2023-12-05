@@ -10,9 +10,7 @@ struct Sub : virtual Base {
   char c;
 };
 
-// CHECK: %struct.Sub = type <{ ptr, i8, %struct.Base }>
-Sub f(Sub x) {
-  return x;
-}
+// CHECK: %struct.Sub = type <{ i32 (...)**, i8, %struct.Base }>
+void f(Sub*) { }
 
 static int i[sizeof(Sub) == 13 ? 1 : -1];

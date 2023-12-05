@@ -3,14 +3,14 @@
 // This previously triggered a warning from -Wunreachable-code because of
 // a busted CFG.
 typedef signed char BOOL;
-BOOL radar10989084(void) {
+BOOL radar10989084() {
   @autoreleasepool {  // no-warning
     return __objc_yes;
   }
 }
 
 // Test the warning works.
-void test_unreachable(void) {
+void test_unreachable() {
   return;
   return; // expected-warning {{will never be executed}}
 }
@@ -20,21 +20,21 @@ void test_unreachable(void) {
 #define CONFIG NO
 
 // Test that 'NO' and 'YES' are not treated as configuration macros.
-int test_NO(void) {
+int test_NO() {
   if (NO)
     return 1; // expected-warning {{will never be executed}}
   else
     return 0;
 }
 
-int test_YES(void) {
+int test_YES() {
   if (YES)
     return 1;
   else
     return 0; // expected-warning {{will never be executed}}
 }
 
-int test_CONFIG(void) {
+int test_CONFIG() {
   if (CONFIG)
     return 1;
   else
@@ -49,7 +49,7 @@ void test_loop_increment(id container) {
   }
 }
 
-void calledFun(void) {}
+void calledFun() {}
 
 // Test "silencing" with parentheses.
 void test_with_paren_silencing(int x) {

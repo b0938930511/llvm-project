@@ -17,21 +17,24 @@
 
 #include "ASTSignals.h"
 #include "Compiler.h"
+#include "Headers.h"
 #include "Protocol.h"
 #include "Quality.h"
 #include "index/Index.h"
 #include "index/Symbol.h"
 #include "index/SymbolOrigin.h"
+#include "support/Logger.h"
 #include "support/Markup.h"
 #include "support/Path.h"
 #include "clang/Sema/CodeCompleteConsumer.h"
 #include "clang/Sema/CodeCompleteOptions.h"
+#include "clang/Tooling/CompilationDatabase.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Error.h"
 #include <functional>
 #include <future>
-#include <optional>
-#include <utility>
 
 namespace clang {
 class NamedDecl;
@@ -56,7 +59,7 @@ struct CodeCompleteOptions {
   /// If none, the implementation may choose an appropriate behavior.
   /// (In practice, ClangdLSPServer enables bundling if the client claims
   /// to supports signature help).
-  std::optional<bool> BundleOverloads;
+  llvm::Optional<bool> BundleOverloads;
 
   /// Limit the number of results returned (0 means no limit).
   /// If more results are available, we set CompletionList.isIncomplete.
@@ -69,10 +72,6 @@ struct CodeCompleteOptions {
     IWYU,
     NeverInsert,
   } InsertIncludes = IncludeInsertion::IWYU;
-
-  /// Whether include insertions for Objective-C code should use #import instead
-  /// of #include.
-  bool ImportInsertions = false;
 
   /// A visual indicator to prepend to the completion label to indicate whether
   /// completion result would trigger an #include insertion or not.
@@ -134,9 +133,7 @@ struct CodeCompleteOptions {
   enum CodeCompletionRankingModel {
     Heuristics,
     DecisionForest,
-  };
-  static const CodeCompletionRankingModel DefaultRankingModel;
-  CodeCompletionRankingModel RankingModel = DefaultRankingModel;
+  } RankingModel = DecisionForest;
 
   /// Callback used to score a CompletionCandidate if DecisionForest ranking
   /// model is enabled.
@@ -149,9 +146,9 @@ struct CodeCompleteOptions {
   /// CompletionScore is NameMatch * pow(Base, Prediction).
   /// The optimal value of Base largely depends on the semantics of the model
   /// and prediction score (e.g. algorithm used during training, number of
-  /// trees, etc.). Usually if the range of Prediction is [-20, 20] then a Base
+  /// trees, etc.). Usually if the range of Prediciton is [-20, 20] then a Base
   /// in [1.2, 1.7] works fine.
-  /// Semantics: E.g. For Base = 1.3, if the Prediction score reduces by 2.6
+  /// Semantics: E.g. For Base = 1.3, if the Prediciton score reduces by 2.6
   /// points then completion score reduces by 50% or 1.3^(-2.6).
   float DecisionForestBase = 1.3f;
 };
@@ -162,10 +159,6 @@ struct CodeCompleteOptions {
 struct CodeCompletion {
   // The unqualified name of the symbol or other completion item.
   std::string Name;
-  // The name of the symbol for filtering and sorting purposes. Typically the
-  // same as `Name`, but may be different e.g. for ObjC methods, `Name` is the
-  // first selector fragment but the `FilterText` is the entire selector.
-  std::string FilterText;
   // The scope qualifier for the symbol name. e.g. "ns1::ns2::"
   // Empty for non-symbol completions. Not inserted, but may be displayed.
   std::string Scope;
@@ -178,7 +171,7 @@ struct CodeCompletion {
   // Type to be displayed for this completion.
   std::string ReturnType;
   // The parsed documentation comment.
-  std::optional<markup::Document> Documentation;
+  llvm::Optional<markup::Document> Documentation;
   CompletionItemKind Kind = CompletionItemKind::Missing;
   // This completion item may represent several symbols that can be inserted in
   // the same way, such as function overloads. In this case BundleSize > 1, and
@@ -197,7 +190,7 @@ struct CodeCompletion {
     // Empty for non-symbol completions, or when not known.
     std::string Header;
     // Present if Header should be inserted to use this item.
-    std::optional<TextEdit> Insertion;
+    llvm::Optional<TextEdit> Insertion;
   };
   // All possible include headers ranked by preference. By default, the first
   // include is used.
@@ -250,7 +243,7 @@ struct CodeCompleteResult {
   // Example: foo.pb^ -> foo.push_back()
   //              ~~
   // Typically matches the textEdit.range of Completions, but not guaranteed to.
-  std::optional<Range> CompletionRange;
+  llvm::Optional<Range> CompletionRange;
   // Usually the source will be parsed with a real C++ parser.
   // But heuristics may be used instead if e.g. the preamble is not ready.
   bool RanParser = true;
@@ -263,13 +256,13 @@ raw_ostream &operator<<(raw_ostream &, const CodeCompleteResult &);
 struct SpeculativeFuzzyFind {
   /// A cached request from past code completions.
   /// Set by caller of `codeComplete()`.
-  std::optional<FuzzyFindRequest> CachedReq;
+  llvm::Optional<FuzzyFindRequest> CachedReq;
   /// The actual request used by `codeComplete()`.
   /// Set by `codeComplete()`. This can be used by callers to update cache.
-  std::optional<FuzzyFindRequest> NewReq;
+  llvm::Optional<FuzzyFindRequest> NewReq;
   /// The result is consumed by `codeComplete()` if speculation succeeded.
   /// NOTE: the destructor will wait for the async call to finish.
-  std::future<std::pair<bool /*Incomplete*/, SymbolSlab>> Result;
+  std::future<SymbolSlab> Result;
 };
 
 /// Gets code completions at a specified \p Pos in \p FileName.
@@ -291,13 +284,12 @@ CodeCompleteResult codeComplete(PathRef FileName, Position Pos,
 /// Get signature help at a specified \p Pos in \p FileName.
 SignatureHelp signatureHelp(PathRef FileName, Position Pos,
                             const PreambleData &Preamble,
-                            const ParseInputs &ParseInput,
-                            MarkupKind DocumentationFormat);
+                            const ParseInputs &ParseInput);
 
 // For index-based completion, we only consider:
 //   * symbols in namespaces or translation unit scopes (e.g. no class
 //     members, no locals)
-//   * enum constants (both scoped and unscoped)
+//   * enum constants in unscoped enum decl (e.g. "red" in "enum {red};")
 //   * primary templates (no specializations)
 // For the other cases, we let Clang do the completion because it does not
 // need any non-local information and it will be much better at following

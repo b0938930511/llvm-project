@@ -1,33 +1,14 @@
-struct ContextClass {
-  int member = 3;
-  ContextClass *this_type = nullptr;
-  ContextClass() { this_type = this; }
+#include <stdio.h>
 
-  int func() const {
-    return member; // break in function in class.
-  }
-
-  template <class T> T templateFunc(T x) const {
-    return member; // break in templated function in class.
+class foo {
+public:
+  template <class T> T func(T x) const {
+    return x+2; //% self.expect("expr 2+3", DATA_TYPES_DISPLAYED_CORRECTLY, substrs = ["5"])
   }
 };
 
-template <typename TC> struct TemplatedContextClass {
-  int member = 4;
-  TemplatedContextClass<TC> *this_type = nullptr;
-  TemplatedContextClass() { this_type = this; }
-
-  int func() const {
-    return member; // break in function in templated class.
-  }
-
-  template <class T> T templateFunc(T x) const {
-    return member; // break in templated function in templated class.
-  }
-};
+int i;
 
 int main() {
-  ContextClass c;
-  TemplatedContextClass<int> t;
-  return c.func() + c.templateFunc(1) + t.func() + t.templateFunc(1);
+  return foo().func(i);
 }

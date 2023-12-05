@@ -8,15 +8,15 @@
 
 #include "UseEqualsDefaultCheck.h"
 #include "../utils/LexerUtils.h"
-#include "../utils/Matchers.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
 #include "clang/Lex/Lexer.h"
-#include <optional>
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::modernize {
+namespace clang {
+namespace tidy {
+namespace modernize {
 
 static const char SpecialFunction[] = "SpecialFunction";
 
@@ -153,24 +153,22 @@ static bool isCopyAssignmentAndCanBeDefaulted(ASTContext *Context,
     //   ((Base*)this)->operator=((Base)Other);
     //
     // So we are looking for a member call that fulfills:
-    if (match(traverse(
-                  TK_AsIs,
-                  compoundStmt(has(ignoringParenImpCasts(cxxMemberCallExpr(
-                      // - The object is an implicit cast of 'this' to a
-                      // pointer to
-                      //   a base class.
-                      onImplicitObjectArgument(implicitCastExpr(
-                          hasImplicitDestinationType(hasCanonicalType(pointsTo(
-                              type(equalsNode(Base->getCanonicalTypeInternal()
-                                                  .getTypePtr()))))),
-                          hasSourceExpression(cxxThisExpr()))),
-                      // - The called method is the operator=.
-                      callee(cxxMethodDecl(isCopyAssignmentOperator())),
-                      // - The argument is (an implicit cast to a Base of)
-                      // the argument taken by "Operator".
-                      argumentCountIs(1),
-                      hasArgument(
-                          0, declRefExpr(to(varDecl(equalsNode(Param)))))))))),
+    if (match(traverse(TK_AsIs,
+                       compoundStmt(has(ignoringParenImpCasts(cxxMemberCallExpr(
+                           // - The object is an implicit cast of 'this' to a
+                           // pointer to
+                           //   a base class.
+                           onImplicitObjectArgument(implicitCastExpr(
+                               hasImplicitDestinationType(
+                                   pointsTo(type(equalsNode(Base)))),
+                               hasSourceExpression(cxxThisExpr()))),
+                           // - The called method is the operator=.
+                           callee(cxxMethodDecl(isCopyAssignmentOperator())),
+                           // - The argument is (an implicit cast to a Base of)
+                           // the argument taken by "Operator".
+                           argumentCountIs(1),
+                           hasArgument(0, declRefExpr(to(varDecl(
+                                              equalsNode(Param)))))))))),
               *Compound, *Context)
             .empty())
       return false;
@@ -216,38 +214,17 @@ void UseEqualsDefaultCheck::storeOptions(ClangTidyOptions::OptionMap &Opts) {
   Options.store(Opts, "IgnoreMacros", IgnoreMacros);
 }
 
-namespace {
-AST_MATCHER(CXXMethodDecl, isOutOfLine) { return Node.isOutOfLine(); }
-} // namespace
-
 void UseEqualsDefaultCheck::registerMatchers(MatchFinder *Finder) {
-  // Skip unions/union-like classes since their constructors behave differently
-  // when defaulted vs. empty.
-  auto IsUnionLikeClass = recordDecl(
-      anyOf(isUnion(),
-            has(fieldDecl(isImplicit(), hasType(cxxRecordDecl(isUnion()))))));
-
-  const LangOptions &LangOpts = getLangOpts();
-  auto IsPublicOrOutOfLineUntilCPP20 =
-      LangOpts.CPlusPlus20
-          ? cxxConstructorDecl()
-          : cxxConstructorDecl(anyOf(isOutOfLine(), isPublic()));
-
   // Destructor.
-  Finder->addMatcher(
-      cxxDestructorDecl(isDefinition(), unless(ofClass(IsUnionLikeClass)))
-          .bind(SpecialFunction),
-      this);
-  // Constructor.
+  Finder->addMatcher(cxxDestructorDecl(isDefinition()).bind(SpecialFunction),
+                     this);
   Finder->addMatcher(
       cxxConstructorDecl(
-          isDefinition(), unless(ofClass(IsUnionLikeClass)),
-          unless(hasParent(functionTemplateDecl())),
+          isDefinition(),
           anyOf(
               // Default constructor.
-              allOf(parameterCountIs(0),
-                    unless(hasAnyConstructorInitializer(isWritten())),
-                    unless(isVariadic()), IsPublicOrOutOfLineUntilCPP20),
+              allOf(unless(hasAnyConstructorInitializer(isWritten())),
+                    parameterCountIs(0)),
               // Copy constructor.
               allOf(isCopyConstructor(),
                     // Discard constructors that can be used as a copy
@@ -259,17 +236,10 @@ void UseEqualsDefaultCheck::registerMatchers(MatchFinder *Finder) {
   // Copy-assignment operator.
   Finder->addMatcher(
       cxxMethodDecl(isDefinition(), isCopyAssignmentOperator(),
-                    unless(ofClass(IsUnionLikeClass)),
-                    unless(hasParent(functionTemplateDecl())),
                     // isCopyAssignmentOperator() allows the parameter to be
                     // passed by value, and in this case it cannot be
                     // defaulted.
-                    hasParameter(0, hasType(lValueReferenceType())),
-                    // isCopyAssignmentOperator() allows non lvalue reference
-                    // return types, and in this case it cannot be defaulted.
-                    returns(qualType(hasCanonicalType(
-                        allOf(lValueReferenceType(pointee(type())),
-                              unless(matchers::isReferenceToConst()))))))
+                    hasParameter(0, hasType(lValueReferenceType())))
           .bind(SpecialFunction),
       this);
 }
@@ -299,18 +269,12 @@ void UseEqualsDefaultCheck::check(const MatchFinder::MatchResult &Result) {
   if (!SpecialFunctionDecl->isCopyAssignmentOperator() && !Body->body_empty())
     return;
 
-  // If body contain any preprocesor derictives, don't warn.
-  if (IgnoreMacros && utils::lexer::rangeContainsExpansionsOrDirectives(
-                          Body->getSourceRange(), *Result.SourceManager,
-                          Result.Context->getLangOpts()))
-    return;
-
   // If there are comments inside the body, don't do the change.
   bool ApplyFix = SpecialFunctionDecl->isCopyAssignmentOperator() ||
                   bodyEmpty(Result.Context, Body);
 
   std::vector<FixItHint> RemoveInitializers;
-  unsigned MemberType = 0;
+  unsigned MemberType;
   if (const auto *Ctor = dyn_cast<CXXConstructorDecl>(SpecialFunctionDecl)) {
     if (Ctor->getNumParams() == 0) {
       MemberType = 0;
@@ -345,13 +309,10 @@ void UseEqualsDefaultCheck::check(const MatchFinder::MatchResult &Result) {
   Diag << MemberType;
 
   if (ApplyFix) {
-    SourceLocation UnifiedEnd = utils::lexer::getUnifiedEndLoc(
-        *Body, Result.Context->getSourceManager(),
-        Result.Context->getLangOpts());
     // Skipping comments, check for a semicolon after Body->getSourceRange()
-    std::optional<Token> Token = utils::lexer::findNextTokenSkippingComments(
-        UnifiedEnd, Result.Context->getSourceManager(),
-        Result.Context->getLangOpts());
+    Optional<Token> Token = utils::lexer::findNextTokenSkippingComments(
+        Body->getSourceRange().getEnd().getLocWithOffset(1),
+        Result.Context->getSourceManager(), Result.Context->getLangOpts());
     StringRef Replacement =
         Token && Token->is(tok::semi) ? "= default" : "= default;";
     Diag << FixItHint::CreateReplacement(Body->getSourceRange(), Replacement)
@@ -359,4 +320,6 @@ void UseEqualsDefaultCheck::check(const MatchFinder::MatchResult &Result) {
   }
 }
 
-} // namespace clang::tidy::modernize
+} // namespace modernize
+} // namespace tidy
+} // namespace clang

@@ -12,11 +12,10 @@
 ; OSABI-AMDHSA-ASM: .section .rodata,#alloc
 ; OSABI-AMDHSA-ASM: .p2align 6
 ; OSABI-AMDHSA-ASM: .amdhsa_kernel fadd
-; OSABI-AMDHSA-ASM:     .amdhsa_user_sgpr_count 6
 ; OSABI-AMDHSA-ASM:     .amdhsa_user_sgpr_private_segment_buffer 1
 ; OSABI-AMDHSA-ASM:     .amdhsa_user_sgpr_kernarg_segment_ptr 1
 ; OSABI-AMDHSA-ASM:     .amdhsa_next_free_vgpr 3
-; OSABI-AMDHSA-ASM:     .amdhsa_next_free_sgpr 8
+; OSABI-AMDHSA-ASM:     .amdhsa_next_free_sgpr 6
 ; OSABI-AMDHSA-ASM:     .amdhsa_reserve_vcc 0
 ; OSABI-AMDHSA-ASM:     .amdhsa_reserve_flat_scratch 0
 ; OSABI-AMDHSA-ASM: .end_amdhsa_kernel
@@ -31,11 +30,10 @@
 ; OSABI-AMDHSA-ASM: .section .rodata,#alloc
 ; OSABI-AMDHSA-ASM: .p2align 6
 ; OSABI-AMDHSA-ASM: .amdhsa_kernel fsub
-; OSABI-AMDHSA-ASM:     .amdhsa_user_sgpr_count 6
 ; OSABI-AMDHSA-ASM:     .amdhsa_user_sgpr_private_segment_buffer 1
 ; OSABI-AMDHSA-ASM:     .amdhsa_user_sgpr_kernarg_segment_ptr 1
 ; OSABI-AMDHSA-ASM:     .amdhsa_next_free_vgpr 3
-; OSABI-AMDHSA-ASM:     .amdhsa_next_free_sgpr 8
+; OSABI-AMDHSA-ASM:     .amdhsa_next_free_sgpr 6
 ; OSABI-AMDHSA-ASM:     .amdhsa_reserve_vcc 0
 ; OSABI-AMDHSA-ASM:     .amdhsa_reserve_flat_scratch 0
 ; OSABI-AMDHSA-ASM: .end_amdhsa_kernel
@@ -66,26 +64,26 @@
 ; OSABI-AMDHSA-ELF: AMDGPU 0x{{[0-9a-f]+}} NT_AMDGPU_METADATA (AMDGPU Metadata)
 
 define amdgpu_kernel void @fadd(
-    ptr addrspace(1) %r,
-    ptr addrspace(1) %a,
-    ptr addrspace(1) %b) {
+    float addrspace(1)* %r,
+    float addrspace(1)* %a,
+    float addrspace(1)* %b) {
 entry:
-  %a.val = load float, ptr addrspace(1) %a
-  %b.val = load float, ptr addrspace(1) %b
+  %a.val = load float, float addrspace(1)* %a
+  %b.val = load float, float addrspace(1)* %b
   %r.val = fadd float %a.val, %b.val
-  store float %r.val, ptr addrspace(1) %r
+  store float %r.val, float addrspace(1)* %r
   ret void
 }
 
 define amdgpu_kernel void @fsub(
-    ptr addrspace(1) %r,
-    ptr addrspace(1) %a,
-    ptr addrspace(1) %b) {
+    float addrspace(1)* %r,
+    float addrspace(1)* %a,
+    float addrspace(1)* %b) {
 entry:
-  %a.val = load float, ptr addrspace(1) %a
-  %b.val = load float, ptr addrspace(1) %b
+  %a.val = load float, float addrspace(1)* %a
+  %b.val = load float, float addrspace(1)* %b
   %r.val = fsub float %a.val, %b.val
-  store float %r.val, ptr addrspace(1) %r
+  store float %r.val, float addrspace(1)* %r
   ret void
 }
 
@@ -97,9 +95,9 @@ entry:
 ; ALL-ASM:     .amdhsa_next_free_sgpr 1
 define amdgpu_kernel void @empty(
     i32 %i,
-    ptr addrspace(1) %r,
-    ptr addrspace(1) %a,
-    ptr addrspace(1) %b) {
+    float addrspace(1)* %r,
+    float addrspace(1)* %a,
+    float addrspace(1)* %b) {
 entry:
   ret void
 }

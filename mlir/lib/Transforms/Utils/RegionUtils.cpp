@@ -8,20 +8,16 @@
 
 #include "mlir/Transforms/RegionUtils.h"
 #include "mlir/IR/Block.h"
-#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/RegionGraphTraits.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
-#include "mlir/Transforms/TopologicalSortUtils.h"
 
 #include "llvm/ADT/DepthFirstIterator.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/SmallSet.h"
-
-#include <deque>
 
 using namespace mlir;
 
@@ -74,110 +70,14 @@ void mlir::getUsedValuesDefinedAbove(MutableArrayRef<Region> regions,
 }
 
 //===----------------------------------------------------------------------===//
-// Make block isolated from above.
-//===----------------------------------------------------------------------===//
-
-SmallVector<Value> mlir::makeRegionIsolatedFromAbove(
-    RewriterBase &rewriter, Region &region,
-    llvm::function_ref<bool(Operation *)> cloneOperationIntoRegion) {
-
-  // Get initial list of values used within region but defined above.
-  llvm::SetVector<Value> initialCapturedValues;
-  mlir::getUsedValuesDefinedAbove(region, initialCapturedValues);
-
-  std::deque<Value> worklist(initialCapturedValues.begin(),
-                             initialCapturedValues.end());
-  llvm::DenseSet<Value> visited;
-  llvm::DenseSet<Operation *> visitedOps;
-
-  llvm::SetVector<Value> finalCapturedValues;
-  SmallVector<Operation *> clonedOperations;
-  while (!worklist.empty()) {
-    Value currValue = worklist.front();
-    worklist.pop_front();
-    if (visited.count(currValue))
-      continue;
-    visited.insert(currValue);
-
-    Operation *definingOp = currValue.getDefiningOp();
-    if (!definingOp || visitedOps.count(definingOp)) {
-      finalCapturedValues.insert(currValue);
-      continue;
-    }
-    visitedOps.insert(definingOp);
-
-    if (!cloneOperationIntoRegion(definingOp)) {
-      // Defining operation isnt cloned, so add the current value to final
-      // captured values list.
-      finalCapturedValues.insert(currValue);
-      continue;
-    }
-
-    // Add all operands of the operation to the worklist and mark the op as to
-    // be cloned.
-    for (Value operand : definingOp->getOperands()) {
-      if (visited.count(operand))
-        continue;
-      worklist.push_back(operand);
-    }
-    clonedOperations.push_back(definingOp);
-  }
-
-  // The operations to be cloned need to be ordered in topological order
-  // so that they can be cloned into the region without violating use-def
-  // chains.
-  mlir::computeTopologicalSorting(clonedOperations);
-
-  OpBuilder::InsertionGuard g(rewriter);
-  // Collect types of existing block
-  Block *entryBlock = &region.front();
-  SmallVector<Type> newArgTypes =
-      llvm::to_vector(entryBlock->getArgumentTypes());
-  SmallVector<Location> newArgLocs = llvm::to_vector(llvm::map_range(
-      entryBlock->getArguments(), [](BlockArgument b) { return b.getLoc(); }));
-
-  // Append the types of the captured values.
-  for (auto value : finalCapturedValues) {
-    newArgTypes.push_back(value.getType());
-    newArgLocs.push_back(value.getLoc());
-  }
-
-  // Create a new entry block.
-  Block *newEntryBlock =
-      rewriter.createBlock(&region, region.begin(), newArgTypes, newArgLocs);
-  auto newEntryBlockArgs = newEntryBlock->getArguments();
-
-  // Create a mapping between the captured values and the new arguments added.
-  IRMapping map;
-  auto replaceIfFn = [&](OpOperand &use) {
-    return use.getOwner()->getBlock()->getParent() == &region;
-  };
-  for (auto [arg, capturedVal] :
-       llvm::zip(newEntryBlockArgs.take_back(finalCapturedValues.size()),
-                 finalCapturedValues)) {
-    map.map(capturedVal, arg);
-    rewriter.replaceUsesWithIf(capturedVal, arg, replaceIfFn);
-  }
-  rewriter.setInsertionPointToStart(newEntryBlock);
-  for (auto clonedOp : clonedOperations) {
-    Operation *newOp = rewriter.clone(*clonedOp, map);
-    rewriter.replaceOpWithIf(clonedOp, newOp->getResults(), replaceIfFn);
-  }
-  rewriter.mergeBlocks(
-      entryBlock, newEntryBlock,
-      newEntryBlock->getArguments().take_front(entryBlock->getNumArguments()));
-  return llvm::to_vector(finalCapturedValues);
-}
-
-//===----------------------------------------------------------------------===//
 // Unreachable Block Elimination
 //===----------------------------------------------------------------------===//
 
 /// Erase the unreachable blocks within the provided regions. Returns success
 /// if any blocks were erased, failure otherwise.
 // TODO: We could likely merge this with the DCE algorithm below.
-LogicalResult mlir::eraseUnreachableBlocks(RewriterBase &rewriter,
-                                           MutableArrayRef<Region> regions) {
+static LogicalResult eraseUnreachableBlocks(RewriterBase &rewriter,
+                                            MutableArrayRef<Region> regions) {
   // Set of blocks found to be reachable within a given region.
   llvm::df_iterator_default_set<Block *, 16> reachable;
   // If any blocks were found to be dead.
@@ -244,17 +144,17 @@ public:
   bool wasProvenLive(Value value) {
     // TODO: For results that are removable, e.g. for region based control flow,
     // we could allow for these values to be tracked independently.
-    if (OpResult result = dyn_cast<OpResult>(value))
+    if (OpResult result = value.dyn_cast<OpResult>())
       return wasProvenLive(result.getOwner());
-    return wasProvenLive(cast<BlockArgument>(value));
+    return wasProvenLive(value.cast<BlockArgument>());
   }
   bool wasProvenLive(BlockArgument arg) { return liveValues.count(arg); }
   void setProvedLive(Value value) {
     // TODO: For results that are removable, e.g. for region based control flow,
     // we could allow for these values to be tracked independently.
-    if (OpResult result = dyn_cast<OpResult>(value))
+    if (OpResult result = value.dyn_cast<OpResult>())
       return setProvedLive(result.getOwner());
-    setProvedLive(cast<BlockArgument>(value));
+    setProvedLive(value.cast<BlockArgument>());
   }
   void setProvedLive(BlockArgument arg) {
     changed |= liveValues.insert(arg).second;
@@ -323,14 +223,12 @@ static void propagateTerminatorLiveness(Operation *op, LiveMap &liveMap) {
     return;
   }
 
-  // If we can't reason about the operand to a successor, conservatively mark
-  // it as live.
+  // If we can't reason about the operands to a successor, conservatively mark
+  // all arguments as live.
   for (unsigned i = 0, e = op->getNumSuccessors(); i != e; ++i) {
-    SuccessorOperands successorOperands =
-        branchInterface.getSuccessorOperands(i);
-    for (unsigned opI = 0, opE = successorOperands.getProducedOperandCount();
-         opI != opE; ++opI)
-      liveMap.setProvedLive(op->getSuccessor(i)->getArgument(opI));
+    if (!branchInterface.getMutableSuccessorOperands(i))
+      for (BlockArgument arg : op->getSuccessor(i)->getArguments())
+        liveMap.setProvedLive(arg);
   }
 }
 
@@ -393,15 +291,18 @@ static void eraseTerminatorSuccessorOperands(Operation *terminator,
     // since it will promote later operands of the terminator being erased
     // first, reducing the quadratic-ness.
     unsigned succ = succE - succI - 1;
-    SuccessorOperands succOperands = branchOp.getSuccessorOperands(succ);
+    Optional<MutableOperandRange> succOperands =
+        branchOp.getMutableSuccessorOperands(succ);
+    if (!succOperands)
+      continue;
     Block *successor = terminator->getSuccessor(succ);
 
-    for (unsigned argI = 0, argE = succOperands.size(); argI < argE; ++argI) {
+    for (unsigned argI = 0, argE = succOperands->size(); argI < argE; ++argI) {
       // Iterating args in reverse is needed for correctness, to avoid
       // shifting later args when earlier args are erased.
       unsigned arg = argE - argI - 1;
       if (!liveMap.wasProvenLive(successor->getArgument(arg)))
-        succOperands.erase(arg);
+        succOperands->erase(arg);
     }
   }
 }
@@ -463,8 +364,8 @@ static LogicalResult deleteDeadness(RewriterBase &rewriter,
 //
 // This function returns success if any operations or arguments were deleted,
 // failure otherwise.
-LogicalResult mlir::runRegionDCE(RewriterBase &rewriter,
-                                 MutableArrayRef<Region> regions) {
+static LogicalResult runRegionDCE(RewriterBase &rewriter,
+                                  MutableArrayRef<Region> regions) {
   LiveMap liveMap;
   do {
     liveMap.resetChanged();
@@ -516,7 +417,7 @@ struct BlockEquivalenceData {
   /// produced within the block before this operation.
   DenseMap<Operation *, unsigned> opOrderIndex;
 };
-} // namespace
+} // end anonymous namespace
 
 BlockEquivalenceData::BlockEquivalenceData(Block *block)
     : block(block), hash(0) {
@@ -538,11 +439,11 @@ unsigned BlockEquivalenceData::getOrderOf(Value value) const {
   assert(value.getParentBlock() == block && "expected value of this block");
 
   // Arguments use the argument number as the order index.
-  if (BlockArgument arg = dyn_cast<BlockArgument>(value))
+  if (BlockArgument arg = value.dyn_cast<BlockArgument>())
     return arg.getArgNumber();
 
   // Otherwise, the result order is offset from the parent op's order.
-  OpResult result = cast<OpResult>(value);
+  OpResult result = value.cast<OpResult>();
   auto opOrderIt = opOrderIndex.find(result.getDefiningOp());
   assert(opOrderIt != opOrderIndex.end() && "expected op to have an order");
   return opOrderIt->second + result.getResultNumber();
@@ -576,7 +477,7 @@ private:
   /// replaced by arguments when the cluster gets merged.
   std::set<std::pair<int, int>> operandsToMerge;
 };
-} // namespace
+} // end anonymous namespace
 
 LogicalResult BlockMergeCluster::addToCluster(BlockEquivalenceData &blockData) {
   if (leaderData.hash != blockData.hash)
@@ -593,7 +494,7 @@ LogicalResult BlockMergeCluster::addToCluster(BlockEquivalenceData &blockData) {
     // Check that the operations are equivalent.
     if (!OperationEquivalence::isEquivalentTo(
             &*lhsIt, &*rhsIt, OperationEquivalence::ignoreValueEquivalence,
-            /*markEquivalent=*/nullptr,
+            OperationEquivalence::ignoreValueEquivalence,
             OperationEquivalence::Flags::IgnoreLocations))
       return failure();
 
@@ -617,23 +518,6 @@ LogicalResult BlockMergeCluster::addToCluster(BlockEquivalenceData &blockData) {
       // Let the operands differ if they are defined in a different block. These
       // will become new arguments if the blocks get merged.
       if (!lhsIsInBlock) {
-
-        // Check whether the operands aren't the result of an immediate
-        // predecessors terminator. In that case we are not able to use it as a
-        // successor operand when branching to the merged block as it does not
-        // dominate its producing operation.
-        auto isValidSuccessorArg = [](Block *block, Value operand) {
-          if (operand.getDefiningOp() !=
-              operand.getParentBlock()->getTerminator())
-            return true;
-          return !llvm::is_contained(block->getPredecessors(),
-                                     operand.getParentBlock());
-        };
-
-        if (!isValidSuccessorArg(leaderBlock, lhsOperand) ||
-            !isValidSuccessorArg(mergeBlock, rhsOperand))
-          return failure();
-
         mismatchedOperands.emplace_back(opI, operand);
         continue;
       }
@@ -669,7 +553,8 @@ LogicalResult BlockMergeCluster::addToCluster(BlockEquivalenceData &blockData) {
 /// their operands updated.
 static bool ableToUpdatePredOperands(Block *block) {
   for (auto it = block->pred_begin(), e = block->pred_end(); it != e; ++it) {
-    if (!isa<BranchOpInterface>((*it)->getTerminator()))
+    auto branch = dyn_cast<BranchOpInterface>((*it)->getTerminator());
+    if (!branch || !branch.getMutableSuccessorOperands(it.getSuccessorIndex()))
       return false;
   }
   return true;
@@ -704,7 +589,7 @@ LogicalResult BlockMergeCluster::merge(RewriterBase &rewriter) {
         1 + blocksToMerge.size(),
         SmallVector<Value, 8>(operandsToMerge.size()));
     unsigned curOpIndex = 0;
-    for (const auto &it : llvm::enumerate(operandsToMerge)) {
+    for (auto it : llvm::enumerate(operandsToMerge)) {
       unsigned nextOpOffset = it.value().first - curOpIndex;
       curOpIndex = it.value().first;
 
@@ -716,11 +601,8 @@ LogicalResult BlockMergeCluster::merge(RewriterBase &rewriter) {
         newArguments[i][it.index()] = operand.get();
 
         // Update the operand and insert an argument if this is the leader.
-        if (i == 0) {
-          Value operandVal = operand.get();
-          operand.set(leaderBlock->addArgument(operandVal.getType(),
-                                               operandVal.getLoc()));
-        }
+        if (i == 0)
+          operand.set(leaderBlock->addArgument(operand.get().getType()));
       }
     }
     // Update the predecessors for each of the blocks.
@@ -729,7 +611,7 @@ LogicalResult BlockMergeCluster::merge(RewriterBase &rewriter) {
            predIt != predE; ++predIt) {
         auto branch = cast<BranchOpInterface>((*predIt)->getTerminator());
         unsigned succIndex = predIt.getSuccessorIndex();
-        branch.getSuccessorOperands(succIndex).append(
+        branch.getMutableSuccessorOperands(succIndex)->append(
             newArguments[clusterIndex]);
       }
     };
@@ -835,20 +717,4 @@ LogicalResult mlir::simplifyRegions(RewriterBase &rewriter,
       succeeded(mergeIdenticalBlocks(rewriter, regions));
   return success(eliminatedBlocks || eliminatedOpsOrArgs ||
                  mergedIdenticalBlocks);
-}
-
-SetVector<Block *> mlir::getTopologicallySortedBlocks(Region &region) {
-  // For each block that has not been visited yet (i.e. that has no
-  // predecessors), add it to the list as well as its successors.
-  SetVector<Block *> blocks;
-  for (Block &b : region) {
-    if (blocks.count(&b) == 0) {
-      llvm::ReversePostOrderTraversal<Block *> traversal(&b);
-      blocks.insert(traversal.begin(), traversal.end());
-    }
-  }
-  assert(blocks.size() == region.getBlocks().size() &&
-         "some blocks are not sorted");
-
-  return blocks;
 }

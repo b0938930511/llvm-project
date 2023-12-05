@@ -3,6 +3,7 @@
 ; inlinehint-threshold. A cold callee with identical body does not get inlined because
 ; cost exceeds the inline-threshold
 
+; RUN: opt < %s -inline -inline-threshold=0 -hot-callsite-threshold=100 -S -enable-new-pm=0 | FileCheck %s
 ; RUN: opt < %s -passes='require<profile-summary>,cgscc(inline)' -inline-threshold=0 -hot-callsite-threshold=100 -S | FileCheck %s
 
 ; Run this with the default O2 pipeline to test that profile summary analysis
@@ -40,7 +41,7 @@ define i32 @caller2(i32 %y1) {
 
 declare i32 @__gxx_personality_v0(...)
 
-define i32 @invoker2(i32 %y1) personality ptr @__gxx_personality_v0 {
+define i32 @invoker2(i32 %y1) personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) {
 ; CHECK-LABEL: @invoker2(
 ; CHECK: invoke i32 @callee2
 ; CHECK-NOT: invoke i32 @callee1
@@ -54,11 +55,11 @@ exit:
   ret i32 1
 
 lpad:
-  %ll = landingpad { ptr, i32 } cleanup
+  %ll = landingpad { i8*, i32 } cleanup
   ret i32 1
 }
 
-define i32 @invoker3(i32 %y1) personality ptr @__gxx_personality_v0 {
+define i32 @invoker3(i32 %y1) personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) {
 ; CHECK-LABEL: @invoker3(
 ; CHECK: invoke i32 @callee2
 ; CHECK-NOT: invoke i32 @callee1
@@ -74,11 +75,11 @@ exit:
   ret i32 1
 
 lpad:
-  %ll = landingpad { ptr, i32 } cleanup
+  %ll = landingpad { i8*, i32 } cleanup
   ret i32 1
 }
 
-define i32 @invoker4(i32 %y1) personality ptr @__gxx_personality_v0 {
+define i32 @invoker4(i32 %y1) personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) {
 ; CHECK-LABEL: @invoker4(
 ; CHECK: invoke i32 @callee2
 ; CHECK-NOT: invoke i32 @callee1
@@ -94,7 +95,7 @@ exit:
   ret i32 1
 
 lpad:
-  %ll = landingpad { ptr, i32 } cleanup
+  %ll = landingpad { i8*, i32 } cleanup
   ret i32 1
 }
 

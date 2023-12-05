@@ -7,13 +7,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "src/math/copysignl.h"
-#include "src/__support/FPUtil/ManipulationFunctions.h"
 #include "src/__support/common.h"
+#include "utils/FPUtil/ManipulationFunctions.h"
 
-namespace LIBC_NAMESPACE {
+namespace __llvm_libc {
 
 LLVM_LIBC_FUNCTION(long double, copysignl, (long double x, long double y)) {
   return fputil::copysign(x, y);
 }
 
-} // namespace LIBC_NAMESPACE
+} // namespace __llvm_libc

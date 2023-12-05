@@ -30,7 +30,7 @@ public:
 
   static void Terminate();
 
-  static llvm::StringRef GetStaticPluginName() { return "darwin-log"; }
+  static ConstString GetStaticPluginName();
 
   /// Return whether the DarwinLog functionality is enabled.
   ///
@@ -46,20 +46,22 @@ public:
 
   // PluginInterface API
 
-  llvm::StringRef GetPluginName() override { return GetStaticPluginName(); }
+  ConstString GetPluginName() override;
+
+  uint32_t GetPluginVersion() override;
 
   // StructuredDataPlugin API
 
-  bool SupportsStructuredDataType(llvm::StringRef type_name) override;
+  bool SupportsStructuredDataType(ConstString type_name) override;
 
   void HandleArrivalOfStructuredData(
-      Process &process, llvm::StringRef type_name,
+      Process &process, ConstString type_name,
       const StructuredData::ObjectSP &object_sp) override;
 
   Status GetDescription(const StructuredData::ObjectSP &object_sp,
                         lldb_private::Stream &stream) override;
 
-  bool GetEnabled(llvm::StringRef type_name) const override;
+  bool GetEnabled(ConstString type_name) const override;
 
   void ModulesDidLoad(Process &process, ModuleList &module_list) override;
 

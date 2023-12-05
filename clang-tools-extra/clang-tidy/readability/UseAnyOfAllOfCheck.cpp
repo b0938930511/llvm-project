@@ -1,8 +1,9 @@
 //===--- UseAnyOfAllOfCheck.cpp - clang-tidy-------------------------------===//
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//                     The LLVM Compiler Infrastructure
+//
+// This file is distributed under the University of Illinois Open Source
+// License. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
 
@@ -37,7 +38,8 @@ AST_MATCHER_P(Stmt, nextStmt, ast_matchers::internal::Matcher<Stmt>,
 }
 } // namespace
 
-namespace tidy::readability {
+namespace tidy {
+namespace readability {
 
 void UseAnyOfAllOfCheck::registerMatchers(MatchFinder *Finder) {
   auto Returns = [](bool V) {
@@ -103,5 +105,6 @@ void UseAnyOfAllOfCheck::check(const MatchFinder::MatchResult &Result) {
   }
 }
 
-} // namespace tidy::readability
+} // namespace readability
+} // namespace tidy
 } // namespace clang

@@ -14,7 +14,6 @@
 
 using namespace lldb;
 using namespace lldb_private;
-using namespace lldb_private::plugin::dwarf;
 
 TEST(DWARFDIETest, ChildIteration) {
   // Tests DWARFDIE::child_iterator.

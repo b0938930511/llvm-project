@@ -23,6 +23,13 @@ class Hexagon_i64_i64_Intrinsic<string GCCIntSuffix,
        intr_properties>;
 
 // tag : A2_add
+class Hexagon_custom_i32_i32i32_Intrinsic<
+      list<IntrinsicProperty> intr_properties = [IntrNoMem]>
+  : Hexagon_NonGCC_Intrinsic<
+       [llvm_i32_ty], [llvm_i32_ty,llvm_i32_ty],
+       intr_properties>;
+
+// tag : A2_addh_h16_hh
 class Hexagon_i32_i32i32_Intrinsic<string GCCIntSuffix,
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
   : Hexagon_Intrinsic<GCCIntSuffix,
@@ -30,6 +37,13 @@ class Hexagon_i32_i32i32_Intrinsic<string GCCIntSuffix,
        intr_properties>;
 
 // tag : A2_addp
+class Hexagon_custom_i64_i64i64_Intrinsic<
+      list<IntrinsicProperty> intr_properties = [IntrNoMem]>
+  : Hexagon_NonGCC_Intrinsic<
+       [llvm_i64_ty], [llvm_i64_ty,llvm_i64_ty],
+       intr_properties>;
+
+// tag : A2_addpsat
 class Hexagon_i64_i64i64_Intrinsic<string GCCIntSuffix,
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
   : Hexagon_Intrinsic<GCCIntSuffix,
@@ -48,6 +62,13 @@ class Hexagon_i64_i32i32_Intrinsic<string GCCIntSuffix,
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
   : Hexagon_Intrinsic<GCCIntSuffix,
        [llvm_i64_ty], [llvm_i32_ty,llvm_i32_ty],
+       intr_properties>;
+
+// tag : A2_neg
+class Hexagon_custom_i32_i32_Intrinsic<
+      list<IntrinsicProperty> intr_properties = [IntrNoMem]>
+  : Hexagon_NonGCC_Intrinsic<
+       [llvm_i32_ty], [llvm_i32_ty],
        intr_properties>;
 
 // tag : A2_roundsat
@@ -267,6 +288,20 @@ class Hexagon_i64_i64i32i32_Intrinsic<string GCCIntSuffix,
        [llvm_i64_ty], [llvm_i64_ty,llvm_i32_ty,llvm_i32_ty],
        intr_properties>;
 
+// tag : M2_dpmpyss_s0
+class Hexagon_custom_i64_i32i32_Intrinsic<
+      list<IntrinsicProperty> intr_properties = [IntrNoMem]>
+  : Hexagon_NonGCC_Intrinsic<
+       [llvm_i64_ty], [llvm_i32_ty,llvm_i32_ty],
+       intr_properties>;
+
+// tag : S2_asl_i_p
+class Hexagon_custom_i64_i64i32_Intrinsic<
+      list<IntrinsicProperty> intr_properties = [IntrNoMem]>
+  : Hexagon_NonGCC_Intrinsic<
+       [llvm_i64_ty], [llvm_i64_ty,llvm_i32_ty],
+       intr_properties>;
+
 // tag : S2_insert
 class Hexagon_i32_i32i32i32i32_Intrinsic<string GCCIntSuffix,
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
@@ -331,44 +366,44 @@ class Hexagon_v32i32_i32_Intrinsic<string GCCIntSuffix,
        intr_properties>;
 
 // tag : V6_pred_and
-class Hexagon_v64i1_v64i1v64i1_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom_v64i1_v64i1v64i1_Intrinsic<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [llvm_v64i1_ty], [llvm_v64i1_ty,llvm_v64i1_ty],
        intr_properties>;
 
 // tag : V6_pred_and
-class Hexagon_v128i1_v128i1v128i1_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom_v128i1_v128i1v128i1_Intrinsic_128B<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [llvm_v128i1_ty], [llvm_v128i1_ty,llvm_v128i1_ty],
        intr_properties>;
 
 // tag : V6_pred_not
-class Hexagon_v64i1_v64i1_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom_v64i1_v64i1_Intrinsic<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [llvm_v64i1_ty], [llvm_v64i1_ty],
        intr_properties>;
 
 // tag : V6_pred_not
-class Hexagon_v128i1_v128i1_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom_v128i1_v128i1_Intrinsic_128B<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [llvm_v128i1_ty], [llvm_v128i1_ty],
        intr_properties>;
 
 // tag : V6_pred_scalar2
-class Hexagon_v64i1_i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom_v64i1_i32_Intrinsic<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [llvm_v64i1_ty], [llvm_i32_ty],
        intr_properties>;
 
 // tag : V6_pred_scalar2
-class Hexagon_v128i1_i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom_v128i1_i32_Intrinsic_128B<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [llvm_v128i1_ty], [llvm_i32_ty],
        intr_properties>;
 
@@ -401,27 +436,27 @@ class Hexagon_v64i32_v64i32v64i32v64i32i32_Intrinsic<string GCCIntSuffix,
        intr_properties>;
 
 // tag : V6_vS32b_nqpred_ai
-class Hexagon__v64i1ptrv16i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom__v64i1ptrv16i32_Intrinsic<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [], [llvm_v64i1_ty,llvm_ptr_ty,llvm_v16i32_ty],
        intr_properties>;
 
 // tag : V6_vS32b_nqpred_ai
-class Hexagon__v128i1ptrv32i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom__v128i1ptrv32i32_Intrinsic_128B<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [], [llvm_v128i1_ty,llvm_ptr_ty,llvm_v32i32_ty],
        intr_properties>;
 
-// tag : V6_vabs_hf
+// tag : V6_vabsb
 class Hexagon_v16i32_v16i32_Intrinsic<string GCCIntSuffix,
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
   : Hexagon_Intrinsic<GCCIntSuffix,
        [llvm_v16i32_ty], [llvm_v16i32_ty],
        intr_properties>;
 
-// tag : V6_vabs_hf
+// tag : V6_vabsb
 class Hexagon_v32i32_v32i32_Intrinsic<string GCCIntSuffix,
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
   : Hexagon_Intrinsic<GCCIntSuffix,
@@ -442,20 +477,6 @@ class Hexagon_v32i32_v32i32v32i32_Intrinsic<string GCCIntSuffix,
        [llvm_v32i32_ty], [llvm_v32i32_ty,llvm_v32i32_ty],
        intr_properties>;
 
-// tag : V6_vadd_sf_bf
-class Hexagon_v32i32_v16i32v16i32_Intrinsic<string GCCIntSuffix,
-      list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
-       [llvm_v32i32_ty], [llvm_v16i32_ty,llvm_v16i32_ty],
-       intr_properties>;
-
-// tag : V6_vadd_sf_bf
-class Hexagon_v64i32_v32i32v32i32_Intrinsic<string GCCIntSuffix,
-      list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
-       [llvm_v64i32_ty], [llvm_v32i32_ty,llvm_v32i32_ty],
-       intr_properties>;
-
 // tag : V6_vaddb_dv
 class Hexagon_v64i32_v64i32v64i32_Intrinsic<string GCCIntSuffix,
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
@@ -464,16 +485,16 @@ class Hexagon_v64i32_v64i32v64i32_Intrinsic<string GCCIntSuffix,
        intr_properties>;
 
 // tag : V6_vaddbnq
-class Hexagon_v16i32_v64i1v16i32v16i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom_v16i32_v64i1v16i32v16i32_Intrinsic<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [llvm_v16i32_ty], [llvm_v64i1_ty,llvm_v16i32_ty,llvm_v16i32_ty],
        intr_properties>;
 
 // tag : V6_vaddbnq
-class Hexagon_v32i32_v128i1v32i32v32i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom_v32i32_v128i1v32i32v32i32_Intrinsic_128B<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [llvm_v32i32_ty], [llvm_v128i1_ty,llvm_v32i32_ty,llvm_v32i32_ty],
        intr_properties>;
 
@@ -491,32 +512,32 @@ class Hexagon_custom_v32i32v128i1_v32i32v32i32v128i1_Intrinsic_128B<
        [llvm_v32i32_ty,llvm_v128i1_ty], [llvm_v32i32_ty,llvm_v32i32_ty,llvm_v128i1_ty],
        intr_properties>;
 
-// tag : V6_vaddcarryo
-class Hexagon_custom_v16i32v64i1_v16i32v16i32_Intrinsic<
-      list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_NonGCC_Intrinsic<
-       [llvm_v16i32_ty,llvm_v64i1_ty], [llvm_v16i32_ty,llvm_v16i32_ty],
-       intr_properties>;
-
-// tag : V6_vaddcarryo
-class Hexagon_custom_v32i32v128i1_v32i32v32i32_Intrinsic_128B<
-      list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_NonGCC_Intrinsic<
-       [llvm_v32i32_ty,llvm_v128i1_ty], [llvm_v32i32_ty,llvm_v32i32_ty],
-       intr_properties>;
-
 // tag : V6_vaddcarrysat
-class Hexagon_v16i32_v16i32v16i32v64i1_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom_v16i32_v16i32v16i32v64i1_Intrinsic<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [llvm_v16i32_ty], [llvm_v16i32_ty,llvm_v16i32_ty,llvm_v64i1_ty],
        intr_properties>;
 
 // tag : V6_vaddcarrysat
-class Hexagon_v32i32_v32i32v32i32v128i1_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom_v32i32_v32i32v32i32v128i1_Intrinsic_128B<
+      list<IntrinsicProperty> intr_properties = [IntrNoMem]>
+  : Hexagon_NonGCC_Intrinsic<
+       [llvm_v32i32_ty], [llvm_v32i32_ty,llvm_v32i32_ty,llvm_v128i1_ty],
+       intr_properties>;
+
+// tag : V6_vaddhw
+class Hexagon_v32i32_v16i32v16i32_Intrinsic<string GCCIntSuffix,
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
   : Hexagon_Intrinsic<GCCIntSuffix,
-       [llvm_v32i32_ty], [llvm_v32i32_ty,llvm_v32i32_ty,llvm_v128i1_ty],
+       [llvm_v32i32_ty], [llvm_v16i32_ty,llvm_v16i32_ty],
+       intr_properties>;
+
+// tag : V6_vaddhw
+class Hexagon_v64i32_v32i32v32i32_Intrinsic<string GCCIntSuffix,
+      list<IntrinsicProperty> intr_properties = [IntrNoMem]>
+  : Hexagon_Intrinsic<GCCIntSuffix,
+       [llvm_v64i32_ty], [llvm_v32i32_ty,llvm_v32i32_ty],
        intr_properties>;
 
 // tag : V6_vaddhw_acc
@@ -541,72 +562,72 @@ class Hexagon_v16i32_v16i32v16i32i32_Intrinsic<string GCCIntSuffix,
        intr_properties>;
 
 // tag : V6_vandnqrt
-class Hexagon_v16i32_v64i1i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom_v16i32_v64i1i32_Intrinsic<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [llvm_v16i32_ty], [llvm_v64i1_ty,llvm_i32_ty],
        intr_properties>;
 
 // tag : V6_vandnqrt
-class Hexagon_v32i32_v128i1i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom_v32i32_v128i1i32_Intrinsic_128B<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [llvm_v32i32_ty], [llvm_v128i1_ty,llvm_i32_ty],
        intr_properties>;
 
 // tag : V6_vandnqrt_acc
-class Hexagon_v16i32_v16i32v64i1i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom_v16i32_v16i32v64i1i32_Intrinsic<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [llvm_v16i32_ty], [llvm_v16i32_ty,llvm_v64i1_ty,llvm_i32_ty],
        intr_properties>;
 
 // tag : V6_vandnqrt_acc
-class Hexagon_v32i32_v32i32v128i1i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom_v32i32_v32i32v128i1i32_Intrinsic_128B<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [llvm_v32i32_ty], [llvm_v32i32_ty,llvm_v128i1_ty,llvm_i32_ty],
        intr_properties>;
 
 // tag : V6_vandvnqv
-class Hexagon_v16i32_v64i1v16i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom_v16i32_v64i1v16i32_Intrinsic<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [llvm_v16i32_ty], [llvm_v64i1_ty,llvm_v16i32_ty],
        intr_properties>;
 
 // tag : V6_vandvnqv
-class Hexagon_v32i32_v128i1v32i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom_v32i32_v128i1v32i32_Intrinsic_128B<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [llvm_v32i32_ty], [llvm_v128i1_ty,llvm_v32i32_ty],
        intr_properties>;
 
 // tag : V6_vandvrt
-class Hexagon_v64i1_v16i32i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom_v64i1_v16i32i32_Intrinsic<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [llvm_v64i1_ty], [llvm_v16i32_ty,llvm_i32_ty],
        intr_properties>;
 
 // tag : V6_vandvrt
-class Hexagon_v128i1_v32i32i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom_v128i1_v32i32i32_Intrinsic_128B<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [llvm_v128i1_ty], [llvm_v32i32_ty,llvm_i32_ty],
        intr_properties>;
 
 // tag : V6_vandvrt_acc
-class Hexagon_v64i1_v64i1v16i32i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom_v64i1_v64i1v16i32i32_Intrinsic<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [llvm_v64i1_ty], [llvm_v64i1_ty,llvm_v16i32_ty,llvm_i32_ty],
        intr_properties>;
 
 // tag : V6_vandvrt_acc
-class Hexagon_v128i1_v128i1v32i32i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom_v128i1_v128i1v32i32i32_Intrinsic_128B<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [llvm_v128i1_ty], [llvm_v128i1_ty,llvm_v32i32_ty,llvm_i32_ty],
        intr_properties>;
 
@@ -624,39 +645,11 @@ class Hexagon_v32i32_v32i32i32_Intrinsic<string GCCIntSuffix,
        [llvm_v32i32_ty], [llvm_v32i32_ty,llvm_i32_ty],
        intr_properties>;
 
-// tag : V6_vasrvuhubrndsat
-class Hexagon_v16i32_v32i32v16i32_Intrinsic<string GCCIntSuffix,
-      list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
-       [llvm_v16i32_ty], [llvm_v32i32_ty,llvm_v16i32_ty],
-       intr_properties>;
-
-// tag : V6_vasrvuhubrndsat
-class Hexagon_v32i32_v64i32v32i32_Intrinsic<string GCCIntSuffix,
-      list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
-       [llvm_v32i32_ty], [llvm_v64i32_ty,llvm_v32i32_ty],
-       intr_properties>;
-
 // tag : V6_vassignp
 class Hexagon_v64i32_v64i32_Intrinsic<string GCCIntSuffix,
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
   : Hexagon_Intrinsic<GCCIntSuffix,
        [llvm_v64i32_ty], [llvm_v64i32_ty],
-       intr_properties>;
-
-// tag : V6_vcvt_hf_b
-class Hexagon_v32i32_v16i32_Intrinsic<string GCCIntSuffix,
-      list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
-       [llvm_v32i32_ty], [llvm_v16i32_ty],
-       intr_properties>;
-
-// tag : V6_vcvt_hf_b
-class Hexagon_v64i32_v32i32_Intrinsic<string GCCIntSuffix,
-      list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
-       [llvm_v64i32_ty], [llvm_v32i32_ty],
        intr_properties>;
 
 // tag : V6_vd0
@@ -694,20 +687,6 @@ class Hexagon_v64i32_v32i32v32i32i32_Intrinsic<string GCCIntSuffix,
        [llvm_v64i32_ty], [llvm_v32i32_ty,llvm_v32i32_ty,llvm_i32_ty],
        intr_properties>;
 
-// tag : V6_vdmpy_sf_hf_acc
-class Hexagon_v16i32_v16i32v16i32v16i32_Intrinsic<string GCCIntSuffix,
-      list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
-       [llvm_v16i32_ty], [llvm_v16i32_ty,llvm_v16i32_ty,llvm_v16i32_ty],
-       intr_properties>;
-
-// tag : V6_vdmpy_sf_hf_acc
-class Hexagon_v32i32_v32i32v32i32v32i32_Intrinsic<string GCCIntSuffix,
-      list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
-       [llvm_v32i32_ty], [llvm_v32i32_ty,llvm_v32i32_ty,llvm_v32i32_ty],
-       intr_properties>;
-
 // tag : V6_vdmpybus_dv
 class Hexagon_v64i32_v64i32i32_Intrinsic<string GCCIntSuffix,
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
@@ -743,31 +722,45 @@ class Hexagon_v32i32_v32i32v64i32i32_Intrinsic<string GCCIntSuffix,
        [llvm_v32i32_ty], [llvm_v32i32_ty,llvm_v64i32_ty,llvm_i32_ty],
        intr_properties>;
 
-// tag : V6_veqb
-class Hexagon_v64i1_v16i32v16i32_Intrinsic<string GCCIntSuffix,
+// tag : V6_vdmpyhvsat_acc
+class Hexagon_v16i32_v16i32v16i32v16i32_Intrinsic<string GCCIntSuffix,
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
   : Hexagon_Intrinsic<GCCIntSuffix,
+       [llvm_v16i32_ty], [llvm_v16i32_ty,llvm_v16i32_ty,llvm_v16i32_ty],
+       intr_properties>;
+
+// tag : V6_vdmpyhvsat_acc
+class Hexagon_v32i32_v32i32v32i32v32i32_Intrinsic<string GCCIntSuffix,
+      list<IntrinsicProperty> intr_properties = [IntrNoMem]>
+  : Hexagon_Intrinsic<GCCIntSuffix,
+       [llvm_v32i32_ty], [llvm_v32i32_ty,llvm_v32i32_ty,llvm_v32i32_ty],
+       intr_properties>;
+
+// tag : V6_veqb
+class Hexagon_custom_v64i1_v16i32v16i32_Intrinsic<
+      list<IntrinsicProperty> intr_properties = [IntrNoMem]>
+  : Hexagon_NonGCC_Intrinsic<
        [llvm_v64i1_ty], [llvm_v16i32_ty,llvm_v16i32_ty],
        intr_properties>;
 
 // tag : V6_veqb
-class Hexagon_v128i1_v32i32v32i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom_v128i1_v32i32v32i32_Intrinsic_128B<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [llvm_v128i1_ty], [llvm_v32i32_ty,llvm_v32i32_ty],
        intr_properties>;
 
 // tag : V6_veqb_and
-class Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [llvm_v64i1_ty], [llvm_v64i1_ty,llvm_v16i32_ty,llvm_v16i32_ty],
        intr_properties>;
 
 // tag : V6_veqb_and
-class Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [llvm_v128i1_ty], [llvm_v128i1_ty,llvm_v32i32_ty,llvm_v32i32_ty],
        intr_properties>;
 
@@ -786,16 +779,16 @@ class Hexagon__ptri32i32v32i32_Intrinsic<string GCCIntSuffix,
        intr_properties>;
 
 // tag : V6_vgathermhq
-class Hexagon__ptrv64i1i32i32v16i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom__ptrv64i1i32i32v16i32_Intrinsic<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [], [llvm_ptr_ty,llvm_v64i1_ty,llvm_i32_ty,llvm_i32_ty,llvm_v16i32_ty],
        intr_properties>;
 
 // tag : V6_vgathermhq
-class Hexagon__ptrv128i1i32i32v32i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom__ptrv128i1i32i32v32i32_Intrinsic_128B<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [], [llvm_ptr_ty,llvm_v128i1_ty,llvm_i32_ty,llvm_i32_ty,llvm_v32i32_ty],
        intr_properties>;
 
@@ -807,16 +800,16 @@ class Hexagon__ptri32i32v64i32_Intrinsic<string GCCIntSuffix,
        intr_properties>;
 
 // tag : V6_vgathermhwq
-class Hexagon__ptrv64i1i32i32v32i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom__ptrv64i1i32i32v32i32_Intrinsic<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [], [llvm_ptr_ty,llvm_v64i1_ty,llvm_i32_ty,llvm_i32_ty,llvm_v32i32_ty],
        intr_properties>;
 
 // tag : V6_vgathermhwq
-class Hexagon__ptrv128i1i32i32v64i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom__ptrv128i1i32i32v64i32_Intrinsic_128B<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [], [llvm_ptr_ty,llvm_v128i1_ty,llvm_i32_ty,llvm_i32_ty,llvm_v64i32_ty],
        intr_properties>;
 
@@ -898,16 +891,16 @@ class Hexagon_v64i32_v64i32v32i32i32_Intrinsic<string GCCIntSuffix,
        intr_properties>;
 
 // tag : V6_vprefixqb
-class Hexagon_v16i32_v64i1_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom_v16i32_v64i1_Intrinsic<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [llvm_v16i32_ty], [llvm_v64i1_ty],
        intr_properties>;
 
 // tag : V6_vprefixqb
-class Hexagon_v32i32_v128i1_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom_v32i32_v128i1_Intrinsic_128B<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [llvm_v32i32_ty], [llvm_v128i1_ty],
        intr_properties>;
 
@@ -939,6 +932,20 @@ class Hexagon_v64i32_v64i32v64i32i32i32_Intrinsic<string GCCIntSuffix,
        [llvm_v64i32_ty], [llvm_v64i32_ty,llvm_v64i32_ty,llvm_i32_ty,llvm_i32_ty],
        intr_properties>;
 
+// tag : V6_vsb
+class Hexagon_v32i32_v16i32_Intrinsic<string GCCIntSuffix,
+      list<IntrinsicProperty> intr_properties = [IntrNoMem]>
+  : Hexagon_Intrinsic<GCCIntSuffix,
+       [llvm_v32i32_ty], [llvm_v16i32_ty],
+       intr_properties>;
+
+// tag : V6_vsb
+class Hexagon_v64i32_v32i32_Intrinsic<string GCCIntSuffix,
+      list<IntrinsicProperty> intr_properties = [IntrNoMem]>
+  : Hexagon_Intrinsic<GCCIntSuffix,
+       [llvm_v64i32_ty], [llvm_v32i32_ty],
+       intr_properties>;
+
 // tag : V6_vscattermh
 class Hexagon__i32i32v16i32v16i32_Intrinsic<string GCCIntSuffix,
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
@@ -954,16 +961,16 @@ class Hexagon__i32i32v32i32v32i32_Intrinsic<string GCCIntSuffix,
        intr_properties>;
 
 // tag : V6_vscattermhq
-class Hexagon__v64i1i32i32v16i32v16i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom__v64i1i32i32v16i32v16i32_Intrinsic<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [], [llvm_v64i1_ty,llvm_i32_ty,llvm_i32_ty,llvm_v16i32_ty,llvm_v16i32_ty],
        intr_properties>;
 
 // tag : V6_vscattermhq
-class Hexagon__v128i1i32i32v32i32v32i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom__v128i1i32i32v32i32v32i32_Intrinsic_128B<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [], [llvm_v128i1_ty,llvm_i32_ty,llvm_i32_ty,llvm_v32i32_ty,llvm_v32i32_ty],
        intr_properties>;
 
@@ -982,30 +989,30 @@ class Hexagon__i32i32v64i32v32i32_Intrinsic<string GCCIntSuffix,
        intr_properties>;
 
 // tag : V6_vscattermhwq
-class Hexagon__v64i1i32i32v32i32v16i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom__v64i1i32i32v32i32v16i32_Intrinsic<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [], [llvm_v64i1_ty,llvm_i32_ty,llvm_i32_ty,llvm_v32i32_ty,llvm_v16i32_ty],
        intr_properties>;
 
 // tag : V6_vscattermhwq
-class Hexagon__v128i1i32i32v64i32v32i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom__v128i1i32i32v64i32v32i32_Intrinsic_128B<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [], [llvm_v128i1_ty,llvm_i32_ty,llvm_i32_ty,llvm_v64i32_ty,llvm_v32i32_ty],
        intr_properties>;
 
 // tag : V6_vswap
-class Hexagon_v32i32_v64i1v16i32v16i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom_v32i32_v64i1v16i32v16i32_Intrinsic<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [llvm_v32i32_ty], [llvm_v64i1_ty,llvm_v16i32_ty,llvm_v16i32_ty],
        intr_properties>;
 
 // tag : V6_vswap
-class Hexagon_v64i32_v128i1v32i32v32i32_Intrinsic<string GCCIntSuffix,
+class Hexagon_custom_v64i32_v128i1v32i32v32i32_Intrinsic_128B<
       list<IntrinsicProperty> intr_properties = [IntrNoMem]>
-  : Hexagon_Intrinsic<GCCIntSuffix,
+  : Hexagon_NonGCC_Intrinsic<
        [llvm_v64i32_ty], [llvm_v128i1_ty,llvm_v32i32_ty,llvm_v32i32_ty],
        intr_properties>;
 
@@ -1070,7 +1077,7 @@ def int_hexagon_A2_abssat :
 Hexagon_i32_i32_Intrinsic<"HEXAGON_A2_abssat">;
 
 def int_hexagon_A2_add :
-Hexagon_i32_i32i32_Intrinsic<"HEXAGON_A2_add">;
+Hexagon_custom_i32_i32i32_Intrinsic;
 
 def int_hexagon_A2_addh_h16_hh :
 Hexagon_i32_i32i32_Intrinsic<"HEXAGON_A2_addh_h16_hh">;
@@ -1109,10 +1116,10 @@ def int_hexagon_A2_addh_l16_sat_ll :
 Hexagon_i32_i32i32_Intrinsic<"HEXAGON_A2_addh_l16_sat_ll">;
 
 def int_hexagon_A2_addi :
-Hexagon_i32_i32i32_Intrinsic<"HEXAGON_A2_addi", [IntrNoMem, ImmArg<ArgIndex<1>>]>;
+Hexagon_custom_i32_i32i32_Intrinsic<[IntrNoMem, ImmArg<ArgIndex<1>>]>;
 
 def int_hexagon_A2_addp :
-Hexagon_i64_i64i64_Intrinsic<"HEXAGON_A2_addp">;
+Hexagon_custom_i64_i64i64_Intrinsic;
 
 def int_hexagon_A2_addpsat :
 Hexagon_i64_i64i64_Intrinsic<"HEXAGON_A2_addpsat">;
@@ -1124,10 +1131,10 @@ def int_hexagon_A2_addsp :
 Hexagon_i64_i32i64_Intrinsic<"HEXAGON_A2_addsp">;
 
 def int_hexagon_A2_and :
-Hexagon_i32_i32i32_Intrinsic<"HEXAGON_A2_and">;
+Hexagon_custom_i32_i32i32_Intrinsic;
 
 def int_hexagon_A2_andir :
-Hexagon_i32_i32i32_Intrinsic<"HEXAGON_A2_andir", [IntrNoMem, ImmArg<ArgIndex<1>>]>;
+Hexagon_custom_i32_i32i32_Intrinsic<[IntrNoMem, ImmArg<ArgIndex<1>>]>;
 
 def int_hexagon_A2_andp :
 Hexagon_i64_i64i64_Intrinsic<"HEXAGON_A2_andp">;
@@ -1181,7 +1188,7 @@ def int_hexagon_A2_minup :
 Hexagon_i64_i64i64_Intrinsic<"HEXAGON_A2_minup">;
 
 def int_hexagon_A2_neg :
-Hexagon_i32_i32_Intrinsic<"HEXAGON_A2_neg">;
+Hexagon_custom_i32_i32_Intrinsic;
 
 def int_hexagon_A2_negp :
 Hexagon_i64_i64_Intrinsic<"HEXAGON_A2_negp">;
@@ -1190,16 +1197,16 @@ def int_hexagon_A2_negsat :
 Hexagon_i32_i32_Intrinsic<"HEXAGON_A2_negsat">;
 
 def int_hexagon_A2_not :
-Hexagon_i32_i32_Intrinsic<"HEXAGON_A2_not">;
+Hexagon_custom_i32_i32_Intrinsic;
 
 def int_hexagon_A2_notp :
 Hexagon_i64_i64_Intrinsic<"HEXAGON_A2_notp">;
 
 def int_hexagon_A2_or :
-Hexagon_i32_i32i32_Intrinsic<"HEXAGON_A2_or">;
+Hexagon_custom_i32_i32i32_Intrinsic;
 
 def int_hexagon_A2_orir :
-Hexagon_i32_i32i32_Intrinsic<"HEXAGON_A2_orir", [IntrNoMem, ImmArg<ArgIndex<1>>]>;
+Hexagon_custom_i32_i32i32_Intrinsic<[IntrNoMem, ImmArg<ArgIndex<1>>]>;
 
 def int_hexagon_A2_orp :
 Hexagon_i64_i64i64_Intrinsic<"HEXAGON_A2_orp">;
@@ -1223,7 +1230,7 @@ def int_hexagon_A2_satuh :
 Hexagon_i32_i32_Intrinsic<"HEXAGON_A2_satuh">;
 
 def int_hexagon_A2_sub :
-Hexagon_i32_i32i32_Intrinsic<"HEXAGON_A2_sub">;
+Hexagon_custom_i32_i32i32_Intrinsic;
 
 def int_hexagon_A2_subh_h16_hh :
 Hexagon_i32_i32i32_Intrinsic<"HEXAGON_A2_subh_h16_hh">;
@@ -1262,10 +1269,10 @@ def int_hexagon_A2_subh_l16_sat_ll :
 Hexagon_i32_i32i32_Intrinsic<"HEXAGON_A2_subh_l16_sat_ll">;
 
 def int_hexagon_A2_subp :
-Hexagon_i64_i64i64_Intrinsic<"HEXAGON_A2_subp">;
+Hexagon_custom_i64_i64i64_Intrinsic;
 
 def int_hexagon_A2_subri :
-Hexagon_i32_i32i32_Intrinsic<"HEXAGON_A2_subri", [IntrNoMem, ImmArg<ArgIndex<0>>]>;
+Hexagon_custom_i32_i32i32_Intrinsic<[IntrNoMem, ImmArg<ArgIndex<0>>]>;
 
 def int_hexagon_A2_subsat :
 Hexagon_i32_i32i32_Intrinsic<"HEXAGON_A2_subsat">;
@@ -1301,10 +1308,10 @@ def int_hexagon_A2_swiz :
 Hexagon_i32_i32_Intrinsic<"HEXAGON_A2_swiz">;
 
 def int_hexagon_A2_sxtb :
-Hexagon_i32_i32_Intrinsic<"HEXAGON_A2_sxtb">;
+Hexagon_custom_i32_i32_Intrinsic;
 
 def int_hexagon_A2_sxth :
-Hexagon_i32_i32_Intrinsic<"HEXAGON_A2_sxth">;
+Hexagon_custom_i32_i32_Intrinsic;
 
 def int_hexagon_A2_sxtw :
 Hexagon_i64_i32_Intrinsic<"HEXAGON_A2_sxtw">;
@@ -1517,16 +1524,16 @@ def int_hexagon_A2_vsubws :
 Hexagon_i64_i64i64_Intrinsic<"HEXAGON_A2_vsubws">;
 
 def int_hexagon_A2_xor :
-Hexagon_i32_i32i32_Intrinsic<"HEXAGON_A2_xor">;
+Hexagon_custom_i32_i32i32_Intrinsic;
 
 def int_hexagon_A2_xorp :
 Hexagon_i64_i64i64_Intrinsic<"HEXAGON_A2_xorp">;
 
 def int_hexagon_A2_zxtb :
-Hexagon_i32_i32_Intrinsic<"HEXAGON_A2_zxtb">;
+Hexagon_custom_i32_i32_Intrinsic;
 
 def int_hexagon_A2_zxth :
-Hexagon_i32_i32_Intrinsic<"HEXAGON_A2_zxth">;
+Hexagon_custom_i32_i32_Intrinsic;
 
 def int_hexagon_A4_andn :
 Hexagon_i32_i32i32_Intrinsic<"HEXAGON_A4_andn">;
@@ -2081,7 +2088,7 @@ def int_hexagon_M2_dpmpyss_rnd_s0 :
 Hexagon_i32_i32i32_Intrinsic<"HEXAGON_M2_dpmpyss_rnd_s0">;
 
 def int_hexagon_M2_dpmpyss_s0 :
-Hexagon_i64_i32i32_Intrinsic<"HEXAGON_M2_dpmpyss_s0">;
+Hexagon_custom_i64_i32i32_Intrinsic;
 
 def int_hexagon_M2_dpmpyuu_acc_s0 :
 Hexagon_i64_i64i32i32_Intrinsic<"HEXAGON_M2_dpmpyuu_acc_s0">;
@@ -2090,7 +2097,7 @@ def int_hexagon_M2_dpmpyuu_nac_s0 :
 Hexagon_i64_i64i32i32_Intrinsic<"HEXAGON_M2_dpmpyuu_nac_s0">;
 
 def int_hexagon_M2_dpmpyuu_s0 :
-Hexagon_i64_i32i32_Intrinsic<"HEXAGON_M2_dpmpyuu_s0">;
+Hexagon_custom_i64_i32i32_Intrinsic;
 
 def int_hexagon_M2_hmmpyh_rs1 :
 Hexagon_i32_i32i32_Intrinsic<"HEXAGON_M2_hmmpyh_rs1">;
@@ -2507,10 +2514,10 @@ def int_hexagon_M2_mpyd_rnd_ll_s1 :
 Hexagon_i64_i32i32_Intrinsic<"HEXAGON_M2_mpyd_rnd_ll_s1">;
 
 def int_hexagon_M2_mpyi :
-Hexagon_i32_i32i32_Intrinsic<"HEXAGON_M2_mpyi">;
+Hexagon_custom_i32_i32i32_Intrinsic;
 
 def int_hexagon_M2_mpysmi :
-Hexagon_i32_i32i32_Intrinsic<"HEXAGON_M2_mpysmi", [IntrNoMem, ImmArg<ArgIndex<1>>]>;
+Hexagon_custom_i32_i32i32_Intrinsic<[IntrNoMem, ImmArg<ArgIndex<1>>]>;
 
 def int_hexagon_M2_mpysu_up :
 Hexagon_i32_i32i32_Intrinsic<"HEXAGON_M2_mpysu_up">;
@@ -2663,7 +2670,7 @@ def int_hexagon_M2_mpyud_nac_ll_s1 :
 Hexagon_i64_i64i32i32_Intrinsic<"HEXAGON_M2_mpyud_nac_ll_s1">;
 
 def int_hexagon_M2_mpyui :
-Hexagon_i32_i32i32_Intrinsic<"HEXAGON_M2_mpyui">;
+Hexagon_custom_i32_i32i32_Intrinsic;
 
 def int_hexagon_M2_nacci :
 Hexagon_i32_i32i32i32_Intrinsic<"HEXAGON_M2_nacci">;
@@ -2951,7 +2958,7 @@ def int_hexagon_S2_addasl_rrri :
 Hexagon_i32_i32i32i32_Intrinsic<"HEXAGON_S2_addasl_rrri", [IntrNoMem, ImmArg<ArgIndex<2>>]>;
 
 def int_hexagon_S2_asl_i_p :
-Hexagon_i64_i64i32_Intrinsic<"HEXAGON_S2_asl_i_p", [IntrNoMem, ImmArg<ArgIndex<1>>]>;
+Hexagon_custom_i64_i64i32_Intrinsic<[IntrNoMem, ImmArg<ArgIndex<1>>]>;
 
 def int_hexagon_S2_asl_i_p_acc :
 Hexagon_i64_i64i64i32_Intrinsic<"HEXAGON_S2_asl_i_p_acc", [IntrNoMem, ImmArg<ArgIndex<2>>]>;
@@ -2969,7 +2976,7 @@ def int_hexagon_S2_asl_i_p_xacc :
 Hexagon_i64_i64i64i32_Intrinsic<"HEXAGON_S2_asl_i_p_xacc", [IntrNoMem, ImmArg<ArgIndex<2>>]>;
 
 def int_hexagon_S2_asl_i_r :
-Hexagon_i32_i32i32_Intrinsic<"HEXAGON_S2_asl_i_r", [IntrNoMem, ImmArg<ArgIndex<1>>]>;
+Hexagon_custom_i32_i32i32_Intrinsic<[IntrNoMem, ImmArg<ArgIndex<1>>]>;
 
 def int_hexagon_S2_asl_i_r_acc :
 Hexagon_i32_i32i32i32_Intrinsic<"HEXAGON_S2_asl_i_r_acc", [IntrNoMem, ImmArg<ArgIndex<2>>]>;
@@ -3038,7 +3045,7 @@ def int_hexagon_S2_asl_r_vw :
 Hexagon_i64_i64i32_Intrinsic<"HEXAGON_S2_asl_r_vw">;
 
 def int_hexagon_S2_asr_i_p :
-Hexagon_i64_i64i32_Intrinsic<"HEXAGON_S2_asr_i_p", [IntrNoMem, ImmArg<ArgIndex<1>>]>;
+Hexagon_custom_i64_i64i32_Intrinsic<[IntrNoMem, ImmArg<ArgIndex<1>>]>;
 
 def int_hexagon_S2_asr_i_p_acc :
 Hexagon_i64_i64i64i32_Intrinsic<"HEXAGON_S2_asr_i_p_acc", [IntrNoMem, ImmArg<ArgIndex<2>>]>;
@@ -3059,7 +3066,7 @@ def int_hexagon_S2_asr_i_p_rnd_goodsyntax :
 Hexagon_i64_i64i32_Intrinsic<"HEXAGON_S2_asr_i_p_rnd_goodsyntax", [IntrNoMem, ImmArg<ArgIndex<1>>]>;
 
 def int_hexagon_S2_asr_i_r :
-Hexagon_i32_i32i32_Intrinsic<"HEXAGON_S2_asr_i_r", [IntrNoMem, ImmArg<ArgIndex<1>>]>;
+Hexagon_custom_i32_i32i32_Intrinsic<[IntrNoMem, ImmArg<ArgIndex<1>>]>;
 
 def int_hexagon_S2_asr_i_r_acc :
 Hexagon_i32_i32i32i32_Intrinsic<"HEXAGON_S2_asr_i_r_acc", [IntrNoMem, ImmArg<ArgIndex<2>>]>;
@@ -3251,7 +3258,7 @@ def int_hexagon_S2_lsl_r_vw :
 Hexagon_i64_i64i32_Intrinsic<"HEXAGON_S2_lsl_r_vw">;
 
 def int_hexagon_S2_lsr_i_p :
-Hexagon_i64_i64i32_Intrinsic<"HEXAGON_S2_lsr_i_p", [IntrNoMem, ImmArg<ArgIndex<1>>]>;
+Hexagon_custom_i64_i64i32_Intrinsic<[IntrNoMem, ImmArg<ArgIndex<1>>]>;
 
 def int_hexagon_S2_lsr_i_p_acc :
 Hexagon_i64_i64i64i32_Intrinsic<"HEXAGON_S2_lsr_i_p_acc", [IntrNoMem, ImmArg<ArgIndex<2>>]>;
@@ -3269,7 +3276,7 @@ def int_hexagon_S2_lsr_i_p_xacc :
 Hexagon_i64_i64i64i32_Intrinsic<"HEXAGON_S2_lsr_i_p_xacc", [IntrNoMem, ImmArg<ArgIndex<2>>]>;
 
 def int_hexagon_S2_lsr_i_r :
-Hexagon_i32_i32i32_Intrinsic<"HEXAGON_S2_lsr_i_r", [IntrNoMem, ImmArg<ArgIndex<1>>]>;
+Hexagon_custom_i32_i32i32_Intrinsic<[IntrNoMem, ImmArg<ArgIndex<1>>]>;
 
 def int_hexagon_S2_lsr_i_r_acc :
 Hexagon_i32_i32i32i32_Intrinsic<"HEXAGON_S2_lsr_i_r_acc", [IntrNoMem, ImmArg<ArgIndex<2>>]>;
@@ -3802,70 +3809,70 @@ def int_hexagon_V6_lvsplatw_128B :
 Hexagon_v32i32_i32_Intrinsic<"HEXAGON_V6_lvsplatw_128B">;
 
 def int_hexagon_V6_pred_and :
-Hexagon_v64i1_v64i1v64i1_Intrinsic<"HEXAGON_V6_pred_and">;
+Hexagon_custom_v64i1_v64i1v64i1_Intrinsic;
 
 def int_hexagon_V6_pred_and_128B :
-Hexagon_v128i1_v128i1v128i1_Intrinsic<"HEXAGON_V6_pred_and_128B">;
+Hexagon_custom_v128i1_v128i1v128i1_Intrinsic_128B;
 
 def int_hexagon_V6_pred_and_n :
-Hexagon_v64i1_v64i1v64i1_Intrinsic<"HEXAGON_V6_pred_and_n">;
+Hexagon_custom_v64i1_v64i1v64i1_Intrinsic;
 
 def int_hexagon_V6_pred_and_n_128B :
-Hexagon_v128i1_v128i1v128i1_Intrinsic<"HEXAGON_V6_pred_and_n_128B">;
+Hexagon_custom_v128i1_v128i1v128i1_Intrinsic_128B;
 
 def int_hexagon_V6_pred_not :
-Hexagon_v64i1_v64i1_Intrinsic<"HEXAGON_V6_pred_not">;
+Hexagon_custom_v64i1_v64i1_Intrinsic;
 
 def int_hexagon_V6_pred_not_128B :
-Hexagon_v128i1_v128i1_Intrinsic<"HEXAGON_V6_pred_not_128B">;
+Hexagon_custom_v128i1_v128i1_Intrinsic_128B;
 
 def int_hexagon_V6_pred_or :
-Hexagon_v64i1_v64i1v64i1_Intrinsic<"HEXAGON_V6_pred_or">;
+Hexagon_custom_v64i1_v64i1v64i1_Intrinsic;
 
 def int_hexagon_V6_pred_or_128B :
-Hexagon_v128i1_v128i1v128i1_Intrinsic<"HEXAGON_V6_pred_or_128B">;
+Hexagon_custom_v128i1_v128i1v128i1_Intrinsic_128B;
 
 def int_hexagon_V6_pred_or_n :
-Hexagon_v64i1_v64i1v64i1_Intrinsic<"HEXAGON_V6_pred_or_n">;
+Hexagon_custom_v64i1_v64i1v64i1_Intrinsic;
 
 def int_hexagon_V6_pred_or_n_128B :
-Hexagon_v128i1_v128i1v128i1_Intrinsic<"HEXAGON_V6_pred_or_n_128B">;
+Hexagon_custom_v128i1_v128i1v128i1_Intrinsic_128B;
 
 def int_hexagon_V6_pred_scalar2 :
-Hexagon_v64i1_i32_Intrinsic<"HEXAGON_V6_pred_scalar2">;
+Hexagon_custom_v64i1_i32_Intrinsic;
 
 def int_hexagon_V6_pred_scalar2_128B :
-Hexagon_v128i1_i32_Intrinsic<"HEXAGON_V6_pred_scalar2_128B">;
+Hexagon_custom_v128i1_i32_Intrinsic_128B;
 
 def int_hexagon_V6_pred_xor :
-Hexagon_v64i1_v64i1v64i1_Intrinsic<"HEXAGON_V6_pred_xor">;
+Hexagon_custom_v64i1_v64i1v64i1_Intrinsic;
 
 def int_hexagon_V6_pred_xor_128B :
-Hexagon_v128i1_v128i1v128i1_Intrinsic<"HEXAGON_V6_pred_xor_128B">;
+Hexagon_custom_v128i1_v128i1v128i1_Intrinsic_128B;
 
 def int_hexagon_V6_vS32b_nqpred_ai :
-Hexagon__v64i1ptrv16i32_Intrinsic<"HEXAGON_V6_vS32b_nqpred_ai", [IntrWriteMem]>;
+Hexagon_custom__v64i1ptrv16i32_Intrinsic<[IntrWriteMem]>;
 
 def int_hexagon_V6_vS32b_nqpred_ai_128B :
-Hexagon__v128i1ptrv32i32_Intrinsic<"HEXAGON_V6_vS32b_nqpred_ai_128B", [IntrWriteMem]>;
+Hexagon_custom__v128i1ptrv32i32_Intrinsic_128B<[IntrWriteMem]>;
 
 def int_hexagon_V6_vS32b_nt_nqpred_ai :
-Hexagon__v64i1ptrv16i32_Intrinsic<"HEXAGON_V6_vS32b_nt_nqpred_ai", [IntrWriteMem]>;
+Hexagon_custom__v64i1ptrv16i32_Intrinsic<[IntrWriteMem]>;
 
 def int_hexagon_V6_vS32b_nt_nqpred_ai_128B :
-Hexagon__v128i1ptrv32i32_Intrinsic<"HEXAGON_V6_vS32b_nt_nqpred_ai_128B", [IntrWriteMem]>;
+Hexagon_custom__v128i1ptrv32i32_Intrinsic_128B<[IntrWriteMem]>;
 
 def int_hexagon_V6_vS32b_nt_qpred_ai :
-Hexagon__v64i1ptrv16i32_Intrinsic<"HEXAGON_V6_vS32b_nt_qpred_ai", [IntrWriteMem]>;
+Hexagon_custom__v64i1ptrv16i32_Intrinsic<[IntrWriteMem]>;
 
 def int_hexagon_V6_vS32b_nt_qpred_ai_128B :
-Hexagon__v128i1ptrv32i32_Intrinsic<"HEXAGON_V6_vS32b_nt_qpred_ai_128B", [IntrWriteMem]>;
+Hexagon_custom__v128i1ptrv32i32_Intrinsic_128B<[IntrWriteMem]>;
 
 def int_hexagon_V6_vS32b_qpred_ai :
-Hexagon__v64i1ptrv16i32_Intrinsic<"HEXAGON_V6_vS32b_qpred_ai", [IntrWriteMem]>;
+Hexagon_custom__v64i1ptrv16i32_Intrinsic<[IntrWriteMem]>;
 
 def int_hexagon_V6_vS32b_qpred_ai_128B :
-Hexagon__v128i1ptrv32i32_Intrinsic<"HEXAGON_V6_vS32b_qpred_ai_128B", [IntrWriteMem]>;
+Hexagon_custom__v128i1ptrv32i32_Intrinsic_128B<[IntrWriteMem]>;
 
 def int_hexagon_V6_vabsdiffh :
 Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vabsdiffh">;
@@ -3928,16 +3935,16 @@ def int_hexagon_V6_vaddb_dv_128B :
 Hexagon_v64i32_v64i32v64i32_Intrinsic<"HEXAGON_V6_vaddb_dv_128B">;
 
 def int_hexagon_V6_vaddbnq :
-Hexagon_v16i32_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vaddbnq">;
+Hexagon_custom_v16i32_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vaddbnq_128B :
-Hexagon_v32i32_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vaddbnq_128B">;
+Hexagon_custom_v32i32_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vaddbq :
-Hexagon_v16i32_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vaddbq">;
+Hexagon_custom_v16i32_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vaddbq_128B :
-Hexagon_v32i32_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vaddbq_128B">;
+Hexagon_custom_v32i32_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vaddh :
 Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vaddh">;
@@ -3952,16 +3959,16 @@ def int_hexagon_V6_vaddh_dv_128B :
 Hexagon_v64i32_v64i32v64i32_Intrinsic<"HEXAGON_V6_vaddh_dv_128B">;
 
 def int_hexagon_V6_vaddhnq :
-Hexagon_v16i32_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vaddhnq">;
+Hexagon_custom_v16i32_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vaddhnq_128B :
-Hexagon_v32i32_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vaddhnq_128B">;
+Hexagon_custom_v32i32_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vaddhq :
-Hexagon_v16i32_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vaddhq">;
+Hexagon_custom_v16i32_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vaddhq_128B :
-Hexagon_v32i32_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vaddhq_128B">;
+Hexagon_custom_v32i32_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vaddhsat :
 Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vaddhsat">;
@@ -4030,16 +4037,16 @@ def int_hexagon_V6_vaddw_dv_128B :
 Hexagon_v64i32_v64i32v64i32_Intrinsic<"HEXAGON_V6_vaddw_dv_128B">;
 
 def int_hexagon_V6_vaddwnq :
-Hexagon_v16i32_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vaddwnq">;
+Hexagon_custom_v16i32_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vaddwnq_128B :
-Hexagon_v32i32_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vaddwnq_128B">;
+Hexagon_custom_v32i32_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vaddwq :
-Hexagon_v16i32_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vaddwq">;
+Hexagon_custom_v16i32_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vaddwq_128B :
-Hexagon_v32i32_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vaddwq_128B">;
+Hexagon_custom_v32i32_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vaddwsat :
 Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vaddwsat">;
@@ -4072,28 +4079,28 @@ def int_hexagon_V6_vand_128B :
 Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vand_128B">;
 
 def int_hexagon_V6_vandqrt :
-Hexagon_v16i32_v64i1i32_Intrinsic<"HEXAGON_V6_vandqrt">;
+Hexagon_custom_v16i32_v64i1i32_Intrinsic;
 
 def int_hexagon_V6_vandqrt_128B :
-Hexagon_v32i32_v128i1i32_Intrinsic<"HEXAGON_V6_vandqrt_128B">;
+Hexagon_custom_v32i32_v128i1i32_Intrinsic_128B;
 
 def int_hexagon_V6_vandqrt_acc :
-Hexagon_v16i32_v16i32v64i1i32_Intrinsic<"HEXAGON_V6_vandqrt_acc">;
+Hexagon_custom_v16i32_v16i32v64i1i32_Intrinsic;
 
 def int_hexagon_V6_vandqrt_acc_128B :
-Hexagon_v32i32_v32i32v128i1i32_Intrinsic<"HEXAGON_V6_vandqrt_acc_128B">;
+Hexagon_custom_v32i32_v32i32v128i1i32_Intrinsic_128B;
 
 def int_hexagon_V6_vandvrt :
-Hexagon_v64i1_v16i32i32_Intrinsic<"HEXAGON_V6_vandvrt">;
+Hexagon_custom_v64i1_v16i32i32_Intrinsic;
 
 def int_hexagon_V6_vandvrt_128B :
-Hexagon_v128i1_v32i32i32_Intrinsic<"HEXAGON_V6_vandvrt_128B">;
+Hexagon_custom_v128i1_v32i32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vandvrt_acc :
-Hexagon_v64i1_v64i1v16i32i32_Intrinsic<"HEXAGON_V6_vandvrt_acc">;
+Hexagon_custom_v64i1_v64i1v16i32i32_Intrinsic;
 
 def int_hexagon_V6_vandvrt_acc_128B :
-Hexagon_v128i1_v128i1v32i32i32_Intrinsic<"HEXAGON_V6_vandvrt_acc_128B">;
+Hexagon_custom_v128i1_v128i1v32i32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vaslh :
 Hexagon_v16i32_v16i32i32_Intrinsic<"HEXAGON_V6_vaslh">;
@@ -4432,220 +4439,220 @@ def int_hexagon_V6_vdsaduh_acc_128B :
 Hexagon_v64i32_v64i32v64i32i32_Intrinsic<"HEXAGON_V6_vdsaduh_acc_128B">;
 
 def int_hexagon_V6_veqb :
-Hexagon_v64i1_v16i32v16i32_Intrinsic<"HEXAGON_V6_veqb">;
+Hexagon_custom_v64i1_v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_veqb_128B :
-Hexagon_v128i1_v32i32v32i32_Intrinsic<"HEXAGON_V6_veqb_128B">;
+Hexagon_custom_v128i1_v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_veqb_and :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_veqb_and">;
+Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_veqb_and_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_veqb_and_128B">;
+Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_veqb_or :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_veqb_or">;
+Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_veqb_or_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_veqb_or_128B">;
+Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_veqb_xor :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_veqb_xor">;
+Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_veqb_xor_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_veqb_xor_128B">;
+Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_veqh :
-Hexagon_v64i1_v16i32v16i32_Intrinsic<"HEXAGON_V6_veqh">;
+Hexagon_custom_v64i1_v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_veqh_128B :
-Hexagon_v128i1_v32i32v32i32_Intrinsic<"HEXAGON_V6_veqh_128B">;
+Hexagon_custom_v128i1_v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_veqh_and :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_veqh_and">;
+Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_veqh_and_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_veqh_and_128B">;
+Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_veqh_or :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_veqh_or">;
+Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_veqh_or_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_veqh_or_128B">;
+Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_veqh_xor :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_veqh_xor">;
+Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_veqh_xor_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_veqh_xor_128B">;
+Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_veqw :
-Hexagon_v64i1_v16i32v16i32_Intrinsic<"HEXAGON_V6_veqw">;
+Hexagon_custom_v64i1_v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_veqw_128B :
-Hexagon_v128i1_v32i32v32i32_Intrinsic<"HEXAGON_V6_veqw_128B">;
+Hexagon_custom_v128i1_v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_veqw_and :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_veqw_and">;
+Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_veqw_and_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_veqw_and_128B">;
+Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_veqw_or :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_veqw_or">;
+Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_veqw_or_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_veqw_or_128B">;
+Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_veqw_xor :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_veqw_xor">;
+Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_veqw_xor_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_veqw_xor_128B">;
+Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vgtb :
-Hexagon_v64i1_v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtb">;
+Hexagon_custom_v64i1_v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vgtb_128B :
-Hexagon_v128i1_v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtb_128B">;
+Hexagon_custom_v128i1_v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vgtb_and :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtb_and">;
+Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vgtb_and_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtb_and_128B">;
+Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vgtb_or :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtb_or">;
+Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vgtb_or_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtb_or_128B">;
+Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vgtb_xor :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtb_xor">;
+Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vgtb_xor_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtb_xor_128B">;
+Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vgth :
-Hexagon_v64i1_v16i32v16i32_Intrinsic<"HEXAGON_V6_vgth">;
+Hexagon_custom_v64i1_v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vgth_128B :
-Hexagon_v128i1_v32i32v32i32_Intrinsic<"HEXAGON_V6_vgth_128B">;
+Hexagon_custom_v128i1_v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vgth_and :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vgth_and">;
+Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vgth_and_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vgth_and_128B">;
+Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vgth_or :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vgth_or">;
+Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vgth_or_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vgth_or_128B">;
+Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vgth_xor :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vgth_xor">;
+Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vgth_xor_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vgth_xor_128B">;
+Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vgtub :
-Hexagon_v64i1_v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtub">;
+Hexagon_custom_v64i1_v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vgtub_128B :
-Hexagon_v128i1_v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtub_128B">;
+Hexagon_custom_v128i1_v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vgtub_and :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtub_and">;
+Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vgtub_and_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtub_and_128B">;
+Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vgtub_or :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtub_or">;
+Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vgtub_or_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtub_or_128B">;
+Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vgtub_xor :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtub_xor">;
+Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vgtub_xor_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtub_xor_128B">;
+Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vgtuh :
-Hexagon_v64i1_v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtuh">;
+Hexagon_custom_v64i1_v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vgtuh_128B :
-Hexagon_v128i1_v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtuh_128B">;
+Hexagon_custom_v128i1_v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vgtuh_and :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtuh_and">;
+Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vgtuh_and_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtuh_and_128B">;
+Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vgtuh_or :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtuh_or">;
+Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vgtuh_or_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtuh_or_128B">;
+Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vgtuh_xor :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtuh_xor">;
+Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vgtuh_xor_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtuh_xor_128B">;
+Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vgtuw :
-Hexagon_v64i1_v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtuw">;
+Hexagon_custom_v64i1_v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vgtuw_128B :
-Hexagon_v128i1_v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtuw_128B">;
+Hexagon_custom_v128i1_v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vgtuw_and :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtuw_and">;
+Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vgtuw_and_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtuw_and_128B">;
+Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vgtuw_or :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtuw_or">;
+Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vgtuw_or_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtuw_or_128B">;
+Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vgtuw_xor :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtuw_xor">;
+Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vgtuw_xor_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtuw_xor_128B">;
+Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vgtw :
-Hexagon_v64i1_v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtw">;
+Hexagon_custom_v64i1_v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vgtw_128B :
-Hexagon_v128i1_v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtw_128B">;
+Hexagon_custom_v128i1_v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vgtw_and :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtw_and">;
+Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vgtw_and_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtw_and_128B">;
+Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vgtw_or :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtw_or">;
+Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vgtw_or_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtw_or_128B">;
+Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vgtw_xor :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtw_xor">;
+Hexagon_custom_v64i1_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vgtw_xor_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtw_xor_128B">;
+Hexagon_custom_v128i1_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vinsertwr :
 Hexagon_v16i32_v16i32i32_Intrinsic<"HEXAGON_V6_vinsertwr">;
@@ -5044,10 +5051,10 @@ def int_hexagon_V6_vmpyuhv_acc_128B :
 Hexagon_v64i32_v64i32v32i32v32i32_Intrinsic<"HEXAGON_V6_vmpyuhv_acc_128B">;
 
 def int_hexagon_V6_vmux :
-Hexagon_v16i32_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vmux">;
+Hexagon_custom_v16i32_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vmux_128B :
-Hexagon_v32i32_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vmux_128B">;
+Hexagon_custom_v32i32_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vnavgh :
 Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vnavgh">;
@@ -5368,16 +5375,16 @@ def int_hexagon_V6_vsubb_dv_128B :
 Hexagon_v64i32_v64i32v64i32_Intrinsic<"HEXAGON_V6_vsubb_dv_128B">;
 
 def int_hexagon_V6_vsubbnq :
-Hexagon_v16i32_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vsubbnq">;
+Hexagon_custom_v16i32_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vsubbnq_128B :
-Hexagon_v32i32_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vsubbnq_128B">;
+Hexagon_custom_v32i32_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vsubbq :
-Hexagon_v16i32_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vsubbq">;
+Hexagon_custom_v16i32_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vsubbq_128B :
-Hexagon_v32i32_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vsubbq_128B">;
+Hexagon_custom_v32i32_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vsubh :
 Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vsubh">;
@@ -5392,16 +5399,16 @@ def int_hexagon_V6_vsubh_dv_128B :
 Hexagon_v64i32_v64i32v64i32_Intrinsic<"HEXAGON_V6_vsubh_dv_128B">;
 
 def int_hexagon_V6_vsubhnq :
-Hexagon_v16i32_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vsubhnq">;
+Hexagon_custom_v16i32_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vsubhnq_128B :
-Hexagon_v32i32_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vsubhnq_128B">;
+Hexagon_custom_v32i32_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vsubhq :
-Hexagon_v16i32_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vsubhq">;
+Hexagon_custom_v16i32_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vsubhq_128B :
-Hexagon_v32i32_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vsubhq_128B">;
+Hexagon_custom_v32i32_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vsubhsat :
 Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vsubhsat">;
@@ -5470,16 +5477,16 @@ def int_hexagon_V6_vsubw_dv_128B :
 Hexagon_v64i32_v64i32v64i32_Intrinsic<"HEXAGON_V6_vsubw_dv_128B">;
 
 def int_hexagon_V6_vsubwnq :
-Hexagon_v16i32_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vsubwnq">;
+Hexagon_custom_v16i32_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vsubwnq_128B :
-Hexagon_v32i32_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vsubwnq_128B">;
+Hexagon_custom_v32i32_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vsubwq :
-Hexagon_v16i32_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vsubwq">;
+Hexagon_custom_v16i32_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vsubwq_128B :
-Hexagon_v32i32_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vsubwq_128B">;
+Hexagon_custom_v32i32_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vsubwsat :
 Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vsubwsat">;
@@ -5494,10 +5501,10 @@ def int_hexagon_V6_vsubwsat_dv_128B :
 Hexagon_v64i32_v64i32v64i32_Intrinsic<"HEXAGON_V6_vsubwsat_dv_128B">;
 
 def int_hexagon_V6_vswap :
-Hexagon_v32i32_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vswap">;
+Hexagon_custom_v32i32_v64i1v16i32v16i32_Intrinsic;
 
 def int_hexagon_V6_vswap_128B :
-Hexagon_v64i32_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vswap_128B">;
+Hexagon_custom_v64i32_v128i1v32i32v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vtmpyb :
 Hexagon_v32i32_v32i32i32_Intrinsic<"HEXAGON_V6_vtmpyb">;
@@ -5604,22 +5611,22 @@ def int_hexagon_V6_lvsplath_128B :
 Hexagon_v32i32_i32_Intrinsic<"HEXAGON_V6_lvsplath_128B">;
 
 def int_hexagon_V6_pred_scalar2v2 :
-Hexagon_v64i1_i32_Intrinsic<"HEXAGON_V6_pred_scalar2v2">;
+Hexagon_custom_v64i1_i32_Intrinsic;
 
 def int_hexagon_V6_pred_scalar2v2_128B :
-Hexagon_v128i1_i32_Intrinsic<"HEXAGON_V6_pred_scalar2v2_128B">;
+Hexagon_custom_v128i1_i32_Intrinsic_128B;
 
 def int_hexagon_V6_shuffeqh :
-Hexagon_v64i1_v64i1v64i1_Intrinsic<"HEXAGON_V6_shuffeqh">;
+Hexagon_custom_v64i1_v64i1v64i1_Intrinsic;
 
 def int_hexagon_V6_shuffeqh_128B :
-Hexagon_v128i1_v128i1v128i1_Intrinsic<"HEXAGON_V6_shuffeqh_128B">;
+Hexagon_custom_v128i1_v128i1v128i1_Intrinsic_128B;
 
 def int_hexagon_V6_shuffeqw :
-Hexagon_v64i1_v64i1v64i1_Intrinsic<"HEXAGON_V6_shuffeqw">;
+Hexagon_custom_v64i1_v64i1v64i1_Intrinsic;
 
 def int_hexagon_V6_shuffeqw_128B :
-Hexagon_v128i1_v128i1v128i1_Intrinsic<"HEXAGON_V6_shuffeqw_128B">;
+Hexagon_custom_v128i1_v128i1v128i1_Intrinsic_128B;
 
 def int_hexagon_V6_vaddbsat :
 Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vaddbsat">;
@@ -5688,28 +5695,28 @@ def int_hexagon_V6_vadduwsat_dv_128B :
 Hexagon_v64i32_v64i32v64i32_Intrinsic<"HEXAGON_V6_vadduwsat_dv_128B">;
 
 def int_hexagon_V6_vandnqrt :
-Hexagon_v16i32_v64i1i32_Intrinsic<"HEXAGON_V6_vandnqrt">;
+Hexagon_custom_v16i32_v64i1i32_Intrinsic;
 
 def int_hexagon_V6_vandnqrt_128B :
-Hexagon_v32i32_v128i1i32_Intrinsic<"HEXAGON_V6_vandnqrt_128B">;
+Hexagon_custom_v32i32_v128i1i32_Intrinsic_128B;
 
 def int_hexagon_V6_vandnqrt_acc :
-Hexagon_v16i32_v16i32v64i1i32_Intrinsic<"HEXAGON_V6_vandnqrt_acc">;
+Hexagon_custom_v16i32_v16i32v64i1i32_Intrinsic;
 
 def int_hexagon_V6_vandnqrt_acc_128B :
-Hexagon_v32i32_v32i32v128i1i32_Intrinsic<"HEXAGON_V6_vandnqrt_acc_128B">;
+Hexagon_custom_v32i32_v32i32v128i1i32_Intrinsic_128B;
 
 def int_hexagon_V6_vandvnqv :
-Hexagon_v16i32_v64i1v16i32_Intrinsic<"HEXAGON_V6_vandvnqv">;
+Hexagon_custom_v16i32_v64i1v16i32_Intrinsic;
 
 def int_hexagon_V6_vandvnqv_128B :
-Hexagon_v32i32_v128i1v32i32_Intrinsic<"HEXAGON_V6_vandvnqv_128B">;
+Hexagon_custom_v32i32_v128i1v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vandvqv :
-Hexagon_v16i32_v64i1v16i32_Intrinsic<"HEXAGON_V6_vandvqv">;
+Hexagon_custom_v16i32_v64i1v16i32_Intrinsic;
 
 def int_hexagon_V6_vandvqv_128B :
-Hexagon_v32i32_v128i1v32i32_Intrinsic<"HEXAGON_V6_vandvqv_128B">;
+Hexagon_custom_v32i32_v128i1v32i32_Intrinsic_128B;
 
 def int_hexagon_V6_vasrhbsat :
 Hexagon_v16i32_v16i32v16i32i32_Intrinsic<"HEXAGON_V6_vasrhbsat">;
@@ -5954,10 +5961,10 @@ def int_hexagon_V6_vgathermh_128B :
 Hexagon__ptri32i32v32i32_Intrinsic<"HEXAGON_V6_vgathermh_128B", [IntrArgMemOnly]>;
 
 def int_hexagon_V6_vgathermhq :
-Hexagon__ptrv64i1i32i32v16i32_Intrinsic<"HEXAGON_V6_vgathermhq", [IntrArgMemOnly]>;
+Hexagon_custom__ptrv64i1i32i32v16i32_Intrinsic<[IntrArgMemOnly]>;
 
 def int_hexagon_V6_vgathermhq_128B :
-Hexagon__ptrv128i1i32i32v32i32_Intrinsic<"HEXAGON_V6_vgathermhq_128B", [IntrArgMemOnly]>;
+Hexagon_custom__ptrv128i1i32i32v32i32_Intrinsic_128B<[IntrArgMemOnly]>;
 
 def int_hexagon_V6_vgathermhw :
 Hexagon__ptri32i32v32i32_Intrinsic<"HEXAGON_V6_vgathermhw", [IntrArgMemOnly]>;
@@ -5966,10 +5973,10 @@ def int_hexagon_V6_vgathermhw_128B :
 Hexagon__ptri32i32v64i32_Intrinsic<"HEXAGON_V6_vgathermhw_128B", [IntrArgMemOnly]>;
 
 def int_hexagon_V6_vgathermhwq :
-Hexagon__ptrv64i1i32i32v32i32_Intrinsic<"HEXAGON_V6_vgathermhwq", [IntrArgMemOnly]>;
+Hexagon_custom__ptrv64i1i32i32v32i32_Intrinsic<[IntrArgMemOnly]>;
 
 def int_hexagon_V6_vgathermhwq_128B :
-Hexagon__ptrv128i1i32i32v64i32_Intrinsic<"HEXAGON_V6_vgathermhwq_128B", [IntrArgMemOnly]>;
+Hexagon_custom__ptrv128i1i32i32v64i32_Intrinsic_128B<[IntrArgMemOnly]>;
 
 def int_hexagon_V6_vgathermw :
 Hexagon__ptri32i32v16i32_Intrinsic<"HEXAGON_V6_vgathermw", [IntrArgMemOnly]>;
@@ -5978,10 +5985,10 @@ def int_hexagon_V6_vgathermw_128B :
 Hexagon__ptri32i32v32i32_Intrinsic<"HEXAGON_V6_vgathermw_128B", [IntrArgMemOnly]>;
 
 def int_hexagon_V6_vgathermwq :
-Hexagon__ptrv64i1i32i32v16i32_Intrinsic<"HEXAGON_V6_vgathermwq", [IntrArgMemOnly]>;
+Hexagon_custom__ptrv64i1i32i32v16i32_Intrinsic<[IntrArgMemOnly]>;
 
 def int_hexagon_V6_vgathermwq_128B :
-Hexagon__ptrv128i1i32i32v32i32_Intrinsic<"HEXAGON_V6_vgathermwq_128B", [IntrArgMemOnly]>;
+Hexagon_custom__ptrv128i1i32i32v32i32_Intrinsic_128B<[IntrArgMemOnly]>;
 
 def int_hexagon_V6_vlut4 :
 Hexagon_v16i32_v16i32i64_Intrinsic<"HEXAGON_V6_vlut4">;
@@ -6044,22 +6051,22 @@ def int_hexagon_V6_vnavgb_128B :
 Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vnavgb_128B">;
 
 def int_hexagon_V6_vprefixqb :
-Hexagon_v16i32_v64i1_Intrinsic<"HEXAGON_V6_vprefixqb">;
+Hexagon_custom_v16i32_v64i1_Intrinsic;
 
 def int_hexagon_V6_vprefixqb_128B :
-Hexagon_v32i32_v128i1_Intrinsic<"HEXAGON_V6_vprefixqb_128B">;
+Hexagon_custom_v32i32_v128i1_Intrinsic_128B;
 
 def int_hexagon_V6_vprefixqh :
-Hexagon_v16i32_v64i1_Intrinsic<"HEXAGON_V6_vprefixqh">;
+Hexagon_custom_v16i32_v64i1_Intrinsic;
 
 def int_hexagon_V6_vprefixqh_128B :
-Hexagon_v32i32_v128i1_Intrinsic<"HEXAGON_V6_vprefixqh_128B">;
+Hexagon_custom_v32i32_v128i1_Intrinsic_128B;
 
 def int_hexagon_V6_vprefixqw :
-Hexagon_v16i32_v64i1_Intrinsic<"HEXAGON_V6_vprefixqw">;
+Hexagon_custom_v16i32_v64i1_Intrinsic;
 
 def int_hexagon_V6_vprefixqw_128B :
-Hexagon_v32i32_v128i1_Intrinsic<"HEXAGON_V6_vprefixqw_128B">;
+Hexagon_custom_v32i32_v128i1_Intrinsic_128B;
 
 def int_hexagon_V6_vscattermh :
 Hexagon__i32i32v16i32v16i32_Intrinsic<"HEXAGON_V6_vscattermh", [IntrWriteMem]>;
@@ -6074,10 +6081,10 @@ def int_hexagon_V6_vscattermh_add_128B :
 Hexagon__i32i32v32i32v32i32_Intrinsic<"HEXAGON_V6_vscattermh_add_128B", [IntrWriteMem]>;
 
 def int_hexagon_V6_vscattermhq :
-Hexagon__v64i1i32i32v16i32v16i32_Intrinsic<"HEXAGON_V6_vscattermhq", [IntrWriteMem]>;
+Hexagon_custom__v64i1i32i32v16i32v16i32_Intrinsic<[IntrWriteMem]>;
 
 def int_hexagon_V6_vscattermhq_128B :
-Hexagon__v128i1i32i32v32i32v32i32_Intrinsic<"HEXAGON_V6_vscattermhq_128B", [IntrWriteMem]>;
+Hexagon_custom__v128i1i32i32v32i32v32i32_Intrinsic_128B<[IntrWriteMem]>;
 
 def int_hexagon_V6_vscattermhw :
 Hexagon__i32i32v32i32v16i32_Intrinsic<"HEXAGON_V6_vscattermhw", [IntrWriteMem]>;
@@ -6092,10 +6099,10 @@ def int_hexagon_V6_vscattermhw_add_128B :
 Hexagon__i32i32v64i32v32i32_Intrinsic<"HEXAGON_V6_vscattermhw_add_128B", [IntrWriteMem]>;
 
 def int_hexagon_V6_vscattermhwq :
-Hexagon__v64i1i32i32v32i32v16i32_Intrinsic<"HEXAGON_V6_vscattermhwq", [IntrWriteMem]>;
+Hexagon_custom__v64i1i32i32v32i32v16i32_Intrinsic<[IntrWriteMem]>;
 
 def int_hexagon_V6_vscattermhwq_128B :
-Hexagon__v128i1i32i32v64i32v32i32_Intrinsic<"HEXAGON_V6_vscattermhwq_128B", [IntrWriteMem]>;
+Hexagon_custom__v128i1i32i32v64i32v32i32_Intrinsic_128B<[IntrWriteMem]>;
 
 def int_hexagon_V6_vscattermw :
 Hexagon__i32i32v16i32v16i32_Intrinsic<"HEXAGON_V6_vscattermw", [IntrWriteMem]>;
@@ -6110,24 +6117,18 @@ def int_hexagon_V6_vscattermw_add_128B :
 Hexagon__i32i32v32i32v32i32_Intrinsic<"HEXAGON_V6_vscattermw_add_128B", [IntrWriteMem]>;
 
 def int_hexagon_V6_vscattermwq :
-Hexagon__v64i1i32i32v16i32v16i32_Intrinsic<"HEXAGON_V6_vscattermwq", [IntrWriteMem]>;
+Hexagon_custom__v64i1i32i32v16i32v16i32_Intrinsic<[IntrWriteMem]>;
 
 def int_hexagon_V6_vscattermwq_128B :
-Hexagon__v128i1i32i32v32i32v32i32_Intrinsic<"HEXAGON_V6_vscattermwq_128B", [IntrWriteMem]>;
+Hexagon_custom__v128i1i32i32v32i32v32i32_Intrinsic_128B<[IntrWriteMem]>;
 
 // V66 HVX Instructions.
 
-def int_hexagon_V6_vaddcarryo :
-Hexagon_custom_v16i32v64i1_v16i32v16i32_Intrinsic;
-
-def int_hexagon_V6_vaddcarryo_128B :
-Hexagon_custom_v32i32v128i1_v32i32v32i32_Intrinsic_128B;
-
 def int_hexagon_V6_vaddcarrysat :
-Hexagon_v16i32_v16i32v16i32v64i1_Intrinsic<"HEXAGON_V6_vaddcarrysat">;
+Hexagon_custom_v16i32_v16i32v16i32v64i1_Intrinsic;
 
 def int_hexagon_V6_vaddcarrysat_128B :
-Hexagon_v32i32_v32i32v32i32v128i1_Intrinsic<"HEXAGON_V6_vaddcarrysat_128B">;
+Hexagon_custom_v32i32_v32i32v32i32v128i1_Intrinsic_128B;
 
 def int_hexagon_V6_vasr_into :
 Hexagon_v32i32_v32i32v16i32v16i32_Intrinsic<"HEXAGON_V6_vasr_into">;
@@ -6146,12 +6147,6 @@ Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vsatdw">;
 
 def int_hexagon_V6_vsatdw_128B :
 Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vsatdw_128B">;
-
-def int_hexagon_V6_vsubcarryo :
-Hexagon_custom_v16i32v64i1_v16i32v16i32_Intrinsic;
-
-def int_hexagon_V6_vsubcarryo_128B :
-Hexagon_custom_v32i32v128i1_v32i32v32i32_Intrinsic_128B;
 
 // V68 HVX Instructions.
 
@@ -6178,530 +6173,4 @@ Hexagon_v32i32_v32i32v32i32v32i32i32_Intrinsic<"HEXAGON_V6_v6mpyvubs10_vxx", [In
 
 def int_hexagon_V6_v6mpyvubs10_vxx_128B :
 Hexagon_v64i32_v64i32v64i32v64i32i32_Intrinsic<"HEXAGON_V6_v6mpyvubs10_vxx_128B", [IntrNoMem, ImmArg<ArgIndex<3>>]>;
-
-def int_hexagon_V6_vabs_hf :
-Hexagon_v16i32_v16i32_Intrinsic<"HEXAGON_V6_vabs_hf">;
-
-def int_hexagon_V6_vabs_hf_128B :
-Hexagon_v32i32_v32i32_Intrinsic<"HEXAGON_V6_vabs_hf_128B">;
-
-def int_hexagon_V6_vabs_sf :
-Hexagon_v16i32_v16i32_Intrinsic<"HEXAGON_V6_vabs_sf">;
-
-def int_hexagon_V6_vabs_sf_128B :
-Hexagon_v32i32_v32i32_Intrinsic<"HEXAGON_V6_vabs_sf_128B">;
-
-def int_hexagon_V6_vadd_hf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vadd_hf">;
-
-def int_hexagon_V6_vadd_hf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vadd_hf_128B">;
-
-def int_hexagon_V6_vadd_hf_hf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vadd_hf_hf">;
-
-def int_hexagon_V6_vadd_hf_hf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vadd_hf_hf_128B">;
-
-def int_hexagon_V6_vadd_qf16 :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vadd_qf16">;
-
-def int_hexagon_V6_vadd_qf16_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vadd_qf16_128B">;
-
-def int_hexagon_V6_vadd_qf16_mix :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vadd_qf16_mix">;
-
-def int_hexagon_V6_vadd_qf16_mix_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vadd_qf16_mix_128B">;
-
-def int_hexagon_V6_vadd_qf32 :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vadd_qf32">;
-
-def int_hexagon_V6_vadd_qf32_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vadd_qf32_128B">;
-
-def int_hexagon_V6_vadd_qf32_mix :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vadd_qf32_mix">;
-
-def int_hexagon_V6_vadd_qf32_mix_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vadd_qf32_mix_128B">;
-
-def int_hexagon_V6_vadd_sf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vadd_sf">;
-
-def int_hexagon_V6_vadd_sf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vadd_sf_128B">;
-
-def int_hexagon_V6_vadd_sf_hf :
-Hexagon_v32i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vadd_sf_hf">;
-
-def int_hexagon_V6_vadd_sf_hf_128B :
-Hexagon_v64i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vadd_sf_hf_128B">;
-
-def int_hexagon_V6_vadd_sf_sf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vadd_sf_sf">;
-
-def int_hexagon_V6_vadd_sf_sf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vadd_sf_sf_128B">;
-
-def int_hexagon_V6_vassign_fp :
-Hexagon_v16i32_v16i32_Intrinsic<"HEXAGON_V6_vassign_fp">;
-
-def int_hexagon_V6_vassign_fp_128B :
-Hexagon_v32i32_v32i32_Intrinsic<"HEXAGON_V6_vassign_fp_128B">;
-
-def int_hexagon_V6_vconv_hf_qf16 :
-Hexagon_v16i32_v16i32_Intrinsic<"HEXAGON_V6_vconv_hf_qf16">;
-
-def int_hexagon_V6_vconv_hf_qf16_128B :
-Hexagon_v32i32_v32i32_Intrinsic<"HEXAGON_V6_vconv_hf_qf16_128B">;
-
-def int_hexagon_V6_vconv_hf_qf32 :
-Hexagon_v16i32_v32i32_Intrinsic<"HEXAGON_V6_vconv_hf_qf32">;
-
-def int_hexagon_V6_vconv_hf_qf32_128B :
-Hexagon_v32i32_v64i32_Intrinsic<"HEXAGON_V6_vconv_hf_qf32_128B">;
-
-def int_hexagon_V6_vconv_sf_qf32 :
-Hexagon_v16i32_v16i32_Intrinsic<"HEXAGON_V6_vconv_sf_qf32">;
-
-def int_hexagon_V6_vconv_sf_qf32_128B :
-Hexagon_v32i32_v32i32_Intrinsic<"HEXAGON_V6_vconv_sf_qf32_128B">;
-
-def int_hexagon_V6_vcvt_b_hf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vcvt_b_hf">;
-
-def int_hexagon_V6_vcvt_b_hf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vcvt_b_hf_128B">;
-
-def int_hexagon_V6_vcvt_h_hf :
-Hexagon_v16i32_v16i32_Intrinsic<"HEXAGON_V6_vcvt_h_hf">;
-
-def int_hexagon_V6_vcvt_h_hf_128B :
-Hexagon_v32i32_v32i32_Intrinsic<"HEXAGON_V6_vcvt_h_hf_128B">;
-
-def int_hexagon_V6_vcvt_hf_b :
-Hexagon_v32i32_v16i32_Intrinsic<"HEXAGON_V6_vcvt_hf_b">;
-
-def int_hexagon_V6_vcvt_hf_b_128B :
-Hexagon_v64i32_v32i32_Intrinsic<"HEXAGON_V6_vcvt_hf_b_128B">;
-
-def int_hexagon_V6_vcvt_hf_h :
-Hexagon_v16i32_v16i32_Intrinsic<"HEXAGON_V6_vcvt_hf_h">;
-
-def int_hexagon_V6_vcvt_hf_h_128B :
-Hexagon_v32i32_v32i32_Intrinsic<"HEXAGON_V6_vcvt_hf_h_128B">;
-
-def int_hexagon_V6_vcvt_hf_sf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vcvt_hf_sf">;
-
-def int_hexagon_V6_vcvt_hf_sf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vcvt_hf_sf_128B">;
-
-def int_hexagon_V6_vcvt_hf_ub :
-Hexagon_v32i32_v16i32_Intrinsic<"HEXAGON_V6_vcvt_hf_ub">;
-
-def int_hexagon_V6_vcvt_hf_ub_128B :
-Hexagon_v64i32_v32i32_Intrinsic<"HEXAGON_V6_vcvt_hf_ub_128B">;
-
-def int_hexagon_V6_vcvt_hf_uh :
-Hexagon_v16i32_v16i32_Intrinsic<"HEXAGON_V6_vcvt_hf_uh">;
-
-def int_hexagon_V6_vcvt_hf_uh_128B :
-Hexagon_v32i32_v32i32_Intrinsic<"HEXAGON_V6_vcvt_hf_uh_128B">;
-
-def int_hexagon_V6_vcvt_sf_hf :
-Hexagon_v32i32_v16i32_Intrinsic<"HEXAGON_V6_vcvt_sf_hf">;
-
-def int_hexagon_V6_vcvt_sf_hf_128B :
-Hexagon_v64i32_v32i32_Intrinsic<"HEXAGON_V6_vcvt_sf_hf_128B">;
-
-def int_hexagon_V6_vcvt_ub_hf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vcvt_ub_hf">;
-
-def int_hexagon_V6_vcvt_ub_hf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vcvt_ub_hf_128B">;
-
-def int_hexagon_V6_vcvt_uh_hf :
-Hexagon_v16i32_v16i32_Intrinsic<"HEXAGON_V6_vcvt_uh_hf">;
-
-def int_hexagon_V6_vcvt_uh_hf_128B :
-Hexagon_v32i32_v32i32_Intrinsic<"HEXAGON_V6_vcvt_uh_hf_128B">;
-
-def int_hexagon_V6_vdmpy_sf_hf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vdmpy_sf_hf">;
-
-def int_hexagon_V6_vdmpy_sf_hf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vdmpy_sf_hf_128B">;
-
-def int_hexagon_V6_vdmpy_sf_hf_acc :
-Hexagon_v16i32_v16i32v16i32v16i32_Intrinsic<"HEXAGON_V6_vdmpy_sf_hf_acc">;
-
-def int_hexagon_V6_vdmpy_sf_hf_acc_128B :
-Hexagon_v32i32_v32i32v32i32v32i32_Intrinsic<"HEXAGON_V6_vdmpy_sf_hf_acc_128B">;
-
-def int_hexagon_V6_vfmax_hf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vfmax_hf">;
-
-def int_hexagon_V6_vfmax_hf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vfmax_hf_128B">;
-
-def int_hexagon_V6_vfmax_sf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vfmax_sf">;
-
-def int_hexagon_V6_vfmax_sf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vfmax_sf_128B">;
-
-def int_hexagon_V6_vfmin_hf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vfmin_hf">;
-
-def int_hexagon_V6_vfmin_hf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vfmin_hf_128B">;
-
-def int_hexagon_V6_vfmin_sf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vfmin_sf">;
-
-def int_hexagon_V6_vfmin_sf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vfmin_sf_128B">;
-
-def int_hexagon_V6_vfneg_hf :
-Hexagon_v16i32_v16i32_Intrinsic<"HEXAGON_V6_vfneg_hf">;
-
-def int_hexagon_V6_vfneg_hf_128B :
-Hexagon_v32i32_v32i32_Intrinsic<"HEXAGON_V6_vfneg_hf_128B">;
-
-def int_hexagon_V6_vfneg_sf :
-Hexagon_v16i32_v16i32_Intrinsic<"HEXAGON_V6_vfneg_sf">;
-
-def int_hexagon_V6_vfneg_sf_128B :
-Hexagon_v32i32_v32i32_Intrinsic<"HEXAGON_V6_vfneg_sf_128B">;
-
-def int_hexagon_V6_vgthf :
-Hexagon_v64i1_v16i32v16i32_Intrinsic<"HEXAGON_V6_vgthf">;
-
-def int_hexagon_V6_vgthf_128B :
-Hexagon_v128i1_v32i32v32i32_Intrinsic<"HEXAGON_V6_vgthf_128B">;
-
-def int_hexagon_V6_vgthf_and :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vgthf_and">;
-
-def int_hexagon_V6_vgthf_and_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vgthf_and_128B">;
-
-def int_hexagon_V6_vgthf_or :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vgthf_or">;
-
-def int_hexagon_V6_vgthf_or_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vgthf_or_128B">;
-
-def int_hexagon_V6_vgthf_xor :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vgthf_xor">;
-
-def int_hexagon_V6_vgthf_xor_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vgthf_xor_128B">;
-
-def int_hexagon_V6_vgtsf :
-Hexagon_v64i1_v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtsf">;
-
-def int_hexagon_V6_vgtsf_128B :
-Hexagon_v128i1_v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtsf_128B">;
-
-def int_hexagon_V6_vgtsf_and :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtsf_and">;
-
-def int_hexagon_V6_vgtsf_and_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtsf_and_128B">;
-
-def int_hexagon_V6_vgtsf_or :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtsf_or">;
-
-def int_hexagon_V6_vgtsf_or_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtsf_or_128B">;
-
-def int_hexagon_V6_vgtsf_xor :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtsf_xor">;
-
-def int_hexagon_V6_vgtsf_xor_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtsf_xor_128B">;
-
-def int_hexagon_V6_vmax_hf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vmax_hf">;
-
-def int_hexagon_V6_vmax_hf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vmax_hf_128B">;
-
-def int_hexagon_V6_vmax_sf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vmax_sf">;
-
-def int_hexagon_V6_vmax_sf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vmax_sf_128B">;
-
-def int_hexagon_V6_vmin_hf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vmin_hf">;
-
-def int_hexagon_V6_vmin_hf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vmin_hf_128B">;
-
-def int_hexagon_V6_vmin_sf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vmin_sf">;
-
-def int_hexagon_V6_vmin_sf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vmin_sf_128B">;
-
-def int_hexagon_V6_vmpy_hf_hf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vmpy_hf_hf">;
-
-def int_hexagon_V6_vmpy_hf_hf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vmpy_hf_hf_128B">;
-
-def int_hexagon_V6_vmpy_hf_hf_acc :
-Hexagon_v16i32_v16i32v16i32v16i32_Intrinsic<"HEXAGON_V6_vmpy_hf_hf_acc">;
-
-def int_hexagon_V6_vmpy_hf_hf_acc_128B :
-Hexagon_v32i32_v32i32v32i32v32i32_Intrinsic<"HEXAGON_V6_vmpy_hf_hf_acc_128B">;
-
-def int_hexagon_V6_vmpy_qf16 :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vmpy_qf16">;
-
-def int_hexagon_V6_vmpy_qf16_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vmpy_qf16_128B">;
-
-def int_hexagon_V6_vmpy_qf16_hf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vmpy_qf16_hf">;
-
-def int_hexagon_V6_vmpy_qf16_hf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vmpy_qf16_hf_128B">;
-
-def int_hexagon_V6_vmpy_qf16_mix_hf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vmpy_qf16_mix_hf">;
-
-def int_hexagon_V6_vmpy_qf16_mix_hf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vmpy_qf16_mix_hf_128B">;
-
-def int_hexagon_V6_vmpy_qf32 :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vmpy_qf32">;
-
-def int_hexagon_V6_vmpy_qf32_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vmpy_qf32_128B">;
-
-def int_hexagon_V6_vmpy_qf32_hf :
-Hexagon_v32i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vmpy_qf32_hf">;
-
-def int_hexagon_V6_vmpy_qf32_hf_128B :
-Hexagon_v64i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vmpy_qf32_hf_128B">;
-
-def int_hexagon_V6_vmpy_qf32_mix_hf :
-Hexagon_v32i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vmpy_qf32_mix_hf">;
-
-def int_hexagon_V6_vmpy_qf32_mix_hf_128B :
-Hexagon_v64i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vmpy_qf32_mix_hf_128B">;
-
-def int_hexagon_V6_vmpy_qf32_qf16 :
-Hexagon_v32i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vmpy_qf32_qf16">;
-
-def int_hexagon_V6_vmpy_qf32_qf16_128B :
-Hexagon_v64i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vmpy_qf32_qf16_128B">;
-
-def int_hexagon_V6_vmpy_qf32_sf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vmpy_qf32_sf">;
-
-def int_hexagon_V6_vmpy_qf32_sf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vmpy_qf32_sf_128B">;
-
-def int_hexagon_V6_vmpy_sf_hf :
-Hexagon_v32i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vmpy_sf_hf">;
-
-def int_hexagon_V6_vmpy_sf_hf_128B :
-Hexagon_v64i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vmpy_sf_hf_128B">;
-
-def int_hexagon_V6_vmpy_sf_hf_acc :
-Hexagon_v32i32_v32i32v16i32v16i32_Intrinsic<"HEXAGON_V6_vmpy_sf_hf_acc">;
-
-def int_hexagon_V6_vmpy_sf_hf_acc_128B :
-Hexagon_v64i32_v64i32v32i32v32i32_Intrinsic<"HEXAGON_V6_vmpy_sf_hf_acc_128B">;
-
-def int_hexagon_V6_vmpy_sf_sf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vmpy_sf_sf">;
-
-def int_hexagon_V6_vmpy_sf_sf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vmpy_sf_sf_128B">;
-
-def int_hexagon_V6_vsub_hf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vsub_hf">;
-
-def int_hexagon_V6_vsub_hf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vsub_hf_128B">;
-
-def int_hexagon_V6_vsub_hf_hf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vsub_hf_hf">;
-
-def int_hexagon_V6_vsub_hf_hf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vsub_hf_hf_128B">;
-
-def int_hexagon_V6_vsub_qf16 :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vsub_qf16">;
-
-def int_hexagon_V6_vsub_qf16_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vsub_qf16_128B">;
-
-def int_hexagon_V6_vsub_qf16_mix :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vsub_qf16_mix">;
-
-def int_hexagon_V6_vsub_qf16_mix_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vsub_qf16_mix_128B">;
-
-def int_hexagon_V6_vsub_qf32 :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vsub_qf32">;
-
-def int_hexagon_V6_vsub_qf32_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vsub_qf32_128B">;
-
-def int_hexagon_V6_vsub_qf32_mix :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vsub_qf32_mix">;
-
-def int_hexagon_V6_vsub_qf32_mix_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vsub_qf32_mix_128B">;
-
-def int_hexagon_V6_vsub_sf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vsub_sf">;
-
-def int_hexagon_V6_vsub_sf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vsub_sf_128B">;
-
-def int_hexagon_V6_vsub_sf_hf :
-Hexagon_v32i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vsub_sf_hf">;
-
-def int_hexagon_V6_vsub_sf_hf_128B :
-Hexagon_v64i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vsub_sf_hf_128B">;
-
-def int_hexagon_V6_vsub_sf_sf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vsub_sf_sf">;
-
-def int_hexagon_V6_vsub_sf_sf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vsub_sf_sf_128B">;
-
-// V69 HVX Instructions.
-
-def int_hexagon_V6_vasrvuhubrndsat :
-Hexagon_v16i32_v32i32v16i32_Intrinsic<"HEXAGON_V6_vasrvuhubrndsat">;
-
-def int_hexagon_V6_vasrvuhubrndsat_128B :
-Hexagon_v32i32_v64i32v32i32_Intrinsic<"HEXAGON_V6_vasrvuhubrndsat_128B">;
-
-def int_hexagon_V6_vasrvuhubsat :
-Hexagon_v16i32_v32i32v16i32_Intrinsic<"HEXAGON_V6_vasrvuhubsat">;
-
-def int_hexagon_V6_vasrvuhubsat_128B :
-Hexagon_v32i32_v64i32v32i32_Intrinsic<"HEXAGON_V6_vasrvuhubsat_128B">;
-
-def int_hexagon_V6_vasrvwuhrndsat :
-Hexagon_v16i32_v32i32v16i32_Intrinsic<"HEXAGON_V6_vasrvwuhrndsat">;
-
-def int_hexagon_V6_vasrvwuhrndsat_128B :
-Hexagon_v32i32_v64i32v32i32_Intrinsic<"HEXAGON_V6_vasrvwuhrndsat_128B">;
-
-def int_hexagon_V6_vasrvwuhsat :
-Hexagon_v16i32_v32i32v16i32_Intrinsic<"HEXAGON_V6_vasrvwuhsat">;
-
-def int_hexagon_V6_vasrvwuhsat_128B :
-Hexagon_v32i32_v64i32v32i32_Intrinsic<"HEXAGON_V6_vasrvwuhsat_128B">;
-
-def int_hexagon_V6_vmpyuhvs :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vmpyuhvs">;
-
-def int_hexagon_V6_vmpyuhvs_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vmpyuhvs_128B">;
-
-// V73 HVX Instructions.
-
-def int_hexagon_V6_vadd_sf_bf :
-Hexagon_v32i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vadd_sf_bf">;
-
-def int_hexagon_V6_vadd_sf_bf_128B :
-Hexagon_v64i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vadd_sf_bf_128B">;
-
-def int_hexagon_V6_vconv_h_hf :
-Hexagon_v16i32_v16i32_Intrinsic<"HEXAGON_V6_vconv_h_hf">;
-
-def int_hexagon_V6_vconv_h_hf_128B :
-Hexagon_v32i32_v32i32_Intrinsic<"HEXAGON_V6_vconv_h_hf_128B">;
-
-def int_hexagon_V6_vconv_hf_h :
-Hexagon_v16i32_v16i32_Intrinsic<"HEXAGON_V6_vconv_hf_h">;
-
-def int_hexagon_V6_vconv_hf_h_128B :
-Hexagon_v32i32_v32i32_Intrinsic<"HEXAGON_V6_vconv_hf_h_128B">;
-
-def int_hexagon_V6_vconv_sf_w :
-Hexagon_v16i32_v16i32_Intrinsic<"HEXAGON_V6_vconv_sf_w">;
-
-def int_hexagon_V6_vconv_sf_w_128B :
-Hexagon_v32i32_v32i32_Intrinsic<"HEXAGON_V6_vconv_sf_w_128B">;
-
-def int_hexagon_V6_vconv_w_sf :
-Hexagon_v16i32_v16i32_Intrinsic<"HEXAGON_V6_vconv_w_sf">;
-
-def int_hexagon_V6_vconv_w_sf_128B :
-Hexagon_v32i32_v32i32_Intrinsic<"HEXAGON_V6_vconv_w_sf_128B">;
-
-def int_hexagon_V6_vcvt_bf_sf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vcvt_bf_sf">;
-
-def int_hexagon_V6_vcvt_bf_sf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vcvt_bf_sf_128B">;
-
-def int_hexagon_V6_vgtbf :
-Hexagon_v64i1_v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtbf">;
-
-def int_hexagon_V6_vgtbf_128B :
-Hexagon_v128i1_v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtbf_128B">;
-
-def int_hexagon_V6_vgtbf_and :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtbf_and">;
-
-def int_hexagon_V6_vgtbf_and_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtbf_and_128B">;
-
-def int_hexagon_V6_vgtbf_or :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtbf_or">;
-
-def int_hexagon_V6_vgtbf_or_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtbf_or_128B">;
-
-def int_hexagon_V6_vgtbf_xor :
-Hexagon_v64i1_v64i1v16i32v16i32_Intrinsic<"HEXAGON_V6_vgtbf_xor">;
-
-def int_hexagon_V6_vgtbf_xor_128B :
-Hexagon_v128i1_v128i1v32i32v32i32_Intrinsic<"HEXAGON_V6_vgtbf_xor_128B">;
-
-def int_hexagon_V6_vmax_bf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vmax_bf">;
-
-def int_hexagon_V6_vmax_bf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vmax_bf_128B">;
-
-def int_hexagon_V6_vmin_bf :
-Hexagon_v16i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vmin_bf">;
-
-def int_hexagon_V6_vmin_bf_128B :
-Hexagon_v32i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vmin_bf_128B">;
-
-def int_hexagon_V6_vmpy_sf_bf :
-Hexagon_v32i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vmpy_sf_bf">;
-
-def int_hexagon_V6_vmpy_sf_bf_128B :
-Hexagon_v64i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vmpy_sf_bf_128B">;
-
-def int_hexagon_V6_vmpy_sf_bf_acc :
-Hexagon_v32i32_v32i32v16i32v16i32_Intrinsic<"HEXAGON_V6_vmpy_sf_bf_acc">;
-
-def int_hexagon_V6_vmpy_sf_bf_acc_128B :
-Hexagon_v64i32_v64i32v32i32v32i32_Intrinsic<"HEXAGON_V6_vmpy_sf_bf_acc_128B">;
-
-def int_hexagon_V6_vsub_sf_bf :
-Hexagon_v32i32_v16i32v16i32_Intrinsic<"HEXAGON_V6_vsub_sf_bf">;
-
-def int_hexagon_V6_vsub_sf_bf_128B :
-Hexagon_v64i32_v32i32v32i32_Intrinsic<"HEXAGON_V6_vsub_sf_bf_128B">;
 

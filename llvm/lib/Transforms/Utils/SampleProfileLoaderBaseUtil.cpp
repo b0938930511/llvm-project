@@ -11,10 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Transforms/Utils/SampleProfileLoaderBaseUtil.h"
-#include "llvm/Analysis/ProfileSummaryInfo.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/Module.h"
-#include "llvm/Transforms/Utils/ModuleUtils.h"
 
 namespace llvm {
 
@@ -37,10 +33,6 @@ cl::opt<bool> NoWarnSampleUnused(
     "no-warn-sample-unused", cl::init(false), cl::Hidden,
     cl::desc("Use this option to turn off/on warnings about function with "
              "samples but without debug information to use those samples. "));
-
-cl::opt<bool> SampleProfileUseProfi(
-    "sample-profile-use-profi", cl::Hidden,
-    cl::desc("Use profi to infer block and edge counts."));
 
 namespace sampleprofutil {
 

@@ -107,7 +107,7 @@ public:
 
   Type *GetType();
 
-  Scalar &ResolveValue(ExecutionContext *exe_ctx, Module *module = nullptr);
+  Scalar &ResolveValue(ExecutionContext *exe_ctx);
 
   const Scalar &GetScalar() const { return m_value; }
 
@@ -145,8 +145,6 @@ public:
 
   void Clear();
 
-  static ValueType GetValueTypeFromAddressType(AddressType address_type);
-
 protected:
   Scalar m_value;
   CompilerType m_compiler_type;
@@ -158,11 +156,13 @@ protected:
 
 class ValueList {
 public:
-  ValueList() = default;
+  ValueList() : m_values() {}
+
+  ValueList(const ValueList &rhs);
+
   ~ValueList() = default;
 
-  ValueList(const ValueList &rhs) = default;
-  ValueList &operator=(const ValueList &rhs) = default;
+  const ValueList &operator=(const ValueList &rhs);
 
   // void InsertValue (Value *value, size_t idx);
   void PushValue(const Value &value);

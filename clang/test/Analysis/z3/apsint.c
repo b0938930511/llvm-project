@@ -2,13 +2,13 @@
 // expected-no-diagnostics
 
 // https://bugs.llvm.org/show_bug.cgi?id=37622
-_Bool a(void) {
+_Bool a() {
   return !({ a(); });
 }
 
 // https://bugs.llvm.org/show_bug.cgi?id=37646
 _Bool b;
-void c(void) {
+void c() {
   _Bool a = b | 0;
   for (;;)
     if (a)

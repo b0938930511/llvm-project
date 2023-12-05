@@ -57,14 +57,13 @@ MlirDiagnosticHandlerID mlirContextAttachDiagnosticHandler(
     MlirContext context, MlirDiagnosticHandler handler, void *userData,
     void (*deleteUserData)(void *)) {
   assert(handler && "unexpected null diagnostic handler");
-  if (deleteUserData == nullptr)
+  if (deleteUserData == NULL)
     deleteUserData = deleteUserDataNoop;
+  std::shared_ptr<void> sharedUserData(userData, deleteUserData);
   DiagnosticEngine::HandlerID id =
       unwrap(context)->getDiagEngine().registerHandler(
-          [handler,
-           ownedUserData = std::unique_ptr<void, decltype(deleteUserData)>(
-               userData, deleteUserData)](Diagnostic &diagnostic) {
-            return unwrap(handler(wrap(diagnostic), ownedUserData.get()));
+          [handler, sharedUserData](Diagnostic &diagnostic) {
+            return unwrap(handler(wrap(diagnostic), sharedUserData.get()));
           });
   return static_cast<MlirDiagnosticHandlerID>(id);
 }

@@ -13,7 +13,6 @@
 #include "lldb/lldb-types.h"
 #include <atomic>
 #include <mutex>
-#include <optional>
 
 namespace lldb_private {
 
@@ -87,12 +86,10 @@ public:
   /// anything nor send any progress updates.
   ///
   /// @param [in] amount The amount to increment m_completed by.
-  ///
-  /// @param [in] an optional message associated with this update.
-  void Increment(uint64_t amount = 1, std::string update = {});
+  void Increment(uint64_t amount = 1);
 
 private:
-  void ReportProgress(std::string update = {});
+  void ReportProgress();
   static std::atomic<uint64_t> g_id;
   /// The title of the progress activity.
   std::string m_title;
@@ -105,7 +102,7 @@ private:
   const uint64_t m_total;
   /// The optional debugger ID to report progress to. If this has no value then
   /// all debuggers will receive this event.
-  std::optional<lldb::user_id_t> m_debugger_id;
+  llvm::Optional<lldb::user_id_t> m_debugger_id;
   /// Set to true when progress has been reported where m_completed == m_total
   /// to ensure that we don't send progress updates after progress has
   /// completed.

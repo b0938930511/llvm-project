@@ -6,7 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-// UNSUPPORTED: no-random-device
+// See bugs.llvm.org/PR20183
+//
+// XFAIL: use_system_cxx_lib && target={{.+}}-apple-macosx10.{{9|10|11}}
+
+// UNSUPPORTED: libcpp-has-no-random-device
 
 // <random>
 
@@ -16,7 +20,6 @@
 
 #include <random>
 #include <cassert>
-#include <string>
 #include <system_error>
 
 #include "test_macros.h"
@@ -29,16 +32,15 @@ int main(int, char**)
         ((void)e); // Prevent unused warning
     }
 
-    // When using the `/dev/urandom` implementation, make sure that we throw
-    // an exception when we hit EOF while reading the custom-provided file.
-#if !defined(TEST_HAS_NO_EXCEPTIONS) && defined(_LIBCPP_USING_DEV_RANDOM)
+#ifndef TEST_HAS_NO_EXCEPTIONS
+    try
     {
         std::random_device r("/dev/null");
-        try {
-            (void)r();
-            LIBCPP_ASSERT(false);
-        } catch (const std::system_error&) {
-        }
+        (void)r();
+        LIBCPP_ASSERT(false);
+    }
+    catch (const std::system_error&)
+    {
     }
 #endif
 

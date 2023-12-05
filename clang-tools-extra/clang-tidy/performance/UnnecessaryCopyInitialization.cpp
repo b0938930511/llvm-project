@@ -14,9 +14,10 @@
 #include "../utils/OptionsUtils.h"
 #include "clang/AST/Decl.h"
 #include "clang/Basic/Diagnostic.h"
-#include <optional>
 
-namespace clang::tidy::performance {
+namespace clang {
+namespace tidy {
+namespace performance {
 namespace {
 
 using namespace ::clang::ast_matchers;
@@ -34,18 +35,18 @@ void recordFixes(const VarDecl &Var, ASTContext &Context,
                  DiagnosticBuilder &Diagnostic) {
   Diagnostic << utils::fixit::changeVarDeclToReference(Var, Context);
   if (!Var.getType().isLocalConstQualified()) {
-    if (std::optional<FixItHint> Fix = utils::fixit::addQualifierToVarDecl(
+    if (llvm::Optional<FixItHint> Fix = utils::fixit::addQualifierToVarDecl(
             Var, Context, DeclSpec::TQ::TQ_const))
       Diagnostic << *Fix;
   }
 }
 
-std::optional<SourceLocation> firstLocAfterNewLine(SourceLocation Loc,
-                                                   SourceManager &SM) {
-  bool Invalid = false;
+llvm::Optional<SourceLocation> firstLocAfterNewLine(SourceLocation Loc,
+                                                    SourceManager &SM) {
+  bool Invalid;
   const char *TextAfter = SM.getCharacterData(Loc, &Invalid);
   if (Invalid) {
-    return std::nullopt;
+    return llvm::None;
   }
   size_t Offset = std::strcspn(TextAfter, "\n");
   return Loc.getLocWithOffset(TextAfter[Offset] == '\0' ? Offset : Offset + 1);
@@ -57,7 +58,7 @@ void recordRemoval(const DeclStmt &Stmt, ASTContext &Context,
   // Attempt to remove trailing comments as well.
   auto Tok = utils::lexer::findNextTokenSkippingComments(Stmt.getEndLoc(), SM,
                                                          Context.getLangOpts());
-  std::optional<SourceLocation> PastNewLine =
+  llvm::Optional<SourceLocation> PastNewLine =
       firstLocAfterNewLine(Stmt.getEndLoc(), SM);
   if (Tok && PastNewLine) {
     auto BeforeFirstTokenAfterComment = Tok->getLocation().getLocWithOffset(-1);
@@ -75,41 +76,35 @@ void recordRemoval(const DeclStmt &Stmt, ASTContext &Context,
 }
 
 AST_MATCHER_FUNCTION_P(StatementMatcher, isConstRefReturningMethodCall,
-                       std::vector<StringRef>, ExcludedContainerTypes) {
+                       std::vector<std::string>, ExcludedContainerTypes) {
   // Match method call expressions where the `this` argument is only used as
   // const, this will be checked in `check()` part. This returned const
   // reference is highly likely to outlive the local const reference of the
   // variable being declared. The assumption is that the const reference being
   // returned either points to a global static variable or to a member of the
   // called object.
-  const auto MethodDecl =
-      cxxMethodDecl(returns(hasCanonicalType(matchers::isReferenceToConst())))
-          .bind(MethodDeclId);
-  const auto ReceiverExpr = declRefExpr(to(varDecl().bind(ObjectArgId)));
-  const auto ReceiverType =
-      hasCanonicalType(recordType(hasDeclaration(namedDecl(
-          unless(matchers::matchesAnyListedName(ExcludedContainerTypes))))));
-
-  return expr(anyOf(
-      cxxMemberCallExpr(callee(MethodDecl), on(ReceiverExpr),
-                        thisPointerType(ReceiverType)),
-      cxxOperatorCallExpr(callee(MethodDecl), hasArgument(0, ReceiverExpr),
-                          hasArgument(0, hasType(ReceiverType)))));
+  return cxxMemberCallExpr(
+      callee(cxxMethodDecl(returns(matchers::isReferenceToConst()))
+                 .bind(MethodDeclId)),
+      on(declRefExpr(to(
+          varDecl(
+              unless(hasType(qualType(hasCanonicalType(hasDeclaration(namedDecl(
+                  matchers::matchesAnyListedName(ExcludedContainerTypes))))))))
+              .bind(ObjectArgId)))));
 }
 
 AST_MATCHER_FUNCTION(StatementMatcher, isConstRefReturningFunctionCall) {
   // Only allow initialization of a const reference from a free function if it
   // has no arguments. Otherwise it could return an alias to one of its
   // arguments and the arguments need to be checked for const use as well.
-  return callExpr(callee(functionDecl(returns(hasCanonicalType(
-                                          matchers::isReferenceToConst())))
+  return callExpr(callee(functionDecl(returns(matchers::isReferenceToConst()))
                              .bind(FunctionDeclId)),
                   argumentCountIs(0), unless(callee(cxxMethodDecl())))
       .bind(InitFunctionCallId);
 }
 
 AST_MATCHER_FUNCTION_P(StatementMatcher, initializerReturnsReferenceToConst,
-                       std::vector<StringRef>, ExcludedContainerTypes) {
+                       std::vector<std::string>, ExcludedContainerTypes) {
   auto OldVarDeclRef =
       declRefExpr(to(varDecl(hasLocalStorage()).bind(OldVarDeclId)));
   return expr(
@@ -134,7 +129,7 @@ AST_MATCHER_FUNCTION_P(StatementMatcher, initializerReturnsReferenceToConst,
 // object arg or variable that is referenced is immutable as well.
 static bool isInitializingVariableImmutable(
     const VarDecl &InitializingVar, const Stmt &BlockStmt, ASTContext &Context,
-    const std::vector<StringRef> &ExcludedContainerTypes) {
+    const std::vector<std::string> &ExcludedContainerTypes) {
   if (!isOnlyUsedAsConst(InitializingVar, BlockStmt, Context))
     return false;
 
@@ -190,12 +185,12 @@ bool differentReplacedTemplateParams(const QualType &VarType,
           getSubstitutedType(VarType, Context)) {
     if (const SubstTemplateTypeParmType *InitializerTmplType =
             getSubstitutedType(InitializerType, Context)) {
-      const TemplateTypeParmDecl *VarTTP = VarTmplType->getReplacedParameter();
-      const TemplateTypeParmDecl *InitTTP =
-          InitializerTmplType->getReplacedParameter();
-      return (VarTTP->getDepth() != InitTTP->getDepth() ||
-              VarTTP->getIndex() != InitTTP->getIndex() ||
-              VarTTP->isParameterPack() != InitTTP->isParameterPack());
+      return VarTmplType->getReplacedParameter()
+                 ->desugar()
+                 .getCanonicalType() !=
+             InitializerTmplType->getReplacedParameter()
+                 ->desugar()
+                 .getCanonicalType();
     }
   }
   return false;
@@ -368,4 +363,6 @@ void UnnecessaryCopyInitialization::storeOptions(
                 utils::options::serializeStringList(ExcludedContainerTypes));
 }
 
-} // namespace clang::tidy::performance
+} // namespace performance
+} // namespace tidy
+} // namespace clang

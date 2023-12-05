@@ -10,17 +10,13 @@
 // adds that blob as a string attribute of the module.
 //
 //===----------------------------------------------------------------------===//
-
-#include "mlir/Dialect/GPU/Transforms/Passes.h"
-#include "mlir/Dialect/LLVMIR/NVVMDialect.h"
-#include "llvm/Support/Debug.h"
+#include "mlir/Dialect/GPU/Passes.h"
 
 #if MLIR_GPU_TO_CUBIN_PASS_ENABLE
 #include "mlir/Pass/Pass.h"
 #include "mlir/Target/LLVMIR/Dialect/NVVM/NVVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
 #include "llvm/Support/TargetSelect.h"
-#include "llvm/Support/Threading.h"
 
 #include <cuda.h>
 
@@ -28,14 +24,13 @@ using namespace mlir;
 
 static void emitCudaError(const llvm::Twine &expr, const char *buffer,
                           CUresult result, Location loc) {
-  const char *error = nullptr;
+  const char *error;
   cuGetErrorString(result, &error);
-  emitError(loc,
-            expr.concat(error ? " failed with error code " + llvm::Twine{error}
-                              : llvm::Twine(" failed with unknown error "))
-                .concat("[")
-                .concat(buffer)
-                .concat("]"));
+  emitError(loc, expr.concat(" failed with error code ")
+                     .concat(llvm::Twine{error})
+                     .concat("[")
+                     .concat(buffer)
+                     .concat("]"));
 }
 
 #define RETURN_ON_CUDA_ERROR(expr)                                             \
@@ -49,14 +44,8 @@ static void emitCudaError(const llvm::Twine &expr, const char *buffer,
 namespace {
 class SerializeToCubinPass
     : public PassWrapper<SerializeToCubinPass, gpu::SerializeToBlobPass> {
-  static llvm::once_flag initializeBackendOnce;
-
 public:
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(SerializeToCubinPass)
-
-  SerializeToCubinPass(StringRef triple = "nvptx64-nvidia-cuda",
-                       StringRef chip = "sm_35", StringRef features = "+ptx60",
-                       int optLevel = 2, bool dumpPtx = false);
+  SerializeToCubinPass();
 
   StringRef getArgument() const override { return "gpu-to-cubin"; }
   StringRef getDescription() const override {
@@ -64,6 +53,8 @@ public:
   }
 
 private:
+  void getDependentDialects(DialectRegistry &registry) const override;
+
   // Serializes PTX to CUBIN.
   std::unique_ptr<std::vector<char>>
   serializeISA(const std::string &isa) override;
@@ -71,34 +62,22 @@ private:
 } // namespace
 
 // Sets the 'option' to 'value' unless it already has a value.
-static void maybeSetOption(Pass::Option<std::string> &option, StringRef value) {
+static void maybeSetOption(Pass::Option<std::string> &option,
+                           const char *value) {
   if (!option.hasValue())
-    option = value.str();
+    option = value;
 }
 
-llvm::once_flag SerializeToCubinPass::initializeBackendOnce;
+SerializeToCubinPass::SerializeToCubinPass() {
+  maybeSetOption(this->triple, "nvptx64-nvidia-cuda");
+  maybeSetOption(this->chip, "sm_35");
+  maybeSetOption(this->features, "+ptx60");
+}
 
-SerializeToCubinPass::SerializeToCubinPass(StringRef triple, StringRef chip,
-                                           StringRef features, int optLevel,
-                                           bool dumpPtx) {
-  // No matter how this pass is constructed, ensure that the NVPTX backend
-  // is initialized exactly once.
-  llvm::call_once(initializeBackendOnce, []() {
-    // Initialize LLVM NVPTX backend.
-#if LLVM_HAS_NVPTX_TARGET
-    LLVMInitializeNVPTXTarget();
-    LLVMInitializeNVPTXTargetInfo();
-    LLVMInitializeNVPTXTargetMC();
-    LLVMInitializeNVPTXAsmPrinter();
-#endif
-  });
-
-  maybeSetOption(this->triple, triple);
-  maybeSetOption(this->chip, chip);
-  maybeSetOption(this->features, features);
-  this->dumpPtx = dumpPtx;
-  if (this->optLevel.getNumOccurrences() == 0)
-    this->optLevel.setValue(optLevel);
+void SerializeToCubinPass::getDependentDialects(
+    DialectRegistry &registry) const {
+  registerNVVMDialectTranslation(registry);
+  gpu::SerializeToBlobPass::getDependentDialects(registry);
 }
 
 std::unique_ptr<std::vector<char>>
@@ -112,11 +91,7 @@ SerializeToCubinPass::serializeISA(const std::string &isa) {
   CUdevice device;
   RETURN_ON_CUDA_ERROR(cuDeviceGet(&device, 0));
   CUcontext context;
-  // Use the primary context.
-  RETURN_ON_CUDA_ERROR(cuDevicePrimaryCtxRetain(&context, device));
-  // Push the primary context so that the next CUDA operations
-  // actually use it.
-  RETURN_ON_CUDA_ERROR(cuCtxPushCurrent(context));
+  RETURN_ON_CUDA_ERROR(cuCtxCreate(&context, 0, device));
   CUlinkState linkState;
 
   CUjit_option jitOptions[] = {CU_JIT_ERROR_LOG_BUFFER,
@@ -130,10 +105,6 @@ SerializeToCubinPass::serializeISA(const std::string &isa) {
                                     &linkState));
 
   auto kernelName = getOperation().getName().str();
-  if (dumpPtx) {
-    llvm::dbgs() << " Kernel Name : [" << kernelName << "]\n";
-    llvm::dbgs() << isa << "\n";
-  }
   RETURN_ON_CUDA_ERROR(cuLinkAddData(
       linkState, CUjitInputType::CU_JIT_INPUT_PTX,
       const_cast<void *>(static_cast<const void *>(isa.c_str())), isa.length(),
@@ -152,10 +123,7 @@ SerializeToCubinPass::serializeISA(const std::string &isa) {
 
   // This will also destroy the cubin data.
   RETURN_ON_CUDA_ERROR(cuLinkDestroy(linkState));
-  // Pop and release the primary context.
-  CUcontext poppedContext;
-  RETURN_ON_CUDA_ERROR(cuCtxPopCurrent(&poppedContext));
-  RETURN_ON_CUDA_ERROR(cuDevicePrimaryCtxRelease(device));
+  RETURN_ON_CUDA_ERROR(cuCtxDestroy(context));
 
   return result;
 }
@@ -163,18 +131,16 @@ SerializeToCubinPass::serializeISA(const std::string &isa) {
 // Register pass to serialize GPU kernel functions to a CUBIN binary annotation.
 void mlir::registerGpuSerializeToCubinPass() {
   PassRegistration<SerializeToCubinPass> registerSerializeToCubin(
-      [] { return std::make_unique<SerializeToCubinPass>(); });
-}
+      [] {
+        // Initialize LLVM NVPTX backend.
+        LLVMInitializeNVPTXTarget();
+        LLVMInitializeNVPTXTargetInfo();
+        LLVMInitializeNVPTXTargetMC();
+        LLVMInitializeNVPTXAsmPrinter();
 
-std::unique_ptr<Pass> mlir::createGpuSerializeToCubinPass(StringRef triple,
-                                                          StringRef arch,
-                                                          StringRef features,
-                                                          int optLevel,
-                                                          bool dumpPtx) {
-  return std::make_unique<SerializeToCubinPass>(triple, arch, features,
-                                                optLevel, dumpPtx);
+        return std::make_unique<SerializeToCubinPass>();
+      });
 }
-
 #else  // MLIR_GPU_TO_CUBIN_PASS_ENABLE
 void mlir::registerGpuSerializeToCubinPass() {}
 #endif // MLIR_GPU_TO_CUBIN_PASS_ENABLE

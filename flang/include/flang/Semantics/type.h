@@ -47,17 +47,11 @@ using SubscriptIntExpr = evaluate::Expr<evaluate::SubscriptInteger>;
 using MaybeSubscriptIntExpr = std::optional<SubscriptIntExpr>;
 using KindExpr = SubscriptIntExpr;
 
-// An array spec bound: an explicit integer expression, assumed size
-// or implied shape(*), or assumed or deferred shape(:).  In the absence
-// of explicit lower bounds it is not possible to distinguish assumed
-// shape bounds from deferred shape bounds without knowing whether the
-// particular symbol is an allocatable/pointer or a non-allocatable
-// non-pointer dummy; use the symbol-based predicates for those
-// determinations.
+// An array spec bound: an explicit integer expression or ASSUMED or DEFERRED
 class Bound {
 public:
-  static Bound Star() { return Bound(Category::Star); }
-  static Bound Colon() { return Bound(Category::Colon); }
+  static Bound Assumed() { return Bound(Category::Assumed); }
+  static Bound Deferred() { return Bound(Category::Deferred); }
   explicit Bound(MaybeSubscriptIntExpr &&expr) : expr_{std::move(expr)} {}
   explicit Bound(common::ConstantSubscript bound);
   Bound(const Bound &) = default;
@@ -65,8 +59,8 @@ public:
   Bound &operator=(const Bound &) = default;
   Bound &operator=(Bound &&) = default;
   bool isExplicit() const { return category_ == Category::Explicit; }
-  bool isStar() const { return category_ == Category::Star; }
-  bool isColon() const { return category_ == Category::Colon; }
+  bool isAssumed() const { return category_ == Category::Assumed; }
+  bool isDeferred() const { return category_ == Category::Deferred; }
   MaybeSubscriptIntExpr &GetExplicit() { return expr_; }
   const MaybeSubscriptIntExpr &GetExplicit() const { return expr_; }
   void SetExplicit(MaybeSubscriptIntExpr &&expr) {
@@ -75,7 +69,7 @@ public:
   }
 
 private:
-  enum class Category { Explicit, Star, Colon };
+  enum class Category { Explicit, Deferred, Assumed };
   Bound(Category category) : category_{category} {}
   Bound(Category category, MaybeSubscriptIntExpr &&expr)
       : category_{category}, expr_{std::move(expr)} {}
@@ -84,8 +78,7 @@ private:
   friend llvm::raw_ostream &operator<<(llvm::raw_ostream &, const Bound &);
 };
 
-// A type parameter value: integer expression, assumed/implied(*),
-// or deferred(:).
+// A type parameter value: integer expression or assumed or deferred.
 class ParamValue {
 public:
   static ParamValue Assumed(common::TypeParamAttr attr) {
@@ -109,7 +102,6 @@ public:
   bool operator==(const ParamValue &that) const {
     return category_ == that.category_ && expr_ == that.expr_;
   }
-  bool operator!=(const ParamValue &that) const { return !(*this == that); }
   std::string AsFortran() const;
 
 private:
@@ -184,26 +176,28 @@ public:
     return MakeExplicit(Bound{1}, std::move(ub));
   }
   // 1:
-  static ShapeSpec MakeAssumedShape() {
-    return ShapeSpec(Bound{1}, Bound::Colon());
+  static ShapeSpec MakeAssumed() {
+    return ShapeSpec(Bound{1}, Bound::Deferred());
   }
   // lb:
-  static ShapeSpec MakeAssumedShape(Bound &&lb) {
-    return ShapeSpec(std::move(lb), Bound::Colon());
+  static ShapeSpec MakeAssumed(Bound &&lb) {
+    return ShapeSpec(std::move(lb), Bound::Deferred());
   }
   // :
   static ShapeSpec MakeDeferred() {
-    return ShapeSpec(Bound::Colon(), Bound::Colon());
+    return ShapeSpec(Bound::Deferred(), Bound::Deferred());
   }
   // 1:*
-  static ShapeSpec MakeImplied() { return ShapeSpec(Bound{1}, Bound::Star()); }
+  static ShapeSpec MakeImplied() {
+    return ShapeSpec(Bound{1}, Bound::Assumed());
+  }
   // lb:*
   static ShapeSpec MakeImplied(Bound &&lb) {
-    return ShapeSpec(std::move(lb), Bound::Star());
+    return ShapeSpec(std::move(lb), Bound::Assumed());
   }
   // ..
   static ShapeSpec MakeAssumedRank() {
-    return ShapeSpec(Bound::Star(), Bound::Star());
+    return ShapeSpec(Bound::Assumed(), Bound::Assumed());
   }
 
   ShapeSpec(const ShapeSpec &) = default;
@@ -226,15 +220,11 @@ private:
 struct ArraySpec : public std::vector<ShapeSpec> {
   ArraySpec() {}
   int Rank() const { return size(); }
-  // These names are not exclusive, as some categories cannot be
-  // distinguished without knowing whether the particular symbol
-  // is allocatable, pointer, or a non-allocatable non-pointer dummy.
-  // Use the symbol-based predicates for exact results.
   inline bool IsExplicitShape() const;
-  inline bool CanBeAssumedShape() const;
-  inline bool CanBeDeferredShape() const;
-  inline bool CanBeImpliedShape() const;
-  inline bool CanBeAssumedSize() const;
+  inline bool IsAssumedShape() const;
+  inline bool IsDeferredShape() const;
+  inline bool IsImpliedShape() const;
+  inline bool IsAssumedSize() const;
   inline bool IsAssumedRank() const;
 
 private:
@@ -249,8 +239,6 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &, const ArraySpec &);
 // The name may not match the symbol's name in case of a USE rename.
 class DerivedTypeSpec {
 public:
-  enum class Category { DerivedType, IntrinsicVector, PairVector, QuadVector };
-
   using RawParameter = std::pair<const parser::Keyword *, ParamValue>;
   using RawParameters = std::vector<RawParameter>;
   using ParameterMapType = std::map<SourceName, ParamValue>;
@@ -261,23 +249,20 @@ public:
   const SourceName &name() const { return name_; }
   const Symbol &typeSymbol() const { return typeSymbol_; }
   const Scope *scope() const { return scope_; }
-  // Return scope_ if it is set, or the typeSymbol_ scope otherwise.
-  const Scope *GetScope() const;
   void set_scope(const Scope &);
   void ReplaceScope(const Scope &);
-  const RawParameters &rawParameters() const { return rawParameters_; }
+  RawParameters &rawParameters() { return rawParameters_; }
   const ParameterMapType &parameters() const { return parameters_; }
 
   bool MightBeParameterized() const;
   bool IsForwardReferenced() const;
-  bool HasDefaultInitialization(
-      bool ignoreAllocatable = false, bool ignorePointer = true) const;
+  bool HasDefaultInitialization() const;
   bool HasDestruction() const;
 
   // The "raw" type parameter list is a simple transcription from the
   // parameter list in the parse tree, built by calling AddRawParamValue().
   // It can be used with forward-referenced derived types.
-  void AddRawParamValue(const parser::Keyword *, ParamValue &&);
+  void AddRawParamValue(const std::optional<parser::Keyword> &, ParamValue &&);
   // Checks the raw parameter list against the definition of a derived type.
   // Converts the raw parameter list to a map, naming each actual parameter.
   void CookParameters(evaluate::FoldingContext &);
@@ -298,24 +283,11 @@ public:
       return nullptr;
     }
   }
+  bool MightBeAssignmentCompatibleWith(const DerivedTypeSpec &) const;
   bool operator==(const DerivedTypeSpec &that) const {
     return RawEquals(that) && parameters_ == that.parameters_;
   }
-  bool operator!=(const DerivedTypeSpec &that) const {
-    return !(*this == that);
-  }
-  // For TYPE IS & CLASS IS: kind type parameters must be
-  // explicit and equal, len type parameters are ignored.
-  bool Match(const DerivedTypeSpec &) const;
   std::string AsFortran() const;
-  std::string VectorTypeAsFortran() const;
-
-  Category category() const { return category_; }
-  void set_category(Category category) { category_ = category; }
-  bool IsVectorType() const {
-    return category_ == Category::IntrinsicVector ||
-        category_ == Category::PairVector || category_ == Category::QuadVector;
-  }
 
 private:
   SourceName name_;
@@ -326,7 +298,6 @@ private:
   bool instantiated_{false};
   RawParameters rawParameters_;
   ParameterMapType parameters_;
-  Category category_{Category::DerivedType};
   bool RawEquals(const DerivedTypeSpec &that) const {
     return &typeSymbol_ == &that.typeSymbol_ && cooked_ == that.cooked_ &&
         rawParameters_ == that.rawParameters_;
@@ -403,31 +374,46 @@ private:
 };
 llvm::raw_ostream &operator<<(llvm::raw_ostream &, const DeclTypeSpec &);
 
+// This represents a proc-interface in the declaration of a procedure or
+// procedure component. It comprises a symbol that represents the specific
+// interface or a decl-type-spec that represents the function return type.
+class ProcInterface {
+public:
+  const Symbol *symbol() const { return symbol_; }
+  const DeclTypeSpec *type() const { return type_; }
+  void set_symbol(const Symbol &symbol);
+  void set_type(const DeclTypeSpec &type);
+
+private:
+  const Symbol *symbol_{nullptr};
+  const DeclTypeSpec *type_{nullptr};
+};
+
 // Define some member functions here in the header so that they can be used by
 // lib/Evaluate without link-time dependency on Semantics.
 
 inline bool ArraySpec::IsExplicitShape() const {
   return CheckAll([](const ShapeSpec &x) { return x.ubound().isExplicit(); });
 }
-inline bool ArraySpec::CanBeAssumedShape() const {
-  return CheckAll([](const ShapeSpec &x) { return x.ubound().isColon(); });
+inline bool ArraySpec::IsAssumedShape() const {
+  return CheckAll([](const ShapeSpec &x) { return x.ubound().isDeferred(); });
 }
-inline bool ArraySpec::CanBeDeferredShape() const {
+inline bool ArraySpec::IsDeferredShape() const {
   return CheckAll([](const ShapeSpec &x) {
-    return x.lbound().isColon() && x.ubound().isColon();
+    return x.lbound().isDeferred() && x.ubound().isDeferred();
   });
 }
-inline bool ArraySpec::CanBeImpliedShape() const {
+inline bool ArraySpec::IsImpliedShape() const {
   return !IsAssumedRank() &&
-      CheckAll([](const ShapeSpec &x) { return x.ubound().isStar(); });
+      CheckAll([](const ShapeSpec &x) { return x.ubound().isAssumed(); });
 }
-inline bool ArraySpec::CanBeAssumedSize() const {
-  return !empty() && !IsAssumedRank() && back().ubound().isStar() &&
+inline bool ArraySpec::IsAssumedSize() const {
+  return !empty() && !IsAssumedRank() && back().ubound().isAssumed() &&
       std::all_of(begin(), end() - 1,
           [](const ShapeSpec &x) { return x.ubound().isExplicit(); });
 }
 inline bool ArraySpec::IsAssumedRank() const {
-  return Rank() == 1 && front().lbound().isStar();
+  return Rank() == 1 && front().lbound().isAssumed();
 }
 
 inline IntrinsicTypeSpec *DeclTypeSpec::AsIntrinsic() {
@@ -458,9 +444,6 @@ inline DerivedTypeSpec *DeclTypeSpec::AsDerived() {
 inline const DerivedTypeSpec *DeclTypeSpec::AsDerived() const {
   return const_cast<DeclTypeSpec *>(this)->AsDerived();
 }
-
-bool IsInteroperableIntrinsicType(
-    const DeclTypeSpec &, const common::LanguageFeatureControl &);
 
 } // namespace Fortran::semantics
 #endif // FORTRAN_SEMANTICS_TYPE_H_

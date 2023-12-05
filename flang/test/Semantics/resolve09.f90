@@ -1,4 +1,5 @@
-! RUN: %python %S/test_errors.py %s %flang_fc1
+! RUN: %S/test_errors.sh %s %t %flang_fc1
+! REQUIRES: shell
 integer :: y
 procedure() :: a
 procedure(real) :: b
@@ -113,16 +114,3 @@ end
 function b8()
   b8 = 0.0
 end
-
-subroutine s9
-  type t
-    procedure(), nopass, pointer :: p1, p2
-  end type
-  type(t) x
-  print *, x%p1()
-  call x%p2
-  !ERROR: Cannot call function 'p1' like a subroutine
-  call x%p1
-  !ERROR: Cannot call subroutine 'p2' like a function
-  print *, x%p2()
-end subroutine

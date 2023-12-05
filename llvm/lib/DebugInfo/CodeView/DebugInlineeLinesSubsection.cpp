@@ -10,7 +10,6 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/DebugInfo/CodeView/CodeView.h"
 #include "llvm/DebugInfo/CodeView/DebugChecksumsSubsection.h"
-#include "llvm/DebugInfo/CodeView/RecordSerialization.h"
 #include "llvm/Support/BinaryStreamReader.h"
 #include "llvm/Support/BinaryStreamWriter.h"
 #include "llvm/Support/Endian.h"
@@ -98,7 +97,7 @@ Error DebugInlineeLinesSubsection::commit(BinaryStreamWriter &Writer) const {
 
     if (auto EC = Writer.writeInteger<uint32_t>(E.ExtraFiles.size()))
       return EC;
-    if (auto EC = Writer.writeArray(ArrayRef(E.ExtraFiles)))
+    if (auto EC = Writer.writeArray(makeArrayRef(E.ExtraFiles)))
       return EC;
   }
 

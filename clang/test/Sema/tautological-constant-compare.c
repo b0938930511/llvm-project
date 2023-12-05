@@ -43,7 +43,7 @@ void TFunc() {
 }
 #endif
 
-int main(void)
+int main()
 {
 #ifdef __cplusplus
   TFunc<unsigned char>();

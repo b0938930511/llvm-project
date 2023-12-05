@@ -242,6 +242,8 @@ protected:
   lldb::addr_t m_byte_size = 0; ///< The size in bytes of this address range.
 };
 
+// bool operator== (const AddressRange& lhs, const AddressRange& rhs);
+
 } // namespace lldb_private
 
 #endif // LLDB_CORE_ADDRESSRANGE_H

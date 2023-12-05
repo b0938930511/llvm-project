@@ -12,7 +12,7 @@
     Any bad names will make the frontend choke.
  */
 
-int main(void)
+main()
 {
 
     __asm__ __volatile__ (".set noat \n\t addi $7,$at,77":::"at");

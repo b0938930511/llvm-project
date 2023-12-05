@@ -208,9 +208,7 @@ runClangMoveOnCode(const move::MoveDefinitionSpec &Spec,
                    DeclarationReporter *const Reporter = nullptr) {
   clang::RewriterTestContext Context;
 
-  llvm::SmallString<16> Dir(WorkingDir);
-  llvm::sys::path::native(Dir);
-  Context.InMemoryFileSystem->setCurrentWorkingDirectory(Dir);
+  Context.InMemoryFileSystem->setCurrentWorkingDirectory(WorkingDir);
 
   std::map<llvm::StringRef, clang::FileID> FileToFileID;
 
@@ -226,12 +224,13 @@ runClangMoveOnCode(const move::MoveDefinitionSpec &Spec,
   CreateFiles(TestCCName, CC);
 
   std::map<std::string, tooling::Replacements> FileToReplacements;
-  ClangMoveContext MoveContext = {Spec, FileToReplacements, Dir.c_str(), "LLVM",
+  ClangMoveContext MoveContext = {Spec, FileToReplacements, WorkingDir, "LLVM",
                                   Reporter != nullptr};
 
   auto Factory = std::make_unique<clang::move::ClangMoveActionFactory>(
       &MoveContext, Reporter);
 
+ // std::string IncludeArg = Twine("-I" + WorkingDir;
   tooling::runToolOnCodeWithArgs(
       Factory->create(), CC, Context.InMemoryFileSystem,
       {"-std=c++11", "-fparse-all-comments", "-I."}, TestCCName, "clang-move",

@@ -1,8 +1,5 @@
 // RUN: %clang_cc1 -fsyntax-only -Wunused -std=c2x -verify %s
 
-// This is the latest version of maybe_unused that we support.
-_Static_assert(__has_c_attribute(maybe_unused) == 202106L);
-
 struct [[maybe_unused]] S1 { // ok
   int a [[maybe_unused]];
 };
@@ -36,10 +33,3 @@ void f2(void);
 void f2(void) {
 }
 
-void label(void) {
-  [[maybe_unused]] label:
-  ;
-
-  other_label: // expected-warning {{unused label 'other_label'}}
-  ;
-}

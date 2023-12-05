@@ -1,34 +1,22 @@
-template <typename T> struct S {
+template<typename T>
+struct S {
   typedef T V;
 
   V value;
 };
 
-typedef S<float> GlobalTypedef;
+typedef S<float> SF;
 
 namespace ns {
-typedef S<float> NamespaceTypedef;
+typedef S<float> SF;
 }
-
 struct ST {
-  typedef S<float> StructTypedef;
+  typedef S<float> SF;
 };
 
-// Struct type that is not supposed to be a local variable in the test
-// expression evaluation scope. Tests that typedef lookup can actually look
-// inside class/struct scopes.
-struct NonLocalVarStruct {
-  typedef int OtherStructTypedef;
-};
-
-int otherFunc() {
-  NonLocalVarStruct::OtherStructTypedef i = 3;
-  return i;
-}
-
-int main(int argc, char const *argv[]) {
-  GlobalTypedef s{.5};
-  ns::NamespaceTypedef in_ns;
-  ST::StructTypedef in_struct;
-  return otherFunc(); // Set a breakpoint here
+int main (int argc, char const *argv[]) {
+  SF s{ .5 };
+  ns::SF in_ns;
+  ST::SF in_struct;
+  return 0; // Set a breakpoint here
 }

@@ -8,4 +8,4 @@ process launch
 # CHECK: stop reason = breakpoint
 continue
 # CHECK: function run in parent
-# CHECK: function run in exec'd child
+# CHECK: child exited: 0

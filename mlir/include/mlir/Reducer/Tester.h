@@ -53,6 +53,6 @@ private:
   ArrayRef<std::string> testScriptArgs;
 };
 
-} // namespace mlir
+} // end namespace mlir
 
 #endif

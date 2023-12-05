@@ -49,7 +49,9 @@
 #include "clang/Tooling/CompilationDatabase.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/OptTable.h"
 #include "llvm/Support/Debug.h"
@@ -57,7 +59,6 @@
 #include "llvm/Support/StringSaver.h"
 #include "llvm/Support/raw_ostream.h"
 #include <memory>
-#include <optional>
 
 namespace clang {
 namespace tooling {
@@ -128,7 +129,7 @@ struct TransferableCommand {
   // Flags that should not apply to all files are stripped from CommandLine.
   CompileCommand Cmd;
   // Language detected from -x or the filename. Never TY_INVALID.
-  std::optional<types::ID> Type;
+  Optional<types::ID> Type;
   // Standard specified by -std.
   LangStandard::Kind Std = LangStandard::lang_unspecified;
   // Whether the command line is for the cl-compatible driver.
@@ -147,7 +148,7 @@ struct TransferableCommand {
         TmpArgv.push_back(S.c_str());
       ClangCLMode = !TmpArgv.empty() &&
                     driver::IsClangCL(driver::getDriverMode(
-                        TmpArgv.front(), llvm::ArrayRef(TmpArgv).slice(1)));
+                        TmpArgv.front(), llvm::makeArrayRef(TmpArgv).slice(1)));
       ArgList = {TmpArgv.begin(), TmpArgv.end()};
     }
 
@@ -164,7 +165,8 @@ struct TransferableCommand {
       const unsigned OldPos = Pos;
       std::unique_ptr<llvm::opt::Arg> Arg(OptTable.ParseOneArg(
           ArgList, Pos,
-          llvm::opt::Visibility(ClangCLMode ? CLOption : ClangOption)));
+          /* Include */ ClangCLMode ? CoreOption | CLOption : 0,
+          /* Exclude */ ClangCLMode ? 0 : CLOption));
 
       if (!Arg)
         continue;
@@ -206,7 +208,7 @@ struct TransferableCommand {
     Type = foldType(*Type);
     // The contract is to store None instead of TY_INVALID.
     if (Type == types::TY_INVALID)
-      Type = std::nullopt;
+      Type = llvm::None;
   }
 
   // Produce a CompileCommand for \p filename, based on this one.
@@ -241,7 +243,8 @@ struct TransferableCommand {
           llvm::Twine(ClangCLMode ? "/std:" : "-std=") +
           LangStandard::getLangStandardForKind(Std).getName()).str());
     }
-    Result.CommandLine.push_back("--");
+    if (Filename.startswith("-") || (ClangCLMode && Filename.startswith("/")))
+      Result.CommandLine.push_back("--");
     Result.CommandLine.push_back(std::string(Filename));
     return Result;
   }
@@ -278,7 +281,7 @@ private:
   }
 
   // Try to interpret the argument as a type specifier, e.g. '-x'.
-  std::optional<types::ID> tryParseTypeArg(const llvm::opt::Arg &Arg) {
+  Optional<types::ID> tryParseTypeArg(const llvm::opt::Arg &Arg) {
     const llvm::opt::Option &Opt = Arg.getOption();
     using namespace driver::options;
     if (ClangCLMode) {
@@ -290,15 +293,15 @@ private:
       if (Opt.matches(driver::options::OPT_x))
         return types::lookupTypeForTypeSpecifier(Arg.getValue());
     }
-    return std::nullopt;
+    return None;
   }
 
   // Try to interpret the argument as '-std='.
-  std::optional<LangStandard::Kind> tryParseStdArg(const llvm::opt::Arg &Arg) {
+  Optional<LangStandard::Kind> tryParseStdArg(const llvm::opt::Arg &Arg) {
     using namespace driver::options;
     if (Arg.getOption().matches(ClangCLMode ? OPT__SLASH_std : OPT_std_EQ))
       return LangStandard::getLangKind(Arg.getValue());
-    return std::nullopt;
+    return None;
   }
 };
 
@@ -326,7 +329,7 @@ public:
       StringRef Path = Strings.save(StringRef(OriginalPaths[I]).lower());
 
       Paths.emplace_back(Path, I);
-      Types.push_back(foldType(guessType(OriginalPaths[I])));
+      Types.push_back(foldType(guessType(Path)));
       Stems.emplace_back(sys::path::stem(Path), I);
       auto Dir = ++sys::path::rbegin(Path), DirEnd = sys::path::rend(Path);
       for (int J = 0; J < DirectorySegmentsIndexed && Dir != DirEnd; ++J, ++Dir)

@@ -8,7 +8,7 @@
 
 // <string>
 
-// bool empty() const noexcept; // constexpr since C++20
+// bool empty() const noexcept;
 
 #include <string>
 #include <cassert>
@@ -17,31 +17,28 @@
 #include "min_allocator.h"
 
 template <class S>
-TEST_CONSTEXPR_CXX20 void test(const S& s) {
-  ASSERT_NOEXCEPT(s.empty());
-  assert(s.empty() == (s.size() == 0));
+void
+test(const S& s)
+{
+    ASSERT_NOEXCEPT(s.empty());
+    assert(s.empty() == (s.size() == 0));
 }
 
-template <class S>
-TEST_CONSTEXPR_CXX20 void test_string() {
-  test(S());
-  test(S("123"));
-  test(S("12345678901234567890123456789012345678901234567890"));
-}
-
-TEST_CONSTEXPR_CXX20 bool test() {
-  test_string<std::string>();
+int main(int, char**)
+{
+    {
+    typedef std::string S;
+    test(S());
+    test(S("123"));
+    test(S("12345678901234567890123456789012345678901234567890"));
+    }
 #if TEST_STD_VER >= 11
-  test_string<std::basic_string<char, std::char_traits<char>, min_allocator<char>>>();
-#endif
-
-  return true;
-}
-
-int main(int, char**) {
-  test();
-#if TEST_STD_VER > 17
-  static_assert(test());
+    {
+    typedef std::basic_string<char, std::char_traits<char>, min_allocator<char>> S;
+    test(S());
+    test(S("123"));
+    test(S("12345678901234567890123456789012345678901234567890"));
+    }
 #endif
 
   return 0;

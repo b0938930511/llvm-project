@@ -8,5 +8,5 @@
 
 #include <stddef.h>
 
-// CHECK: a type specifier is required
+// CHECK: C++ requires
 invalid;

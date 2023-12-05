@@ -43,7 +43,7 @@ DOUBLE *dp = &d;
 
 #__public_macro WIBBLE // expected-error{{no macro named 'WIBBLE'}}
 
-void f(void) {
+void f() {
   // CHECK-PREPROCESSED: int i = INTEGER;
   int i = INTEGER; // the value was exported, the macro was not.
   i += macros; // expanded from __MODULE__ within the 'macros' module.
@@ -95,7 +95,7 @@ INTEGER my_integer = 0;
 #  error TOP_LEFT_UNDEF should not be defined
 #endif
 
-void test1(void) {
+void test1() {
   int i;
   TOP_RIGHT_REDEF *ip = &i;
 }
@@ -120,7 +120,7 @@ void test1(void) {
 #  error TOP should be visible
 #endif
 
-void test2(void) {
+void test2() {
   int i;
   float f;
   double d;
@@ -134,7 +134,7 @@ void test2(void) {
 
 #define LEFT_RIGHT_DIFFERENT double // FIXME: expected-warning{{'LEFT_RIGHT_DIFFERENT' macro redefined}}
 
-void test3(void) {
+void test3() {
   double d;
   LEFT_RIGHT_DIFFERENT *dp = &d; // okay
   int x = FN_ADD(1,2);
@@ -146,7 +146,7 @@ void test3(void) {
 
 @import macros_bottom;
 
-TOP_DEF_RIGHT_UNDEF *TDRUf(void) { return TDRUp; }
+TOP_DEF_RIGHT_UNDEF *TDRUf() { return TDRUp; }
 
 @import macros_right.undef;
 

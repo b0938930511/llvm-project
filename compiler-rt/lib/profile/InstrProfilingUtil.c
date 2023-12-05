@@ -34,19 +34,13 @@
 #endif
 
 #if defined(__Fuchsia__)
-#include <zircon/process.h>
 #include <zircon/syscalls.h>
-#endif
-
-#if defined(__FreeBSD__)
-#include <signal.h>
-#include <sys/procctl.h>
 #endif
 
 #include "InstrProfiling.h"
 #include "InstrProfilingUtil.h"
 
-COMPILER_RT_VISIBILITY unsigned lprofDirMode = 0755;
+COMPILER_RT_WEAK unsigned lprofDirMode = 0755;
 
 COMPILER_RT_VISIBILITY
 void __llvm_profile_recursive_mkdir(char *path) {
@@ -324,39 +318,26 @@ COMPILER_RT_VISIBILITY const char *lprofFindLastDirSeparator(const char *Path) {
   return Sep;
 }
 
-COMPILER_RT_VISIBILITY int lprofSuspendSigKill(void) {
+COMPILER_RT_VISIBILITY int lprofSuspendSigKill() {
 #if defined(__linux__)
   int PDeachSig = 0;
   /* Temporarily suspend getting SIGKILL upon exit of the parent process. */
   if (prctl(PR_GET_PDEATHSIG, &PDeachSig) == 0 && PDeachSig == SIGKILL)
     prctl(PR_SET_PDEATHSIG, 0);
   return (PDeachSig == SIGKILL);
-#elif defined(__FreeBSD__)
-  int PDeachSig = 0, PDisableSig = 0;
-  if (procctl(P_PID, 0, PROC_PDEATHSIG_STATUS, &PDeachSig) == 0 &&
-      PDeachSig == SIGKILL)
-    procctl(P_PID, 0, PROC_PDEATHSIG_CTL, &PDisableSig);
-  return (PDeachSig == SIGKILL);
 #else
   return 0;
 #endif
 }
 
-COMPILER_RT_VISIBILITY void lprofRestoreSigKill(void) {
+COMPILER_RT_VISIBILITY void lprofRestoreSigKill() {
 #if defined(__linux__)
   prctl(PR_SET_PDEATHSIG, SIGKILL);
-#elif defined(__FreeBSD__)
-  int PEnableSig = SIGKILL;
-  procctl(P_PID, 0, PROC_PDEATHSIG_CTL, &PEnableSig);
 #endif
 }
 
 COMPILER_RT_VISIBILITY int lprofReleaseMemoryPagesToOS(uintptr_t Begin,
                                                        uintptr_t End) {
-#if defined(__ve__)
-  // VE doesn't support madvise.
-  return 0;
-#else
   size_t PageSize = getpagesize();
   uintptr_t BeginAligned = lprofRoundUpTo((uintptr_t)Begin, PageSize);
   uintptr_t EndAligned = lprofRoundDownTo((uintptr_t)End, PageSize);
@@ -371,5 +352,9 @@ COMPILER_RT_VISIBILITY int lprofReleaseMemoryPagesToOS(uintptr_t Begin,
 #endif
   }
   return 0;
-#endif
+}
+
+COMPILER_RT_VISIBILITY void warnIfNonZero(int *i) {
+  if (*i)
+    PROF_WARN("Expected flag to be 0, but got: %d\n", *i);
 }

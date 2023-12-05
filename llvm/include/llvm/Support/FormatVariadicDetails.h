@@ -10,7 +10,6 @@
 #define LLVM_SUPPORT_FORMATVARIADICDETAILS_H
 
 #include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <type_traits>
@@ -24,7 +23,7 @@ class format_adapter {
   virtual void anchor();
 
 protected:
-  virtual ~format_adapter() = default;
+  virtual ~format_adapter() {}
 
 public:
   virtual void format(raw_ostream &S, StringRef Options) = 0;
@@ -79,11 +78,11 @@ public:
   using ConstRefT = const std::decay_t<T> &;
 
   template <typename U>
-  static char test(std::enable_if_t<
-                   std::is_same_v<decltype(std::declval<llvm::raw_ostream &>()
-                                           << std::declval<U>()),
-                                  llvm::raw_ostream &>,
-                   int *>);
+  static char test(
+      std::enable_if_t<std::is_same<decltype(std::declval<llvm::raw_ostream &>()
+                                             << std::declval<U>()),
+                                    llvm::raw_ostream &>::value,
+                       int *>);
 
   template <typename U> static double test(...);
 
@@ -95,7 +94,8 @@ public:
 template <typename T>
 struct uses_format_member
     : public std::integral_constant<
-          bool, std::is_base_of_v<format_adapter, std::remove_reference_t<T>>> {
+          bool,
+          std::is_base_of<format_adapter, std::remove_reference_t<T>>::value> {
 };
 
 // Simple template that decides whether a type T should use the format_provider
@@ -146,7 +146,7 @@ build_format_adapter(T &&Item) {
   // would be responsible for consuming it.
   // Make the caller opt into this by calling fmt_consume().
   static_assert(
-      !std::is_same_v<llvm::Error, std::remove_cv_t<T>>,
+      !std::is_same<llvm::Error, std::remove_cv_t<T>>::value,
       "llvm::Error-by-value must be wrapped in fmt_consume() for formatv");
   return stream_operator_format_adapter<T>(std::forward<T>(Item));
 }

@@ -11,12 +11,14 @@
 
 #include "CloexecCheck.h"
 
-namespace clang::tidy::android {
+namespace clang {
+namespace tidy {
+namespace android {
 
 /// epoll_create() is better to be replaced by epoll_create1().
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/android/cloexec-epoll-create.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/android-cloexec-epoll-create.html
 class CloexecEpollCreateCheck : public CloexecCheck {
 public:
   CloexecEpollCreateCheck(StringRef Name, ClangTidyContext *Context)
@@ -25,6 +27,8 @@ public:
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
 };
 
-} // namespace clang::tidy::android
+} // namespace android
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_ANDROID_CLOEXEC_EPOLL_CREATE_H

@@ -5,10 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-///
-/// \file
-/// This file defines the SmallString class.
-///
+//
+// This file defines the SmallString class.
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef LLVM_ADT_SMALLSTRING_H
@@ -71,16 +70,16 @@ public:
 
   /// Append from a list of StringRefs.
   void append(std::initializer_list<StringRef> Refs) {
-    size_t CurrentSize = this->size();
-    size_t SizeNeeded = CurrentSize;
+    size_t SizeNeeded = this->size();
     for (const StringRef &Ref : Refs)
       SizeNeeded += Ref.size();
-    this->resize_for_overwrite(SizeNeeded);
+    this->reserve(SizeNeeded);
+    auto CurEnd = this->end();
     for (const StringRef &Ref : Refs) {
-      std::copy(Ref.begin(), Ref.end(), this->begin() + CurrentSize);
-      CurrentSize += Ref.size();
+      this->uninitialized_copy(Ref.begin(), Ref.end(), CurEnd);
+      CurEnd += Ref.size();
     }
-    assert(CurrentSize == this->size());
+    this->set_size(SizeNeeded);
   }
 
   /// @}
@@ -98,9 +97,8 @@ public:
     return str().equals_insensitive(RHS);
   }
 
-  /// compare - Compare two strings; the result is negative, zero, or positive
-  /// if this string is lexicographically less than, equal to, or greater than
-  /// the \p RHS.
+  /// Compare two strings; the result is -1, 0, or 1 if this string is
+  /// lexicographically less than, equal to, or greater than the \p RHS.
   int compare(StringRef RHS) const {
     return str().compare(RHS);
   }

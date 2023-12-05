@@ -13,7 +13,6 @@
 #include "lldb/Core/EmulateInstruction.h"
 #include "lldb/Interpreter/OptionValue.h"
 #include "lldb/Utility/Status.h"
-#include <optional>
 
 class EmulateInstructionARM64 : public lldb_private::EmulateInstruction {
 public:
@@ -25,9 +24,9 @@ public:
 
   static void Terminate();
 
-  static llvm::StringRef GetPluginNameStatic() { return "arm64"; }
+  static lldb_private::ConstString GetPluginNameStatic();
 
-  static llvm::StringRef GetPluginDescriptionStatic();
+  static const char *GetPluginDescriptionStatic();
 
   static lldb_private::EmulateInstruction *
   CreateInstance(const lldb_private::ArchSpec &arch,
@@ -47,7 +46,9 @@ public:
     return false;
   }
 
-  llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
+  lldb_private::ConstString GetPluginName() override;
+
+  uint32_t GetPluginVersion() override { return 1; }
 
   bool SetTargetTriple(const lldb_private::ArchSpec &arch) override;
 
@@ -60,14 +61,14 @@ public:
 
   bool EvaluateInstruction(uint32_t evaluate_options) override;
 
-  bool TestEmulation(lldb_private::Stream &out_stream,
+  bool TestEmulation(lldb_private::Stream *out_stream,
                      lldb_private::ArchSpec &arch,
                      lldb_private::OptionValueDictionary *test_data) override {
     return false;
   }
 
-  std::optional<lldb_private::RegisterInfo>
-  GetRegisterInfo(lldb::RegisterKind reg_kind, uint32_t reg_num) override;
+  bool GetRegisterInfo(lldb::RegisterKind reg_kind, uint32_t reg_num,
+                       lldb_private::RegisterInfo &reg_info) override;
 
   bool
   CreateFunctionEntryUnwind(lldb_private::UnwindPlan &unwind_plan) override;

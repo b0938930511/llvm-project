@@ -6,8 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/TableGen/Record.h"
-#include "llvm/TableGen/TableGenBackend.h"
+#include <algorithm>
+#include <string>
 #include <vector>
 using namespace llvm;
 
@@ -18,7 +20,7 @@ namespace {
 class Attributes {
 public:
   Attributes(RecordKeeper &R) : Records(R) {}
-  void run(raw_ostream &OS);
+  void emit(raw_ostream &OS);
 
 private:
   void emitTargetIndependentNames(raw_ostream &OS);
@@ -44,7 +46,7 @@ void Attributes::emitTargetIndependentNames(raw_ostream &OS) {
        << "(FIRST, SECOND) ATTRIBUTE_ALL(FIRST, SECOND)\n";
     OS << "#endif\n\n";
     for (StringRef KindName : KindNames) {
-      for (auto *A : Records.getAllDerivedDefinitions(KindName)) {
+      for (auto A : Records.getAllDerivedDefinitions(KindName)) {
         OS << MacroName << "(" << A->getName() << ","
            << A->getValueAsString("AttrString") << ")\n";
       }
@@ -55,7 +57,6 @@ void Attributes::emitTargetIndependentNames(raw_ostream &OS) {
   // Emit attribute enums in the same order llvm::Attribute::operator< expects.
   Emit({"EnumAttr", "TypeAttr", "IntAttr"}, "ATTRIBUTE_ENUM");
   Emit({"StrBoolAttr"}, "ATTRIBUTE_STRBOOL");
-  Emit({"ComplexStrAttr"}, "ATTRIBUTE_COMPLEXSTR");
 
   OS << "#undef ATTRIBUTE_ALL\n";
   OS << "#endif\n\n";
@@ -65,7 +66,7 @@ void Attributes::emitTargetIndependentNames(raw_ostream &OS) {
   unsigned Value = 1; // Leave zero for AttrKind::None.
   for (StringRef KindName : {"EnumAttr", "TypeAttr", "IntAttr"}) {
     OS << "First" << KindName << " = " << Value << ",\n";
-    for (auto *A : Records.getAllDerivedDefinitions(KindName)) {
+    for (auto A : Records.getAllDerivedDefinitions(KindName)) {
       OS << A->getName() << " = " << Value << ",\n";
       Value++;
     }
@@ -114,7 +115,7 @@ void Attributes::emitAttributeProperties(raw_ostream &OS) {
   OS << "#undef GET_ATTR_PROP_TABLE\n";
   OS << "static const uint8_t AttrPropTable[] = {\n";
   for (StringRef KindName : {"EnumAttr", "TypeAttr", "IntAttr"}) {
-    for (auto *A : Records.getAllDerivedDefinitions(KindName)) {
+    for (auto A : Records.getAllDerivedDefinitions(KindName)) {
       OS << "0";
       for (Init *P : *A->getValueAsListInit("Properties"))
         OS << " | AttributeProperty::" << cast<DefInit>(P)->getDef()->getName();
@@ -125,11 +126,16 @@ void Attributes::emitAttributeProperties(raw_ostream &OS) {
   OS << "#endif\n";
 }
 
-void Attributes::run(raw_ostream &OS) {
+void Attributes::emit(raw_ostream &OS) {
   emitTargetIndependentNames(OS);
   emitFnAttrCompatCheck(OS, false);
   emitAttributeProperties(OS);
 }
 
-static TableGen::Emitter::OptClass<Attributes> X("gen-attrs",
-                                                 "Generate attributes");
+namespace llvm {
+
+void EmitAttributes(RecordKeeper &RK, raw_ostream &OS) {
+  Attributes(RK).emit(OS);
+}
+
+} // End llvm namespace.

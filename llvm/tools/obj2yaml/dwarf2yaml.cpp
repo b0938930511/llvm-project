@@ -8,7 +8,6 @@
 
 #include "llvm/BinaryFormat/Dwarf.h"
 #include "llvm/DebugInfo/DWARF/DWARFContext.h"
-#include "llvm/DebugInfo/DWARF/DWARFDebugAbbrev.h"
 #include "llvm/DebugInfo/DWARF/DWARFDebugAddr.h"
 #include "llvm/DebugInfo/DWARF/DWARFDebugArangeSet.h"
 #include "llvm/DebugInfo/DWARF/DWARFDebugPubTable.h"
@@ -18,21 +17,17 @@
 #include "llvm/ObjectYAML/DWARFYAML.h"
 
 #include <algorithm>
-#include <optional>
 
 using namespace llvm;
 
-Error dumpDebugAbbrev(DWARFContext &DCtx, DWARFYAML::Data &Y) {
+void dumpDebugAbbrev(DWARFContext &DCtx, DWARFYAML::Data &Y) {
   auto AbbrevSetPtr = DCtx.getDebugAbbrev();
   if (AbbrevSetPtr) {
     uint64_t AbbrevTableID = 0;
-    if (Error Err = AbbrevSetPtr->parse())
-      return Err;
-    for (const auto &AbbrvDeclSet : *AbbrevSetPtr) {
+    for (auto AbbrvDeclSet : *AbbrevSetPtr) {
       Y.DebugAbbrev.emplace_back();
       Y.DebugAbbrev.back().ID = AbbrevTableID++;
-      for (const DWARFAbbreviationDeclaration &AbbrvDecl :
-           AbbrvDeclSet.second) {
+      for (auto AbbrvDecl : AbbrvDeclSet.second) {
         DWARFYAML::Abbrev Abbrv;
         Abbrv.Code = AbbrvDecl.getCode();
         Abbrv.Tag = AbbrvDecl.getTag();
@@ -50,14 +45,13 @@ Error dumpDebugAbbrev(DWARFContext &DCtx, DWARFYAML::Data &Y) {
       }
     }
   }
-  return Error::success();
 }
 
 Error dumpDebugAddr(DWARFContext &DCtx, DWARFYAML::Data &Y) {
   DWARFDebugAddrTable AddrTable;
   DWARFDataExtractor AddrData(DCtx.getDWARFObj(),
                               DCtx.getDWARFObj().getAddrSection(),
-                              DCtx.isLittleEndian(), /*AddressSize=*/0);
+                              DCtx.isLittleEndian(), /*AddrSize=*/0);
   std::vector<DWARFYAML::AddrTableEntry> AddrTables;
   uint64_t Offset = 0;
   while (AddrData.isValidOffset(Offset)) {
@@ -170,7 +164,7 @@ Error dumpDebugRanges(DWARFContext &DCtx, DWARFYAML::Data &Y) {
   return ErrorSuccess();
 }
 
-static std::optional<DWARFYAML::PubSection>
+static Optional<DWARFYAML::PubSection>
 dumpPubSection(const DWARFContext &DCtx, const DWARFSection &Section,
                bool IsGNUStyle) {
   DWARFYAML::PubSection Y;
@@ -183,7 +177,7 @@ dumpPubSection(const DWARFContext &DCtx, const DWARFSection &Section,
                 [](Error Err) { consumeError(std::move(Err)); });
   ArrayRef<DWARFDebugPubTable::Set> Sets = Table.getData();
   if (Sets.empty())
-    return std::nullopt;
+    return None;
 
   // FIXME: Currently, obj2yaml only supports dumping the first pubtable.
   Y.Format = Sets[0].Format;
@@ -223,12 +217,6 @@ void dumpDebugInfo(DWARFContext &DCtx, DWARFYAML::Data &Y) {
     if (NewUnit.Version >= 5)
       NewUnit.Type = (dwarf::UnitType)CU->getUnitType();
     const DWARFDebugAbbrev *DebugAbbrev = DCtx.getDebugAbbrev();
-    // FIXME: Ideally we would propagate this error upwards, but that would
-    // prevent us from displaying any debug info at all. For now we just consume
-    // the error and display everything that was parsed successfully.
-    if (Error Err = DebugAbbrev->parse())
-      llvm::consumeError(std::move(Err));
-
     NewUnit.AbbrevTableID = std::distance(
         DebugAbbrev->begin(),
         llvm::find_if(
@@ -258,15 +246,15 @@ void dumpDebugInfo(DWARFContext &DCtx, DWARFYAML::Data &Y) {
           auto FormValue = DIEWrapper.find(AttrSpec.Attr);
           if (!FormValue)
             return;
-          auto Form = FormValue->getForm();
+          auto Form = FormValue.getValue().getForm();
           bool indirect = false;
           do {
             indirect = false;
             switch (Form) {
             case dwarf::DW_FORM_addr:
             case dwarf::DW_FORM_GNU_addr_index:
-              if (auto Val = FormValue->getAsAddress())
-                NewValue.Value = *Val;
+              if (auto Val = FormValue.getValue().getAsAddress())
+                NewValue.Value = Val.getValue();
               break;
             case dwarf::DW_FORM_ref_addr:
             case dwarf::DW_FORM_ref1:
@@ -275,16 +263,16 @@ void dumpDebugInfo(DWARFContext &DCtx, DWARFYAML::Data &Y) {
             case dwarf::DW_FORM_ref8:
             case dwarf::DW_FORM_ref_udata:
             case dwarf::DW_FORM_ref_sig8:
-              if (auto Val = FormValue->getAsReferenceUVal())
-                NewValue.Value = *Val;
+              if (auto Val = FormValue.getValue().getAsReferenceUVal())
+                NewValue.Value = Val.getValue();
               break;
             case dwarf::DW_FORM_exprloc:
             case dwarf::DW_FORM_block:
             case dwarf::DW_FORM_block1:
             case dwarf::DW_FORM_block2:
             case dwarf::DW_FORM_block4:
-              if (auto Val = FormValue->getAsBlock()) {
-                auto BlockData = *Val;
+              if (auto Val = FormValue.getValue().getAsBlock()) {
+                auto BlockData = Val.getValue();
                 std::copy(BlockData.begin(), BlockData.end(),
                           std::back_inserter(NewValue.BlockData));
               }
@@ -299,19 +287,19 @@ void dumpDebugInfo(DWARFContext &DCtx, DWARFYAML::Data &Y) {
             case dwarf::DW_FORM_udata:
             case dwarf::DW_FORM_ref_sup4:
             case dwarf::DW_FORM_ref_sup8:
-              if (auto Val = FormValue->getAsUnsignedConstant())
-                NewValue.Value = *Val;
+              if (auto Val = FormValue.getValue().getAsUnsignedConstant())
+                NewValue.Value = Val.getValue();
               break;
             case dwarf::DW_FORM_string:
-              if (auto Val = dwarf::toString(FormValue))
-                NewValue.CStr = *Val;
+              if (auto Val = FormValue.getValue().getAsCString())
+                NewValue.CStr = Val.getValue();
               break;
             case dwarf::DW_FORM_indirect:
               indirect = true;
-              if (auto Val = FormValue->getAsUnsignedConstant()) {
-                NewValue.Value = *Val;
+              if (auto Val = FormValue.getValue().getAsUnsignedConstant()) {
+                NewValue.Value = Val.getValue();
                 NewEntry.Values.push_back(NewValue);
-                Form = static_cast<dwarf::Form>(*Val);
+                Form = static_cast<dwarf::Form>(Val.getValue());
               }
               break;
             case dwarf::DW_FORM_strp:
@@ -322,8 +310,8 @@ void dumpDebugInfo(DWARFContext &DCtx, DWARFYAML::Data &Y) {
             case dwarf::DW_FORM_strp_sup:
             case dwarf::DW_FORM_GNU_str_index:
             case dwarf::DW_FORM_strx:
-              if (auto Val = FormValue->getAsCStringOffset())
-                NewValue.Value = *Val;
+              if (auto Val = FormValue.getValue().getAsCStringOffset())
+                NewValue.Value = Val.getValue();
               break;
             case dwarf::DW_FORM_flag_present:
               NewValue.Value = 1;
@@ -461,7 +449,9 @@ void dumpDebugLines(DWARFContext &DCtx, DWARFYAML::Data &Y) {
 
           default:
             for (uint8_t i = 0;
-                 i < (*DebugLines.StandardOpcodeLengths)[NewOp.Opcode - 1]; ++i)
+                 i <
+                 DebugLines.StandardOpcodeLengths.getValue()[NewOp.Opcode - 1];
+                 ++i)
               NewOp.StandardOpcodeData.push_back(LineData.getULEB128(&Offset));
           }
         }

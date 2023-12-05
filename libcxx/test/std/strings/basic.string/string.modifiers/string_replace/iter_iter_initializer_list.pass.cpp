@@ -10,7 +10,7 @@
 
 // <string>
 
-// basic_string& replace(const_iterator i1, const_iterator i2, initializer_list<charT> il); // constexpr since C++20
+// basic_string& replace(const_iterator i1, const_iterator i2, initializer_list<charT> il);
 
 #include <string>
 #include <cassert>
@@ -18,25 +18,19 @@
 #include "test_macros.h"
 #include "min_allocator.h"
 
-template <class S>
-TEST_CONSTEXPR_CXX20 void test_string() {
-  S s("123def456");
-  s.replace(s.cbegin() + 3, s.cbegin() + 6, {'a', 'b', 'c'});
-  assert(s == "123abc456");
-}
-
-TEST_CONSTEXPR_CXX20 bool test() {
-  test_string<std::string>();
-  test_string<std::basic_string<char, std::char_traits<char>, min_allocator<char> > >();
-
-  return true;
-}
-
-int main(int, char**) {
-  test();
-#if TEST_STD_VER > 17
-  static_assert(test());
-#endif
+int main(int, char**)
+{
+    {
+        std::string s("123def456");
+        s.replace(s.cbegin() + 3, s.cbegin() + 6, {'a', 'b', 'c'});
+        assert(s == "123abc456");
+    }
+    {
+        typedef std::basic_string<char, std::char_traits<char>, min_allocator<char>> S;
+        S s("123def456");
+        s.replace(s.cbegin() + 3, s.cbegin() + 6, {'a', 'b', 'c'});
+        assert(s == "123abc456");
+    }
 
   return 0;
 }

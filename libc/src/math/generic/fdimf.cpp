@@ -7,13 +7,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "src/math/fdimf.h"
-#include "src/__support/FPUtil/BasicOperations.h"
 #include "src/__support/common.h"
+#include "utils/FPUtil/BasicOperations.h"
 
-namespace LIBC_NAMESPACE {
+namespace __llvm_libc {
 
 LLVM_LIBC_FUNCTION(float, fdimf, (float x, float y)) {
   return fputil::fdim(x, y);
 }
 
-} // namespace LIBC_NAMESPACE
+} // namespace __llvm_libc

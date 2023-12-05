@@ -1,30 +1,25 @@
-# RUN: not llvm-mc -triple riscv64 -mattr=+zbs < %s 2>&1 | FileCheck %s
+# RUN: not llvm-mc -triple riscv64 -mattr=+experimental-b,experimental-zbs < %s 2>&1 | FileCheck %s
 
 # Too few operands
-bclr t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+bclrw t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
 # Too few operands
-bset t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+bsetw t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
 # Too few operands
-binv t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+binvw t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
 # Too few operands
-bext t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+bextw t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
 # Too few operands
-bclri t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+bclriw t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
 # Immediate operand out of range
-bclri t0, t1, 64 # CHECK: :[[@LINE]]:15: error: immediate must be an integer in the range [0, 63]
-bclri t0, t1, -1 # CHECK: :[[@LINE]]:15: error: immediate must be an integer in the range [0, 63]
+bclriw t0, t1, 32 # CHECK: :[[@LINE]]:16: error: immediate must be an integer in the range [0, 31]
+bclriw t0, t1, -1 # CHECK: :[[@LINE]]:16: error: immediate must be an integer in the range [0, 31]
 # Too few operands
-bseti t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+bsetiw t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
 # Immediate operand out of range
-bseti t0, t1, 64 # CHECK: :[[@LINE]]:15: error: immediate must be an integer in the range [0, 63]
-bseti t0, t1, -1 # CHECK: :[[@LINE]]:15: error: immediate must be an integer in the range [0, 63]
+bsetiw t0, t1, 32 # CHECK: :[[@LINE]]:16: error: immediate must be an integer in the range [0, 31]
+bsetiw t0, t1, -1 # CHECK: :[[@LINE]]:16: error: immediate must be an integer in the range [0, 31]
 # Too few operands
-binvi t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+binviw t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
 # Immediate operand out of range
-binvi t0, t1, 64 # CHECK: :[[@LINE]]:15: error: immediate must be an integer in the range [0, 63]
-binvi t0, t1, -1 # CHECK: :[[@LINE]]:15: error: immediate must be an integer in the range [0, 63]
-# Too few operands
-bexti t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
-# Immediate operand out of range
-bexti t0, t1, 64 # CHECK: :[[@LINE]]:15: error: immediate must be an integer in the range [0, 63]
-bexti t0, t1, -1 # CHECK: :[[@LINE]]:15: error: immediate must be an integer in the range [0, 63]
+binviw t0, t1, 32 # CHECK: :[[@LINE]]:16: error: immediate must be an integer in the range [0, 31]
+binviw t0, t1, -1 # CHECK: :[[@LINE]]:16: error: immediate must be an integer in the range [0, 31]

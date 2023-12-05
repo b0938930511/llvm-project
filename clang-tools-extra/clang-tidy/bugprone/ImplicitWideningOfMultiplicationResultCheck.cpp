@@ -9,7 +9,6 @@
 #include "ImplicitWideningOfMultiplicationResultCheck.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
-#include <optional>
 
 using namespace clang::ast_matchers;
 
@@ -21,7 +20,9 @@ AST_MATCHER(ImplicitCastExpr, isPartOfExplicitCast) {
 } // namespace
 } // namespace clang
 
-namespace clang::tidy::bugprone {
+namespace clang {
+namespace tidy {
+namespace bugprone {
 
 static const Expr *getLHSOfMulBinOp(const Expr *E) {
   assert(E == E->IgnoreParens() && "Already skipped all parens!");
@@ -42,8 +43,8 @@ ImplicitWideningOfMultiplicationResultCheck::
           Options.get("UseCXXStaticCastsInCppSources", true)),
       UseCXXHeadersInCppSources(Options.get("UseCXXHeadersInCppSources", true)),
       IncludeInserter(Options.getLocalOrGlobal("IncludeStyle",
-                                               utils::IncludeSorter::IS_LLVM),
-                      areDiagsSelfContained()) {}
+                                               utils::IncludeSorter::IS_LLVM)) {
+}
 
 void ImplicitWideningOfMultiplicationResultCheck::registerPPCallbacks(
     const SourceManager &SM, Preprocessor *PP, Preprocessor *ModuleExpanderPP) {
@@ -58,7 +59,7 @@ void ImplicitWideningOfMultiplicationResultCheck::storeOptions(
   Options.store(Opts, "IncludeStyle", IncludeInserter.getStyle());
 }
 
-std::optional<FixItHint>
+llvm::Optional<FixItHint>
 ImplicitWideningOfMultiplicationResultCheck::includeStddefHeader(
     SourceLocation File) {
   return IncludeInserter.createIncludeInsertion(
@@ -151,7 +152,7 @@ void ImplicitWideningOfMultiplicationResultCheck::handlePointerOffsetting(
 
   // We are looking for a pointer offset operation,
   // with one hand being a pointer, and another one being an offset.
-  const Expr *PointerExpr = nullptr, *IndexExpr = nullptr;
+  const Expr *PointerExpr, *IndexExpr;
   if (const auto *BO = dyn_cast<BinaryOperator>(E)) {
     PointerExpr = BO->getLHS();
     IndexExpr = BO->getRHS();
@@ -271,4 +272,6 @@ void ImplicitWideningOfMultiplicationResultCheck::check(
     handlePointerOffsetting(MatchedDecl);
 }
 
-} // namespace clang::tidy::bugprone
+} // namespace bugprone
+} // namespace tidy
+} // namespace clang

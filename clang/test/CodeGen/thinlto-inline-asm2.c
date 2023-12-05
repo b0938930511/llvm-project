@@ -14,7 +14,7 @@
 // NM-NOT: {{.}}
 // NM:     ---------------- T ref
 // NM-NOT: {{.}}
-const char *ref(void) {
+const char *ref() {
   const char *ret;
   asm("lea ff_h264_cabac_tables(%%rip), %0" : "=r"(ret));
   return ret;

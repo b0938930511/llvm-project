@@ -15,7 +15,9 @@
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::readability {
+namespace clang {
+namespace tidy {
+namespace readability {
 
 AST_MATCHER(CXXMethodDecl, isStatic) { return Node.isStatic(); }
 
@@ -62,13 +64,6 @@ public:
       return nullptr;
 
     return Parents.begin()->get<T>();
-  }
-
-  const Expr *getParentExprIgnoreParens(const Expr *E) {
-    const Expr *Parent = getParent<Expr>(E);
-    while (isa_and_nonnull<ParenExpr>(Parent))
-      Parent = getParent<Expr>(Parent);
-    return Parent;
   }
 
   bool VisitUnresolvedMemberExpr(const UnresolvedMemberExpr *) {
@@ -145,7 +140,7 @@ public:
       return true;
     }
 
-    const auto *Parent = getParentExprIgnoreParens(Member);
+    const auto *Parent = getParent<Expr>(Member);
 
     if (const auto *Cast = dyn_cast_or_null<ImplicitCastExpr>(Parent)) {
       // A read access to a member is safe when the member either
@@ -172,12 +167,12 @@ public:
   bool VisitCXXThisExpr(const CXXThisExpr *E) {
     Usage = Const;
 
-    const auto *Parent = getParentExprIgnoreParens(E);
+    const auto *Parent = getParent<Expr>(E);
 
     // Look through deref of this.
     if (const auto *UnOp = dyn_cast_or_null<UnaryOperator>(Parent)) {
       if (UnOp->getOpcode() == UO_Deref) {
-        Parent = getParentExprIgnoreParens(UnOp);
+        Parent = getParent<Expr>(UnOp);
       }
     }
 
@@ -241,7 +236,8 @@ static SourceLocation getConstInsertionPoint(const CXXMethodDecl *M) {
   if (!TSI)
     return {};
 
-  auto FTL = TSI->getTypeLoc().IgnoreParens().getAs<FunctionTypeLoc>();
+  FunctionTypeLoc FTL =
+      TSI->getTypeLoc().IgnoreParens().getAs<FunctionTypeLoc>();
   if (!FTL)
     return {};
 
@@ -264,4 +260,6 @@ void MakeMemberFunctionConstCheck::check(
   }
 }
 
-} // namespace clang::tidy::readability
+} // namespace readability
+} // namespace tidy
+} // namespace clang

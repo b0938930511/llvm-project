@@ -1,23 +1,23 @@
 // RUN: %clang_cc1 %s -emit-llvm -DDOUBLE -O0 -o - -triple=amdgcn-amd-amdhsa \
-// RUN:   | FileCheck -check-prefixes=FLOAT,DOUBLE %s
+// RUN:   | opt -instnamer -S | FileCheck -check-prefixes=FLOAT,DOUBLE %s
 
 // RUN: %clang_cc1 %s -emit-llvm -DDOUBLE -O0 -o - -triple=aarch64-linux-gnu \
-// RUN:   | FileCheck -check-prefixes=FLOAT,DOUBLE %s
+// RUN:   | opt -instnamer -S | FileCheck -check-prefixes=FLOAT,DOUBLE %s
 
 // RUN: %clang_cc1 %s -emit-llvm -O0 -o - -triple=armv8-apple-ios7.0 \
-// RUN:   | FileCheck -check-prefixes=FLOAT %s
+// RUN:   | opt -instnamer -S | FileCheck -check-prefixes=FLOAT %s
 
 // RUN: %clang_cc1 %s -emit-llvm -DDOUBLE -O0 -o - -triple=hexagon \
-// RUN:   | FileCheck -check-prefixes=FLOAT,DOUBLE %s
+// RUN:   | opt -instnamer -S | FileCheck -check-prefixes=FLOAT,DOUBLE %s
 
 // RUN: %clang_cc1 %s -emit-llvm -DDOUBLE -O0 -o - -triple=mips64-mti-linux-gnu \
-// RUN:   | FileCheck -check-prefixes=FLOAT,DOUBLE %s
+// RUN:   | opt -instnamer -S | FileCheck -check-prefixes=FLOAT,DOUBLE %s
 
 // RUN: %clang_cc1 %s -emit-llvm -O0 -o - -triple=i686-linux-gnu \
-// RUN:   | FileCheck -check-prefixes=FLOAT %s
+// RUN:   | opt -instnamer -S | FileCheck -check-prefixes=FLOAT %s
 
 // RUN: %clang_cc1 %s -emit-llvm -DDOUBLE -O0 -o - -triple=x86_64-linux-gnu \
-// RUN:   | FileCheck -check-prefixes=FLOAT,DOUBLE %s
+// RUN:   | opt -instnamer -S | FileCheck -check-prefixes=FLOAT,DOUBLE %s
 
 typedef enum memory_order {
   memory_order_relaxed = __ATOMIC_RELAXED,
@@ -28,17 +28,17 @@ typedef enum memory_order {
 } memory_order;
 
 void test(float *f, float ff, double *d, double dd) {
-  // FLOAT: atomicrmw fadd ptr {{.*}} monotonic
+  // FLOAT: atomicrmw fadd float* {{.*}} monotonic
   __atomic_fetch_add(f, ff, memory_order_relaxed);
 
-  // FLOAT: atomicrmw fsub ptr {{.*}} monotonic
+  // FLOAT: atomicrmw fsub float* {{.*}} monotonic
   __atomic_fetch_sub(f, ff, memory_order_relaxed);
 
 #ifdef DOUBLE
-  // DOUBLE: atomicrmw fadd ptr {{.*}} monotonic
+  // DOUBLE: atomicrmw fadd double* {{.*}} monotonic
   __atomic_fetch_add(d, dd, memory_order_relaxed);
 
-  // DOUBLE: atomicrmw fsub ptr {{.*}} monotonic
+  // DOUBLE: atomicrmw fsub double* {{.*}} monotonic
   __atomic_fetch_sub(d, dd, memory_order_relaxed);
 #endif
 }

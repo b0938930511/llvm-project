@@ -1,4 +1,5 @@
 // RUN: %clang_cc1 %s -triple x86_64-linux -emit-llvm -fblocks -o - | FileCheck %s
+// rdar://5865221
 
 // These will be inlined by the optimizers provided the block descriptors
 // and block literals are internal constants.
@@ -14,7 +15,6 @@ static int block(int x) {
 	return (^(int x){return x+1;})(x);
 }
 
-extern int printf(const char *, ...);
 static void print(int result) {
     printf("%d\n", result);
 }

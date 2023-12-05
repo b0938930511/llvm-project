@@ -2,6 +2,7 @@
 
 
 # GCN-LABEL: bb.0:
+# GCN:  V_MOV_B32_e32 1092616192
 # GCN:  S_MOV_B32 1082130432
 # GCN:  %3:vgpr_32 = V_MADAK_F32 1082130432, killed %0, 1092616192, implicit $mode, implicit $exec
 
@@ -20,6 +21,7 @@ body:             |
 
 
 # GCN-LABEL: bb.0:
+# GCN:  V_MOV_B32_e32 1092616192
 # GCN:  S_MOV_B32 1082130432
 # GCN:  %3:vgpr_32 = V_MADAK_F32 1082130432, killed %0, 1092616192, implicit $mode, implicit $exec
 
@@ -37,6 +39,7 @@ body:             |
 ...
 
 # GCN-LABEL: bb.0:
+# GCN:  V_MOV_B32_e32 1092616192
 # GCN:  S_MOV_B32 1082130432
 # GCN:  %3:vgpr_32 = V_MADAK_F32 killed %0, killed %0, 1092616192, implicit $mode, implicit $exec
 
@@ -54,6 +57,7 @@ body:             |
 ...
 
 # GCN-LABEL: bb.0:
+# GCN:  V_MOV_B32_e32 1092616192
 # GCN:  V_MOV_B32_e32 1082130432
 # GCN:  %3:vgpr_32 = V_MADAK_F32 1082130432, killed %0, 1092616192, implicit $mode, implicit $exec
 
@@ -72,6 +76,7 @@ body:             |
 
 
 # GCN-LABEL: bb.0:
+# GCN:  V_MOV_B32_e32 1092616192
 # GCN:  V_MOV_B32_e32 1082130432
 # GCN:  %3:vgpr_32 = V_MADAK_F32 1082130432, killed %0, 1092616192, implicit $mode, implicit $exec
 
@@ -89,6 +94,7 @@ body:             |
 ...
 
 # GCN-LABEL: bb.0:
+# GCN:  V_MOV_B32_e32 1092616192, implicit $exec
 # GCN:  S_MOV_B32 1082130432
 # GCN:  V_MADAK_F32 1082130432, killed $vgpr1, 1092616192, implicit $mode, implicit $exec
 
@@ -107,6 +113,7 @@ body:             |
 ...
 
 # GCN-LABEL: bb.0:
+# GCN:  V_MOV_B32_e32 1092616192, implicit $exec
 # GCN:  S_MOV_B32 1082130432
 # GCN:  V_MADAK_F32 1082130432, killed $vgpr0, 1092616192, implicit $mode, implicit $exec
 
@@ -159,6 +166,7 @@ body:             |
 ...
 
 # GCN-LABEL: bb.0:
+# GCN:  V_MOV_B32_e32 1092616192, implicit $exec
 # GCN:  $sgpr2 = S_MOV_B32 1082130432
 # GCN:  V_MADAK_F32 1082130432, killed %0, 1092616192, implicit $mode, implicit $exec
 

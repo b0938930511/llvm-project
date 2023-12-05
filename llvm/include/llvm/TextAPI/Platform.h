@@ -14,22 +14,34 @@
 
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/BinaryFormat/MachO.h"
-#include "llvm/Support/VersionTuple.h"
 
 namespace llvm {
 namespace MachO {
 
-using PlatformSet = SmallSet<PlatformType, 3>;
-using PlatformVersionSet = SmallSet<std::pair<PlatformType, VersionTuple>, 3>;
+/// Defines the list of MachO platforms.
+enum class PlatformKind : unsigned {
+  unknown,
+  macOS = MachO::PLATFORM_MACOS,
+  iOS = MachO::PLATFORM_IOS,
+  tvOS = MachO::PLATFORM_TVOS,
+  watchOS = MachO::PLATFORM_WATCHOS,
+  bridgeOS = MachO::PLATFORM_BRIDGEOS,
+  macCatalyst = MachO::PLATFORM_MACCATALYST,
+  iOSSimulator = MachO::PLATFORM_IOSSIMULATOR,
+  tvOSSimulator = MachO::PLATFORM_TVOSSIMULATOR,
+  watchOSSimulator = MachO::PLATFORM_WATCHOSSIMULATOR,
+  driverKit = MachO::PLATFORM_DRIVERKIT,
+};
 
-PlatformType mapToPlatformType(PlatformType Platform, bool WantSim);
-PlatformType mapToPlatformType(const Triple &Target);
+using PlatformSet = SmallSet<PlatformKind, 3>;
+
+PlatformKind mapToPlatformKind(PlatformKind Platform, bool WantSim);
+PlatformKind mapToPlatformKind(const Triple &Target);
 PlatformSet mapToPlatformSet(ArrayRef<Triple> Targets);
-StringRef getPlatformName(PlatformType Platform);
-PlatformType getPlatformFromName(StringRef Name);
-std::string getOSAndEnvironmentName(PlatformType Platform,
+StringRef getPlatformName(PlatformKind Platform);
+PlatformKind getPlatformFromName(StringRef Name);
+std::string getOSAndEnvironmentName(PlatformKind Platform,
                                     std::string Version = "");
-VersionTuple mapToSupportedOSVersion(const Triple &Triple);
 
 } // end namespace MachO.
 } // end namespace llvm.

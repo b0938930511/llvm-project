@@ -6,7 +6,7 @@
 
 typedef int BOOL;
 
-id IhaveSideEffect(void);
+id IhaveSideEffect();
 
 @protocol NSObject
 - (BOOL)isEqual:(id)object;
@@ -64,9 +64,9 @@ void func(Foo *p) {
 @end
 
 void block_test(Foo *p) {
-  id (^B)(void) = ^(void) {
+  id (^B)() = ^() {
     if (p) {
-      id (^IB)(void) = ^(void) {
+      id (^IB)() = ^() {
         id bar = [p retain];
 	      [p release];
         return bar;

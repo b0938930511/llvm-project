@@ -71,13 +71,13 @@ B:
   ret void
 }
 
-define i1 @ptrcmp(ptr %p) {
+define i1 @ptrcmp(i8* %p) {
 ; CHECK-LABEL: @ptrcmp(
-; CHECK-NEXT:    [[FR:%.*]] = freeze ptr [[P:%.*]]
-; CHECK-NEXT:    [[C:%.*]] = icmp eq ptr [[FR]], null
+; CHECK-NEXT:    [[FR:%.*]] = freeze i8* [[P:%.*]]
+; CHECK-NEXT:    [[C:%.*]] = icmp eq i8* [[FR]], null
 ; CHECK-NEXT:    ret i1 [[C]]
 ;
-  %c = icmp eq ptr %p, null
+  %c = icmp eq i8* %p, null
   %fr = freeze i1 %c
   ret i1 %fr
 }

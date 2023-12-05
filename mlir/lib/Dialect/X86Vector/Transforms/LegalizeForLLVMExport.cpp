@@ -10,8 +10,8 @@
 
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/X86Vector/X86VectorDialect.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
@@ -22,11 +22,11 @@ using namespace mlir::x86vector;
 /// Extracts the "main" vector element type from the given X86Vector operation.
 template <typename OpTy>
 static Type getSrcVectorElementType(OpTy op) {
-  return cast<VectorType>(op.getSrc().getType()).getElementType();
+  return op.src().getType().template cast<VectorType>().getElementType();
 }
 template <>
 Type getSrcVectorElementType(Vp2IntersectOp op) {
-  return cast<VectorType>(op.getA().getType()).getElementType();
+  return op.a().getType().template cast<VectorType>().getElementType();
 }
 
 namespace {
@@ -40,24 +40,24 @@ struct LowerToIntrinsic : public OpConversionPattern<OpTy> {
   explicit LowerToIntrinsic(LLVMTypeConverter &converter)
       : OpConversionPattern<OpTy>(converter, &converter.getContext()) {}
 
-  const LLVMTypeConverter &getTypeConverter() const {
-    return *static_cast<const LLVMTypeConverter *>(
+  LLVMTypeConverter &getTypeConverter() const {
+    return *static_cast<LLVMTypeConverter *>(
         OpConversionPattern<OpTy>::getTypeConverter());
   }
 
   LogicalResult
-  matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
+  matchAndRewrite(OpTy op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
     Type elementType = getSrcVectorElementType<OpTy>(op);
     unsigned bitwidth = elementType.getIntOrFloatBitWidth();
     if (bitwidth == 32)
-      return LLVM::detail::oneToOneRewrite(
-          op, Intr32OpTy::getOperationName(), adaptor.getOperands(),
-          op->getAttrs(), getTypeConverter(), rewriter);
+      return LLVM::detail::oneToOneRewrite(op, Intr32OpTy::getOperationName(),
+                                           operands, getTypeConverter(),
+                                           rewriter);
     if (bitwidth == 64)
-      return LLVM::detail::oneToOneRewrite(
-          op, Intr64OpTy::getOperationName(), adaptor.getOperands(),
-          op->getAttrs(), getTypeConverter(), rewriter);
+      return LLVM::detail::oneToOneRewrite(op, Intr64OpTy::getOperationName(),
+                                           operands, getTypeConverter(),
+                                           rewriter);
     return rewriter.notifyMatchFailure(
         op, "expected 'src' to be either f32 or f64");
   }
@@ -68,23 +68,24 @@ struct MaskCompressOpConversion
   using ConvertOpToLLVMPattern<MaskCompressOp>::ConvertOpToLLVMPattern;
 
   LogicalResult
-  matchAndRewrite(MaskCompressOp op, OpAdaptor adaptor,
+  matchAndRewrite(MaskCompressOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    auto opType = adaptor.getA().getType();
+    MaskCompressOp::Adaptor adaptor(operands);
+    auto opType = adaptor.a().getType();
 
     Value src;
-    if (op.getSrc()) {
-      src = adaptor.getSrc();
-    } else if (op.getConstantSrc()) {
-      src = rewriter.create<arith::ConstantOp>(op.getLoc(), opType,
-                                               op.getConstantSrcAttr());
+    if (op.src()) {
+      src = adaptor.src();
+    } else if (op.constant_src()) {
+      src = rewriter.create<ConstantOp>(op.getLoc(), opType,
+                                        op.constant_srcAttr());
     } else {
-      auto zeroAttr = rewriter.getZeroAttr(opType);
-      src = rewriter.create<arith::ConstantOp>(op->getLoc(), opType, zeroAttr);
+      Attribute zeroAttr = rewriter.getZeroAttr(opType);
+      src = rewriter.create<ConstantOp>(op->getLoc(), opType, zeroAttr);
     }
 
-    rewriter.replaceOpWithNewOp<MaskCompressIntrOp>(op, opType, adaptor.getA(),
-                                                    src, adaptor.getK());
+    rewriter.replaceOpWithNewOp<MaskCompressIntrOp>(op, opType, adaptor.a(),
+                                                    src, adaptor.k());
 
     return success();
   }
@@ -94,10 +95,12 @@ struct RsqrtOpConversion : public ConvertOpToLLVMPattern<RsqrtOp> {
   using ConvertOpToLLVMPattern<RsqrtOp>::ConvertOpToLLVMPattern;
 
   LogicalResult
-  matchAndRewrite(RsqrtOp op, OpAdaptor adaptor,
+  matchAndRewrite(RsqrtOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    auto opType = adaptor.getA().getType();
-    rewriter.replaceOpWithNewOp<RsqrtIntrOp>(op, opType, adaptor.getA());
+    RsqrtOp::Adaptor adaptor(operands);
+
+    auto opType = adaptor.a().getType();
+    rewriter.replaceOpWithNewOp<RsqrtIntrOp>(op, opType, adaptor.a());
     return success();
   }
 };
@@ -106,16 +109,17 @@ struct DotOpConversion : public ConvertOpToLLVMPattern<DotOp> {
   using ConvertOpToLLVMPattern<DotOp>::ConvertOpToLLVMPattern;
 
   LogicalResult
-  matchAndRewrite(DotOp op, OpAdaptor adaptor,
+  matchAndRewrite(DotOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    auto opType = adaptor.getA().getType();
+    DotOp::Adaptor adaptor(operands);
+    auto opType = adaptor.a().getType();
     Type llvmIntType = IntegerType::get(&getTypeConverter()->getContext(), 8);
     // Dot product of all elements, broadcasted to all elements.
     auto attr = rewriter.getI8IntegerAttr(static_cast<int8_t>(0xff));
     Value scale =
         rewriter.create<LLVM::ConstantOp>(op.getLoc(), llvmIntType, attr);
-    rewriter.replaceOpWithNewOp<DotIntrOp>(op, opType, adaptor.getA(),
-                                           adaptor.getB(), scale);
+    rewriter.replaceOpWithNewOp<DotIntrOp>(op, opType, adaptor.a(), adaptor.b(),
+                                           scale);
     return success();
   }
 };

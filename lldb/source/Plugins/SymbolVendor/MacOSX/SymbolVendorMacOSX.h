@@ -19,9 +19,9 @@ public:
 
   static void Terminate();
 
-  static llvm::StringRef GetPluginNameStatic() { return "macosx"; }
+  static lldb_private::ConstString GetPluginNameStatic();
 
-  static llvm::StringRef GetPluginDescriptionStatic();
+  static const char *GetPluginDescriptionStatic();
 
   static lldb_private::SymbolVendor *
   CreateInstance(const lldb::ModuleSP &module_sp,
@@ -31,7 +31,9 @@ public:
   SymbolVendorMacOSX(const lldb::ModuleSP &module_sp);
 
   // PluginInterface protocol
-  llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
+  lldb_private::ConstString GetPluginName() override;
+
+  uint32_t GetPluginVersion() override;
 };
 
 #endif // LLDB_SOURCE_PLUGINS_SYMBOLVENDOR_MACOSX_SYMBOLVENDORMACOSX_H

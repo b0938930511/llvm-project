@@ -124,7 +124,6 @@ syn keyword llvmKeyword
       \ nocallback
       \ nocapture
       \ nocf_check
-      \ no_cfi
       \ noduplicate
       \ nofree
       \ noimplicitfloat
@@ -139,10 +138,8 @@ syn keyword llvmKeyword
       \ nosync
       \ noundef
       \ nounwind
-      \ nosanitize_bounds
       \ nosanitize_coverage
       \ null_pointer_is_valid
-      \ optdebug
       \ optforfuzzing
       \ optnone
       \ optsize

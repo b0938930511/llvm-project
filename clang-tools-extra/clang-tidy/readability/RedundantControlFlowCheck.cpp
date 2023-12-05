@@ -13,7 +13,9 @@
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::readability {
+namespace clang {
+namespace tidy {
+namespace readability {
 
 namespace {
 
@@ -77,7 +79,7 @@ void RedundantControlFlowCheck::issueDiagnostic(
   SourceLocation Start;
   if (Previous != Block->body_rend())
     Start = Lexer::findLocationAfterToken(
-        cast<Stmt>(*Previous)->getEndLoc(), tok::semi, SM, getLangOpts(),
+        dyn_cast<Stmt>(*Previous)->getEndLoc(), tok::semi, SM, getLangOpts(),
         /*SkipTrailingWhitespaceAndNewLine=*/true);
   if (!Start.isValid())
     Start = StmtRange.getBegin();
@@ -89,4 +91,6 @@ void RedundantControlFlowCheck::issueDiagnostic(
   diag(StmtRange.getBegin(), Diag) << FixItHint::CreateRemoval(RemovedRange);
 }
 
-} // namespace clang::tidy::readability
+} // namespace readability
+} // namespace tidy
+} // namespace clang

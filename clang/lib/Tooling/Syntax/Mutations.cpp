@@ -15,6 +15,7 @@
 #include "clang/Tooling/Syntax/Tokens.h"
 #include "clang/Tooling/Syntax/Tree.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
 #include <cassert>
@@ -76,8 +77,7 @@ public:
   }
 };
 
-void syntax::removeStatement(syntax::Arena &A, TokenBufferTokenManager &TBTM,
-                             syntax::Statement *S) {
+void syntax::removeStatement(syntax::Arena &A, syntax::Statement *S) {
   assert(S);
   assert(S->canModify());
 
@@ -90,5 +90,5 @@ void syntax::removeStatement(syntax::Arena &A, TokenBufferTokenManager &TBTM,
   if (isa<EmptyStatement>(S))
     return; // already an empty statement, nothing to do.
 
-  MutationsImpl::replace(S, createEmptyStatement(A, TBTM));
+  MutationsImpl::replace(S, createEmptyStatement(A));
 }

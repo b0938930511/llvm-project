@@ -7,7 +7,7 @@ typedef struct _NSRect { NSPoint origin; NSSize size; } NSRect;
 
 extern const NSPoint NSZeroPoint;
 
-extern NSSize canvasSize(void);
-void func(void) {
+extern NSSize canvasSize();
+void func() {
    const NSRect canvasRect = { NSZeroPoint, canvasSize() };
 }

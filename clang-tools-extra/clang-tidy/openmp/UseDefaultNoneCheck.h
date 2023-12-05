@@ -11,14 +11,16 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::openmp {
+namespace clang {
+namespace tidy {
+namespace openmp {
 
 /// Finds OpenMP directives that are allowed to contain a ``default`` clause,
 /// but either don't specify it or the clause is specified but with the kind
 /// other than ``none``, and suggests to use the ``default(none)`` clause.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/openmp/use-default-none.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/openmp-use-default-none.html
 class UseDefaultNoneCheck : public ClangTidyCheck {
 public:
   UseDefaultNoneCheck(StringRef Name, ClangTidyContext *Context)
@@ -30,6 +32,8 @@ public:
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
 };
 
-} // namespace clang::tidy::openmp
+} // namespace openmp
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_OPENMP_USEDEFAULTNONECHECK_H

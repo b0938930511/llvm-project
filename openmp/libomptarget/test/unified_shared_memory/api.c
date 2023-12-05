@@ -1,12 +1,11 @@
 // RUN: %libomptarget-compile-run-and-check-generic
 // XFAIL: nvptx64-nvidia-cuda
-// XFAIL: nvptx64-nvidia-cuda-LTO
 
-// Fails on amdgpu with error: GPU Memory Error
-// UNSUPPORTED: amdgcn-amd-amdhsa
+// Fails on amdgcn with error: GPU Memory Error
+// XFAIL: amdgcn-amd-amdhsa
 
-#include <omp.h>
 #include <stdio.h>
+#include <omp.h>
 
 // ---------------------------------------------------------------------------
 // Various definitions copied from OpenMP RTL

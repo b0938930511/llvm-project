@@ -23,20 +23,23 @@ Available options:
   General:
     -h|--help               show this help message
   Docker-specific:
-    -s|--source             image source dir (i.e. debian10, nvidia-cuda, etc)
+    -s|--source             image source dir (i.e. debian8, nvidia-cuda, etc)
     -d|--docker-repository  docker repository for the image
     -t|--docker-tag         docker tag for the image
   Checkout arguments:
-    -b|--branch         git branch to checkout, i.e. 'main',
-                        'release/10.x'
-                        (default: 'main')
-    -r|--revision       git revision to checkout
+    -b|--branch         svn branch to checkout, i.e. 'trunk',
+                        'branches/release_40'
+                        (default: 'trunk')
+    -r|--revision       svn revision to checkout
     -c|--cherrypick     revision to cherry-pick. Can be specified multiple times.
                         Cherry-picks are performed in the sorted order using the
                         following command:
-                        'git cherry-pick \$rev'.
-    -p|--llvm-project   Add the project to a list LLVM_ENABLE_PROJECTS, passed to
-                        CMake.
+                        'svn patch <(svn diff -c \$rev)'.
+    -p|--llvm-project   name of an svn project to checkout. Will also add the
+                        project to a list LLVM_ENABLE_PROJECTS, passed to CMake.
+                        For clang, please use 'clang', not 'cfe'.
+                        Project 'llvm' is always included and ignored, if
+                        specified.
                         Can be specified multiple times.
     -c|--checksums      name of a file, containing checksums of llvm checkout.
                         Script will fail if checksums of the checkout do not
@@ -51,18 +54,18 @@ Required options: --source and --docker-repository, at least one
 All options after '--' are passed to CMake invocation.
 
 For example, running:
-$ build_docker_image.sh -s debian10 -d mydocker/debian10-clang -t latest \
+$ build_docker_image.sh -s debian8 -d mydocker/debian8-clang -t latest \ 
   -p clang -i install-clang -i install-clang-resource-headers
 will produce two docker images:
-    mydocker/debian10-clang-build:latest - an intermediate image used to compile
+    mydocker/debian8-clang-build:latest - an intermediate image used to compile
       clang.
-    mydocker/clang-debian10:latest       - a small image with preinstalled clang.
+    mydocker/clang-debian8:latest       - a small image with preinstalled clang.
 Please note that this example produces a not very useful installation, since it
 doesn't override CMake defaults, which produces a Debug and non-boostrapped
 version of clang.
 
 To get a 2-stage clang build, you could use this command:
-$ ./build_docker_image.sh -s debian10 -d mydocker/clang-debian10 -t "latest" \
+$ ./build_docker_image.sh -s debian8 -d mydocker/clang-debian8 -t "latest" \ 
     -p clang -i stage2-install-clang -i stage2-install-clang-resource-headers \ 
     -- \ 
     -DLLVM_TARGETS_TO_BUILD=Native -DCMAKE_BUILD_TYPE=Release \ 
@@ -96,7 +99,7 @@ while [[ $# -gt 0 ]]; do
       DOCKER_TAG="$1"
       shift
       ;;
-    -r|--revision|-c|--cherrypick|-b|--branch)
+    -r|--revision|-c|-cherrypick|-b|--branch)
       CHECKOUT_ARGS="$CHECKOUT_ARGS $1 $2"
       shift 2
       ;;
@@ -107,7 +110,15 @@ while [[ $# -gt 0 ]]; do
       ;;
     -p|--llvm-project)
       PROJ="$2"
-      CMAKE_ENABLED_PROJECTS="$CMAKE_ENABLED_PROJECTS;$PROJ"
+      if [ "$PROJ" == "cfe" ]; then
+        PROJ="clang"
+      fi
+
+      CHECKOUT_ARGS="$CHECKOUT_ARGS $1 $PROJ"
+      if [ "$PROJ" != "clang-tools-extra" ]; then
+        CMAKE_ENABLED_PROJECTS="$CMAKE_ENABLED_PROJECTS;$PROJ"
+      fi
+
       shift 2
       ;;
     -c|--checksums)

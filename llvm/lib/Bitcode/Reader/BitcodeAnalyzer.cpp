@@ -13,7 +13,6 @@
 #include "llvm/Bitstream/BitstreamReader.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/SHA1.h"
-#include <optional>
 
 using namespace llvm;
 
@@ -22,14 +21,14 @@ static Error reportError(StringRef Message) {
 }
 
 /// Return a symbolic block name if known, otherwise return null.
-static std::optional<const char *>
-GetBlockName(unsigned BlockID, const BitstreamBlockInfo &BlockInfo,
-             CurStreamTypeType CurStreamType) {
+static Optional<const char *> GetBlockName(unsigned BlockID,
+                                           const BitstreamBlockInfo &BlockInfo,
+                                           CurStreamTypeType CurStreamType) {
   // Standard blocks for all bitcode files.
   if (BlockID < bitc::FIRST_APPLICATION_BLOCKID) {
     if (BlockID == bitc::BLOCKINFO_BLOCK_ID)
       return "BLOCKINFO_BLOCK";
-    return std::nullopt;
+    return None;
   }
 
   // Check to see if we have a blockinfo record for this block, with a name.
@@ -40,11 +39,11 @@ GetBlockName(unsigned BlockID, const BitstreamBlockInfo &BlockInfo,
   }
 
   if (CurStreamType != LLVMIRBitstream)
-    return std::nullopt;
+    return None;
 
   switch (BlockID) {
   default:
-    return std::nullopt;
+    return None;
   case bitc::OPERAND_BUNDLE_TAGS_BLOCK_ID:
     return "OPERAND_BUNDLE_TAGS_BLOCK";
   case bitc::MODULE_BLOCK_ID:
@@ -85,16 +84,15 @@ GetBlockName(unsigned BlockID, const BitstreamBlockInfo &BlockInfo,
 }
 
 /// Return a symbolic code name if known, otherwise return null.
-static std::optional<const char *>
-GetCodeName(unsigned CodeID, unsigned BlockID,
-            const BitstreamBlockInfo &BlockInfo,
-            CurStreamTypeType CurStreamType) {
+static Optional<const char *> GetCodeName(unsigned CodeID, unsigned BlockID,
+                                          const BitstreamBlockInfo &BlockInfo,
+                                          CurStreamTypeType CurStreamType) {
   // Standard blocks for all bitcode files.
   if (BlockID < bitc::FIRST_APPLICATION_BLOCKID) {
     if (BlockID == bitc::BLOCKINFO_BLOCK_ID) {
       switch (CodeID) {
       default:
-        return std::nullopt;
+        return None;
       case bitc::BLOCKINFO_CODE_SETBID:
         return "SETBID";
       case bitc::BLOCKINFO_CODE_BLOCKNAME:
@@ -103,30 +101,30 @@ GetCodeName(unsigned CodeID, unsigned BlockID,
         return "SETRECORDNAME";
       }
     }
-    return std::nullopt;
+    return None;
   }
 
   // Check to see if we have a blockinfo record for this record, with a name.
   if (const BitstreamBlockInfo::BlockInfo *Info =
           BlockInfo.getBlockInfo(BlockID)) {
-    for (const std::pair<unsigned, std::string> &RN : Info->RecordNames)
-      if (RN.first == CodeID)
-        return RN.second.c_str();
+    for (unsigned i = 0, e = Info->RecordNames.size(); i != e; ++i)
+      if (Info->RecordNames[i].first == CodeID)
+        return Info->RecordNames[i].second.c_str();
   }
 
   if (CurStreamType != LLVMIRBitstream)
-    return std::nullopt;
+    return None;
 
 #define STRINGIFY_CODE(PREFIX, CODE)                                           \
   case bitc::PREFIX##_##CODE:                                                  \
     return #CODE;
   switch (BlockID) {
   default:
-    return std::nullopt;
+    return None;
   case bitc::MODULE_BLOCK_ID:
     switch (CodeID) {
     default:
-      return std::nullopt;
+      return None;
       STRINGIFY_CODE(MODULE_CODE, VERSION)
       STRINGIFY_CODE(MODULE_CODE, TRIPLE)
       STRINGIFY_CODE(MODULE_CODE, DATALAYOUT)
@@ -146,14 +144,14 @@ GetCodeName(unsigned CodeID, unsigned BlockID,
   case bitc::IDENTIFICATION_BLOCK_ID:
     switch (CodeID) {
     default:
-      return std::nullopt;
+      return None;
       STRINGIFY_CODE(IDENTIFICATION_CODE, STRING)
       STRINGIFY_CODE(IDENTIFICATION_CODE, EPOCH)
     }
   case bitc::PARAMATTR_BLOCK_ID:
     switch (CodeID) {
     default:
-      return std::nullopt;
+      return None;
     // FIXME: Should these be different?
     case bitc::PARAMATTR_CODE_ENTRY_OLD:
       return "ENTRY";
@@ -163,14 +161,14 @@ GetCodeName(unsigned CodeID, unsigned BlockID,
   case bitc::PARAMATTR_GROUP_BLOCK_ID:
     switch (CodeID) {
     default:
-      return std::nullopt;
+      return None;
     case bitc::PARAMATTR_GRP_CODE_ENTRY:
       return "ENTRY";
     }
   case bitc::TYPE_BLOCK_ID_NEW:
     switch (CodeID) {
     default:
-      return std::nullopt;
+      return None;
       STRINGIFY_CODE(TYPE_CODE, NUMENTRY)
       STRINGIFY_CODE(TYPE_CODE, VOID)
       STRINGIFY_CODE(TYPE_CODE, FLOAT)
@@ -198,7 +196,7 @@ GetCodeName(unsigned CodeID, unsigned BlockID,
   case bitc::CONSTANTS_BLOCK_ID:
     switch (CodeID) {
     default:
-      return std::nullopt;
+      return None;
       STRINGIFY_CODE(CST_CODE, SETTYPE)
       STRINGIFY_CODE(CST_CODE, NULL)
       STRINGIFY_CODE(CST_CODE, UNDEF)
@@ -221,7 +219,6 @@ GetCodeName(unsigned CodeID, unsigned BlockID,
       STRINGIFY_CODE(CST_CODE, CE_SHUFVEC_EX)
       STRINGIFY_CODE(CST_CODE, CE_UNOP)
       STRINGIFY_CODE(CST_CODE, DSO_LOCAL_EQUIVALENT)
-      STRINGIFY_CODE(CST_CODE, NO_CFI_VALUE)
     case bitc::CST_CODE_BLOCKADDRESS:
       return "CST_CODE_BLOCKADDRESS";
       STRINGIFY_CODE(CST_CODE, DATA)
@@ -229,7 +226,7 @@ GetCodeName(unsigned CodeID, unsigned BlockID,
   case bitc::FUNCTION_BLOCK_ID:
     switch (CodeID) {
     default:
-      return std::nullopt;
+      return None;
       STRINGIFY_CODE(FUNC_CODE, DECLAREBLOCKS)
       STRINGIFY_CODE(FUNC_CODE, INST_BINOP)
       STRINGIFY_CODE(FUNC_CODE, INST_CAST)
@@ -269,12 +266,11 @@ GetCodeName(unsigned CodeID, unsigned BlockID,
       STRINGIFY_CODE(FUNC_CODE, INST_STOREATOMIC)
       STRINGIFY_CODE(FUNC_CODE, INST_CMPXCHG)
       STRINGIFY_CODE(FUNC_CODE, INST_CALLBR)
-      STRINGIFY_CODE(FUNC_CODE, BLOCKADDR_USERS)
     }
   case bitc::VALUE_SYMTAB_BLOCK_ID:
     switch (CodeID) {
     default:
-      return std::nullopt;
+      return None;
       STRINGIFY_CODE(VST_CODE, ENTRY)
       STRINGIFY_CODE(VST_CODE, BBENTRY)
       STRINGIFY_CODE(VST_CODE, FNENTRY)
@@ -283,7 +279,7 @@ GetCodeName(unsigned CodeID, unsigned BlockID,
   case bitc::MODULE_STRTAB_BLOCK_ID:
     switch (CodeID) {
     default:
-      return std::nullopt;
+      return None;
       STRINGIFY_CODE(MST_CODE, ENTRY)
       STRINGIFY_CODE(MST_CODE, HASH)
     }
@@ -291,7 +287,7 @@ GetCodeName(unsigned CodeID, unsigned BlockID,
   case bitc::FULL_LTO_GLOBALVAL_SUMMARY_BLOCK_ID:
     switch (CodeID) {
     default:
-      return std::nullopt;
+      return None;
       STRINGIFY_CODE(FS, PERMODULE)
       STRINGIFY_CODE(FS, PERMODULE_PROFILE)
       STRINGIFY_CODE(FS, PERMODULE_RELBF)
@@ -317,22 +313,17 @@ GetCodeName(unsigned CodeID, unsigned BlockID,
       STRINGIFY_CODE(FS, TYPE_ID_METADATA)
       STRINGIFY_CODE(FS, BLOCK_COUNT)
       STRINGIFY_CODE(FS, PARAM_ACCESS)
-      STRINGIFY_CODE(FS, PERMODULE_CALLSITE_INFO)
-      STRINGIFY_CODE(FS, PERMODULE_ALLOC_INFO)
-      STRINGIFY_CODE(FS, COMBINED_CALLSITE_INFO)
-      STRINGIFY_CODE(FS, COMBINED_ALLOC_INFO)
-      STRINGIFY_CODE(FS, STACK_IDS)
     }
   case bitc::METADATA_ATTACHMENT_ID:
     switch (CodeID) {
     default:
-      return std::nullopt;
+      return None;
       STRINGIFY_CODE(METADATA, ATTACHMENT)
     }
   case bitc::METADATA_BLOCK_ID:
     switch (CodeID) {
     default:
-      return std::nullopt;
+      return None;
       STRINGIFY_CODE(METADATA, STRING_OLD)
       STRINGIFY_CODE(METADATA, VALUE)
       STRINGIFY_CODE(METADATA, NODE)
@@ -376,13 +367,13 @@ GetCodeName(unsigned CodeID, unsigned BlockID,
   case bitc::METADATA_KIND_BLOCK_ID:
     switch (CodeID) {
     default:
-      return std::nullopt;
+      return None;
       STRINGIFY_CODE(METADATA, KIND)
     }
   case bitc::USELIST_BLOCK_ID:
     switch (CodeID) {
     default:
-      return std::nullopt;
+      return None;
     case bitc::USELIST_CODE_DEFAULT:
       return "USELIST_CODE_DEFAULT";
     case bitc::USELIST_CODE_BB:
@@ -392,21 +383,21 @@ GetCodeName(unsigned CodeID, unsigned BlockID,
   case bitc::OPERAND_BUNDLE_TAGS_BLOCK_ID:
     switch (CodeID) {
     default:
-      return std::nullopt;
+      return None;
     case bitc::OPERAND_BUNDLE_TAG:
       return "OPERAND_BUNDLE_TAG";
     }
   case bitc::STRTAB_BLOCK_ID:
     switch (CodeID) {
     default:
-      return std::nullopt;
+      return None;
     case bitc::STRTAB_BLOB:
       return "BLOB";
     }
   case bitc::SYMTAB_BLOCK_ID:
     switch (CodeID) {
     default:
-      return std::nullopt;
+      return None;
     case bitc::SYMTAB_BLOB:
       return "BLOB";
     }
@@ -475,7 +466,7 @@ static Expected<CurStreamTypeType> ReadSignature(BitstreamCursor &Stream) {
   return UnknownBitstream;
 }
 
-static Expected<CurStreamTypeType> analyzeHeader(std::optional<BCDumpOptions> O,
+static Expected<CurStreamTypeType> analyzeHeader(Optional<BCDumpOptions> O,
                                                  BitstreamCursor &Stream) {
   ArrayRef<uint8_t> Bytes = Stream.getBitcodeBytes();
   const unsigned char *BufPtr = (const unsigned char *)Bytes.data();
@@ -538,9 +529,10 @@ Error BitcodeAnalyzer::decodeMetadataStringsBlob(StringRef Indent,
     if (R.AtEndOfStream())
       return reportError("bad length");
 
-    uint32_t Size;
-    if (Error E = R.ReadVBR(6).moveInto(Size))
-      return E;
+    Expected<uint32_t> MaybeSize = R.ReadVBR(6);
+    if (!MaybeSize)
+      return MaybeSize.takeError();
+    uint32_t Size = MaybeSize.get();
     if (Strings.size() < Size)
       return reportError("truncated chars");
 
@@ -555,16 +547,19 @@ Error BitcodeAnalyzer::decodeMetadataStringsBlob(StringRef Indent,
 }
 
 BitcodeAnalyzer::BitcodeAnalyzer(StringRef Buffer,
-                                 std::optional<StringRef> BlockInfoBuffer)
+                                 Optional<StringRef> BlockInfoBuffer)
     : Stream(Buffer) {
   if (BlockInfoBuffer)
     BlockInfoStream.emplace(*BlockInfoBuffer);
 }
 
-Error BitcodeAnalyzer::analyze(std::optional<BCDumpOptions> O,
-                               std::optional<StringRef> CheckHash) {
-  if (Error E = analyzeHeader(O, Stream).moveInto(CurStreamType))
-    return E;
+Error BitcodeAnalyzer::analyze(Optional<BCDumpOptions> O,
+                               Optional<StringRef> CheckHash) {
+  Expected<CurStreamTypeType> MaybeType = analyzeHeader(O, Stream);
+  if (!MaybeType)
+    return MaybeType.takeError();
+  else
+    CurStreamType = *MaybeType;
 
   Stream.setBlockInfo(&BlockInfo);
 
@@ -572,8 +567,9 @@ Error BitcodeAnalyzer::analyze(std::optional<BCDumpOptions> O,
   // The block info must be a top-level block.
   if (BlockInfoStream) {
     BitstreamCursor BlockInfoCursor(*BlockInfoStream);
-    if (Error E = analyzeHeader(O, BlockInfoCursor).takeError())
-      return E;
+    Expected<CurStreamTypeType> H = analyzeHeader(O, BlockInfoCursor);
+    if (!H)
+      return H.takeError();
 
     while (!BlockInfoCursor.AtEndOfStream()) {
       Expected<unsigned> MaybeCode = BlockInfoCursor.ReadCode();
@@ -586,11 +582,12 @@ Error BitcodeAnalyzer::analyze(std::optional<BCDumpOptions> O,
       if (!MaybeBlockID)
         return MaybeBlockID.takeError();
       if (MaybeBlockID.get() == bitc::BLOCKINFO_BLOCK_ID) {
-        std::optional<BitstreamBlockInfo> NewBlockInfo;
-        if (Error E =
-                BlockInfoCursor.ReadBlockInfoBlock(/*ReadBlockInfoNames=*/true)
-                    .moveInto(NewBlockInfo))
-          return E;
+        Expected<Optional<BitstreamBlockInfo>> MaybeNewBlockInfo =
+            BlockInfoCursor.ReadBlockInfoBlock(/*ReadBlockInfoNames=*/true);
+        if (!MaybeNewBlockInfo)
+          return MaybeNewBlockInfo.takeError();
+        Optional<BitstreamBlockInfo> NewBlockInfo =
+            std::move(MaybeNewBlockInfo.get());
         if (!NewBlockInfo)
           return reportError("Malformed BlockInfoBlock in block info file");
         BlockInfo = std::move(*NewBlockInfo);
@@ -623,7 +620,7 @@ Error BitcodeAnalyzer::analyze(std::optional<BCDumpOptions> O,
 }
 
 void BitcodeAnalyzer::printStats(BCDumpOptions O,
-                                 std::optional<StringRef> Filename) {
+                                 Optional<StringRef> Filename) {
   uint64_t BufferSizeBits = Stream.getBitcodeBytes().size() * CHAR_BIT;
   // Print a summary of the read file.
   O.OS << "Summary ";
@@ -655,14 +652,16 @@ void BitcodeAnalyzer::printStats(BCDumpOptions O,
 
   // Emit per-block stats.
   O.OS << "Per-block Summary:\n";
-  for (const auto &Stat : BlockIDStats) {
-    O.OS << "  Block ID #" << Stat.first;
-    if (std::optional<const char *> BlockName =
-            GetBlockName(Stat.first, BlockInfo, CurStreamType))
+  for (std::map<unsigned, PerBlockIDStats>::iterator I = BlockIDStats.begin(),
+                                                     E = BlockIDStats.end();
+       I != E; ++I) {
+    O.OS << "  Block ID #" << I->first;
+    if (Optional<const char *> BlockName =
+            GetBlockName(I->first, BlockInfo, CurStreamType))
       O.OS << " (" << *BlockName << ")";
     O.OS << ":\n";
 
-    const PerBlockIDStats &Stats = Stat.second;
+    const PerBlockIDStats &Stats = I->second;
     O.OS << "      Num Instances: " << Stats.NumInstances << "\n";
     O.OS << "         Total Size: ";
     printSize(O.OS, Stats.NumBits);
@@ -701,8 +700,8 @@ void BitcodeAnalyzer::printStats(BCDumpOptions O,
 
       O.OS << "\tRecord Histogram:\n";
       O.OS << "\t\t  Count    # Bits     b/Rec   % Abv  Record Kind\n";
-      for (const auto &FreqPair : FreqPairs) {
-        const PerRecordStats &RecStats = Stats.CodeFreq[FreqPair.second];
+      for (unsigned i = 0, e = FreqPairs.size(); i != e; ++i) {
+        const PerRecordStats &RecStats = Stats.CodeFreq[FreqPairs[i].second];
 
         O.OS << format("\t\t%7d %9lu", RecStats.NumInstances,
                        (unsigned long)RecStats.TotalBits);
@@ -720,11 +719,11 @@ void BitcodeAnalyzer::printStats(BCDumpOptions O,
           O.OS << "        ";
 
         O.OS << "  ";
-        if (std::optional<const char *> CodeName = GetCodeName(
-                FreqPair.second, Stat.first, BlockInfo, CurStreamType))
+        if (Optional<const char *> CodeName = GetCodeName(
+                FreqPairs[i].second, I->first, BlockInfo, CurStreamType))
           O.OS << *CodeName << "\n";
         else
-          O.OS << "UnknownCode" << FreqPair.second << "\n";
+          O.OS << "UnknownCode" << FreqPairs[i].second << "\n";
       }
       O.OS << "\n";
     }
@@ -732,8 +731,8 @@ void BitcodeAnalyzer::printStats(BCDumpOptions O,
 }
 
 Error BitcodeAnalyzer::parseBlock(unsigned BlockID, unsigned IndentLevel,
-                                  std::optional<BCDumpOptions> O,
-                                  std::optional<StringRef> CheckHash) {
+                                  Optional<BCDumpOptions> O,
+                                  Optional<StringRef> CheckHash) {
   std::string Indent(IndentLevel * 2, ' ');
   uint64_t BlockBitStart = Stream.GetCurrentBitNo();
 
@@ -743,22 +742,24 @@ Error BitcodeAnalyzer::parseBlock(unsigned BlockID, unsigned IndentLevel,
   BlockStats.NumInstances++;
 
   // BLOCKINFO is a special part of the stream.
-  bool DumpRecords = O.has_value();
+  bool DumpRecords = O.hasValue();
   if (BlockID == bitc::BLOCKINFO_BLOCK_ID) {
-    if (O && !O->DumpBlockinfo)
+    if (O)
       O->OS << Indent << "<BLOCKINFO_BLOCK/>\n";
-    std::optional<BitstreamBlockInfo> NewBlockInfo;
-    if (Error E = Stream.ReadBlockInfoBlock(/*ReadBlockInfoNames=*/true)
-                      .moveInto(NewBlockInfo))
-      return E;
+    Expected<Optional<BitstreamBlockInfo>> MaybeNewBlockInfo =
+        Stream.ReadBlockInfoBlock(/*ReadBlockInfoNames=*/true);
+    if (!MaybeNewBlockInfo)
+      return MaybeNewBlockInfo.takeError();
+    Optional<BitstreamBlockInfo> NewBlockInfo =
+        std::move(MaybeNewBlockInfo.get());
     if (!NewBlockInfo)
       return reportError("Malformed BlockInfoBlock");
     BlockInfo = std::move(*NewBlockInfo);
     if (Error Err = Stream.JumpToBit(BlockBitStart))
       return Err;
     // It's not really interesting to dump the contents of the blockinfo
-    // block, so only do it if the user explicitly requests it.
-    DumpRecords = O && O->DumpBlockinfo;
+    // block.
+    DumpRecords = false;
   }
 
   unsigned NumWords = 0;
@@ -768,7 +769,7 @@ Error BitcodeAnalyzer::parseBlock(unsigned BlockID, unsigned IndentLevel,
   // Keep it for later, when we see a MODULE_HASH record
   uint64_t BlockEntryPos = Stream.getCurrentByteNo();
 
-  std::optional<const char *> BlockName;
+  Optional<const char *> BlockName = None;
   if (DumpRecords) {
     O->OS << Indent << "<";
     if ((BlockName = GetBlockName(BlockID, BlockInfo, CurStreamType)))
@@ -789,16 +790,17 @@ Error BitcodeAnalyzer::parseBlock(unsigned BlockID, unsigned IndentLevel,
   uint64_t MetadataIndexOffset = 0;
 
   // Read all the records for this block.
-  while (true) {
+  while (1) {
     if (Stream.AtEndOfStream())
       return reportError("Premature end of bitstream");
 
     uint64_t RecordStartBit = Stream.GetCurrentBitNo();
 
-    BitstreamEntry Entry;
-    if (Error E = Stream.advance(BitstreamCursor::AF_DontAutoprocessAbbrevs)
-                      .moveInto(Entry))
-      return E;
+    Expected<BitstreamEntry> MaybeEntry =
+        Stream.advance(BitstreamCursor::AF_DontAutoprocessAbbrevs);
+    if (!MaybeEntry)
+      return MaybeEntry.takeError();
+    BitstreamEntry Entry = MaybeEntry.get();
 
     switch (Entry.Kind) {
     case BitstreamEntry::Error:
@@ -845,9 +847,10 @@ Error BitcodeAnalyzer::parseBlock(unsigned BlockID, unsigned IndentLevel,
 
     StringRef Blob;
     uint64_t CurrentRecordPos = Stream.GetCurrentBitNo();
-    unsigned Code;
-    if (Error E = Stream.readRecord(Entry.ID, Record, &Blob).moveInto(Code))
-      return E;
+    Expected<unsigned> MaybeCode = Stream.readRecord(Entry.ID, Record, &Blob);
+    if (!MaybeCode)
+      return MaybeCode.takeError();
+    unsigned Code = MaybeCode.get();
 
     // Increment the # occurrences of this code.
     if (BlockStats.CodeFreq.size() <= Code)
@@ -862,7 +865,7 @@ Error BitcodeAnalyzer::parseBlock(unsigned BlockID, unsigned IndentLevel,
 
     if (DumpRecords) {
       O->OS << Indent << "  <";
-      std::optional<const char *> CodeName =
+      Optional<const char *> CodeName =
           GetCodeName(Code, BlockID, BlockInfo, CurStreamType);
       if (CodeName)
         O->OS << *CodeName;
@@ -872,10 +875,7 @@ Error BitcodeAnalyzer::parseBlock(unsigned BlockID, unsigned IndentLevel,
         O->OS << " codeid=" << Code;
       const BitCodeAbbrev *Abbv = nullptr;
       if (Entry.ID != bitc::UNABBREV_RECORD) {
-        Expected<const BitCodeAbbrev *> MaybeAbbv = Stream.getAbbrev(Entry.ID);
-        if (!MaybeAbbv)
-          return MaybeAbbv.takeError();
-        Abbv = MaybeAbbv.get();
+        Abbv = Stream.getAbbrev(Entry.ID);
         O->OS << " abbrevid=" << Entry.ID;
       }
 
@@ -905,13 +905,13 @@ Error BitcodeAnalyzer::parseBlock(unsigned BlockID, unsigned IndentLevel,
 
       // If we found a module hash, let's verify that it matches!
       if (BlockID == bitc::MODULE_BLOCK_ID && Code == bitc::MODULE_CODE_HASH &&
-          CheckHash) {
+          CheckHash.hasValue()) {
         if (Record.size() != 5)
           O->OS << " (invalid)";
         else {
           // Recompute the hash and compare it to the one in the bitcode
           SHA1 Hasher;
-          std::array<uint8_t, 20> Hash;
+          StringRef Hash;
           Hasher.update(*CheckHash);
           {
             int BlockSize = (CurrentRecordPos / 8) - BlockEntryPos;
@@ -919,14 +919,14 @@ Error BitcodeAnalyzer::parseBlock(unsigned BlockID, unsigned IndentLevel,
             Hasher.update(ArrayRef<uint8_t>(Ptr, BlockSize));
             Hash = Hasher.result();
           }
-          std::array<uint8_t, 20> RecordedHash;
+          std::array<char, 20> RecordedHash;
           int Pos = 0;
           for (auto &Val : Record) {
             assert(!(Val >> 32) && "Unexpected high bits set");
             support::endian::write32be(&RecordedHash[Pos], Val);
             Pos += 4;
           }
-          if (Hash == RecordedHash)
+          if (Hash == StringRef(RecordedHash.data(), RecordedHash.size()))
             O->OS << " (match)";
           else
             O->OS << " (!mismatch!)";
@@ -967,8 +967,8 @@ Error BitcodeAnalyzer::parseBlock(unsigned BlockID, unsigned IndentLevel,
             O->OS.write_escaped(Blob, /*hex=*/true) << "'";
           } else {
             bool BlobIsPrintable = true;
-            for (char C : Blob)
-              if (!isPrint(static_cast<unsigned char>(C))) {
+            for (unsigned i = 0, e = Blob.size(); i != e; ++i)
+              if (!isPrint(static_cast<unsigned char>(Blob[i]))) {
                 BlobIsPrintable = false;
                 break;
               }

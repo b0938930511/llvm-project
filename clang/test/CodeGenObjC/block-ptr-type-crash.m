@@ -1,6 +1,8 @@
-// RUN: %clang_cc1 -Wno-objc-root-class -Wno-int-conversion -fblocks -o /dev/null -triple x86_64-- -emit-llvm %s
+// RUN: %clang_cc1 -Wno-objc-root-class -fblocks -o /dev/null -triple x86_64-- -emit-llvm %s
 // REQUIRES: asserts
 // Verify there is no assertion.
+
+// rdar://30111891
 
 typedef unsigned long long uint64_t;
 typedef enum AnEnum : uint64_t AnEnum;
@@ -8,7 +10,7 @@ enum AnEnum: uint64_t {
     AnEnumA
 };
 
-typedef void (^BlockType)(void);
+typedef void (^BlockType)();
 @interface MyClass
 @end
 @implementation MyClass

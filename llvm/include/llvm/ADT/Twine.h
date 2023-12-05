@@ -15,7 +15,9 @@
 #include <cassert>
 #include <cstdint>
 #include <string>
+#if __cplusplus > 201402L
 #include <string_view>
+#endif
 
 namespace llvm {
 
@@ -101,10 +103,6 @@ namespace llvm {
       /// StringRef, and SmallString.  Can't use a StringRef here
       /// because they are not trivally constructible.
       PtrAndLengthKind,
-
-      /// A pointer and length representation that's also null-terminated.
-      /// Guaranteed to be constructed from a compile-time string literal.
-      StringLiteralKind,
 
       /// A pointer to a formatv_object_base instance.
       FormatvObjectKind,
@@ -289,6 +287,7 @@ namespace llvm {
       assert(isValid() && "Invalid twine!");
     }
 
+#if __cplusplus > 201402L
     /// Construct from an std::string_view by converting it to a pointer and
     /// length.  This handles string_views on a pure API basis, and avoids
     /// storing one (or a pointer to one) inside a Twine, which avoids problems
@@ -299,17 +298,10 @@ namespace llvm {
       LHS.ptrAndLength.length = Str.length();
       assert(isValid() && "Invalid twine!");
     }
+#endif
 
     /// Construct from a StringRef.
     /*implicit*/ Twine(const StringRef &Str) : LHSKind(PtrAndLengthKind) {
-      LHS.ptrAndLength.ptr = Str.data();
-      LHS.ptrAndLength.length = Str.size();
-      assert(isValid() && "Invalid twine!");
-    }
-
-    /// Construct from a StringLiteral.
-    /*implicit*/ Twine(const StringLiteral &Str)
-        : LHSKind(StringLiteralKind) {
       LHS.ptrAndLength.ptr = Str.data();
       LHS.ptrAndLength.length = Str.size();
       assert(isValid() && "Invalid twine!");
@@ -430,11 +422,6 @@ namespace llvm {
       return isNullary();
     }
 
-    /// Check if this twine is guaranteed to refer to single string literal.
-    bool isSingleStringLiteral() const {
-      return isUnary() && getLHSKind() == StringLiteralKind;
-    }
-
     /// Return true if this twine can be dynamically accessed as a single
     /// StringRef value with getSingleStringRef().
     bool isSingleStringRef() const {
@@ -445,7 +432,6 @@ namespace llvm {
       case CStringKind:
       case StdStringKind:
       case PtrAndLengthKind:
-      case StringLiteralKind:
         return true;
       default:
         return false;
@@ -481,7 +467,6 @@ namespace llvm {
       case StdStringKind:
         return StringRef(*LHS.stdString);
       case PtrAndLengthKind:
-      case StringLiteralKind:
         return StringRef(LHS.ptrAndLength.ptr, LHS.ptrAndLength.length);
       }
     }

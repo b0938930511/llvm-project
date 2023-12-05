@@ -18,6 +18,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/CodeGen/ScheduleHazardRecognizer.h"
 #include "llvm/Support/DataTypes.h"
+#include <array>
 #include <initializer_list>
 
 namespace llvm {
@@ -33,7 +34,7 @@ class ARMHazardRecognizerFPMLx : public ScheduleHazardRecognizer {
   unsigned FpMLxStalls = 0;
 
 public:
-  ARMHazardRecognizerFPMLx() { MaxLookAhead = 1; }
+  ARMHazardRecognizerFPMLx() : ScheduleHazardRecognizer() { MaxLookAhead = 1; }
 
   HazardType getHazardType(SUnit *SU, int Stalls) override;
   void Reset() override;

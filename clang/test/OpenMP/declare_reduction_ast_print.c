@@ -31,8 +31,8 @@ void init(struct SSS *priv, struct SSS orig);
 #pragma omp declare reduction(fun : struct SSS : omp_out = omp_in) initializer(init(&omp_priv, omp_orig))
 // CHECK: #pragma omp declare reduction (fun : struct SSS : omp_out = omp_in) initializer(init(&omp_priv, omp_orig))
 
-// CHECK: int main(void) {
-int main(void) {
+// CHECK: int main() {
+int main() {
 #pragma omp declare reduction(fun : struct SSS : omp_out = omp_in) initializer(init(&omp_priv, omp_orig))
   // CHECK: #pragma omp declare reduction (fun : struct SSS : omp_out = omp_in) initializer(init(&omp_priv, omp_orig))
   {

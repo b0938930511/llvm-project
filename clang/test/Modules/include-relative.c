@@ -8,4 +8,4 @@
 
 #include "a.h"
 
-int f(void) { return n; }
+int f() { return n; }

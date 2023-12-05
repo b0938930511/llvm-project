@@ -26,11 +26,11 @@ class TargetMachine;
 
 class LLVM_LIBRARY_VISIBILITY X86AsmPrinter : public AsmPrinter {
   const X86Subtarget *Subtarget = nullptr;
+  StackMaps SM;
   FaultMaps FM;
   std::unique_ptr<MCCodeEmitter> CodeEmitter;
   bool EmitFPOData = false;
-  bool ShouldEmitWeakSwiftAsyncExtendedFramePointerFlags = false;
-  bool IndCSPrefix = false;
+  bool NeedsRetpoline = false;
 
   // This utility class tracks the length of a stackmap instruction's 'shadow'.
   // It is used by the X86AsmPrinter to ensure that the stackmap shadow
@@ -98,14 +98,6 @@ class LLVM_LIBRARY_VISIBILITY X86AsmPrinter : public AsmPrinter {
 
   void LowerFENTRY_CALL(const MachineInstr &MI, X86MCInstLower &MCIL);
 
-  // KCFI specific lowering for X86.
-  uint32_t MaskKCFIType(uint32_t Value);
-  void EmitKCFITypePadding(const MachineFunction &MF, bool HasType = true);
-  void LowerKCFI_CHECK(const MachineInstr &MI);
-
-  // Address sanitizer specific lowering for X86.
-  void LowerASAN_CHECK_MEMACCESS(const MachineInstr &MI);
-
   // Choose between emitting .seh_ directives and .cv_fpo_ directives.
   void EmitSEHInstruction(const MachineInstr *MI);
 
@@ -136,7 +128,10 @@ public:
 
   void emitInstruction(const MachineInstr *MI) override;
 
-  void emitBasicBlockEnd(const MachineBasicBlock &MBB) override;
+  void emitBasicBlockEnd(const MachineBasicBlock &MBB) override {
+    AsmPrinter::emitBasicBlockEnd(MBB);
+    SMShadowTracker.emitShadowPadding(*OutStreamer, getSubtargetInfo());
+  }
 
   bool PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
                        const char *ExtraCode, raw_ostream &O) override;
@@ -153,11 +148,6 @@ public:
   bool runOnMachineFunction(MachineFunction &MF) override;
   void emitFunctionBodyStart() override;
   void emitFunctionBodyEnd() override;
-  void emitKCFITypeId(const MachineFunction &MF) override;
-
-  bool shouldEmitWeakSwiftAsyncExtendedFramePointerFlags() const override {
-    return ShouldEmitWeakSwiftAsyncExtendedFramePointerFlags;
-  }
 };
 
 } // end namespace llvm

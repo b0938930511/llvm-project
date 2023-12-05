@@ -25,5 +25,5 @@ body: |
 
   bb.3:
     $eax = COPY %0
-    RET64 $eax
+    RETQ $eax
 ...

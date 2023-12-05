@@ -11,21 +11,23 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::readability {
+namespace clang {
+namespace tidy {
+namespace readability {
 
 /// Checks the code for dangling else, and possible misleading indentations due
 /// to missing braces. Note that this check only works as expected when the tabs
 /// or spaces are used consistently and not mixed.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/readability/misleading-indentation.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/readability-misleading-indentation.html
 class MisleadingIndentationCheck : public ClangTidyCheck {
 public:
   MisleadingIndentationCheck(StringRef Name, ClangTidyContext *Context)
       : ClangTidyCheck(Name, Context) {}
   void registerMatchers(ast_matchers::MatchFinder *Finder) override;
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
-  std::optional<TraversalKind> getCheckTraversalKind() const override {
+  llvm::Optional<TraversalKind> getCheckTraversalKind() const override {
     return TK_IgnoreUnlessSpelledInSource;
   }
 
@@ -35,6 +37,8 @@ private:
   void missingBracesCheck(const SourceManager &SM, const CompoundStmt *CStmt);
 };
 
-} // namespace clang::tidy::readability
+} // namespace readability
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_READABILITY_MISLEADING_INDENTATION_H

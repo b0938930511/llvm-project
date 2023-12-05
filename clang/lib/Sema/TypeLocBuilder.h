@@ -40,21 +40,17 @@ class TypeLocBuilder {
   /// The inline buffer.
   enum { BufferMaxAlignment = alignof(void *) };
   alignas(BufferMaxAlignment) char InlineBuffer[InlineCapacity];
-  unsigned NumBytesAtAlign4;
-  bool AtAlign8;
+  unsigned NumBytesAtAlign4, NumBytesAtAlign8;
 
 public:
   TypeLocBuilder()
       : Buffer(InlineBuffer), Capacity(InlineCapacity), Index(InlineCapacity),
-        NumBytesAtAlign4(0), AtAlign8(false) {}
+        NumBytesAtAlign4(0), NumBytesAtAlign8(0) {}
 
   ~TypeLocBuilder() {
     if (Buffer != InlineBuffer)
       delete[] Buffer;
   }
-
-  TypeLocBuilder(const TypeLocBuilder &) = delete;
-  TypeLocBuilder &operator=(const TypeLocBuilder &) = delete;
 
   /// Ensures that this buffer has at least as much capacity as described.
   void reserve(size_t Requested) {
@@ -66,10 +62,6 @@ public:
   /// Pushes a copy of the given TypeLoc onto this builder.  The builder
   /// must be empty for this to work.
   void pushFullCopy(TypeLoc L);
-
-  /// Pushes 'T' with all locations pointing to 'Loc'.
-  /// The builder must be empty for this to work.
-  void pushTrivial(ASTContext &Context, QualType T, SourceLocation Loc);
 
   /// Pushes space for a typespec TypeLoc.  Invalidates any TypeLocs
   /// previously retrieved from this builder.
@@ -85,8 +77,7 @@ public:
     LastTy = QualType();
 #endif
     Index = Capacity;
-    NumBytesAtAlign4 = 0;
-    AtAlign8 = false;
+    NumBytesAtAlign4 = NumBytesAtAlign8 = 0;
   }
 
   /// Tell the TypeLocBuilder that the type it is storing has been

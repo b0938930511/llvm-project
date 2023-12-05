@@ -6,12 +6,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-// UNSUPPORTED: c++03, c++11, c++14
+// UNSUPPORTED: c++03
+// UNSUPPORTED: !libc++ && c++11
+// UNSUPPORTED: !libc++ && c++14
 
 // <charconv>
 
-// constexpr from_chars_result from_chars(const char* first, const char* last,
-//                                        Integral& value, int base = 10)
+// from_chars_result from_chars(const char* first, const char* last,
+//                              Integral& value, int base = 10)
 
 #include <charconv>
 #include "test_macros.h"
@@ -20,7 +22,7 @@
 template <typename T>
 struct test_basics
 {
-    TEST_CONSTEXPR_CXX23 void operator()()
+    void operator()()
     {
         std::from_chars_result r;
         T x;
@@ -38,8 +40,7 @@ struct test_basics
         }
 
         {
-            // The string has more characters than valid in an 128-bit value.
-            char s[] = "0X7BAtSGHDkEIXZgQRfYChLpOzRnM ";
+            char s[] = "0X7BAtSGHDkEIXZg ";
 
             // The letters from a (or A) through z (or Z) are ascribed the
             // values 10 through 35; (C11 7.22.1.4/3)
@@ -84,18 +85,16 @@ struct test_basics
 template <typename T>
 struct test_signed
 {
-    TEST_CONSTEXPR_CXX23 void operator()()
+    void operator()()
     {
         std::from_chars_result r;
-        T x = 42;
+        T x;
 
         {
             // If the pattern allows for an optional sign,
             // but the string has no digit characters following the sign,
             char s[] = "- 9+12";
             r = std::from_chars(s, s + sizeof(s), x);
-            // value is unmodified,
-            assert(x == 42);
             // no characters match the pattern.
             assert(r.ptr == s);
             assert(r.ec == std::errc::invalid_argument);
@@ -135,19 +134,10 @@ struct test_signed
     }
 };
 
-TEST_CONSTEXPR_CXX23 bool test()
+int main(int, char**)
 {
     run<test_basics>(integrals);
     run<test_signed>(all_signed);
-
-    return true;
-}
-
-int main(int, char**) {
-    test();
-#if TEST_STD_VER > 20
-    static_assert(test());
-#endif
 
     return 0;
 }

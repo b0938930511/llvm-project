@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "ByteStreamer.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/BinaryFormat/Dwarf.h"
 #include "llvm/CodeGen/AsmPrinter.h"
@@ -18,11 +19,14 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCDwarf.h"
+#include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/MC/MCSection.h"
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSymbol.h"
+#include "llvm/MC/MachineLocation.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Target/TargetLoweringObjectFile.h"
+#include "llvm/Target/TargetMachine.h"
 #include <cstdint>
 using namespace llvm;
 
@@ -31,6 +35,28 @@ using namespace llvm;
 //===----------------------------------------------------------------------===//
 // Dwarf Emission Helper Routines
 //===----------------------------------------------------------------------===//
+
+/// EmitSLEB128 - emit the specified signed leb128 value.
+void AsmPrinter::emitSLEB128(int64_t Value, const char *Desc) const {
+  if (isVerbose() && Desc)
+    OutStreamer->AddComment(Desc);
+
+  OutStreamer->emitSLEB128IntValue(Value);
+}
+
+void AsmPrinter::emitULEB128(uint64_t Value, const char *Desc,
+                             unsigned PadTo) const {
+  if (isVerbose() && Desc)
+    OutStreamer->AddComment(Desc);
+
+  OutStreamer->emitULEB128IntValue(Value, PadTo);
+}
+
+/// Emit something like ".uleb128 Hi-Lo".
+void AsmPrinter::emitLabelDifferenceAsULEB128(const MCSymbol *Hi,
+                                              const MCSymbol *Lo) const {
+  OutStreamer->emitAbsoluteSymbolDiffAsULEB128(Hi, Lo);
+}
 
 static const char *DecodeDWARFEncoding(unsigned Encoding) {
   switch (Encoding) {
@@ -108,7 +134,7 @@ unsigned AsmPrinter::GetSizeOfEncodedValue(unsigned Encoding) const {
   default:
     llvm_unreachable("Invalid encoded value.");
   case dwarf::DW_EH_PE_absptr:
-    return MAI->getCodePointerSize();
+    return MF->getDataLayout().getPointerSize();
   case dwarf::DW_EH_PE_udata2:
     return 2;
   case dwarf::DW_EH_PE_udata4:
@@ -136,12 +162,12 @@ void AsmPrinter::emitDwarfSymbolReference(const MCSymbol *Label,
     if (MAI->needsDwarfSectionOffsetDirective()) {
       assert(!isDwarf64() &&
              "emitting DWARF64 is not implemented for COFF targets");
-      OutStreamer->emitCOFFSecRel32(Label, /*Offset=*/0);
+      OutStreamer->EmitCOFFSecRel32(Label, /*Offset=*/0);
       return;
     }
 
     // If the format uses relocations with dwarf, refer to the symbol directly.
-    if (doesDwarfUseRelocationsAcrossSections()) {
+    if (MAI->doesDwarfUseRelocationsAcrossSections()) {
       OutStreamer->emitSymbolValue(Label, getDwarfOffsetByteSize());
       return;
     }
@@ -153,7 +179,7 @@ void AsmPrinter::emitDwarfSymbolReference(const MCSymbol *Label,
 }
 
 void AsmPrinter::emitDwarfStringOffset(DwarfStringPoolEntry S) const {
-  if (doesDwarfUseRelocationsAcrossSections()) {
+  if (MAI->doesDwarfUseRelocationsAcrossSections()) {
     assert(S.Symbol && "No symbol available");
     emitDwarfSymbolReference(S.Symbol);
     return;
@@ -204,59 +230,52 @@ void AsmPrinter::emitCallSiteValue(uint64_t Value, unsigned Encoding) const {
 //===----------------------------------------------------------------------===//
 
 void AsmPrinter::emitCFIInstruction(const MCCFIInstruction &Inst) const {
-  SMLoc Loc = Inst.getLoc();
   switch (Inst.getOperation()) {
   default:
     llvm_unreachable("Unexpected instruction");
   case MCCFIInstruction::OpDefCfaOffset:
-    OutStreamer->emitCFIDefCfaOffset(Inst.getOffset(), Loc);
+    OutStreamer->emitCFIDefCfaOffset(Inst.getOffset());
     break;
   case MCCFIInstruction::OpAdjustCfaOffset:
-    OutStreamer->emitCFIAdjustCfaOffset(Inst.getOffset(), Loc);
+    OutStreamer->emitCFIAdjustCfaOffset(Inst.getOffset());
     break;
   case MCCFIInstruction::OpDefCfa:
-    OutStreamer->emitCFIDefCfa(Inst.getRegister(), Inst.getOffset(), Loc);
+    OutStreamer->emitCFIDefCfa(Inst.getRegister(), Inst.getOffset());
     break;
   case MCCFIInstruction::OpDefCfaRegister:
-    OutStreamer->emitCFIDefCfaRegister(Inst.getRegister(), Loc);
+    OutStreamer->emitCFIDefCfaRegister(Inst.getRegister());
     break;
   case MCCFIInstruction::OpLLVMDefAspaceCfa:
     OutStreamer->emitCFILLVMDefAspaceCfa(Inst.getRegister(), Inst.getOffset(),
-                                         Inst.getAddressSpace(), Loc);
+                                         Inst.getAddressSpace());
     break;
   case MCCFIInstruction::OpOffset:
-    OutStreamer->emitCFIOffset(Inst.getRegister(), Inst.getOffset(), Loc);
+    OutStreamer->emitCFIOffset(Inst.getRegister(), Inst.getOffset());
     break;
   case MCCFIInstruction::OpRegister:
-    OutStreamer->emitCFIRegister(Inst.getRegister(), Inst.getRegister2(), Loc);
+    OutStreamer->emitCFIRegister(Inst.getRegister(), Inst.getRegister2());
     break;
   case MCCFIInstruction::OpWindowSave:
-    OutStreamer->emitCFIWindowSave(Loc);
+    OutStreamer->emitCFIWindowSave();
     break;
   case MCCFIInstruction::OpNegateRAState:
-    OutStreamer->emitCFINegateRAState(Loc);
+    OutStreamer->emitCFINegateRAState();
     break;
   case MCCFIInstruction::OpSameValue:
-    OutStreamer->emitCFISameValue(Inst.getRegister(), Loc);
+    OutStreamer->emitCFISameValue(Inst.getRegister());
     break;
   case MCCFIInstruction::OpGnuArgsSize:
-    OutStreamer->emitCFIGnuArgsSize(Inst.getOffset(), Loc);
+    OutStreamer->emitCFIGnuArgsSize(Inst.getOffset());
     break;
   case MCCFIInstruction::OpEscape:
     OutStreamer->AddComment(Inst.getComment());
-    OutStreamer->emitCFIEscape(Inst.getValues(), Loc);
+    OutStreamer->emitCFIEscape(Inst.getValues());
     break;
   case MCCFIInstruction::OpRestore:
-    OutStreamer->emitCFIRestore(Inst.getRegister(), Loc);
+    OutStreamer->emitCFIRestore(Inst.getRegister());
     break;
   case MCCFIInstruction::OpUndefined:
-    OutStreamer->emitCFIUndefined(Inst.getRegister(), Loc);
-    break;
-  case MCCFIInstruction::OpRememberState:
-    OutStreamer->emitCFIRememberState(Loc);
-    break;
-  case MCCFIInstruction::OpRestoreState:
-    OutStreamer->emitCFIRestoreState(Loc);
+    OutStreamer->emitCFIUndefined(Inst.getRegister());
     break;
   }
 }
@@ -288,7 +307,7 @@ void AsmPrinter::emitDwarfDIE(const DIE &Die) const {
 
   // Emit the DIE children if any.
   if (Die.hasChildren()) {
-    for (const auto &Child : Die.children())
+    for (auto &Child : Die.children())
       emitDwarfDIE(Child);
 
     OutStreamer->AddComment("End Of Children Mark");

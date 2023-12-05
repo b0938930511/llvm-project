@@ -13,7 +13,7 @@
 @end
 
 @implementation B
-- (id)obj {return self;} // 'id' overrides are permitted?
+- (id)obj {return self;} // 'id' overrides are white-listed?
 - (A*)a { return self;}  // expected-warning {{conflicting return type in implementation of 'a'}}
 - (void)takesA: (B*)a  // expected-warning {{conflicting parameter types in implementation of 'takesA:'}}
 {}

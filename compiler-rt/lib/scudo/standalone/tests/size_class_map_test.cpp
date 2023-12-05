@@ -20,6 +20,10 @@ TEST(ScudoSizeClassMapTest, DefaultSizeClassMap) {
   testSizeClassMap<scudo::DefaultSizeClassMap>();
 }
 
+TEST(ScudoSizeClassMapTest, SvelteSizeClassMap) {
+  testSizeClassMap<scudo::SvelteSizeClassMap>();
+}
+
 TEST(ScudoSizeClassMapTest, AndroidSizeClassMap) {
   testSizeClassMap<scudo::AndroidSizeClassMap>();
 }
@@ -29,7 +33,7 @@ struct OneClassSizeClassConfig {
   static const scudo::uptr MinSizeLog = 5;
   static const scudo::uptr MidSizeLog = 5;
   static const scudo::uptr MaxSizeLog = 5;
-  static const scudo::u16 MaxNumCachedHint = 0;
+  static const scudo::u32 MaxNumCachedHint = 0;
   static const scudo::uptr MaxBytesCachedLog = 0;
   static const scudo::uptr SizeDelta = 0;
 };
@@ -44,7 +48,7 @@ struct LargeMaxSizeClassConfig {
   static const scudo::uptr MinSizeLog = 4;
   static const scudo::uptr MidSizeLog = 8;
   static const scudo::uptr MaxSizeLog = 63;
-  static const scudo::u16 MaxNumCachedHint = 128;
+  static const scudo::u32 MaxNumCachedHint = 128;
   static const scudo::uptr MaxBytesCachedLog = 16;
   static const scudo::uptr SizeDelta = 0;
 };

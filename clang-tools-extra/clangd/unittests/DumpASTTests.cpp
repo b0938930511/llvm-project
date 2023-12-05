@@ -9,7 +9,6 @@
 #include "Annotations.h"
 #include "DumpAST.h"
 #include "TestTU.h"
-#include "clang/AST/ASTTypeTraits.h"
 #include "llvm/Support/ScopedPrinter.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -21,7 +20,7 @@ using testing::Contains;
 using testing::Not;
 using testing::SizeIs;
 
-MATCHER_P(withDetail, str, "") { return arg.detail == str; }
+MATCHER_P(WithDetail, str, "") { return arg.detail == str; }
 
 TEST(DumpASTTests, BasicInfo) {
   std::pair</*Code=*/std::string, /*Expected=*/std::string> Cases[] = {
@@ -121,8 +120,7 @@ declaration: Var - root
         expression: DeclRef - operator+
       expression: MaterializeTemporary - lvalue
         expression: CXXTemporaryObject - Foo
-          type: Elaborated
-            type: Record - Foo
+          type: Record - Foo
       expression: IntegerLiteral - 42
       )"},
       {R"cpp(
@@ -170,10 +168,11 @@ TEST(DumpASTTests, NoRange) {
   auto Node = dumpAST(
       DynTypedNode::create(*AST.getASTContext().getTranslationUnitDecl()),
       AST.getTokens(), AST.getASTContext());
-  ASSERT_THAT(Node.children, Contains(withDetail("varFromSource")));
-  ASSERT_THAT(Node.children, Not(Contains(withDetail("funcFromHeader"))));
+  ASSERT_THAT(Node.children, Contains(WithDetail("varFromSource")));
+  ASSERT_THAT(Node.children, Not(Contains(WithDetail("funcFromHeader"))));
   EXPECT_THAT(Node.arcana, testing::StartsWith("TranslationUnitDecl "));
-  ASSERT_FALSE(Node.range) << "Expected no range for translation unit";
+  ASSERT_FALSE(Node.range.hasValue())
+      << "Expected no range for translation unit";
 }
 
 TEST(DumpASTTests, Arcana) {

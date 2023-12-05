@@ -12,7 +12,9 @@
 #include "../ClangTidyCheck.h"
 #include "../utils/FileExtensionsUtils.h"
 
-namespace clang::tidy::misc {
+namespace clang {
+namespace tidy {
+namespace misc {
 
 /// Finds non-extern non-inline function and variable definitions in header
 /// files, which can lead to potential ODR violations.
@@ -28,7 +30,7 @@ namespace clang::tidy::misc {
 ///     empty string between ";" if there are other filename extensions.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/misc/definitions-in-headers.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/misc-definitions-in-headers.html
 class DefinitionsInHeadersCheck : public ClangTidyCheck {
 public:
   DefinitionsInHeadersCheck(StringRef Name, ClangTidyContext *Context);
@@ -41,10 +43,12 @@ public:
 
 private:
   const bool UseHeaderFileExtension;
-  StringRef RawStringHeaderFileExtensions;
-  FileExtensionsSet HeaderFileExtensions;
+  const std::string RawStringHeaderFileExtensions;
+  utils::FileExtensionsSet HeaderFileExtensions;
 };
 
-} // namespace clang::tidy::misc
+} // namespace misc
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_MISC_DEFINITIONS_IN_HEADERS_H

@@ -23,17 +23,9 @@ OPTIONS
 
  Select slice of universal Mach-O file.
 
-.. option:: -chained_fixups
-
- Print chained fixup information.
-
 .. option:: -C
 
  Print linker optimization hints.
-
-.. option:: -dyld_info
-
-  Print bind and rebase information.
 
 .. option:: -D
 
@@ -77,7 +69,7 @@ OPTIONS
 
 .. option:: -l
 
- Print load commands.
+ Print load commnads.
 
 .. option:: -mcpu=<value>
 
@@ -140,7 +132,7 @@ Otherwise, it exits with code 0.
 BUGS
 ----
 
-To report bugs, please visit <https://github.com/llvm/llvm-project/labels/tools:llvm-objdump/>.
+To report bugs, please visit <https://bugs.llvm.org/>.
 
 SEE ALSO
 --------

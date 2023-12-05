@@ -11,13 +11,15 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::abseil {
+namespace clang {
+namespace tidy {
+namespace abseil {
 
 /// Checks for cases where addition should be performed in the
 /// ``absl::Time`` domain.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/abseil/duration-addition.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/abseil-duration-addition.html
 class DurationAdditionCheck : public ClangTidyCheck {
 public:
   DurationAdditionCheck(StringRef Name, ClangTidyContext *Context)
@@ -26,6 +28,8 @@ public:
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
 };
 
-} // namespace clang::tidy::abseil
+} // namespace abseil
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_ABSEIL_TIMEADDITIONCHECK_H

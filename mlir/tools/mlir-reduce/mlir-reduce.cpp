@@ -21,11 +21,13 @@
 
 using namespace mlir;
 
+namespace mlir {
 namespace test {
 #ifdef MLIR_INCLUDE_TESTS
 void registerTestDialect(DialectRegistry &);
 #endif
 } // namespace test
+} // namespace mlir
 
 int main(int argc, char **argv) {
   registerAllPasses();

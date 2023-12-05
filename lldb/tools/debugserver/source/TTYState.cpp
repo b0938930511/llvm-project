@@ -18,7 +18,7 @@
 TTYState::TTYState()
     : m_fd(-1), m_tflags(-1), m_ttystateErr(-1), m_processGroup(-1) {}
 
-TTYState::~TTYState() = default;
+TTYState::~TTYState() {}
 
 bool TTYState::GetTTYState(int fd, bool saveProcessGroup) {
   if (fd >= 0 && ::isatty(fd)) {
@@ -39,19 +39,20 @@ bool TTYState::GetTTYState(int fd, bool saveProcessGroup) {
 }
 
 bool TTYState::SetTTYState() const {
+  int result = 0;
   if (IsValid()) {
     if (TFlagsValid())
-      fcntl(m_fd, F_SETFL, m_tflags);
+      result = fcntl(m_fd, F_SETFL, m_tflags);
 
     if (TTYStateValid())
-      tcsetattr(m_fd, TCSANOW, &m_ttystate);
+      result = tcsetattr(m_fd, TCSANOW, &m_ttystate);
 
     if (ProcessGroupValid()) {
       // Save the original signal handler.
       void (*saved_sigttou_callback)(int) = NULL;
       saved_sigttou_callback = (void (*)(int))signal(SIGTTOU, SIG_IGN);
       // Set the process group
-      tcsetpgrp(m_fd, m_processGroup);
+      result = tcsetpgrp(m_fd, m_processGroup);
       // Restore the original signal handler.
       signal(SIGTTOU, saved_sigttou_callback);
     }
@@ -62,7 +63,7 @@ bool TTYState::SetTTYState() const {
 
 TTYStateSwitcher::TTYStateSwitcher() : m_currentState(~0) {}
 
-TTYStateSwitcher::~TTYStateSwitcher() = default;
+TTYStateSwitcher::~TTYStateSwitcher() {}
 
 bool TTYStateSwitcher::GetState(uint32_t idx, int fd, bool saveProcessGroup) {
   if (ValidStateIndex(idx))

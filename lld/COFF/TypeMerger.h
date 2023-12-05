@@ -10,14 +10,13 @@
 #define LLD_COFF_TYPEMERGER_H
 
 #include "Config.h"
-#include "DebugTypes.h"
-#include "lld/Common/Timer.h"
 #include "llvm/DebugInfo/CodeView/MergingTypeTableBuilder.h"
 #include "llvm/DebugInfo/CodeView/TypeHashing.h"
 #include "llvm/Support/Allocator.h"
 #include <atomic>
 
-namespace lld::coff {
+namespace lld {
+namespace coff {
 
 using llvm::codeview::GloballyHashedType;
 using llvm::codeview::TypeIndex;
@@ -26,19 +25,19 @@ struct GHashState;
 
 class TypeMerger {
 public:
-  TypeMerger(COFFLinkerContext &ctx, llvm::BumpPtrAllocator &alloc);
+  TypeMerger(llvm::BumpPtrAllocator &alloc);
 
   ~TypeMerger();
 
   /// Get the type table or the global type table if /DEBUG:GHASH is enabled.
   inline llvm::codeview::TypeCollection &getTypeTable() {
-    assert(!ctx.config.debugGHashes);
+    assert(!config->debugGHashes);
     return typeTable;
   }
 
   /// Get the ID table or the global ID table if /DEBUG:GHASH is enabled.
   inline llvm::codeview::TypeCollection &getIDTable() {
-    assert(!ctx.config.debugGHashes);
+    assert(!config->debugGHashes);
     return idTable;
   }
 
@@ -60,24 +59,9 @@ public:
   // keyed by type index.
   SmallVector<uint32_t, 0> tpiCounts;
   SmallVector<uint32_t, 0> ipiCounts;
-
-  /// Dependency type sources, such as type servers or PCH object files. These
-  /// must be processed before objects that rely on them. Set by
-  /// sortDependencies.
-  ArrayRef<TpiSource *> dependencySources;
-
-  /// Object file sources. These must be processed after dependencySources.
-  ArrayRef<TpiSource *> objectSources;
-
-  /// Sorts the dependencies and reassigns TpiSource indices.
-  void sortDependencies();
-
-private:
-  void clearGHashes();
-
-  COFFLinkerContext &ctx;
 };
 
-} // namespace lld::coff
+} // namespace coff
+} // namespace lld
 
 #endif

@@ -67,7 +67,7 @@ bool Replacement::isApplicable() const {
 
 bool Replacement::apply(Rewriter &Rewrite) const {
   SourceManager &SM = Rewrite.getSourceMgr();
-  auto Entry = SM.getFileManager().getOptionalFileRef(FilePath);
+  auto Entry = SM.getFileManager().getFile(FilePath);
   if (!Entry)
     return false;
 
@@ -122,8 +122,7 @@ void Replacement::setFromSourceLocation(const SourceManager &Sources,
                                         StringRef ReplacementText) {
   const std::pair<FileID, unsigned> DecomposedLocation =
       Sources.getDecomposedLoc(Start);
-  OptionalFileEntryRef Entry =
-      Sources.getFileEntryRefForID(DecomposedLocation.first);
+  const FileEntry *Entry = Sources.getFileEntryForID(DecomposedLocation.first);
   this->FilePath = std::string(Entry ? Entry->getName() : InvalidLocation);
   this->ReplacementRange = Range(DecomposedLocation.second, Length);
   this->ReplacementText = std::string(ReplacementText);
@@ -180,9 +179,9 @@ static std::string getReplacementErrString(replacement_error Err) {
 
 std::string ReplacementError::message() const {
   std::string Message = getReplacementErrString(Err);
-  if (NewReplacement)
+  if (NewReplacement.hasValue())
     Message += "\nNew replacement: " + NewReplacement->toString();
-  if (ExistingReplacement)
+  if (ExistingReplacement.hasValue())
     Message += "\nExisting replacement: " + ExistingReplacement->toString();
   return Message;
 }
@@ -271,7 +270,7 @@ llvm::Error Replacements::add(const Replacement &R) {
     assert(R.getLength() == 0);
     // `I` is also an insertion, `R` and `I` conflict.
     if (I->getLength() == 0) {
-      // Check if two insertions are order-independent: if inserting them in
+      // Check if two insertions are order-indepedent: if inserting them in
       // either order produces the same text, they are order-independent.
       if ((R.getReplacementText() + I->getReplacementText()).str() !=
           (I->getReplacementText() + R.getReplacementText()).str())
@@ -320,7 +319,7 @@ llvm::Error Replacements::add(const Replacement &R) {
     Replaces.insert(R);
   } else {
     // `I` overlaps with `R`. We need to check `R` against all overlapping
-    // replacements to see if they are order-independent. If they are, merge `R`
+    // replacements to see if they are order-indepedent. If they are, merge `R`
     // with them and replace them with the merged replacements.
     auto MergeBegin = I;
     auto MergeEnd = std::next(I);

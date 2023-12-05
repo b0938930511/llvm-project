@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -fsyntax-only -verify %s -std=c++11 -Wno-deprecated-builtins
+// RUN: %clang_cc1 -fsyntax-only -verify %s -std=c++11
 // expected-no-diagnostics
 struct T1 {
 };

@@ -24,7 +24,6 @@ class Block;
 class BlockArgument;
 class Operation;
 class OpOperand;
-class OpPrintingFlags;
 class OpResult;
 class Region;
 class Value;
@@ -71,14 +70,6 @@ public:
 protected:
   ValueImpl(Type type, Kind kind) : typeAndKind(type, kind) {}
 
-  /// Expose a few methods explicitly for the debugger to call for
-  /// visualization.
-#ifndef NDEBUG
-  LLVM_DUMP_METHOD Type debug_getType() const { return getType(); }
-  LLVM_DUMP_METHOD Kind debug_getKind() const { return getKind(); }
-
-#endif
-
   /// The type of this result and the kind.
   llvm::PointerIntPair<Type, 3, Kind> typeAndKind;
 };
@@ -90,31 +81,34 @@ protected:
 /// class has value-type semantics and is just a simple wrapper around a
 /// ValueImpl that is either owner by a block(in the case of a BlockArgument) or
 /// an Operation(in the case of an OpResult).
-/// As most IR construct, this isn't const-correct, but we keep method
-/// consistent and as such method that immediately modify this Value aren't
-/// marked `const` (include modifying the Value use-list).
 class Value {
 public:
-  constexpr Value(detail::ValueImpl *impl = nullptr) : impl(impl) {}
+  Value(detail::ValueImpl *impl = nullptr) : impl(impl) {}
+  Value(const Value &) = default;
+  Value &operator=(const Value &) = default;
 
   template <typename U>
   bool isa() const {
-    return llvm::isa<U>(*this);
+    assert(*this && "isa<> used on a null type.");
+    return U::classof(*this);
   }
 
+  template <typename First, typename Second, typename... Rest>
+  bool isa() const {
+    return isa<First>() || isa<Second, Rest...>();
+  }
   template <typename U>
   U dyn_cast() const {
-    return llvm::dyn_cast<U>(*this);
+    return isa<U>() ? U(impl) : U(nullptr);
   }
-
   template <typename U>
   U dyn_cast_or_null() const {
-    return llvm::dyn_cast_if_present<U>(*this);
+    return (*this && isa<U>()) ? U(impl) : U(nullptr);
   }
-
   template <typename U>
   U cast() const {
-    return llvm::cast<U>(*this);
+    assert(isa<U>());
+    return U(impl);
   }
 
   explicit operator bool() const { return impl; }
@@ -161,25 +155,26 @@ public:
   //===--------------------------------------------------------------------===//
 
   /// Drop all uses of this object from their respective owners.
-  void dropAllUses() { return impl->dropAllUses(); }
+  void dropAllUses() const { return impl->dropAllUses(); }
 
   /// Replace all uses of 'this' value with the new value, updating anything in
   /// the IR that uses 'this' to use the other value instead.  When this returns
   /// there are zero uses of 'this'.
-  void replaceAllUsesWith(Value newValue) {
+  void replaceAllUsesWith(Value newValue) const {
     impl->replaceAllUsesWith(newValue);
   }
 
   /// Replace all uses of 'this' value with 'newValue', updating anything in the
   /// IR that uses 'this' to use the other value instead except if the user is
   /// listed in 'exceptions' .
-  void replaceAllUsesExcept(Value newValue,
-                            const SmallPtrSetImpl<Operation *> &exceptions);
+  void
+  replaceAllUsesExcept(Value newValue,
+                       const SmallPtrSetImpl<Operation *> &exceptions) const;
 
   /// Replace all uses of 'this' value with 'newValue', updating anything in the
   /// IR that uses 'this' to use the other value instead except if the user is
   /// 'exceptedUser'.
-  void replaceAllUsesExcept(Value newValue, Operation *exceptedUser);
+  void replaceAllUsesExcept(Value newValue, Operation *exceptedUser) const;
 
   /// Replace all uses of 'this' value with 'newValue' if the given callback
   /// returns true.
@@ -187,12 +182,7 @@ public:
                          function_ref<bool(OpOperand &)> shouldReplace);
 
   /// Returns true if the value is used outside of the given block.
-  bool isUsedOutsideOfBlock(Block *block) const;
-
-  /// Shuffle the use list order according to the provided indices. It is
-  /// responsibility of the caller to make sure that the indices map the current
-  /// use-list chain to another valid use-list chain.
-  void shuffleUseList(ArrayRef<unsigned> indices);
+  bool isUsedOutsideOfBlock(Block *block);
 
   //===--------------------------------------------------------------------===//
   // Uses
@@ -226,14 +216,12 @@ public:
   //===--------------------------------------------------------------------===//
   // Utilities
 
-  void print(raw_ostream &os) const;
-  void print(raw_ostream &os, const OpPrintingFlags &flags) const;
-  void print(raw_ostream &os, AsmState &state) const;
-  void dump() const;
+  void print(raw_ostream &os);
+  void print(raw_ostream &os, AsmState &state);
+  void dump();
 
   /// Print this value as if it were an operand.
-  void printAsOperand(raw_ostream &os, AsmState &state) const;
-  void printAsOperand(raw_ostream &os, const OpPrintingFlags &flags) const;
+  void printAsOperand(raw_ostream &os, AsmState &state);
 
   /// Methods for supporting PointerLikeTypeTraits.
   void *getAsOpaquePointer() const { return impl; }
@@ -269,9 +257,6 @@ public:
 
   /// Return which operand this is in the OpOperand list of the Operation.
   unsigned getOperandNumber();
-
-  /// Set the current value being used by this operand.
-  void assign(Value value) { set(value); }
 
 private:
   /// Keep the constructor private and accessible to the OperandStorage class
@@ -309,7 +294,7 @@ private:
   /// Allow access to owner and constructor.
   friend BlockArgument;
 };
-} // namespace detail
+} // end namespace detail
 
 /// This class represents an argument of a Block.
 class BlockArgument : public Value {
@@ -434,20 +419,7 @@ inline unsigned OpResultImpl::getResultNumber() const {
   return cast<InlineOpResult>(this)->getResultNumber();
 }
 
-/// TypedValue is a Value with a statically know type.
-/// TypedValue can be null/empty
-template <typename Ty>
-struct TypedValue : Value {
-  using Value::Value;
-
-  static bool classof(Value value) { return llvm::isa<Ty>(value.getType()); }
-
-  /// Return the known Type
-  Ty getType() { return llvm::cast<Ty>(Value::getType()); }
-  void setType(Ty ty) { Value::setType(ty); }
-};
-
-} // namespace detail
+} // end namespace detail
 
 /// This is a value defined by a result of an operation.
 class OpResult : public Value {
@@ -487,12 +459,6 @@ inline ::llvm::hash_code hash_value(Value arg) {
   return ::llvm::hash_value(arg.getImpl());
 }
 
-template <typename Ty, typename Value = mlir::Value>
-/// If Ty is mlir::Type this will select `Value` instead of having a wrapper
-/// around it. This helps resolve ambiguous conversion issues.
-using TypedValue = std::conditional_t<std::is_same_v<Ty, mlir::Type>,
-                                      mlir::Value, detail::TypedValue<Ty>>;
-
 } // namespace mlir
 
 namespace llvm {
@@ -523,29 +489,6 @@ struct DenseMapInfo<mlir::BlockArgument> : public DenseMapInfo<mlir::Value> {
     return reinterpret_cast<mlir::detail::BlockArgumentImpl *>(pointer);
   }
 };
-template <>
-struct DenseMapInfo<mlir::OpResult> : public DenseMapInfo<mlir::Value> {
-  static mlir::OpResult getEmptyKey() {
-    void *pointer = llvm::DenseMapInfo<void *>::getEmptyKey();
-    return reinterpret_cast<mlir::detail::OpResultImpl *>(pointer);
-  }
-  static mlir::OpResult getTombstoneKey() {
-    void *pointer = llvm::DenseMapInfo<void *>::getTombstoneKey();
-    return reinterpret_cast<mlir::detail::OpResultImpl *>(pointer);
-  }
-};
-template <typename T>
-struct DenseMapInfo<mlir::detail::TypedValue<T>>
-    : public DenseMapInfo<mlir::Value> {
-  static mlir::detail::TypedValue<T> getEmptyKey() {
-    void *pointer = llvm::DenseMapInfo<void *>::getEmptyKey();
-    return reinterpret_cast<mlir::detail::ValueImpl *>(pointer);
-  }
-  static mlir::detail::TypedValue<T> getTombstoneKey() {
-    void *pointer = llvm::DenseMapInfo<void *>::getTombstoneKey();
-    return reinterpret_cast<mlir::detail::ValueImpl *>(pointer);
-  }
-};
 
 /// Allow stealing the low bits of a value.
 template <>
@@ -570,51 +513,7 @@ public:
     return reinterpret_cast<mlir::detail::BlockArgumentImpl *>(pointer);
   }
 };
-template <>
-struct PointerLikeTypeTraits<mlir::OpResult>
-    : public PointerLikeTypeTraits<mlir::Value> {
-public:
-  static inline mlir::OpResult getFromVoidPointer(void *pointer) {
-    return reinterpret_cast<mlir::detail::OpResultImpl *>(pointer);
-  }
-};
-template <typename T>
-struct PointerLikeTypeTraits<mlir::detail::TypedValue<T>>
-    : public PointerLikeTypeTraits<mlir::Value> {
-public:
-  static inline mlir::detail::TypedValue<T> getFromVoidPointer(void *pointer) {
-    return reinterpret_cast<mlir::detail::ValueImpl *>(pointer);
-  }
-};
 
-/// Add support for llvm style casts. We provide a cast between To and From if
-/// From is mlir::Value or derives from it.
-template <typename To, typename From>
-struct CastInfo<
-    To, From,
-    std::enable_if_t<std::is_same_v<mlir::Value, std::remove_const_t<From>> ||
-                     std::is_base_of_v<mlir::Value, From>>>
-    : NullableValueCastFailed<To>,
-      DefaultDoCastIfPossible<To, From, CastInfo<To, From>> {
-  /// Arguments are taken as mlir::Value here and not as `From`, because
-  /// when casting from an intermediate type of the hierarchy to one of its
-  /// children, the val.getKind() inside T::classof will use the static
-  /// getKind() of the parent instead of the non-static ValueImpl::getKind()
-  /// that returns the dynamic type. This means that T::classof would end up
-  /// comparing the static Kind of the children to the static Kind of its
-  /// parent, making it impossible to downcast from the parent to the child.
-  static inline bool isPossible(mlir::Value ty) {
-    /// Return a constant true instead of a dynamic true when casting to self or
-    /// up the hierarchy.
-    if constexpr (std::is_base_of_v<To, From>) {
-      return true;
-    } else {
-      return To::classof(ty);
-    }
-  }
-  static inline To doCast(mlir::Value value) { return To(value.getImpl()); }
-};
-
-} // namespace llvm
+} // end namespace llvm
 
 #endif

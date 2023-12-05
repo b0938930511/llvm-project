@@ -229,9 +229,8 @@ private:
     bool IsFollowedBySimpleReturnStmt;
     SmallVector<ObjCMessageExpr *, 4> Releases;
 
-    PoolScope()
-        : PoolVar(nullptr), CompoundParent(nullptr),
-          IsFollowedBySimpleReturnStmt(false) {}
+    PoolScope() : PoolVar(nullptr), CompoundParent(nullptr), Begin(), End(),
+                  IsFollowedBySimpleReturnStmt(false) { }
 
     SourceRange getIndentedRange() const {
       Stmt::child_iterator rangeS = Begin;
@@ -417,11 +416,11 @@ private:
   Selector DrainSel;
 
   struct PoolVarInfo {
-    DeclStmt *Dcl = nullptr;
+    DeclStmt *Dcl;
     ExprSet Refs;
     SmallVector<PoolScope, 2> Scopes;
 
-    PoolVarInfo() = default;
+    PoolVarInfo() : Dcl(nullptr) { }
   };
 
   std::map<VarDecl *, PoolVarInfo> PoolVars;

@@ -18,7 +18,8 @@ Node0x1 [shape=record,label=
       "program_state": {
         "environment": null,
         "constraints": null,
-        "dynamic_types": null,        
+        "dynamic_types": null,
+        "constructing_objects": null,
         "checker_messages": null,
         "store": {
           "pointer": "0x2",
@@ -71,7 +72,8 @@ Node0x4 [shape=record,label=
       "program_state": {
         "environment": null,
         "constraints": null,
-        "dynamic_types": null,        
+        "dynamic_types": null,
+        "constructing_objects": null,
         "checker_messages": null,
         "store": {
           "pointer": "0x5",

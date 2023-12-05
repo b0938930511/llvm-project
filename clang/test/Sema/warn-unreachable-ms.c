@@ -1,8 +1,8 @@
 // RUN: %clang_cc1 %s -triple=i686-pc-win32 -fsyntax-only -verify -fms-extensions -Wunreachable-code
 
-void f(void);
+void f();
 
-void g1(void) {
+void g1() {
   __try {
     f();
     __leave;
@@ -24,7 +24,7 @@ void g1(void) {
   }
 }
 
-void g2(void) {
+void g2() {
   __try {
     // Nested __try.
     __try {
@@ -41,7 +41,7 @@ void g2(void) {
   }
 }
 
-void g3(void) {
+void g3() {
   __try {
     __try {
       f();

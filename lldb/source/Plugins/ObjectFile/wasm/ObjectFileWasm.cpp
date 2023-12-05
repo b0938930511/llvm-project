@@ -15,7 +15,6 @@
 #include "lldb/Target/SectionLoadList.h"
 #include "lldb/Target/Target.h"
 #include "lldb/Utility/DataBufferHeap.h"
-#include "lldb/Utility/LLDBLog.h"
 #include "lldb/Utility/Log.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
@@ -24,7 +23,6 @@
 #include "llvm/BinaryFormat/Wasm.h"
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/Format.h"
-#include <optional>
 
 using namespace lldb;
 using namespace lldb_private;
@@ -44,13 +42,13 @@ static bool ValidateModuleHeader(const DataBufferSP &data_sp) {
       llvm::file_magic::wasm_object)
     return false;
 
-  const uint8_t *Ptr = data_sp->GetBytes() + sizeof(llvm::wasm::WasmMagic);
+  uint8_t *Ptr = data_sp->GetBytes() + sizeof(llvm::wasm::WasmMagic);
 
   uint32_t version = llvm::support::endian::read32le(Ptr);
   return version == llvm::wasm::WasmVersion;
 }
 
-static std::optional<ConstString>
+static llvm::Optional<ConstString>
 GetWasmString(llvm::DataExtractor &data, llvm::DataExtractor::Cursor &c) {
   // A Wasm string is encoded as a vector of UTF-8 codes.
   // Vectors are encoded with their u32 length followed by the element
@@ -58,21 +56,21 @@ GetWasmString(llvm::DataExtractor &data, llvm::DataExtractor::Cursor &c) {
   uint64_t len = data.getULEB128(c);
   if (!c) {
     consumeError(c.takeError());
-    return std::nullopt;
+    return llvm::None;
   }
 
   if (len >= (uint64_t(1) << 32)) {
-    return std::nullopt;
+    return llvm::None;
   }
 
   llvm::SmallVector<uint8_t, 32> str_storage;
   data.getU8(c, str_storage, len);
   if (!c) {
     consumeError(c.takeError());
-    return std::nullopt;
+    return llvm::None;
   }
 
-  llvm::StringRef str = toStringRef(llvm::ArrayRef(str_storage));
+  llvm::StringRef str = toStringRef(makeArrayRef(str_storage));
   return ConstString(str);
 }
 
@@ -88,11 +86,16 @@ void ObjectFileWasm::Terminate() {
   PluginManager::UnregisterPlugin(CreateInstance);
 }
 
+ConstString ObjectFileWasm::GetPluginNameStatic() {
+  static ConstString g_name("wasm");
+  return g_name;
+}
+
 ObjectFile *
-ObjectFileWasm::CreateInstance(const ModuleSP &module_sp, DataBufferSP data_sp,
+ObjectFileWasm::CreateInstance(const ModuleSP &module_sp, DataBufferSP &data_sp,
                                offset_t data_offset, const FileSpec *file,
                                offset_t file_offset, offset_t length) {
-  Log *log = GetLog(LLDBLog::Object);
+  Log *log(GetLogIfAllCategoriesSet(LIBLLDB_LOG_OBJECT));
 
   if (!data_sp) {
     data_sp = MapFileData(*file, length, file_offset);
@@ -142,7 +145,7 @@ ObjectFileWasm::CreateInstance(const ModuleSP &module_sp, DataBufferSP data_sp,
 }
 
 ObjectFile *ObjectFileWasm::CreateMemoryInstance(const ModuleSP &module_sp,
-                                                 WritableDataBufferSP data_sp,
+                                                 DataBufferSP &data_sp,
                                                  const ProcessSP &process_sp,
                                                  addr_t header_addr) {
   if (!ValidateModuleHeader(data_sp))
@@ -182,7 +185,7 @@ bool ObjectFileWasm::DecodeNextSection(lldb::offset_t *offset_ptr) {
     // identifying the custom section, followed by an uninterpreted sequence
     // of bytes.
     lldb::offset_t prev_offset = c.tell();
-    std::optional<ConstString> sect_name = GetWasmString(data, c);
+    llvm::Optional<ConstString> sect_name = GetWasmString(data, c);
     if (!sect_name)
       return false;
 
@@ -193,7 +196,7 @@ bool ObjectFileWasm::DecodeNextSection(lldb::offset_t *offset_ptr) {
     m_sect_infos.push_back(section_info{*offset_ptr + c.tell(), section_length,
                                         section_id, *sect_name});
     *offset_ptr += (c.tell() + section_length);
-  } else if (section_id <= llvm::wasm::WASM_SEC_LAST_KNOWN) {
+  } else if (section_id <= llvm::wasm::WASM_SEC_TAG) {
     m_sect_infos.push_back(section_info{*offset_ptr + c.tell(),
                                         static_cast<uint32_t>(payload_len),
                                         section_id, ConstString()});
@@ -228,7 +231,7 @@ size_t ObjectFileWasm::GetModuleSpecifications(
   return 1;
 }
 
-ObjectFileWasm::ObjectFileWasm(const ModuleSP &module_sp, DataBufferSP data_sp,
+ObjectFileWasm::ObjectFileWasm(const ModuleSP &module_sp, DataBufferSP &data_sp,
                                offset_t data_offset, const FileSpec *file,
                                offset_t offset, offset_t length)
     : ObjectFile(module_sp, file, offset, length, data_sp, data_offset),
@@ -237,7 +240,7 @@ ObjectFileWasm::ObjectFileWasm(const ModuleSP &module_sp, DataBufferSP data_sp,
 }
 
 ObjectFileWasm::ObjectFileWasm(const lldb::ModuleSP &module_sp,
-                               lldb::WritableDataBufferSP header_data_sp,
+                               lldb::DataBufferSP &header_data_sp,
                                const lldb::ProcessSP &process_sp,
                                lldb::addr_t header_addr)
     : ObjectFile(module_sp, process_sp, header_addr, header_data_sp),
@@ -248,7 +251,7 @@ bool ObjectFileWasm::ParseHeader() {
   return true;
 }
 
-void ObjectFileWasm::ParseSymtab(Symtab &symtab) {}
+Symtab *ObjectFileWasm::GetSymtab() { return nullptr; }
 
 static SectionType GetSectionTypeFromName(llvm::StringRef Name) {
   if (Name.consume_front(".debug_") || Name.consume_front(".zdebug_")) {
@@ -413,7 +416,7 @@ DataExtractor ObjectFileWasm::ReadImageData(offset_t offset, uint32_t size) {
   return data;
 }
 
-std::optional<FileSpec> ObjectFileWasm::GetExternalDebugInfoFileSpec() {
+llvm::Optional<FileSpec> ObjectFileWasm::GetExternalDebugInfoFileSpec() {
   static ConstString g_sect_name_external_debug_info("external_debug_info");
 
   for (const section_info &sect_info : m_sect_infos) {
@@ -423,12 +426,12 @@ std::optional<FileSpec> ObjectFileWasm::GetExternalDebugInfoFileSpec() {
           ReadImageData(sect_info.offset, kBufferSize);
       llvm::DataExtractor data = section_header_data.GetAsLLVM();
       llvm::DataExtractor::Cursor c(0);
-      std::optional<ConstString> symbols_url = GetWasmString(data, c);
+      llvm::Optional<ConstString> symbols_url = GetWasmString(data, c);
       if (symbols_url)
         return FileSpec(symbols_url->GetStringRef());
     }
   }
-  return std::nullopt;
+  return llvm::None;
 }
 
 void ObjectFileWasm::Dump(Stream *s) {

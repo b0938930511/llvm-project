@@ -38,13 +38,13 @@ DominatingValue<RValue>::saved_type::save(CodeGenFunction &CGF, RValue rv) {
 
     // These automatically dominate and don't need to be saved.
     if (!DominatingLLVMValue::needsSaving(V))
-      return saved_type(V, nullptr, ScalarLiteral);
+      return saved_type(V, ScalarLiteral);
 
     // Everything else needs an alloca.
     Address addr =
       CGF.CreateDefaultAlignTempAlloca(V->getType(), "saved-rvalue");
     CGF.Builder.CreateStore(V, addr);
-    return saved_type(addr.getPointer(), nullptr, ScalarAddress);
+    return saved_type(addr.getPointer(), ScalarAddress);
   }
 
   if (rv.isComplex()) {
@@ -54,19 +54,19 @@ DominatingValue<RValue>::saved_type::save(CodeGenFunction &CGF, RValue rv) {
     Address addr = CGF.CreateDefaultAlignTempAlloca(ComplexTy, "saved-complex");
     CGF.Builder.CreateStore(V.first, CGF.Builder.CreateStructGEP(addr, 0));
     CGF.Builder.CreateStore(V.second, CGF.Builder.CreateStructGEP(addr, 1));
-    return saved_type(addr.getPointer(), nullptr, ComplexAddress);
+    return saved_type(addr.getPointer(), ComplexAddress);
   }
 
   assert(rv.isAggregate());
   Address V = rv.getAggregateAddress(); // TODO: volatile?
   if (!DominatingLLVMValue::needsSaving(V.getPointer()))
-    return saved_type(V.getPointer(), V.getElementType(), AggregateLiteral,
+    return saved_type(V.getPointer(), AggregateLiteral,
                       V.getAlignment().getQuantity());
 
   Address addr =
     CGF.CreateTempAlloca(V.getType(), CGF.getPointerAlign(), "saved-rvalue");
   CGF.Builder.CreateStore(V.getPointer(), addr);
-  return saved_type(addr.getPointer(), V.getElementType(), AggregateAddress,
+  return saved_type(addr.getPointer(), AggregateAddress,
                     V.getAlignment().getQuantity());
 }
 
@@ -75,9 +75,8 @@ DominatingValue<RValue>::saved_type::save(CodeGenFunction &CGF, RValue rv) {
 /// point.
 RValue DominatingValue<RValue>::saved_type::restore(CodeGenFunction &CGF) {
   auto getSavingAddress = [&](llvm::Value *value) {
-    auto *AI = cast<llvm::AllocaInst>(value);
-    return Address(value, AI->getAllocatedType(),
-                   CharUnits::fromQuantity(AI->getAlign().value()));
+    auto alignment = cast<llvm::AllocaInst>(value)->getAlignment();
+    return Address(value, CharUnits::fromQuantity(alignment));
   };
   switch (K) {
   case ScalarLiteral:
@@ -85,12 +84,10 @@ RValue DominatingValue<RValue>::saved_type::restore(CodeGenFunction &CGF) {
   case ScalarAddress:
     return RValue::get(CGF.Builder.CreateLoad(getSavingAddress(Value)));
   case AggregateLiteral:
-    return RValue::getAggregate(
-        Address(Value, ElementType, CharUnits::fromQuantity(Align)));
+    return RValue::getAggregate(Address(Value, CharUnits::fromQuantity(Align)));
   case AggregateAddress: {
     auto addr = CGF.Builder.CreateLoad(getSavingAddress(Value));
-    return RValue::getAggregate(
-        Address(addr, ElementType, CharUnits::fromQuantity(Align)));
+    return RValue::getAggregate(Address(addr, CharUnits::fromQuantity(Align)));
   }
   case ComplexAddress: {
     Address address = getSavingAddress(Value);
@@ -183,15 +180,6 @@ void *EHScopeStack::pushCleanup(CleanupKind Kind, size_t Size) {
   bool IsNormalCleanup = Kind & NormalCleanup;
   bool IsEHCleanup = Kind & EHCleanup;
   bool IsLifetimeMarker = Kind & LifetimeMarker;
-
-  // Per C++ [except.terminate], it is implementation-defined whether none,
-  // some, or all cleanups are called before std::terminate. Thus, when
-  // terminate is the current EH scope, we may skip adding any EH cleanup
-  // scopes.
-  if (InnermostEHScope != stable_end() &&
-      find(InnermostEHScope)->getKind() == EHScope::Terminate)
-    IsEHCleanup = false;
-
   EHCleanupScope *Scope =
     new (Buffer) EHCleanupScope(IsNormalCleanup,
                                 IsEHCleanup,
@@ -207,13 +195,8 @@ void *EHScopeStack::pushCleanup(CleanupKind Kind, size_t Size) {
     Scope->setLifetimeMarker();
 
   // With Windows -EHa, Invoke llvm.seh.scope.begin() for EHCleanup
-  // If exceptions are disabled/ignored and SEH is not in use, then there is no
-  // invoke destination. SEH "works" even if exceptions are off. In practice,
-  // this means that C++ destructors and other EH cleanups don't run, which is
-  // consistent with MSVC's behavior, except in the presence of -EHa.
-  // Check getInvokeDest() to generate llvm.seh.scope.begin() as needed.
   if (CGF->getLangOpts().EHAsynch && IsEHCleanup && !IsLifetimeMarker &&
-      CGF->getTarget().getCXXABI().isMicrosoft() && CGF->getInvokeDest())
+      CGF->getTarget().getCXXABI().isMicrosoft())
     CGF->EmitSehCppScopeBegin();
 
   return Scope->getCleanupBuffer();
@@ -561,7 +544,7 @@ static llvm::BasicBlock *SimplifyCleanupEntry(CodeGenFunction &CGF,
   Entry->replaceAllUsesWith(Pred);
 
   // Merge the blocks.
-  Pred->splice(Pred->end(), Entry);
+  Pred->getInstList().splice(Pred->end(), Entry->getInstList());
 
   // Kill the entry block.
   Entry->eraseFromParent();
@@ -787,7 +770,7 @@ void CodeGenFunction::PopCleanupBlock(bool FallthroughIsBranchThrough) {
   if (!RequiresNormalCleanup) {
     // Mark CPP scope end for passed-by-value Arg temp
     //   per Windows ABI which is "normally" Cleanup in callee
-    if (IsEHa && getInvokeDest() && Builder.GetInsertBlock()) {
+    if (IsEHa && getInvokeDest()) {
       if (Personality.isMSVCXXPersonality())
         EmitSehCppScopeEnd();
     }
@@ -841,7 +824,7 @@ void CodeGenFunction::PopCleanupBlock(bool FallthroughIsBranchThrough) {
       EmitBlock(NormalEntry);
 
       // intercept normal cleanup to mark SEH scope end
-      if (IsEHa && getInvokeDest()) {
+      if (IsEHa) {
         if (Personality.isMSVCXXPersonality())
           EmitSehCppScopeEnd();
         else
@@ -873,13 +856,8 @@ void CodeGenFunction::PopCleanupBlock(bool FallthroughIsBranchThrough) {
 
       // If there's exactly one branch-after and no other threads,
       // we can route it without a switch.
-      // Skip for SEH, since ExitSwitch is used to generate code to indicate
-      // abnormal termination. (SEH: Except _leave and fall-through at
-      // the end, all other exits in a _try (return/goto/continue/break)
-      // are considered as abnormal terminations, using NormalCleanupDestSlot
-      // to indicate abnormal termination)
       if (!Scope.hasBranchThroughs() && !HasFixups && !HasFallthrough &&
-          !currentFunctionUsesSEHTry() && Scope.getNumBranchAfters() == 1) {
+          Scope.getNumBranchAfters() == 1) {
         assert(!BranchThroughDest || !IsActive);
 
         // Clean up the possibly dead store to the cleanup dest slot.
@@ -952,7 +930,7 @@ void CodeGenFunction::PopCleanupBlock(bool FallthroughIsBranchThrough) {
       // Append the prepared cleanup prologue from above.
       llvm::BasicBlock *NormalExit = Builder.GetInsertBlock();
       for (unsigned I = 0, E = InstsToAppend.size(); I != E; ++I)
-        InstsToAppend[I]->insertInto(NormalExit, NormalExit->end());
+        NormalExit->getInstList().push_back(InstsToAppend[I]);
 
       // Optimistically hope that any fixups will continue falling through.
       for (unsigned I = FixupDepth, E = EHStack.getNumBranchFixups();
@@ -1026,7 +1004,8 @@ void CodeGenFunction::PopCleanupBlock(bool FallthroughIsBranchThrough) {
     // throwing cleanups. For funclet EH personalities, the cleanupendpad models
     // program termination when cleanups throw.
     bool PushedTerminate = false;
-    SaveAndRestore RestoreCurrentFuncletPad(CurrentFuncletPad);
+    SaveAndRestore<llvm::Instruction *> RestoreCurrentFuncletPad(
+        CurrentFuncletPad);
     llvm::CleanupPadInst *CPI = nullptr;
 
     const EHPersonality &Personality = EHPersonality::get(*this);
@@ -1041,8 +1020,6 @@ void CodeGenFunction::PopCleanupBlock(bool FallthroughIsBranchThrough) {
     if (!Personality.isMSVCPersonality()) {
       EHStack.pushTerminate();
       PushedTerminate = true;
-    } else if (IsEHa && getInvokeDest()) {
-      EmitSehCppScopeEnd();
     }
 
     // We only actually emit the cleanup code if the cleanup is either
@@ -1347,8 +1324,7 @@ static void EmitSehScope(CodeGenFunction &CGF,
       CGF.getBundlesForFunclet(SehCppScope.getCallee());
   if (CGF.CurrentFuncletPad)
     BundleList.emplace_back("funclet", CGF.CurrentFuncletPad);
-  CGF.Builder.CreateInvoke(SehCppScope, Cont, InvokeDest, std::nullopt,
-                           BundleList);
+  CGF.Builder.CreateInvoke(SehCppScope, Cont, InvokeDest, None, BundleList);
   CGF.EmitBlock(Cont);
 }
 

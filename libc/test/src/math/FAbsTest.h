@@ -6,15 +6,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "test/UnitTest/FPMatcher.h"
-#include "test/UnitTest/Test.h"
+#include "utils/FPUtil/TestHelpers.h"
 #include "utils/MPFRWrapper/MPFRUtils.h"
+#include "utils/UnitTest/Test.h"
 
 #include <math.h>
 
-namespace mpfr = LIBC_NAMESPACE::testing::mpfr;
+namespace mpfr = __llvm_libc::testing::mpfr;
 
-template <typename T> class FAbsTest : public LIBC_NAMESPACE::testing::Test {
+template <typename T> class FAbsTest : public __llvm_libc::testing::Test {
 
   DECLARE_SPECIAL_CONSTANTS(T)
 
@@ -25,16 +25,16 @@ public:
     EXPECT_FP_EQ(aNaN, func(aNaN));
 
     EXPECT_FP_EQ(inf, func(inf));
-    EXPECT_FP_EQ(inf, func(neg_inf));
+    EXPECT_FP_EQ(inf, func(negInf));
 
     EXPECT_FP_EQ(zero, func(zero));
-    EXPECT_FP_EQ(zero, func(neg_zero));
+    EXPECT_FP_EQ(zero, func(negZero));
   }
 
   void testRange(FabsFunc func) {
-    constexpr UIntType COUNT = 100'000;
-    constexpr UIntType STEP = UIntType(-1) / COUNT;
-    for (UIntType i = 0, v = 0; i <= COUNT; ++i, v += STEP) {
+    constexpr UIntType count = 10000000;
+    constexpr UIntType step = UIntType(-1) / count;
+    for (UIntType i = 0, v = 0; i <= count; ++i, v += step) {
       T x = T(FPBits(v));
       if (isnan(x) || isinf(x))
         continue;

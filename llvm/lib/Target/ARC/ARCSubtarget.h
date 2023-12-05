@@ -29,14 +29,13 @@ class StringRef;
 class TargetMachine;
 
 class ARCSubtarget : public ARCGenSubtargetInfo {
+  bool Xnorm = false;
+
   virtual void anchor();
   ARCInstrInfo InstrInfo;
   ARCFrameLowering FrameLowering;
   ARCTargetLowering TLInfo;
   SelectionDAGTargetInfo TSInfo;
-
-  // ARC processor extensions
-  bool Xnorm = false;
 
 public:
   /// This constructor initializes the data members to match that

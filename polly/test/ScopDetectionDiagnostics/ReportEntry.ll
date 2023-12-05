@@ -1,8 +1,10 @@
-; RUN: opt %loadPolly -polly-detect -pass-remarks-missed="polly-detect" -disable-output < %s 2>&1| FileCheck %s
+; RUN: opt %loadPolly -analyze -polly-detect \
+; RUN:     -pass-remarks-missed="polly-detect" \
+; RUN:     < %s 2>&1| FileCheck %s
 
 ; CHECK: remark: <unknown>:0:0: Scop contains function entry (not yet supported).
 
-define void @hoge(ptr %arg)  {
+define void @hoge(i8* %arg)  {
 bb1:
   br i1 false, label %bb2, label %bb3
 

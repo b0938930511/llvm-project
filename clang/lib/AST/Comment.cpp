@@ -29,16 +29,15 @@ namespace comments {
 #undef ABSTRACT_COMMENT
 
 // DeclInfo is also allocated with a BumpPtrAllocator.
-static_assert(std::is_trivially_destructible_v<DeclInfo>,
+static_assert(std::is_trivially_destructible<DeclInfo>::value,
               "DeclInfo should be trivially destructible!");
 
 const char *Comment::getCommentKindName() const {
   switch (getCommentKind()) {
-  case CommentKind::None:
-    return "None";
+  case NoCommentKind: return "NoCommentKind";
 #define ABSTRACT_COMMENT(COMMENT)
-#define COMMENT(CLASS, PARENT)                                                 \
-  case CommentKind::CLASS:                                                     \
+#define COMMENT(CLASS, PARENT) \
+  case CLASS##Kind: \
     return #CLASS;
 #include "clang/AST/CommentNodes.inc"
 #undef COMMENT
@@ -82,11 +81,10 @@ static inline void CheckCommentASTNodes() {
 
 Comment::child_iterator Comment::child_begin() const {
   switch (getCommentKind()) {
-  case CommentKind::None:
-    llvm_unreachable("comment without a kind");
+  case NoCommentKind: llvm_unreachable("comment without a kind");
 #define ABSTRACT_COMMENT(COMMENT)
-#define COMMENT(CLASS, PARENT)                                                 \
-  case CommentKind::CLASS:                                                     \
+#define COMMENT(CLASS, PARENT) \
+  case CLASS##Kind: \
     return static_cast<const CLASS *>(this)->child_begin();
 #include "clang/AST/CommentNodes.inc"
 #undef COMMENT
@@ -97,11 +95,10 @@ Comment::child_iterator Comment::child_begin() const {
 
 Comment::child_iterator Comment::child_end() const {
   switch (getCommentKind()) {
-  case CommentKind::None:
-    llvm_unreachable("comment without a kind");
+  case NoCommentKind: llvm_unreachable("comment without a kind");
 #define ABSTRACT_COMMENT(COMMENT)
-#define COMMENT(CLASS, PARENT)                                                 \
-  case CommentKind::CLASS:                                                     \
+#define COMMENT(CLASS, PARENT) \
+  case CLASS##Kind: \
     return static_cast<const CLASS *>(this)->child_end();
 #include "clang/AST/CommentNodes.inc"
 #undef COMMENT
@@ -111,7 +108,12 @@ Comment::child_iterator Comment::child_end() const {
 }
 
 bool TextComment::isWhitespaceNoCache() const {
-  return llvm::all_of(Text, clang::isWhitespace);
+  for (StringRef::const_iterator I = Text.begin(), E = Text.end();
+       I != E; ++I) {
+    if (!clang::isWhitespace(*I))
+      return false;
+  }
+  return true;
 }
 
 bool ParagraphComment::isWhitespaceNoCache() const {
@@ -187,14 +189,13 @@ static bool getFunctionTypeLoc(TypeLoc TL, FunctionTypeLoc &ResFTL) {
   return false;
 }
 
-const char *
-ParamCommandComment::getDirectionAsString(ParamCommandPassDirection D) {
+const char *ParamCommandComment::getDirectionAsString(PassDirection D) {
   switch (D) {
-  case ParamCommandPassDirection::In:
+  case ParamCommandComment::In:
     return "[in]";
-  case ParamCommandPassDirection::Out:
+  case ParamCommandComment::Out:
     return "[out]";
-  case ParamCommandPassDirection::InOut:
+  case ParamCommandComment::InOut:
     return "[in,out]";
   }
   llvm_unreachable("unknown PassDirection");
@@ -209,8 +210,7 @@ void DeclInfo::fill() {
   IsObjCMethod = false;
   IsInstanceMethod = false;
   IsClassMethod = false;
-  IsVariadic = false;
-  ParamVars = std::nullopt;
+  ParamVars = None;
   TemplateParameters = nullptr;
 
   if (!CommentDecl) {
@@ -221,7 +221,6 @@ void DeclInfo::fill() {
   CurrentDecl = CommentDecl;
 
   Decl::Kind K = CommentDecl->getKind();
-  const TypeSourceInfo *TSI = nullptr;
   switch (K) {
   default:
     // Defaults are should be good for declarations we don't handle explicitly.
@@ -248,8 +247,6 @@ void DeclInfo::fill() {
       IsInstanceMethod = MD->isInstance();
       IsClassMethod = !IsInstanceMethod;
     }
-    IsVariadic = FD->isVariadic();
-    assert(involvesFunctionType());
     break;
   }
   case Decl::ObjCMethod: {
@@ -260,8 +257,6 @@ void DeclInfo::fill() {
     IsObjCMethod = true;
     IsInstanceMethod = MD->isInstanceMethod();
     IsClassMethod = !IsInstanceMethod;
-    IsVariadic = MD->isVariadic();
-    assert(involvesFunctionType());
     break;
   }
   case Decl::FunctionTemplate: {
@@ -272,8 +267,6 @@ void DeclInfo::fill() {
     ParamVars = FD->parameters();
     ReturnType = FD->getReturnType();
     TemplateParameters = FTD->getTemplateParameters();
-    IsVariadic = FD->isVariadic();
-    assert(involvesFunctionType());
     break;
   }
   case Decl::ClassTemplate: {
@@ -300,66 +293,76 @@ void DeclInfo::fill() {
     Kind = ClassKind;
     break;
   case Decl::Var:
-    if (const VarTemplateDecl *VTD =
-            cast<VarDecl>(CommentDecl)->getDescribedVarTemplate()) {
-      TemplateKind = TemplateSpecialization;
-      TemplateParameters = VTD->getTemplateParameters();
-    }
-    [[fallthrough]];
   case Decl::Field:
   case Decl::EnumConstant:
   case Decl::ObjCIvar:
   case Decl::ObjCAtDefsField:
-  case Decl::ObjCProperty:
+  case Decl::ObjCProperty: {
+    const TypeSourceInfo *TSI;
     if (const auto *VD = dyn_cast<DeclaratorDecl>(CommentDecl))
       TSI = VD->getTypeSourceInfo();
     else if (const auto *PD = dyn_cast<ObjCPropertyDecl>(CommentDecl))
       TSI = PD->getTypeSourceInfo();
+    else
+      TSI = nullptr;
+    if (TSI) {
+      TypeLoc TL = TSI->getTypeLoc().getUnqualifiedLoc();
+      FunctionTypeLoc FTL;
+      if (getFunctionTypeLoc(TL, FTL)) {
+        ParamVars = FTL.getParams();
+        ReturnType = FTL.getReturnLoc().getType();
+      }
+    }
     Kind = VariableKind;
-    break;
-  case Decl::VarTemplate: {
-    const VarTemplateDecl *VTD = cast<VarTemplateDecl>(CommentDecl);
-    Kind = VariableKind;
-    TemplateKind = Template;
-    TemplateParameters = VTD->getTemplateParameters();
-    if (const VarDecl *VD = VTD->getTemplatedDecl())
-      TSI = VD->getTypeSourceInfo();
     break;
   }
   case Decl::Namespace:
     Kind = NamespaceKind;
     break;
   case Decl::TypeAlias:
-  case Decl::Typedef:
+  case Decl::Typedef: {
     Kind = TypedefKind;
-    TSI = cast<TypedefNameDecl>(CommentDecl)->getTypeSourceInfo();
+    // If this is a typedef / using to something we consider a function, extract
+    // arguments and return type.
+    const TypeSourceInfo *TSI =
+        K == Decl::Typedef
+            ? cast<TypedefDecl>(CommentDecl)->getTypeSourceInfo()
+            : cast<TypeAliasDecl>(CommentDecl)->getTypeSourceInfo();
+    if (!TSI)
+      break;
+    TypeLoc TL = TSI->getTypeLoc().getUnqualifiedLoc();
+    FunctionTypeLoc FTL;
+    if (getFunctionTypeLoc(TL, FTL)) {
+      Kind = FunctionKind;
+      ParamVars = FTL.getParams();
+      ReturnType = FTL.getReturnLoc().getType();
+    }
     break;
+  }
   case Decl::TypeAliasTemplate: {
     const TypeAliasTemplateDecl *TAT = cast<TypeAliasTemplateDecl>(CommentDecl);
     Kind = TypedefKind;
     TemplateKind = Template;
     TemplateParameters = TAT->getTemplateParameters();
-    if (TypeAliasDecl *TAD = TAT->getTemplatedDecl())
-      TSI = TAD->getTypeSourceInfo();
+    TypeAliasDecl *TAD = TAT->getTemplatedDecl();
+    if (!TAD)
+      break;
+
+    const TypeSourceInfo *TSI = TAD->getTypeSourceInfo();
+    if (!TSI)
+      break;
+    TypeLoc TL = TSI->getTypeLoc().getUnqualifiedLoc();
+    FunctionTypeLoc FTL;
+    if (getFunctionTypeLoc(TL, FTL)) {
+      Kind = FunctionKind;
+      ParamVars = FTL.getParams();
+      ReturnType = FTL.getReturnLoc().getType();
+    }
     break;
   }
   case Decl::Enum:
     Kind = EnumKind;
     break;
-  }
-
-  // If the type is a typedef / using to something we consider a function,
-  // extract arguments and return type.
-  if (TSI) {
-    TypeLoc TL = TSI->getTypeLoc().getUnqualifiedLoc();
-    FunctionTypeLoc FTL;
-    if (getFunctionTypeLoc(TL, FTL)) {
-      ParamVars = FTL.getParams();
-      ReturnType = FTL.getReturnLoc().getType();
-      if (const auto *FPT = dyn_cast<FunctionProtoType>(FTL.getTypePtr()))
-        IsVariadic = FPT->isVariadic();
-      assert(involvesFunctionType());
-    }
   }
 
   IsFilled = true;

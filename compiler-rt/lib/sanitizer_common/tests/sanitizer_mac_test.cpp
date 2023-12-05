@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "sanitizer_common/sanitizer_platform.h"
-#if SANITIZER_APPLE
+#if SANITIZER_MAC
 
 #include "sanitizer_common/sanitizer_mac.h"
 
@@ -89,4 +89,4 @@ TEST(SanitizerMac, GetDarwinKernelVersion) {
 
 }  // namespace __sanitizer
 
-#endif  // SANITIZER_APPLE
+#endif  // SANITIZER_MAC

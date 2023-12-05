@@ -21,6 +21,8 @@
 #include "clang/Sema/DeclSpec.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/None.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -28,7 +30,6 @@
 #include "llvm/Support/type_traits.h"
 #include <cassert>
 #include <memory>
-#include <optional>
 #include <string>
 #include <utility>
 
@@ -328,20 +329,9 @@ public:
     /// Code completion inside the filename part of a #include directive.
     CCC_IncludedFile,
 
-    /// Code completion of an attribute name.
-    CCC_Attribute,
-
     /// An unknown context, in which we are recovering from a parsing
     /// error and don't know which completions we should give.
-    CCC_Recovery,
-
-    /// Code completion in a @class forward declaration.
-    CCC_ObjCClassForwardDecl,
-
-    /// Code completion at a top level, i.e. in a namespace or global scope,
-    /// but also in expression statements. This is because REPL inputs can be
-    /// declarations or expression statements.
-    CCC_TopLevelOrExpression,
+    CCC_Recovery
   };
 
   using VisitedContextSet = llvm::SmallPtrSet<DeclContext *, 8>;
@@ -366,7 +356,7 @@ private:
 
   /// The scope specifier that comes before the completion token e.g.
   /// "a::b::"
-  std::optional<CXXScopeSpec> ScopeSpecifier;
+  llvm::Optional<CXXScopeSpec> ScopeSpecifier;
 
   /// A set of declaration contexts visited by Sema when doing lookup for
   /// code completion.
@@ -375,11 +365,11 @@ private:
 public:
   /// Construct a new code-completion context of the given kind.
   CodeCompletionContext(Kind CCKind)
-      : CCKind(CCKind), IsUsingDeclaration(false), SelIdents(std::nullopt) {}
+      : CCKind(CCKind), IsUsingDeclaration(false), SelIdents(None) {}
 
   /// Construct a new code-completion context of the given kind.
   CodeCompletionContext(Kind CCKind, QualType T,
-                        ArrayRef<IdentifierInfo *> SelIdents = std::nullopt)
+                        ArrayRef<IdentifierInfo *> SelIdents = None)
       : CCKind(CCKind), IsUsingDeclaration(false), SelIdents(SelIdents) {
     if (CCKind == CCC_DotMemberAccess || CCKind == CCC_ArrowMemberAccess ||
         CCKind == CCC_ObjCPropertyAccess || CCKind == CCC_ObjCClassMessage ||
@@ -429,14 +419,14 @@ public:
     return VisitedContexts;
   }
 
-  std::optional<const CXXScopeSpec *> getCXXScopeSpecifier() {
+  llvm::Optional<const CXXScopeSpec *> getCXXScopeSpecifier() {
     if (ScopeSpecifier)
-      return &*ScopeSpecifier;
-    return std::nullopt;
+      return ScopeSpecifier.getPointer();
+    return llvm::None;
   }
 };
 
-/// Get string representation of \p Kind, useful for debugging.
+/// Get string representation of \p Kind, useful for for debugging.
 llvm::StringRef getCompletionKindString(CodeCompletionContext::Kind Kind);
 
 /// A "string" used to describe how code completion can
@@ -613,11 +603,8 @@ public:
     return begin()[I];
   }
 
-  /// Returns the text in the first TypedText chunk.
+  /// Returns the text in the TypedText chunk.
   const char *getTypedText() const;
-
-  /// Returns the combined text from all TypedText chunks.
-  std::string getAllTypedText() const;
 
   /// Retrieve the priority of this code completion result.
   unsigned getPriority() const { return Priority; }
@@ -857,12 +844,6 @@ public:
   /// rather than a use of that entity.
   bool DeclaringEntity : 1;
 
-  /// When completing a function, whether it can be a call. This will usually be
-  /// true, but we have some heuristics, e.g. when a pointer to a non-static
-  /// member function is completed outside of that class' scope, it can never
-  /// be a call.
-  bool FunctionCanBeCall : 1;
-
   /// If the result should have a nested-name-specifier, this is it.
   /// When \c QualifierIsInformative, the nested-name-specifier is
   /// informative rather than required.
@@ -889,7 +870,7 @@ public:
         FixIts(std::move(FixIts)), Hidden(false), InBaseClass(false),
         QualifierIsInformative(QualifierIsInformative),
         StartsNestedNameSpecifier(false), AllParametersAreInformative(false),
-        DeclaringEntity(false), FunctionCanBeCall(true), Qualifier(Qualifier) {
+        DeclaringEntity(false), Qualifier(Qualifier) {
     // FIXME: Add assert to check FixIts range requirements.
     computeCursorKindAndAvailability(Accessible);
   }
@@ -899,8 +880,7 @@ public:
       : Keyword(Keyword), Priority(Priority), Kind(RK_Keyword),
         CursorKind(CXCursor_NotImplemented), Hidden(false), InBaseClass(false),
         QualifierIsInformative(false), StartsNestedNameSpecifier(false),
-        AllParametersAreInformative(false), DeclaringEntity(false),
-        FunctionCanBeCall(true) {}
+        AllParametersAreInformative(false), DeclaringEntity(false) {}
 
   /// Build a result that refers to a macro.
   CodeCompletionResult(const IdentifierInfo *Macro,
@@ -910,7 +890,7 @@ public:
         CursorKind(CXCursor_MacroDefinition), Hidden(false), InBaseClass(false),
         QualifierIsInformative(false), StartsNestedNameSpecifier(false),
         AllParametersAreInformative(false), DeclaringEntity(false),
-        FunctionCanBeCall(true), MacroDefInfo(MI) {}
+        MacroDefInfo(MI) {}
 
   /// Build a result that refers to a pattern.
   CodeCompletionResult(
@@ -922,7 +902,7 @@ public:
         CursorKind(CursorKind), Availability(Availability), Hidden(false),
         InBaseClass(false), QualifierIsInformative(false),
         StartsNestedNameSpecifier(false), AllParametersAreInformative(false),
-        DeclaringEntity(false), FunctionCanBeCall(true) {}
+        DeclaringEntity(false) {}
 
   /// Build a result that refers to a pattern with an associated
   /// declaration.
@@ -931,7 +911,7 @@ public:
       : Declaration(D), Pattern(Pattern), Priority(Priority), Kind(RK_Pattern),
         Hidden(false), InBaseClass(false), QualifierIsInformative(false),
         StartsNestedNameSpecifier(false), AllParametersAreInformative(false),
-        DeclaringEntity(false), FunctionCanBeCall(true) {
+        DeclaringEntity(false) {
     computeCursorKindAndAvailability();
   }
 
@@ -1026,22 +1006,12 @@ public:
       /// The candidate is a function declaration.
       CK_Function,
 
-      /// The candidate is a function template, arguments are being completed.
+      /// The candidate is a function template.
       CK_FunctionTemplate,
 
       /// The "candidate" is actually a variable, expression, or block
       /// for which we only have a function prototype.
-      CK_FunctionType,
-
-      /// The candidate is a variable or expression of function type
-      /// for which we have the location of the prototype declaration.
-      CK_FunctionProtoTypeLoc,
-
-      /// The candidate is a template, template arguments are being completed.
-      CK_Template,
-
-      /// The candidate is aggregate initialization of a record type.
-      CK_Aggregate,
+      CK_FunctionType
     };
 
   private:
@@ -1060,48 +1030,17 @@ public:
       /// The function type that describes the entity being called,
       /// when Kind == CK_FunctionType.
       const FunctionType *Type;
-
-      /// The location of the function prototype that describes the entity being
-      /// called, when Kind == CK_FunctionProtoTypeLoc.
-      FunctionProtoTypeLoc ProtoTypeLoc;
-
-      /// The template overload candidate, available when
-      /// Kind == CK_Template.
-      const TemplateDecl *Template;
-
-      /// The class being aggregate-initialized,
-      /// when Kind == CK_Aggregate
-      const RecordDecl *AggregateType;
     };
 
   public:
     OverloadCandidate(FunctionDecl *Function)
-        : Kind(CK_Function), Function(Function) {
-      assert(Function != nullptr);
-    }
+        : Kind(CK_Function), Function(Function) {}
 
     OverloadCandidate(FunctionTemplateDecl *FunctionTemplateDecl)
-        : Kind(CK_FunctionTemplate), FunctionTemplate(FunctionTemplateDecl) {
-      assert(FunctionTemplateDecl != nullptr);
-    }
+        : Kind(CK_FunctionTemplate), FunctionTemplate(FunctionTemplateDecl) {}
 
     OverloadCandidate(const FunctionType *Type)
-        : Kind(CK_FunctionType), Type(Type) {
-      assert(Type != nullptr);
-    }
-
-    OverloadCandidate(FunctionProtoTypeLoc Prototype)
-        : Kind(CK_FunctionProtoTypeLoc), ProtoTypeLoc(Prototype) {
-      assert(!Prototype.isNull());
-    }
-
-    OverloadCandidate(const RecordDecl *Aggregate)
-        : Kind(CK_Aggregate), AggregateType(Aggregate) {
-      assert(Aggregate != nullptr);
-    }
-
-    OverloadCandidate(const TemplateDecl *Template)
-        : Kind(CK_Template), Template(Template) {}
+        : Kind(CK_FunctionType), Type(Type) {}
 
     /// Determine the kind of overload candidate.
     CandidateKind getKind() const { return Kind; }
@@ -1120,40 +1059,13 @@ public:
     /// function is stored.
     const FunctionType *getFunctionType() const;
 
-    /// Retrieve the function ProtoTypeLoc candidate.
-    /// This can be called for any Kind, but returns null for kinds
-    /// other than CK_FunctionProtoTypeLoc.
-    const FunctionProtoTypeLoc getFunctionProtoTypeLoc() const;
-
-    const TemplateDecl *getTemplate() const {
-      assert(getKind() == CK_Template && "Not a template");
-      return Template;
-    }
-
-    /// Retrieve the aggregate type being initialized.
-    const RecordDecl *getAggregate() const {
-      assert(getKind() == CK_Aggregate);
-      return AggregateType;
-    }
-
-    /// Get the number of parameters in this signature.
-    unsigned getNumParams() const;
-
-    /// Get the type of the Nth parameter.
-    /// Returns null if the type is unknown or N is out of range.
-    QualType getParamType(unsigned N) const;
-
-    /// Get the declaration of the Nth parameter.
-    /// Returns null if the decl is unknown or N is out of range.
-    const NamedDecl *getParamDecl(unsigned N) const;
-
     /// Create a new code-completion string that describes the function
     /// signature of this overload candidate.
-    CodeCompletionString *
-    CreateSignatureString(unsigned CurrentArg, Sema &S,
-                          CodeCompletionAllocator &Allocator,
-                          CodeCompletionTUInfo &CCTUInfo,
-                          bool IncludeBriefComments, bool Braced) const;
+    CodeCompletionString *CreateSignatureString(unsigned CurrentArg,
+                                                Sema &S,
+                                      CodeCompletionAllocator &Allocator,
+                                      CodeCompletionTUInfo &CCTUInfo,
+                                      bool IncludeBriefComments) const;
   };
 
   CodeCompleteConsumer(const CodeCompleteOptions &CodeCompleteOpts)
@@ -1227,8 +1139,7 @@ public:
   virtual void ProcessOverloadCandidates(Sema &S, unsigned CurrentArg,
                                          OverloadCandidate *Candidates,
                                          unsigned NumCandidates,
-                                         SourceLocation OpenParLoc,
-                                         bool Braced) {}
+                                         SourceLocation OpenParLoc) {}
   //@}
 
   /// Retrieve the allocator that will be used to allocate
@@ -1279,8 +1190,7 @@ public:
   void ProcessOverloadCandidates(Sema &S, unsigned CurrentArg,
                                  OverloadCandidate *Candidates,
                                  unsigned NumCandidates,
-                                 SourceLocation OpenParLoc,
-                                 bool Braced) override;
+                                 SourceLocation OpenParLoc) override;
 
   bool isResultFilteredOut(StringRef Filter, CodeCompletionResult Results) override;
 

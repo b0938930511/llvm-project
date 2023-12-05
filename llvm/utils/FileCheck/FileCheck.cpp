@@ -18,9 +18,7 @@
 #include "llvm/FileCheck/FileCheck.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Process.h"
-#include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cmath>
@@ -81,7 +79,7 @@ static cl::opt<bool> AllowEmptyInput(
              "checks that some error message does not occur, for example."));
 
 static cl::opt<bool> AllowUnusedPrefixes(
-    "allow-unused-prefixes",
+    "allow-unused-prefixes", cl::init(false), cl::ZeroOrMore,
     cl::desc("Allow prefixes to be specified but not appear in the test."));
 
 static cl::opt<bool> MatchFullLines(
@@ -104,12 +102,12 @@ static cl::opt<bool> AllowDeprecatedDagOverlap(
              "non-overlapping CHECK-DAG implementation.\n"));
 
 static cl::opt<bool> Verbose(
-    "v",
+    "v", cl::init(false), cl::ZeroOrMore,
     cl::desc("Print directive pattern matches, or add them to the input dump\n"
              "if enabled.\n"));
 
 static cl::opt<bool> VerboseVerbose(
-    "vv",
+    "vv", cl::init(false), cl::ZeroOrMore,
     cl::desc("Print information helpful in diagnosing internal FileCheck\n"
              "issues, or add it to the input dump if enabled.  Implies\n"
              "-v.\n"));
@@ -369,8 +367,6 @@ static std::string GetCheckTypeAbbreviation(Check::FileCheckType Ty) {
     return "bad-not";
   case Check::CheckBadCount:
     return "bad-count";
-  case Check::CheckMisspelled:
-    return "misspelled";
   case Check::CheckNone:
     llvm_unreachable("invalid FileCheckType");
   }
@@ -390,7 +386,7 @@ BuildInputAnnotations(const SourceMgr &SM, unsigned CheckFileBufferID,
   };
   // How many diagnostics does each pattern have?
   std::map<SMLoc, unsigned, CompareSMLoc> DiagCountPerPattern;
-  for (const FileCheckDiag &Diag : Diags)
+  for (auto Diag : Diags)
     ++DiagCountPerPattern[Diag.CheckLoc];
   // How many diagnostics have we seen so far per pattern?
   std::map<SMLoc, unsigned, CompareSMLoc> DiagIndexPerPattern;
@@ -419,6 +415,7 @@ BuildInputAnnotations(const SourceMgr &SM, unsigned CheckFileBufferID,
                        "the check file or for an implicit pattern");
     if (DiagCountPerPattern[DiagItr->CheckLoc] > 1)
       Label << "'" << DiagIndexPerPattern[DiagItr->CheckLoc]++;
+    Label.flush();
     LabelWidth = std::max((std::string::size_type)LabelWidth, A.Label.size());
 
     A.Marker = GetMarker(DiagItr->MatchTy);
@@ -634,7 +631,7 @@ static void DumpAnnotatedInput(raw_ostream &OS, const FileCheckRequest &Req,
     // -dump-input-filter.  However, in case the resulting ellipsis would occupy
     // more lines than the input lines and annotations it elides, buffer the
     // elided lines and annotations so we can print them instead.
-    raw_ostream *LineOS;
+    raw_ostream *LineOS = &OS;
     if ((!PrevLineInFilter || PrevLineInFilter + DumpInputContext < Line) &&
         (NextLineInFilter == UINT_MAX ||
          Line + DumpInputContext < NextLineInFilter))
@@ -673,7 +670,7 @@ static void DumpAnnotatedInput(raw_ostream &OS, const FileCheckRequest &Req,
       for (unsigned Col = 1; InputFilePtr != InputFileEnd && !Newline; ++Col) {
         bool WasInMatch = InMatch;
         InMatch = false;
-        for (const InputAnnotation &M : FoundAndExpectedMatches) {
+        for (auto M : FoundAndExpectedMatches) {
           if (M.InputStartCol <= Col && Col < M.InputEndCol) {
             InMatch = true;
             break;
@@ -810,6 +807,17 @@ int main(int argc, char **argv) {
   if (!FC.ValidateCheckPrefixes())
     return 2;
 
+  Regex PrefixRE = FC.buildCheckPrefixRegex();
+  std::string REError;
+  if (!PrefixRE.isValid(REError)) {
+    errs() << "Unable to combine check-prefix strings into a prefix regular "
+              "expression! This is likely a bug in FileCheck's verification of "
+              "the check-prefix strings. Regular expression parsing failed "
+              "with the following error: "
+           << REError << "\n";
+    return 2;
+  }
+
   SourceMgr SM;
 
   // Read the expected strings from the check file.
@@ -831,7 +839,7 @@ int main(int argc, char **argv) {
                             SMLoc());
 
   std::pair<unsigned, unsigned> ImpPatBufferIDRange;
-  if (FC.readCheckFile(SM, CheckFileText, &ImpPatBufferIDRange))
+  if (FC.readCheckFile(SM, CheckFileText, PrefixRE, &ImpPatBufferIDRange))
     return 2;
 
   // Open the file to check and add it to SourceMgr.

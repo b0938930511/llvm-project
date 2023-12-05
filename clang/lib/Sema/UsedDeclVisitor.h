@@ -72,8 +72,7 @@ public:
       QualType Destroyed = S.Context.getBaseElementType(DestroyedOrNull);
       if (const RecordType *DestroyedRec = Destroyed->getAs<RecordType>()) {
         CXXRecordDecl *Record = cast<CXXRecordDecl>(DestroyedRec->getDecl());
-        if (Record->getDefinition())
-          asImpl().visitUsedDecl(E->getBeginLoc(), S.LookupDestructor(Record));
+        asImpl().visitUsedDecl(E->getBeginLoc(), S.LookupDestructor(Record));
       }
     }
 
@@ -82,28 +81,11 @@ public:
 
   void VisitCXXConstructExpr(CXXConstructExpr *E) {
     asImpl().visitUsedDecl(E->getBeginLoc(), E->getConstructor());
-    CXXConstructorDecl *D = E->getConstructor();
-    for (const CXXCtorInitializer *Init : D->inits()) {
-      if (Init->isInClassMemberInitializer())
-        asImpl().Visit(Init->getInit());
-    }
     Inherited::VisitCXXConstructExpr(E);
   }
 
   void VisitCXXDefaultArgExpr(CXXDefaultArgExpr *E) {
     asImpl().Visit(E->getExpr());
-    Inherited::VisitCXXDefaultArgExpr(E);
-  }
-
-  void VisitCXXDefaultInitExpr(CXXDefaultInitExpr *E) {
-    asImpl().Visit(E->getExpr());
-    Inherited::VisitCXXDefaultInitExpr(E);
-  }
-
-  void VisitInitListExpr(InitListExpr *ILE) {
-    if (ILE->hasArrayFiller())
-      asImpl().Visit(ILE->getArrayFiller());
-    Inherited::VisitInitListExpr(ILE);
   }
 
   void visitUsedDecl(SourceLocation Loc, Decl *D) {

@@ -7,11 +7,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "src/math/ilogbf.h"
-#include "src/__support/FPUtil/ManipulationFunctions.h"
 #include "src/__support/common.h"
+#include "utils/FPUtil/ManipulationFunctions.h"
 
-namespace LIBC_NAMESPACE {
+namespace __llvm_libc {
 
 LLVM_LIBC_FUNCTION(int, ilogbf, (float x)) { return fputil::ilogb(x); }
 
-} // namespace LIBC_NAMESPACE
+} // namespace __llvm_libc

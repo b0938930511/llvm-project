@@ -15,15 +15,18 @@
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instruction.h"
-#include "llvm/IR/IntrinsicInst.h"
+#include <unordered_set>
 
 using namespace llvm;
 
 namespace llvm {
 
-std::optional<PseudoProbe>
-extractProbeFromDiscriminator(const DILocation *DIL) {
-  if (DIL) {
+Optional<PseudoProbe> extractProbeFromDiscriminator(const Instruction &Inst) {
+  assert(isa<CallBase>(&Inst) && !isa<IntrinsicInst>(&Inst) &&
+         "Only call instructions should have pseudo probe encodes as their "
+         "Dwarf discriminators");
+  if (const DebugLoc &DLoc = Inst.getDebugLoc()) {
+    const DILocation *DIL = DLoc;
     auto Discriminator = DIL->getDiscriminator();
     if (DILocation::isPseudoProbeDiscriminator(Discriminator)) {
       PseudoProbe Probe;
@@ -36,24 +39,13 @@ extractProbeFromDiscriminator(const DILocation *DIL) {
       Probe.Factor =
           PseudoProbeDwarfDiscriminator::extractProbeFactor(Discriminator) /
           (float)PseudoProbeDwarfDiscriminator::FullDistributionFactor;
-      Probe.Discriminator = 0;
       return Probe;
     }
   }
-  return std::nullopt;
+  return None;
 }
 
-std::optional<PseudoProbe>
-extractProbeFromDiscriminator(const Instruction &Inst) {
-  assert(isa<CallBase>(&Inst) && !isa<IntrinsicInst>(&Inst) &&
-         "Only call instructions should have pseudo probe encodes as their "
-         "Dwarf discriminators");
-  if (const DebugLoc &DLoc = Inst.getDebugLoc())
-    return extractProbeFromDiscriminator(DLoc);
-  return std::nullopt;
-}
-
-std::optional<PseudoProbe> extractProbe(const Instruction &Inst) {
+Optional<PseudoProbe> extractProbe(const Instruction &Inst) {
   if (const auto *II = dyn_cast<PseudoProbeInst>(&Inst)) {
     PseudoProbe Probe;
     Probe.Id = II->getIndex()->getZExtValue();
@@ -61,16 +53,13 @@ std::optional<PseudoProbe> extractProbe(const Instruction &Inst) {
     Probe.Attr = II->getAttributes()->getZExtValue();
     Probe.Factor = II->getFactor()->getZExtValue() /
                    (float)PseudoProbeFullDistributionFactor;
-    Probe.Discriminator = 0;
-    if (const DebugLoc &DLoc = Inst.getDebugLoc())
-      Probe.Discriminator = DLoc->getDiscriminator();
     return Probe;
   }
 
   if (isa<CallBase>(&Inst) && !isa<IntrinsicInst>(&Inst))
     return extractProbeFromDiscriminator(Inst);
 
-  return std::nullopt;
+  return None;
 }
 
 void setProbeDistributionFactor(Instruction &Inst, float Factor) {
@@ -109,4 +98,12 @@ void setProbeDistributionFactor(Instruction &Inst, float Factor) {
   }
 }
 
+void addPseudoProbeAttribute(PseudoProbeInst &Inst,
+                             PseudoProbeAttributes Attr) {
+  IRBuilder<> Builder(&Inst);
+  uint32_t OldAttr = Inst.getAttributes()->getZExtValue();
+  uint32_t NewAttr = OldAttr | (uint32_t)Attr;
+  if (OldAttr != NewAttr)
+    Inst.replaceUsesOfWith(Inst.getAttributes(), Builder.getInt32(NewAttr));
+}
 } // namespace llvm

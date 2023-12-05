@@ -6,12 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// Required for dyld macOS 12.0+
-#if (__APPLE__)
-__attribute__((weak))
-#endif
-extern "C" void
-__asan_on_error() {
+extern "C"
+void __asan_on_error() {
   fprintf(stderr, "__asan_on_error called\n");
   fflush(stderr);
 }

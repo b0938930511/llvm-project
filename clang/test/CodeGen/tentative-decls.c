@@ -11,7 +11,7 @@ struct s0 x;
 
 struct s0 y;
 // CHECK-DAG: @y = {{(dso_local )?}}global %struct.s0 zeroinitializer
-struct s0 *f0(void) {
+struct s0 *f0() {
   return &y;
 }
 
@@ -21,7 +21,7 @@ struct s0 {
 
 // CHECK-DAG: @b = {{(dso_local )?}}global [1 x {{.*}}] zeroinitializer
 int b[];
-int *f1(void) {
+int *f1() {
   return b;
 }
 
@@ -33,6 +33,6 @@ int c[4];
 // Check that we emit static tentative definitions
 // CHECK-DAG: @c5 = internal global [1 x {{.*}}] zeroinitializer
 static int c5[];
-static int func(void) { return c5[0]; }
-int callfunc(void) { return func(); }
+static int func() { return c5[0]; }
+int callfunc() { return func(); }
 

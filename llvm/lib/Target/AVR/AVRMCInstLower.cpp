@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "AVRMCInstLower.h"
+
 #include "AVRInstrInfo.h"
 #include "MCTargetDesc/AVRMCExpr.h"
 
@@ -22,16 +23,13 @@
 
 namespace llvm {
 
-MCOperand
-AVRMCInstLower::lowerSymbolOperand(const MachineOperand &MO, MCSymbol *Sym,
-                                   const AVRSubtarget &Subtarget) const {
+MCOperand AVRMCInstLower::lowerSymbolOperand(const MachineOperand &MO,
+                                             MCSymbol *Sym) const {
   unsigned char TF = MO.getTargetFlags();
   const MCExpr *Expr = MCSymbolRefExpr::create(Sym, Ctx);
 
   bool IsNegated = false;
-  if (TF & AVRII::MO_NEG) {
-    IsNegated = true;
-  }
+  if (TF & AVRII::MO_NEG) { IsNegated = true; }
 
   if (!MO.isJTI() && MO.getOffset()) {
     Expr = MCBinaryExpr::createAdd(
@@ -42,19 +40,15 @@ AVRMCInstLower::lowerSymbolOperand(const MachineOperand &MO, MCSymbol *Sym,
 
   if (TF & AVRII::MO_LO) {
     if (IsFunction) {
-      Expr =
-          AVRMCExpr::create(Subtarget.hasEIJMPCALL() ? AVRMCExpr::VK_AVR_LO8_GS
-                                                     : AVRMCExpr::VK_AVR_PM_LO8,
-                            Expr, IsNegated, Ctx);
+      // N.B. Should we use _GS fixups here to cope with >128k progmem?
+      Expr = AVRMCExpr::create(AVRMCExpr::VK_AVR_PM_LO8, Expr, IsNegated, Ctx);
     } else {
       Expr = AVRMCExpr::create(AVRMCExpr::VK_AVR_LO8, Expr, IsNegated, Ctx);
     }
   } else if (TF & AVRII::MO_HI) {
     if (IsFunction) {
-      Expr =
-          AVRMCExpr::create(Subtarget.hasEIJMPCALL() ? AVRMCExpr::VK_AVR_HI8_GS
-                                                     : AVRMCExpr::VK_AVR_PM_HI8,
-                            Expr, IsNegated, Ctx);
+      // N.B. Should we use _GS fixups here to cope with >128k progmem?
+      Expr = AVRMCExpr::create(AVRMCExpr::VK_AVR_PM_HI8, Expr, IsNegated, Ctx);
     } else {
       Expr = AVRMCExpr::create(AVRMCExpr::VK_AVR_HI8, Expr, IsNegated, Ctx);
     }
@@ -65,9 +59,7 @@ AVRMCInstLower::lowerSymbolOperand(const MachineOperand &MO, MCSymbol *Sym,
   return MCOperand::createExpr(Expr);
 }
 
-void AVRMCInstLower::lowerInstruction(const MachineInstr &MI,
-                                      MCInst &OutMI) const {
-  auto &Subtarget = MI.getParent()->getParent()->getSubtarget<AVRSubtarget>();
+void AVRMCInstLower::lowerInstruction(const MachineInstr &MI, MCInst &OutMI) const {
   OutMI.setOpcode(MI.getOpcode());
 
   for (MachineOperand const &MO : MI.operands()) {
@@ -87,12 +79,11 @@ void AVRMCInstLower::lowerInstruction(const MachineInstr &MI,
       MCOp = MCOperand::createImm(MO.getImm());
       break;
     case MachineOperand::MO_GlobalAddress:
-      MCOp =
-          lowerSymbolOperand(MO, Printer.getSymbol(MO.getGlobal()), Subtarget);
+      MCOp = lowerSymbolOperand(MO, Printer.getSymbol(MO.getGlobal()));
       break;
     case MachineOperand::MO_ExternalSymbol:
       MCOp = lowerSymbolOperand(
-          MO, Printer.GetExternalSymbolSymbol(MO.getSymbolName()), Subtarget);
+          MO, Printer.GetExternalSymbolSymbol(MO.getSymbolName()));
       break;
     case MachineOperand::MO_MachineBasicBlock:
       MCOp = MCOperand::createExpr(
@@ -102,15 +93,13 @@ void AVRMCInstLower::lowerInstruction(const MachineInstr &MI,
       continue;
     case MachineOperand::MO_BlockAddress:
       MCOp = lowerSymbolOperand(
-          MO, Printer.GetBlockAddressSymbol(MO.getBlockAddress()), Subtarget);
+          MO, Printer.GetBlockAddressSymbol(MO.getBlockAddress()));
       break;
     case MachineOperand::MO_JumpTableIndex:
-      MCOp = lowerSymbolOperand(MO, Printer.GetJTISymbol(MO.getIndex()),
-                                Subtarget);
+      MCOp = lowerSymbolOperand(MO, Printer.GetJTISymbol(MO.getIndex()));
       break;
     case MachineOperand::MO_ConstantPoolIndex:
-      MCOp = lowerSymbolOperand(MO, Printer.GetCPISymbol(MO.getIndex()),
-                                Subtarget);
+      MCOp = lowerSymbolOperand(MO, Printer.GetCPISymbol(MO.getIndex()));
       break;
     }
 
@@ -119,3 +108,4 @@ void AVRMCInstLower::lowerInstruction(const MachineInstr &MI,
 }
 
 } // end of namespace llvm
+

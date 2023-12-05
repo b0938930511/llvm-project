@@ -29,9 +29,9 @@ class CombinedAllocator {
                          LargeMmapAllocatorPtrArray,
                          typename PrimaryAllocator::AddressSpaceView>;
 
-  void InitLinkerInitialized(s32 release_to_os_interval_ms,
-                             uptr heap_start = 0) {
-    primary_.Init(release_to_os_interval_ms, heap_start);
+  void InitLinkerInitialized(s32 release_to_os_interval_ms) {
+    stats_.InitLinkerInitialized();
+    primary_.Init(release_to_os_interval_ms);
     secondary_.InitLinkerInitialized();
   }
 
@@ -112,13 +112,15 @@ class CombinedAllocator {
     return new_p;
   }
 
-  bool PointerIsMine(const void *p) const {
+  bool PointerIsMine(void *p) {
     if (primary_.PointerIsMine(p))
       return true;
     return secondary_.PointerIsMine(p);
   }
 
-  bool FromPrimary(const void *p) const { return primary_.PointerIsMine(p); }
+  bool FromPrimary(void *p) {
+    return primary_.PointerIsMine(p);
+  }
 
   void *GetMetaData(const void *p) {
     if (primary_.PointerIsMine(p))
@@ -134,7 +136,7 @@ class CombinedAllocator {
 
   // This function does the same as GetBlockBegin, but is much faster.
   // Must be called with the allocator locked.
-  void *GetBlockBeginFastLocked(const void *p) {
+  void *GetBlockBeginFastLocked(void *p) {
     if (primary_.PointerIsMine(p))
       return primary_.GetBlockBegin(p);
     return secondary_.GetBlockBeginFastLocked(p);
@@ -175,12 +177,12 @@ class CombinedAllocator {
 
   // ForceLock() and ForceUnlock() are needed to implement Darwin malloc zone
   // introspection API.
-  void ForceLock() SANITIZER_NO_THREAD_SAFETY_ANALYSIS {
+  void ForceLock() NO_THREAD_SAFETY_ANALYSIS {
     primary_.ForceLock();
     secondary_.ForceLock();
   }
 
-  void ForceUnlock() SANITIZER_NO_THREAD_SAFETY_ANALYSIS {
+  void ForceUnlock() NO_THREAD_SAFETY_ANALYSIS {
     secondary_.ForceUnlock();
     primary_.ForceUnlock();
   }

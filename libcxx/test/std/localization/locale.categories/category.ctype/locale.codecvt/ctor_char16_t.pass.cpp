@@ -20,6 +20,8 @@
 
 #include "test_macros.h"
 
+//#ifndef _LIBCPP_HAS_NO_UNICODE_CHARS
+
 typedef std::codecvt<char16_t, char, std::mbstate_t> F;
 
 class my_facet
@@ -36,8 +38,11 @@ public:
 
 int my_facet::count = 0;
 
+//#endif
+
 int main(int, char**)
 {
+//#ifndef _LIBCPP_HAS_NO_UNICODE_CHARS
     {
         std::locale l(std::locale::classic(), new my_facet);
         assert(my_facet::count == 1);
@@ -53,6 +58,7 @@ int main(int, char**)
         assert(my_facet::count == 1);
     }
     assert(my_facet::count == 0);
+//#endif
 
   return 0;
 }

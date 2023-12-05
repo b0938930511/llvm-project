@@ -245,13 +245,26 @@ public:
   ///     represented by this symbol context object, nullptr otherwise.
   Block *GetFunctionBlock();
 
-  /// Determines the name of the instance variable for the this decl context.
+  /// If this symbol context represents a function that is a method, return
+  /// true and provide information about the method.
   ///
-  /// For C++ the name is "this", for Objective-C the name is "self".
+  /// \param[out] language
+  ///     If \b true is returned, the language for the method.
+  ///
+  /// \param[out] is_instance_method
+  ///     If \b true is returned, \b true if this is a instance method,
+  ///     \b false if this is a static/class function.
+  ///
+  /// \param[out] language_object_name
+  ///     If \b true is returned, the name of the artificial variable
+  ///     for the language ("this" for C++, "self" for ObjC).
   ///
   /// \return
-  ///     Returns a StringRef for the name of the instance variable.
-  llvm::StringRef GetInstanceVariableName();
+  ///     \b True if this symbol context represents a function that
+  ///     is a method of a class, \b false otherwise.
+  bool GetFunctionMethodInfo(lldb::LanguageType &language,
+                             bool &is_instance_method,
+                             ConstString &language_object_name);
 
   /// Sorts the types in TypeMap according to SymbolContext to TypeList
   ///
@@ -451,15 +464,11 @@ public:
 protected:
   typedef std::vector<SymbolContext>
       collection; ///< The collection type for the list.
-  typedef collection::const_iterator const_iterator;
 
   // Member variables.
   collection m_symbol_contexts; ///< The list of symbol contexts.
 
 public:
-  const_iterator begin() const { return m_symbol_contexts.begin(); }
-  const_iterator end() const { return m_symbol_contexts.end(); }
-
   typedef AdaptedIterable<collection, SymbolContext, vector_adapter>
       SymbolContextIterable;
   SymbolContextIterable SymbolContexts() {

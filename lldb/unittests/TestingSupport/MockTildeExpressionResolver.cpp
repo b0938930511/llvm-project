@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "MockTildeExpressionResolver.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Path.h"
 
 using namespace lldb_private;
@@ -21,7 +20,7 @@ MockTildeExpressionResolver::MockTildeExpressionResolver(StringRef CurrentUser,
 
 void MockTildeExpressionResolver::AddKnownUser(StringRef User,
                                                StringRef HomeDir) {
-  assert(!UserDirectories.contains(User));
+  assert(UserDirectories.find(User) == UserDirectories.end());
   UserDirectories.insert(std::make_pair(User, HomeDir));
 }
 
@@ -31,7 +30,7 @@ void MockTildeExpressionResolver::Clear() {
 }
 
 void MockTildeExpressionResolver::SetCurrentUser(StringRef User) {
-  assert(UserDirectories.contains(User));
+  assert(UserDirectories.find(User) != UserDirectories.end());
   CurrentUser = User;
 }
 

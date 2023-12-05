@@ -34,13 +34,6 @@
 LLVM_C_EXTERN_C_BEGIN
 
 /**
- * @defgroup LLVMCExecutionEngineORC On-Request-Compilation
- * @ingroup LLVMCExecutionEngine
- *
- * @{
- */
-
-/**
  * Represents an address in the executor process.
  */
 typedef uint64_t LLVMOrcJITTargetAddress;
@@ -54,7 +47,6 @@ typedef uint64_t LLVMOrcExecutorAddress;
  * Represents generic linkage flags for a symbol definition.
  */
 typedef enum {
-  LLVMJITSymbolGenericFlagsNone = 0,
   LLVMJITSymbolGenericFlagsExported = 1U << 0,
   LLVMJITSymbolGenericFlagsWeak = 1U << 1,
   LLVMJITSymbolGenericFlagsCallable = 1U << 2,
@@ -123,13 +115,13 @@ typedef LLVMOrcCSymbolFlagsMapPair *LLVMOrcCSymbolFlagsMapPairs;
 typedef struct {
   LLVMOrcSymbolStringPoolEntryRef Name;
   LLVMJITEvaluatedSymbol Sym;
-} LLVMOrcCSymbolMapPair;
+} LLVMJITCSymbolMapPair;
 
 /**
  * Represents a list of (SymbolStringPtr, JITEvaluatedSymbol) pairs that can be
  * used to construct a SymbolMap.
  */
-typedef LLVMOrcCSymbolMapPair *LLVMOrcCSymbolMapPairs;
+typedef LLVMJITCSymbolMapPair *LLVMOrcCSymbolMapPairs;
 
 /**
  * Represents a SymbolAliasMapEntry
@@ -202,22 +194,6 @@ typedef enum {
   LLVMOrcJITDylibLookupFlagsMatchExportedSymbolsOnly,
   LLVMOrcJITDylibLookupFlagsMatchAllSymbols
 } LLVMOrcJITDylibLookupFlags;
-
-/**
- * An element type for a JITDylib search order.
- */
-typedef struct {
-  LLVMOrcJITDylibRef JD;
-  LLVMOrcJITDylibLookupFlags JDLookupFlags;
-} LLVMOrcCJITDylibSearchOrderElement;
-
-/**
- * A JITDylib search order.
- *
- * The list is terminated with an element containing a null pointer for the JD
- * field.
- */
-typedef LLVMOrcCJITDylibSearchOrderElement *LLVMOrcCJITDylibSearchOrder;
 
 /**
  * Symbol lookup flags for lookup sets. This should be kept in sync with
@@ -346,7 +322,7 @@ typedef struct LLVMOrcOpaqueLookupState *LLVMOrcLookupStateRef;
  * into.
  *
  * The JDLookupFlags argument can be inspected to determine whether the original
- * lookup included non-exported symbols.
+ * lookup included non-exported symobls.
  *
  * Finally, the LookupSet argument contains the set of symbols that could not
  * be found in JD already (the set of generation candidates).
@@ -356,14 +332,6 @@ typedef LLVMErrorRef (*LLVMOrcCAPIDefinitionGeneratorTryToGenerateFunction)(
     LLVMOrcLookupStateRef *LookupState, LLVMOrcLookupKind Kind,
     LLVMOrcJITDylibRef JD, LLVMOrcJITDylibLookupFlags JDLookupFlags,
     LLVMOrcCLookupSet LookupSet, size_t LookupSetSize);
-
-/**
- * Disposer for a custom generator.
- *
- * Will be called by ORC when the JITDylib that the generator is attached to
- * is destroyed.
- */
-typedef void (*LLVMOrcDisposeCAPIDefinitionGeneratorFunction)(void *Ctx);
 
 /**
  * Predicate function for SymbolStringPoolEntries.
@@ -508,7 +476,7 @@ void LLVMOrcSymbolStringPoolClearDeadEntries(LLVMOrcSymbolStringPoolRef SSP);
  * Intern a string in the ExecutionSession's SymbolStringPool and return a
  * reference to it. This increments the ref-count of the pool entry, and the
  * returned value should be released once the client is done with it by
- * calling LLVMOrcReleaseSymbolStringPoolEntry.
+ * calling LLVMOrReleaseSymbolStringPoolEntry.
  *
  * Since strings are uniqued within the SymbolStringPool
  * LLVMOrcSymbolStringPoolEntryRefs can be compared by value to test string
@@ -520,58 +488,6 @@ LLVMOrcSymbolStringPoolEntryRef
 LLVMOrcExecutionSessionIntern(LLVMOrcExecutionSessionRef ES, const char *Name);
 
 /**
- * Callback type for ExecutionSession lookups.
- *
- * If Err is LLVMErrorSuccess then Result will contain a pointer to a
- * list of ( SymbolStringPtr, JITEvaluatedSymbol ) pairs of length NumPairs.
- *
- * If Err is a failure value then Result and Ctx are undefined and should
- * not be accessed. The Callback is responsible for handling the error
- * value (e.g. by calling LLVMGetErrorMessage + LLVMDisposeErrorMessage).
- *
- * The caller retains ownership of the Result array and will release all
- * contained symbol names. Clients are responsible for retaining any symbol
- * names that they wish to hold after the function returns.
- */
-typedef void (*LLVMOrcExecutionSessionLookupHandleResultFunction)(
-    LLVMErrorRef Err, LLVMOrcCSymbolMapPairs Result, size_t NumPairs,
-    void *Ctx);
-
-/**
- * Look up symbols in an execution session.
- *
- * This is a wrapper around the general ExecutionSession::lookup function.
- *
- * The SearchOrder argument contains a list of (JITDylibs, JITDylibSearchFlags)
- * pairs that describe the search order. The JITDylibs will be searched in the
- * given order to try to find the symbols in the Symbols argument.
- *
- * The Symbols argument should contain a null-terminated array of
- * (SymbolStringPtr, SymbolLookupFlags) pairs describing the symbols to be
- * searched for. This function takes ownership of the elements of the Symbols
- * array. The Name fields of the Symbols elements are taken to have been
- * retained by the client for this function. The client should *not* release the
- * Name fields, but are still responsible for destroying the array itself.
- *
- * The HandleResult function will be called once all searched for symbols have
- * been found, or an error occurs. The HandleResult function will be passed an
- * LLVMErrorRef indicating success or failure, and (on success) a
- * null-terminated LLVMOrcCSymbolMapPairs array containing the function result,
- * and the Ctx value passed to the lookup function.
- *
- * The client is fully responsible for managing the lifetime of the Ctx object.
- * A common idiom is to allocate the context prior to the lookup and deallocate
- * it in the handler.
- *
- * THIS API IS EXPERIMENTAL AND LIKELY TO CHANGE IN THE NEAR FUTURE!
- */
-void LLVMOrcExecutionSessionLookup(
-    LLVMOrcExecutionSessionRef ES, LLVMOrcLookupKind K,
-    LLVMOrcCJITDylibSearchOrder SearchOrder, size_t SearchOrderSize,
-    LLVMOrcCLookupSet Symbols, size_t SymbolsSize,
-    LLVMOrcExecutionSessionLookupHandleResultFunction HandleResult, void *Ctx);
-
-/**
  * Increments the ref-count for a SymbolStringPool entry.
  */
 void LLVMOrcRetainSymbolStringPoolEntry(LLVMOrcSymbolStringPoolEntryRef S);
@@ -581,11 +497,6 @@ void LLVMOrcRetainSymbolStringPoolEntry(LLVMOrcSymbolStringPoolEntryRef S);
  */
 void LLVMOrcReleaseSymbolStringPoolEntry(LLVMOrcSymbolStringPoolEntryRef S);
 
-/**
- * Return the c-string for the given symbol. This string will remain valid until
- * the entry is freed (once all LLVMOrcSymbolStringPoolEntryRefs have been
- * released).
- */
 const char *LLVMOrcSymbolStringPoolEntryStr(LLVMOrcSymbolStringPoolEntryRef S);
 
 /**
@@ -629,7 +540,7 @@ void LLVMOrcDisposeMaterializationUnit(LLVMOrcMaterializationUnitRef MU);
  * unit. This function takes ownership of the elements of the Syms array. The
  * Name fields of the array elements are taken to have been retained for this
  * function. The client should *not* release the elements of the array, but is
- * still responsible for destroying the array itself.
+ * still responsible for destroyingthe array itself.
  *
  * The InitSym argument indicates whether or not this MaterializationUnit
  * contains static initializers. If three are no static initializers (the common
@@ -783,7 +694,7 @@ LLVMOrcMaterializationResponsibilityGetRequestedSymbols(
  */
 void LLVMOrcDisposeSymbols(LLVMOrcSymbolStringPoolEntryRef *Symbols);
 
-/**
+/*
  * Notifies the target JITDylib that the given symbols have been resolved.
  * This will update the given symbols' addresses in the JITDylib, and notify
  * any pending queries on the given symbols of their resolution. The given
@@ -796,7 +707,7 @@ void LLVMOrcDisposeSymbols(LLVMOrcSymbolStringPoolEntryRef *Symbols);
  * method returns an error then clients should log it and call
  * LLVMOrcMaterializationResponsibilityFailMaterialization. If no dependencies
  * have been registered for the symbols covered by this
- * MaterializationResponsibility then this method is guaranteed to return
+ * MaterializationResponsibiility then this method is guaranteed to return
  * LLVMErrorSuccess.
  */
 LLVMErrorRef LLVMOrcMaterializationResponsibilityNotifyResolved(
@@ -813,7 +724,7 @@ LLVMErrorRef LLVMOrcMaterializationResponsibilityNotifyResolved(
  * method returns an error then clients should log it and call
  * LLVMOrcMaterializationResponsibilityFailMaterialization.
  * If no dependencies have been registered for the symbols covered by this
- * MaterializationResponsibility then this method is guaranteed to return
+ * MaterializationResponsibiility then this method is guaranteed to return
  * LLVMErrorSuccess.
  */
 LLVMErrorRef LLVMOrcMaterializationResponsibilityNotifyEmitted(
@@ -839,7 +750,7 @@ LLVMErrorRef LLVMOrcMaterializationResponsibilityDefineMaterializing(
 /**
  * Notify all not-yet-emitted covered by this MaterializationResponsibility
  * instance that an error has occurred.
- * This will remove all symbols covered by this MaterializationResponsibility
+ * This will remove all symbols covered by this MaterializationResponsibilty
  * from the target JITDylib, and send an error to any queries waiting on
  * these symbols.
  */
@@ -983,27 +894,9 @@ void LLVMOrcJITDylibAddGenerator(LLVMOrcJITDylibRef JD,
 
 /**
  * Create a custom generator.
- *
- * The F argument will be used to implement the DefinitionGenerator's
- * tryToGenerate method (see
- * LLVMOrcCAPIDefinitionGeneratorTryToGenerateFunction).
- *
- * Ctx is a context object that will be passed to F. This argument is
- * permitted to be null.
- *
- * Dispose is the disposal function for Ctx. This argument is permitted to be
- * null (in which case the client is responsible for the lifetime of Ctx).
  */
 LLVMOrcDefinitionGeneratorRef LLVMOrcCreateCustomCAPIDefinitionGenerator(
-    LLVMOrcCAPIDefinitionGeneratorTryToGenerateFunction F, void *Ctx,
-    LLVMOrcDisposeCAPIDefinitionGeneratorFunction Dispose);
-
-/**
- * Continue a lookup that was suspended in a generator (see
- * LLVMOrcCAPIDefinitionGeneratorTryToGenerateFunction).
- */
-void LLVMOrcLookupStateContinueLookup(LLVMOrcLookupStateRef S,
-                                      LLVMErrorRef Err);
+    LLVMOrcCAPIDefinitionGeneratorTryToGenerateFunction F, void *Ctx);
 
 /**
  * Get a DynamicLibrarySearchGenerator that will reflect process symbols into
@@ -1026,49 +919,6 @@ void LLVMOrcLookupStateContinueLookup(LLVMOrcLookupStateRef S,
 LLVMErrorRef LLVMOrcCreateDynamicLibrarySearchGeneratorForProcess(
     LLVMOrcDefinitionGeneratorRef *Result, char GlobalPrefx,
     LLVMOrcSymbolPredicate Filter, void *FilterCtx);
-
-/**
- * Get a LLVMOrcCreateDynamicLibararySearchGeneratorForPath that will reflect
- * library symbols into the JITDylib. On success the resulting generator is
- * owned by the client. Ownership is typically transferred by adding the
- * instance to a JITDylib using LLVMOrcJITDylibAddGenerator,
- *
- * The GlobalPrefix argument specifies the character that appears on the front
- * of linker-mangled symbols for the target platform (e.g. '_' on MachO).
- * If non-null, this character will be stripped from the start of all symbol
- * strings before passing the remaining substring to dlsym.
- *
- * The optional Filter and Ctx arguments can be used to supply a symbol name
- * filter: Only symbols for which the filter returns true will be visible to
- * JIT'd code. If the Filter argument is null then all library symbols will
- * be visible to JIT'd code. Note that the symbol name passed to the Filter
- * function is the full mangled symbol: The client is responsible for stripping
- * the global prefix if present.
- * 
- * THIS API IS EXPERIMENTAL AND LIKELY TO CHANGE IN THE NEAR FUTURE!
- * 
- */
-LLVMErrorRef LLVMOrcCreateDynamicLibrarySearchGeneratorForPath(
-    LLVMOrcDefinitionGeneratorRef *Result, const char *FileName,
-    char GlobalPrefix, LLVMOrcSymbolPredicate Filter, void *FilterCtx);
-
-/**
- * Get a LLVMOrcCreateStaticLibrarySearchGeneratorForPath that will reflect
- * static library symbols into the JITDylib. On success the resulting
- * generator is owned by the client. Ownership is typically transferred by
- * adding the instance to a JITDylib using LLVMOrcJITDylibAddGenerator,
- *
- * Call with the optional TargetTriple argument will succeed if the file at
- * the given path is a static library or a MachO universal binary containing a
- * static library that is compatible with the given triple. Otherwise it will
- * return an error.
- *
- * THIS API IS EXPERIMENTAL AND LIKELY TO CHANGE IN THE NEAR FUTURE!
- * 
- */
-LLVMErrorRef LLVMOrcCreateStaticLibrarySearchGeneratorForPath(
-    LLVMOrcDefinitionGeneratorRef *Result, LLVMOrcObjectLayerRef ObjLayer,
-    const char *FileName, const char *TargetTriple);
 
 /**
  * Create a ThreadSafeContext containing a new LLVMContext.
@@ -1282,10 +1132,6 @@ void LLVMOrcDisposeDumpObjects(LLVMOrcDumpObjectsRef DumpObjects);
  */
 LLVMErrorRef LLVMOrcDumpObjects_CallOperator(LLVMOrcDumpObjectsRef DumpObjects,
                                              LLVMMemoryBufferRef *ObjBuffer);
-
-/**
- * @}
- */
 
 LLVM_C_EXTERN_C_END
 

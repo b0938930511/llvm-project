@@ -79,9 +79,6 @@ private:
 /// list like format, e.g. by prepending with "- " and indentation.
 class BulletList : public Block {
 public:
-  BulletList();
-  ~BulletList();
-
   void renderMarkdown(llvm::raw_ostream &OS) const override;
   void renderPlainText(llvm::raw_ostream &OS) const override;
   std::unique_ptr<Block> clone() const override;

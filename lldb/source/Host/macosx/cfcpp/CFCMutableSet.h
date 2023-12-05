@@ -16,7 +16,7 @@ public:
   // Constructors and Destructors
   CFCMutableSet(CFMutableSetRef s = NULL);
   CFCMutableSet(const CFCMutableSet &rhs);
-  ~CFCMutableSet() override;
+  virtual ~CFCMutableSet();
 
   // Operators
   const CFCMutableSet &operator=(const CFCMutableSet &rhs);

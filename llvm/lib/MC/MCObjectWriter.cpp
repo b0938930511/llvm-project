@@ -7,12 +7,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/MC/MCObjectWriter.h"
+#include "llvm/MC/MCAssembler.h"
 #include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCFragment.h"
 #include "llvm/MC/MCSymbol.h"
-namespace llvm {
-class MCSection;
-}
 
 using namespace llvm;
 
@@ -28,7 +26,9 @@ bool MCObjectWriter::isSymbolRefDifferenceFullyResolved(
 
   const MCSymbol &SA = A->getSymbol();
   const MCSymbol &SB = B->getSymbol();
-  assert(!SA.isUndefined() && !SB.isUndefined());
+  if (SA.isUndefined() || SB.isUndefined())
+    return false;
+
   if (!SA.getFragment() || !SB.getFragment())
     return false;
 

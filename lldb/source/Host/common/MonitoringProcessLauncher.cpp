@@ -10,7 +10,6 @@
 #include "lldb/Host/FileSystem.h"
 #include "lldb/Host/HostProcess.h"
 #include "lldb/Host/ProcessLaunchInfo.h"
-#include "lldb/Utility/LLDBLog.h"
 #include "lldb/Utility/Log.h"
 
 #include "llvm/Support/FileSystem.h"
@@ -51,11 +50,12 @@ MonitoringProcessLauncher::LaunchProcess(const ProcessLaunchInfo &launch_info,
       m_delegate_launcher->LaunchProcess(resolved_info, error);
 
   if (process.GetProcessId() != LLDB_INVALID_PROCESS_ID) {
-    Log *log = GetLog(LLDBLog::Process);
+    Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_PROCESS));
 
     assert(launch_info.GetMonitorProcessCallback());
     llvm::Expected<HostThread> maybe_thread =
-        process.StartMonitoring(launch_info.GetMonitorProcessCallback());
+        process.StartMonitoring(launch_info.GetMonitorProcessCallback(),
+                                launch_info.GetMonitorSignals());
     if (!maybe_thread)
       error.SetErrorStringWithFormatv("failed to launch host thread: {}",
                                       llvm::toString(maybe_thread.takeError()));

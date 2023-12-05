@@ -17,7 +17,7 @@ id foo(int x) {
   return title;
 }
 
-// Static analyzer is wrong: NSWidth(imgRect) not understood as unconditional assignment
+// <rdar://problem/8808566> Static analyzer is wrong: NSWidth(imgRect) not understood as unconditional assignment
 //
 // Note: this requires inlining support.  This previously issued a false positive use of
 // uninitialized value when calling NSWidth.
@@ -52,9 +52,9 @@ static __inline__ __attribute__((always_inline)) CGFloat NSHeight(NSRect aRect) 
     return (aRect.size.height);
 }
 
-NSSize rdar880566_size(void);
+NSSize rdar880566_size();
 
-double rdar8808566(void) {
+double rdar8808566() {
   NSRect myRect;
   myRect.size = rdar880566_size();
   double x = NSWidth(myRect) + NSHeight(myRect); // no-warning

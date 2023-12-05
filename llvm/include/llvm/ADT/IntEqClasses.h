@@ -5,17 +5,16 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-///
-/// \file
-/// Equivalence classes for small integers. This is a mapping of the integers
-/// 0 .. N-1 into M equivalence classes numbered 0 .. M-1.
-///
-/// Initially each integer has its own equivalence class. Classes are joined by
-/// passing a representative member of each class to join().
-///
-/// Once the classes are built, compress() will number them 0 .. M-1 and prevent
-/// further changes.
-///
+//
+// Equivalence classes for small integers. This is a mapping of the integers
+// 0 .. N-1 into M equivalence classes numbered 0 .. M-1.
+//
+// Initially each integer has its own equivalence class. Classes are joined by
+// passing a representative member of each class to join().
+//
+// Once the classes are built, compress() will number them 0 .. M-1 and prevent
+// further changes.
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef LLVM_ADT_INTEQCLASSES_H
@@ -35,11 +34,11 @@ class IntEqClasses {
 
   /// NumClasses - The number of equivalence classes when compressed, or 0 when
   /// uncompressed.
-  unsigned NumClasses = 0;
+  unsigned NumClasses;
 
 public:
   /// IntEqClasses - Create an equivalence class mapping for 0 .. N-1.
-  IntEqClasses(unsigned N = 0) { grow(N); }
+  IntEqClasses(unsigned N = 0) : NumClasses(0) { grow(N); }
 
   /// grow - Increase capacity to hold 0 .. N-1, putting new integers in unique
   /// equivalence classes.

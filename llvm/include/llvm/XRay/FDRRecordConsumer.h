@@ -30,7 +30,7 @@ class LogBuilderConsumer : public RecordConsumer {
 
 public:
   explicit LogBuilderConsumer(std::vector<std::unique_ptr<Record>> &R)
-      : Records(R) {}
+      : RecordConsumer(), Records(R) {}
 
   Error consume(std::unique_ptr<Record> R) override;
 };
@@ -42,7 +42,8 @@ class PipelineConsumer : public RecordConsumer {
   std::vector<RecordVisitor *> Visitors;
 
 public:
-  PipelineConsumer(std::initializer_list<RecordVisitor *> V) : Visitors(V) {}
+  PipelineConsumer(std::initializer_list<RecordVisitor *> V)
+      : RecordConsumer(), Visitors(V) {}
 
   Error consume(std::unique_ptr<Record> R) override;
 };

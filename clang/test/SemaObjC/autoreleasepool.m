@@ -1,6 +1,6 @@
 // RUN: %clang_cc1 -fsyntax-only -verify -Wno-objc-root-class %s
 
-void *objc_autoreleasepool_push(void);
+void *objc_autoreleasepool_push();
 void autoreleasepool_pop(void*);
 
 @interface AUTORP @end

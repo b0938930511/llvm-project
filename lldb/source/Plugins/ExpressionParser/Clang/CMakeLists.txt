@@ -7,10 +7,8 @@ add_lldb_library(lldbPluginExpressionParserClang
   ClangASTSource.cpp
   ClangDeclVendor.cpp
   ClangExpressionDeclMap.cpp
-  ClangExpressionHelper.cpp
   ClangExpressionParser.cpp
   ClangExpressionSourceCode.cpp
-  ClangExpressionUtil.cpp
   ClangExpressionVariable.cpp
   ClangExternalASTSourceCallbacks.cpp
   ClangFunctionCaller.cpp
@@ -40,6 +38,7 @@ add_lldb_library(lldbPluginExpressionParserClang
     lldbPluginCPlusPlusLanguage
     lldbPluginCPPRuntime
     lldbPluginObjCRuntime
+    lldbPluginRenderScriptRuntime
     lldbPluginTypeSystemClang
   CLANG_LIBS
     clangAST
@@ -59,5 +58,4 @@ add_lldb_library(lldbPluginExpressionParserClang
     ipo
     MCJIT
     Support
-    TargetParser
   )

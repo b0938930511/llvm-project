@@ -15,9 +15,9 @@
 #include <type_traits>
 
 // Other libraries and framework includes
+#include "llvm/ADT/Triple.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/Support/MathExtras.h"
-#include "llvm/TargetParser/Triple.h"
 
 #include "lldb/Core/Module.h"
 #include "lldb/Core/PluginManager.h"
@@ -46,7 +46,7 @@
     DEFINE_REG_NAME(dwarf_num), DEFINE_REG_NAME_STR(str_name),                \
     0, 0, eEncodingInvalid, eFormatDefault,                                   \
     { dwarf_num, dwarf_num, generic_num, LLDB_INVALID_REGNUM, dwarf_num },    \
-    nullptr, nullptr, nullptr,                                                \
+    nullptr, nullptr, nullptr, 0                                              \
   }
 
 #define DEFINE_REGISTER_STUB(dwarf_num, str_name) \
@@ -151,10 +151,10 @@ bool ABISysV_arc::IsRegisterFileReduced(RegisterContext &reg_ctx) const {
                                                           /*fail_value*/ 0);
     // RF_BUILD "Number of Entries" bit.
     const uint32_t rf_entries_bit = 1U << 9U;
-    m_is_reg_file_reduced = (reg_value & rf_entries_bit) != 0;
+    m_is_reg_file_reduced = (reg_value | rf_entries_bit) != 0;
   }
 
-  return m_is_reg_file_reduced.value_or(false);
+  return m_is_reg_file_reduced.getValueOr(false);
 }
 
 //------------------------------------------------------------------
@@ -167,15 +167,15 @@ ABISP ABISysV_arc::CreateInstance(ProcessSP process_sp, const ArchSpec &arch) {
       ABISP();
 }
 
-static const size_t word_size = 4U;
-static const size_t reg_size = word_size;
+namespace {
+const size_t word_size = 4U;
+const size_t reg_size = word_size;
 
-static inline size_t AugmentArgSize(size_t size_in_bytes) {
+inline size_t AugmentArgSize(size_t size_in_bytes) {
   return llvm::alignTo(size_in_bytes, word_size);
 }
 
-static size_t
-TotalArgsSizeInWords(const llvm::ArrayRef<ABI::CallArgument> &args) {
+size_t TotalArgsSizeInWords(const llvm::ArrayRef<ABI::CallArgument> &args) {
   size_t total_size = 0;
   for (const auto &arg : args)
     total_size +=
@@ -185,6 +185,7 @@ TotalArgsSizeInWords(const llvm::ArrayRef<ABI::CallArgument> &args) {
 
   return total_size;
 }
+} // namespace
 
 bool ABISysV_arc::PrepareTrivialCall(Thread &thread, addr_t sp,
                                      addr_t func_addr, addr_t return_addr,
@@ -271,7 +272,7 @@ bool ABISysV_arc::PrepareTrivialCall(Thread &thread, addr_t sp, addr_t pc,
         reg_value[byte_index++] = 0;
       }
 
-      RegisterValue reg_val_obj(llvm::ArrayRef(reg_value, reg_size),
+      RegisterValue reg_val_obj(llvm::makeArrayRef(reg_value, reg_size),
                                 eByteOrderLittle);
       if (!reg_ctx->WriteRegister(
             reg_ctx->GetRegisterInfo(eRegisterKindGeneric, reg_index),
@@ -371,8 +372,9 @@ Status ABISysV_arc::SetReturnValueObject(StackFrameSP &frame_sp,
   return result;
 }
 
+namespace {
 template <typename T>
-static void SetInteger(Scalar &scalar, uint64_t raw_value, bool is_signed) {
+void SetInteger(Scalar &scalar, uint64_t raw_value, bool is_signed) {
   raw_value &= std::numeric_limits<T>::max();
   if (is_signed)
     scalar = static_cast<typename std::make_signed<T>::type>(raw_value);
@@ -380,8 +382,8 @@ static void SetInteger(Scalar &scalar, uint64_t raw_value, bool is_signed) {
     scalar = static_cast<T>(raw_value);
 }
 
-static bool SetSizedInteger(Scalar &scalar, uint64_t raw_value,
-                            uint8_t size_in_bytes, bool is_signed) {
+bool SetSizedInteger(Scalar &scalar, uint64_t raw_value, uint8_t size_in_bytes,
+                     bool is_signed) {
   switch (size_in_bytes) {
   default:
     return false;
@@ -406,8 +408,7 @@ static bool SetSizedInteger(Scalar &scalar, uint64_t raw_value,
   return true;
 }
 
-static bool SetSizedFloat(Scalar &scalar, uint64_t raw_value,
-                          uint8_t size_in_bytes) {
+bool SetSizedFloat(Scalar &scalar, uint64_t raw_value, uint8_t size_in_bytes) {
   switch (size_in_bytes) {
   default:
     return false;
@@ -424,8 +425,7 @@ static bool SetSizedFloat(Scalar &scalar, uint64_t raw_value,
   return true;
 }
 
-static uint64_t ReadRawValue(const RegisterContextSP &reg_ctx,
-                             uint8_t size_in_bytes) {
+uint64_t ReadRawValue(const RegisterContextSP &reg_ctx, uint8_t size_in_bytes) {
   auto reg_info_r0 =
       reg_ctx->GetRegisterInfo(eRegisterKindGeneric, LLDB_REGNUM_GENERIC_ARG1);
 
@@ -441,6 +441,7 @@ static uint64_t ReadRawValue(const RegisterContextSP &reg_ctx,
 
   return raw_value;
 }
+} // namespace
 
 ValueObjectSP
 ABISysV_arc::GetReturnValueObjectSimple(Thread &thread,
@@ -458,7 +459,7 @@ ABISysV_arc::GetReturnValueObjectSimple(Thread &thread,
   const uint32_t type_flags = compiler_type.GetTypeInfo();
   // Integer return type.
   if (type_flags & eTypeIsInteger) {
-    const size_t byte_size = compiler_type.GetByteSize(&thread).value_or(0);
+    const size_t byte_size = compiler_type.GetByteSize(&thread).getValueOr(0);
     auto raw_value = ReadRawValue(reg_ctx, byte_size);
 
     const bool is_signed = (type_flags & eTypeIsSigned) != 0;
@@ -482,7 +483,7 @@ ABISysV_arc::GetReturnValueObjectSimple(Thread &thread,
 
     if (compiler_type.IsFloatingPointType(float_count, is_complex) &&
         1 == float_count && !is_complex) {
-      const size_t byte_size = compiler_type.GetByteSize(&thread).value_or(0);
+      const size_t byte_size = compiler_type.GetByteSize(&thread).getValueOr(0);
       auto raw_value = ReadRawValue(reg_ctx, byte_size);
 
       if (!SetSizedFloat(value.GetScalar(), raw_value, byte_size))
@@ -599,3 +600,18 @@ void ABISysV_arc::Initialize() {
 void ABISysV_arc::Terminate() {
   PluginManager::UnregisterPlugin(CreateInstance);
 }
+
+ConstString ABISysV_arc::GetPluginNameStatic() {
+  static ConstString g_name("sysv-arc");
+  return g_name;
+}
+
+//------------------------------------------------------------------
+// PluginInterface protocol
+//------------------------------------------------------------------
+
+ConstString ABISysV_arc::GetPluginName() {
+  return GetPluginNameStatic();
+}
+
+uint32_t ABISysV_arc::GetPluginVersion() { return 1; }

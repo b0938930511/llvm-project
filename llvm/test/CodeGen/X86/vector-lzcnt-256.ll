@@ -16,7 +16,7 @@ define <4 x i64> @testv4i64(<4 x i64> %in) nounwind {
 ; AVX1-NEXT:    vmovdqa {{.*#+}} xmm3 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX1-NEXT:    vpshufb %xmm2, %xmm3, %xmm4
 ; AVX1-NEXT:    vpsrlw $4, %xmm2, %xmm1
-; AVX1-NEXT:    vbroadcastss {{.*#+}} xmm5 = [15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15]
+; AVX1-NEXT:    vmovdqa {{.*#+}} xmm5 = [15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15]
 ; AVX1-NEXT:    vpand %xmm5, %xmm1, %xmm6
 ; AVX1-NEXT:    vpxor %xmm1, %xmm1, %xmm1
 ; AVX1-NEXT:    vpcmpeqb %xmm1, %xmm6, %xmm7
@@ -65,8 +65,7 @@ define <4 x i64> @testv4i64(<4 x i64> %in) nounwind {
 ;
 ; AVX2-LABEL: testv4i64:
 ; AVX2:       # %bb.0:
-; AVX2-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; AVX2-NEXT:    # ymm1 = mem[0,1,0,1]
+; AVX2-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX2-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; AVX2-NEXT:    vpsrlw $4, %ymm0, %ymm3
 ; AVX2-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %ymm3, %ymm3
@@ -94,11 +93,10 @@ define <4 x i64> @testv4i64(<4 x i64> %in) nounwind {
 ;
 ; AVX512VL-LABEL: testv4i64:
 ; AVX512VL:       # %bb.0:
-; AVX512VL-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; AVX512VL-NEXT:    # ymm1 = mem[0,1,0,1]
+; AVX512VL-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX512VL-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; AVX512VL-NEXT:    vpsrlw $4, %ymm0, %ymm3
-; AVX512VL-NEXT:    vpandd {{\.?LCPI[0-9]+_[0-9]+}}(%rip){1to8}, %ymm3, %ymm3
+; AVX512VL-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %ymm3, %ymm3
 ; AVX512VL-NEXT:    vpxor %xmm4, %xmm4, %xmm4
 ; AVX512VL-NEXT:    vpcmpeqb %ymm4, %ymm3, %ymm5
 ; AVX512VL-NEXT:    vpand %ymm5, %ymm2, %ymm2
@@ -123,11 +121,10 @@ define <4 x i64> @testv4i64(<4 x i64> %in) nounwind {
 ;
 ; AVX512VLBWDQ-LABEL: testv4i64:
 ; AVX512VLBWDQ:       # %bb.0:
-; AVX512VLBWDQ-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; AVX512VLBWDQ-NEXT:    # ymm1 = mem[0,1,0,1]
+; AVX512VLBWDQ-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX512VLBWDQ-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; AVX512VLBWDQ-NEXT:    vpsrlw $4, %ymm0, %ymm3
-; AVX512VLBWDQ-NEXT:    vpandd {{\.?LCPI[0-9]+_[0-9]+}}(%rip){1to8}, %ymm3, %ymm3
+; AVX512VLBWDQ-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %ymm3, %ymm3
 ; AVX512VLBWDQ-NEXT:    vpxor %xmm4, %xmm4, %xmm4
 ; AVX512VLBWDQ-NEXT:    vpcmpeqb %ymm4, %ymm3, %ymm5
 ; AVX512VLBWDQ-NEXT:    vpand %ymm5, %ymm2, %ymm2
@@ -164,8 +161,7 @@ define <4 x i64> @testv4i64(<4 x i64> %in) nounwind {
 ;
 ; X32-AVX-LABEL: testv4i64:
 ; X32-AVX:       # %bb.0:
-; X32-AVX-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; X32-AVX-NEXT:    # ymm1 = mem[0,1,0,1]
+; X32-AVX-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; X32-AVX-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; X32-AVX-NEXT:    vpsrlw $4, %ymm0, %ymm3
 ; X32-AVX-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}, %ymm3, %ymm3
@@ -202,7 +198,7 @@ define <4 x i64> @testv4i64u(<4 x i64> %in) nounwind {
 ; AVX1-NEXT:    vmovdqa {{.*#+}} xmm3 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX1-NEXT:    vpshufb %xmm2, %xmm3, %xmm4
 ; AVX1-NEXT:    vpsrlw $4, %xmm2, %xmm1
-; AVX1-NEXT:    vbroadcastss {{.*#+}} xmm5 = [15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15]
+; AVX1-NEXT:    vmovdqa {{.*#+}} xmm5 = [15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15]
 ; AVX1-NEXT:    vpand %xmm5, %xmm1, %xmm6
 ; AVX1-NEXT:    vpxor %xmm1, %xmm1, %xmm1
 ; AVX1-NEXT:    vpcmpeqb %xmm1, %xmm6, %xmm7
@@ -251,8 +247,7 @@ define <4 x i64> @testv4i64u(<4 x i64> %in) nounwind {
 ;
 ; AVX2-LABEL: testv4i64u:
 ; AVX2:       # %bb.0:
-; AVX2-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; AVX2-NEXT:    # ymm1 = mem[0,1,0,1]
+; AVX2-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX2-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; AVX2-NEXT:    vpsrlw $4, %ymm0, %ymm3
 ; AVX2-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %ymm3, %ymm3
@@ -280,11 +275,10 @@ define <4 x i64> @testv4i64u(<4 x i64> %in) nounwind {
 ;
 ; AVX512VL-LABEL: testv4i64u:
 ; AVX512VL:       # %bb.0:
-; AVX512VL-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; AVX512VL-NEXT:    # ymm1 = mem[0,1,0,1]
+; AVX512VL-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX512VL-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; AVX512VL-NEXT:    vpsrlw $4, %ymm0, %ymm3
-; AVX512VL-NEXT:    vpandd {{\.?LCPI[0-9]+_[0-9]+}}(%rip){1to8}, %ymm3, %ymm3
+; AVX512VL-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %ymm3, %ymm3
 ; AVX512VL-NEXT:    vpxor %xmm4, %xmm4, %xmm4
 ; AVX512VL-NEXT:    vpcmpeqb %ymm4, %ymm3, %ymm5
 ; AVX512VL-NEXT:    vpand %ymm5, %ymm2, %ymm2
@@ -309,11 +303,10 @@ define <4 x i64> @testv4i64u(<4 x i64> %in) nounwind {
 ;
 ; AVX512VLBWDQ-LABEL: testv4i64u:
 ; AVX512VLBWDQ:       # %bb.0:
-; AVX512VLBWDQ-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; AVX512VLBWDQ-NEXT:    # ymm1 = mem[0,1,0,1]
+; AVX512VLBWDQ-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX512VLBWDQ-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; AVX512VLBWDQ-NEXT:    vpsrlw $4, %ymm0, %ymm3
-; AVX512VLBWDQ-NEXT:    vpandd {{\.?LCPI[0-9]+_[0-9]+}}(%rip){1to8}, %ymm3, %ymm3
+; AVX512VLBWDQ-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %ymm3, %ymm3
 ; AVX512VLBWDQ-NEXT:    vpxor %xmm4, %xmm4, %xmm4
 ; AVX512VLBWDQ-NEXT:    vpcmpeqb %ymm4, %ymm3, %ymm5
 ; AVX512VLBWDQ-NEXT:    vpand %ymm5, %ymm2, %ymm2
@@ -350,8 +343,7 @@ define <4 x i64> @testv4i64u(<4 x i64> %in) nounwind {
 ;
 ; X32-AVX-LABEL: testv4i64u:
 ; X32-AVX:       # %bb.0:
-; X32-AVX-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; X32-AVX-NEXT:    # ymm1 = mem[0,1,0,1]
+; X32-AVX-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; X32-AVX-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; X32-AVX-NEXT:    vpsrlw $4, %ymm0, %ymm3
 ; X32-AVX-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}, %ymm3, %ymm3
@@ -388,7 +380,7 @@ define <8 x i32> @testv8i32(<8 x i32> %in) nounwind {
 ; AVX1-NEXT:    vmovdqa {{.*#+}} xmm2 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX1-NEXT:    vpshufb %xmm1, %xmm2, %xmm3
 ; AVX1-NEXT:    vpsrlw $4, %xmm1, %xmm4
-; AVX1-NEXT:    vbroadcastss {{.*#+}} xmm5 = [15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15]
+; AVX1-NEXT:    vmovdqa {{.*#+}} xmm5 = [15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15]
 ; AVX1-NEXT:    vpand %xmm5, %xmm4, %xmm4
 ; AVX1-NEXT:    vpxor %xmm6, %xmm6, %xmm6
 ; AVX1-NEXT:    vpcmpeqb %xmm6, %xmm4, %xmm7
@@ -427,8 +419,7 @@ define <8 x i32> @testv8i32(<8 x i32> %in) nounwind {
 ;
 ; AVX2-LABEL: testv8i32:
 ; AVX2:       # %bb.0:
-; AVX2-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; AVX2-NEXT:    # ymm1 = mem[0,1,0,1]
+; AVX2-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX2-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; AVX2-NEXT:    vpsrlw $4, %ymm0, %ymm3
 ; AVX2-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %ymm3, %ymm3
@@ -451,11 +442,10 @@ define <8 x i32> @testv8i32(<8 x i32> %in) nounwind {
 ;
 ; AVX512VL-LABEL: testv8i32:
 ; AVX512VL:       # %bb.0:
-; AVX512VL-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; AVX512VL-NEXT:    # ymm1 = mem[0,1,0,1]
+; AVX512VL-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX512VL-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; AVX512VL-NEXT:    vpsrlw $4, %ymm0, %ymm3
-; AVX512VL-NEXT:    vpandd {{\.?LCPI[0-9]+_[0-9]+}}(%rip){1to8}, %ymm3, %ymm3
+; AVX512VL-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %ymm3, %ymm3
 ; AVX512VL-NEXT:    vpxor %xmm4, %xmm4, %xmm4
 ; AVX512VL-NEXT:    vpcmpeqb %ymm4, %ymm3, %ymm5
 ; AVX512VL-NEXT:    vpand %ymm5, %ymm2, %ymm2
@@ -475,11 +465,10 @@ define <8 x i32> @testv8i32(<8 x i32> %in) nounwind {
 ;
 ; AVX512VLBWDQ-LABEL: testv8i32:
 ; AVX512VLBWDQ:       # %bb.0:
-; AVX512VLBWDQ-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; AVX512VLBWDQ-NEXT:    # ymm1 = mem[0,1,0,1]
+; AVX512VLBWDQ-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX512VLBWDQ-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; AVX512VLBWDQ-NEXT:    vpsrlw $4, %ymm0, %ymm3
-; AVX512VLBWDQ-NEXT:    vpandd {{\.?LCPI[0-9]+_[0-9]+}}(%rip){1to8}, %ymm3, %ymm3
+; AVX512VLBWDQ-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %ymm3, %ymm3
 ; AVX512VLBWDQ-NEXT:    vpxor %xmm4, %xmm4, %xmm4
 ; AVX512VLBWDQ-NEXT:    vpcmpeqb %ymm4, %ymm3, %ymm5
 ; AVX512VLBWDQ-NEXT:    vpand %ymm5, %ymm2, %ymm2
@@ -511,8 +500,7 @@ define <8 x i32> @testv8i32(<8 x i32> %in) nounwind {
 ;
 ; X32-AVX-LABEL: testv8i32:
 ; X32-AVX:       # %bb.0:
-; X32-AVX-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; X32-AVX-NEXT:    # ymm1 = mem[0,1,0,1]
+; X32-AVX-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; X32-AVX-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; X32-AVX-NEXT:    vpsrlw $4, %ymm0, %ymm3
 ; X32-AVX-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}, %ymm3, %ymm3
@@ -544,7 +532,7 @@ define <8 x i32> @testv8i32u(<8 x i32> %in) nounwind {
 ; AVX1-NEXT:    vmovdqa {{.*#+}} xmm2 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX1-NEXT:    vpshufb %xmm1, %xmm2, %xmm3
 ; AVX1-NEXT:    vpsrlw $4, %xmm1, %xmm4
-; AVX1-NEXT:    vbroadcastss {{.*#+}} xmm5 = [15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15]
+; AVX1-NEXT:    vmovdqa {{.*#+}} xmm5 = [15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15]
 ; AVX1-NEXT:    vpand %xmm5, %xmm4, %xmm4
 ; AVX1-NEXT:    vpxor %xmm6, %xmm6, %xmm6
 ; AVX1-NEXT:    vpcmpeqb %xmm6, %xmm4, %xmm7
@@ -583,8 +571,7 @@ define <8 x i32> @testv8i32u(<8 x i32> %in) nounwind {
 ;
 ; AVX2-LABEL: testv8i32u:
 ; AVX2:       # %bb.0:
-; AVX2-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; AVX2-NEXT:    # ymm1 = mem[0,1,0,1]
+; AVX2-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX2-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; AVX2-NEXT:    vpsrlw $4, %ymm0, %ymm3
 ; AVX2-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %ymm3, %ymm3
@@ -607,11 +594,10 @@ define <8 x i32> @testv8i32u(<8 x i32> %in) nounwind {
 ;
 ; AVX512VL-LABEL: testv8i32u:
 ; AVX512VL:       # %bb.0:
-; AVX512VL-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; AVX512VL-NEXT:    # ymm1 = mem[0,1,0,1]
+; AVX512VL-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX512VL-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; AVX512VL-NEXT:    vpsrlw $4, %ymm0, %ymm3
-; AVX512VL-NEXT:    vpandd {{\.?LCPI[0-9]+_[0-9]+}}(%rip){1to8}, %ymm3, %ymm3
+; AVX512VL-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %ymm3, %ymm3
 ; AVX512VL-NEXT:    vpxor %xmm4, %xmm4, %xmm4
 ; AVX512VL-NEXT:    vpcmpeqb %ymm4, %ymm3, %ymm5
 ; AVX512VL-NEXT:    vpand %ymm5, %ymm2, %ymm2
@@ -631,11 +617,10 @@ define <8 x i32> @testv8i32u(<8 x i32> %in) nounwind {
 ;
 ; AVX512VLBWDQ-LABEL: testv8i32u:
 ; AVX512VLBWDQ:       # %bb.0:
-; AVX512VLBWDQ-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; AVX512VLBWDQ-NEXT:    # ymm1 = mem[0,1,0,1]
+; AVX512VLBWDQ-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX512VLBWDQ-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; AVX512VLBWDQ-NEXT:    vpsrlw $4, %ymm0, %ymm3
-; AVX512VLBWDQ-NEXT:    vpandd {{\.?LCPI[0-9]+_[0-9]+}}(%rip){1to8}, %ymm3, %ymm3
+; AVX512VLBWDQ-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %ymm3, %ymm3
 ; AVX512VLBWDQ-NEXT:    vpxor %xmm4, %xmm4, %xmm4
 ; AVX512VLBWDQ-NEXT:    vpcmpeqb %ymm4, %ymm3, %ymm5
 ; AVX512VLBWDQ-NEXT:    vpand %ymm5, %ymm2, %ymm2
@@ -667,8 +652,7 @@ define <8 x i32> @testv8i32u(<8 x i32> %in) nounwind {
 ;
 ; X32-AVX-LABEL: testv8i32u:
 ; X32-AVX:       # %bb.0:
-; X32-AVX-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; X32-AVX-NEXT:    # ymm1 = mem[0,1,0,1]
+; X32-AVX-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; X32-AVX-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; X32-AVX-NEXT:    vpsrlw $4, %ymm0, %ymm3
 ; X32-AVX-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}, %ymm3, %ymm3
@@ -700,7 +684,7 @@ define <16 x i16> @testv16i16(<16 x i16> %in) nounwind {
 ; AVX1-NEXT:    vmovdqa {{.*#+}} xmm2 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX1-NEXT:    vpshufb %xmm1, %xmm2, %xmm3
 ; AVX1-NEXT:    vpsrlw $4, %xmm1, %xmm4
-; AVX1-NEXT:    vbroadcastss {{.*#+}} xmm5 = [15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15]
+; AVX1-NEXT:    vmovdqa {{.*#+}} xmm5 = [15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15]
 ; AVX1-NEXT:    vpand %xmm5, %xmm4, %xmm4
 ; AVX1-NEXT:    vpxor %xmm6, %xmm6, %xmm6
 ; AVX1-NEXT:    vpcmpeqb %xmm6, %xmm4, %xmm7
@@ -729,8 +713,7 @@ define <16 x i16> @testv16i16(<16 x i16> %in) nounwind {
 ;
 ; AVX2-LABEL: testv16i16:
 ; AVX2:       # %bb.0:
-; AVX2-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; AVX2-NEXT:    # ymm1 = mem[0,1,0,1]
+; AVX2-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX2-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; AVX2-NEXT:    vpsrlw $4, %ymm0, %ymm3
 ; AVX2-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %ymm3, %ymm3
@@ -748,11 +731,10 @@ define <16 x i16> @testv16i16(<16 x i16> %in) nounwind {
 ;
 ; AVX512VL-LABEL: testv16i16:
 ; AVX512VL:       # %bb.0:
-; AVX512VL-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; AVX512VL-NEXT:    # ymm1 = mem[0,1,0,1]
+; AVX512VL-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX512VL-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; AVX512VL-NEXT:    vpsrlw $4, %ymm0, %ymm3
-; AVX512VL-NEXT:    vpandd {{\.?LCPI[0-9]+_[0-9]+}}(%rip){1to8}, %ymm3, %ymm3
+; AVX512VL-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %ymm3, %ymm3
 ; AVX512VL-NEXT:    vpxor %xmm4, %xmm4, %xmm4
 ; AVX512VL-NEXT:    vpcmpeqb %ymm4, %ymm3, %ymm5
 ; AVX512VL-NEXT:    vpand %ymm5, %ymm2, %ymm2
@@ -767,11 +749,10 @@ define <16 x i16> @testv16i16(<16 x i16> %in) nounwind {
 ;
 ; AVX512VLBWDQ-LABEL: testv16i16:
 ; AVX512VLBWDQ:       # %bb.0:
-; AVX512VLBWDQ-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; AVX512VLBWDQ-NEXT:    # ymm1 = mem[0,1,0,1]
+; AVX512VLBWDQ-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX512VLBWDQ-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; AVX512VLBWDQ-NEXT:    vpsrlw $4, %ymm0, %ymm3
-; AVX512VLBWDQ-NEXT:    vpandd {{\.?LCPI[0-9]+_[0-9]+}}(%rip){1to8}, %ymm3, %ymm3
+; AVX512VLBWDQ-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %ymm3, %ymm3
 ; AVX512VLBWDQ-NEXT:    vpxor %xmm4, %xmm4, %xmm4
 ; AVX512VLBWDQ-NEXT:    vpcmpeqb %ymm4, %ymm3, %ymm5
 ; AVX512VLBWDQ-NEXT:    vpand %ymm5, %ymm2, %ymm2
@@ -794,8 +775,7 @@ define <16 x i16> @testv16i16(<16 x i16> %in) nounwind {
 ;
 ; X32-AVX-LABEL: testv16i16:
 ; X32-AVX:       # %bb.0:
-; X32-AVX-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; X32-AVX-NEXT:    # ymm1 = mem[0,1,0,1]
+; X32-AVX-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; X32-AVX-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; X32-AVX-NEXT:    vpsrlw $4, %ymm0, %ymm3
 ; X32-AVX-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}, %ymm3, %ymm3
@@ -821,7 +801,7 @@ define <16 x i16> @testv16i16u(<16 x i16> %in) nounwind {
 ; AVX1-NEXT:    vmovdqa {{.*#+}} xmm2 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX1-NEXT:    vpshufb %xmm1, %xmm2, %xmm3
 ; AVX1-NEXT:    vpsrlw $4, %xmm1, %xmm4
-; AVX1-NEXT:    vbroadcastss {{.*#+}} xmm5 = [15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15]
+; AVX1-NEXT:    vmovdqa {{.*#+}} xmm5 = [15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15]
 ; AVX1-NEXT:    vpand %xmm5, %xmm4, %xmm4
 ; AVX1-NEXT:    vpxor %xmm6, %xmm6, %xmm6
 ; AVX1-NEXT:    vpcmpeqb %xmm6, %xmm4, %xmm7
@@ -850,8 +830,7 @@ define <16 x i16> @testv16i16u(<16 x i16> %in) nounwind {
 ;
 ; AVX2-LABEL: testv16i16u:
 ; AVX2:       # %bb.0:
-; AVX2-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; AVX2-NEXT:    # ymm1 = mem[0,1,0,1]
+; AVX2-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX2-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; AVX2-NEXT:    vpsrlw $4, %ymm0, %ymm3
 ; AVX2-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %ymm3, %ymm3
@@ -869,11 +848,10 @@ define <16 x i16> @testv16i16u(<16 x i16> %in) nounwind {
 ;
 ; AVX512VL-LABEL: testv16i16u:
 ; AVX512VL:       # %bb.0:
-; AVX512VL-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; AVX512VL-NEXT:    # ymm1 = mem[0,1,0,1]
+; AVX512VL-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX512VL-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; AVX512VL-NEXT:    vpsrlw $4, %ymm0, %ymm3
-; AVX512VL-NEXT:    vpandd {{\.?LCPI[0-9]+_[0-9]+}}(%rip){1to8}, %ymm3, %ymm3
+; AVX512VL-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %ymm3, %ymm3
 ; AVX512VL-NEXT:    vpxor %xmm4, %xmm4, %xmm4
 ; AVX512VL-NEXT:    vpcmpeqb %ymm4, %ymm3, %ymm5
 ; AVX512VL-NEXT:    vpand %ymm5, %ymm2, %ymm2
@@ -888,11 +866,10 @@ define <16 x i16> @testv16i16u(<16 x i16> %in) nounwind {
 ;
 ; AVX512VLBWDQ-LABEL: testv16i16u:
 ; AVX512VLBWDQ:       # %bb.0:
-; AVX512VLBWDQ-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; AVX512VLBWDQ-NEXT:    # ymm1 = mem[0,1,0,1]
+; AVX512VLBWDQ-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX512VLBWDQ-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; AVX512VLBWDQ-NEXT:    vpsrlw $4, %ymm0, %ymm3
-; AVX512VLBWDQ-NEXT:    vpandd {{\.?LCPI[0-9]+_[0-9]+}}(%rip){1to8}, %ymm3, %ymm3
+; AVX512VLBWDQ-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %ymm3, %ymm3
 ; AVX512VLBWDQ-NEXT:    vpxor %xmm4, %xmm4, %xmm4
 ; AVX512VLBWDQ-NEXT:    vpcmpeqb %ymm4, %ymm3, %ymm5
 ; AVX512VLBWDQ-NEXT:    vpand %ymm5, %ymm2, %ymm2
@@ -915,8 +892,7 @@ define <16 x i16> @testv16i16u(<16 x i16> %in) nounwind {
 ;
 ; X32-AVX-LABEL: testv16i16u:
 ; X32-AVX:       # %bb.0:
-; X32-AVX-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; X32-AVX-NEXT:    # ymm1 = mem[0,1,0,1]
+; X32-AVX-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; X32-AVX-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; X32-AVX-NEXT:    vpsrlw $4, %ymm0, %ymm3
 ; X32-AVX-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}, %ymm3, %ymm3
@@ -942,7 +918,7 @@ define <32 x i8> @testv32i8(<32 x i8> %in) nounwind {
 ; AVX1-NEXT:    vmovdqa {{.*#+}} xmm2 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX1-NEXT:    vpshufb %xmm1, %xmm2, %xmm3
 ; AVX1-NEXT:    vpsrlw $4, %xmm1, %xmm1
-; AVX1-NEXT:    vbroadcastss {{.*#+}} xmm4 = [15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15]
+; AVX1-NEXT:    vmovdqa {{.*#+}} xmm4 = [15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15]
 ; AVX1-NEXT:    vpand %xmm4, %xmm1, %xmm1
 ; AVX1-NEXT:    vpxor %xmm5, %xmm5, %xmm5
 ; AVX1-NEXT:    vpcmpeqb %xmm5, %xmm1, %xmm6
@@ -961,8 +937,7 @@ define <32 x i8> @testv32i8(<32 x i8> %in) nounwind {
 ;
 ; AVX2-LABEL: testv32i8:
 ; AVX2:       # %bb.0:
-; AVX2-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; AVX2-NEXT:    # ymm1 = mem[0,1,0,1]
+; AVX2-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX2-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; AVX2-NEXT:    vpsrlw $4, %ymm0, %ymm0
 ; AVX2-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %ymm0, %ymm0
@@ -975,11 +950,10 @@ define <32 x i8> @testv32i8(<32 x i8> %in) nounwind {
 ;
 ; AVX512VL-LABEL: testv32i8:
 ; AVX512VL:       # %bb.0:
-; AVX512VL-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; AVX512VL-NEXT:    # ymm1 = mem[0,1,0,1]
+; AVX512VL-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX512VL-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; AVX512VL-NEXT:    vpsrlw $4, %ymm0, %ymm0
-; AVX512VL-NEXT:    vpandd {{\.?LCPI[0-9]+_[0-9]+}}(%rip){1to8}, %ymm0, %ymm0
+; AVX512VL-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %ymm0, %ymm0
 ; AVX512VL-NEXT:    vpxor %xmm3, %xmm3, %xmm3
 ; AVX512VL-NEXT:    vpcmpeqb %ymm3, %ymm0, %ymm3
 ; AVX512VL-NEXT:    vpand %ymm3, %ymm2, %ymm2
@@ -989,11 +963,10 @@ define <32 x i8> @testv32i8(<32 x i8> %in) nounwind {
 ;
 ; AVX512VLBWDQ-LABEL: testv32i8:
 ; AVX512VLBWDQ:       # %bb.0:
-; AVX512VLBWDQ-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; AVX512VLBWDQ-NEXT:    # ymm1 = mem[0,1,0,1]
+; AVX512VLBWDQ-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX512VLBWDQ-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; AVX512VLBWDQ-NEXT:    vpsrlw $4, %ymm0, %ymm0
-; AVX512VLBWDQ-NEXT:    vpandd {{\.?LCPI[0-9]+_[0-9]+}}(%rip){1to8}, %ymm0, %ymm0
+; AVX512VLBWDQ-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %ymm0, %ymm0
 ; AVX512VLBWDQ-NEXT:    vpxor %xmm3, %xmm3, %xmm3
 ; AVX512VLBWDQ-NEXT:    vpcmpeqb %ymm3, %ymm0, %ymm3
 ; AVX512VLBWDQ-NEXT:    vpand %ymm3, %ymm2, %ymm2
@@ -1003,21 +976,22 @@ define <32 x i8> @testv32i8(<32 x i8> %in) nounwind {
 ;
 ; AVX512-LABEL: testv32i8:
 ; AVX512:       # %bb.0:
-; AVX512-NEXT:    vpmovzxbd {{.*#+}} zmm1 = xmm0[0],zero,zero,zero,xmm0[1],zero,zero,zero,xmm0[2],zero,zero,zero,xmm0[3],zero,zero,zero,xmm0[4],zero,zero,zero,xmm0[5],zero,zero,zero,xmm0[6],zero,zero,zero,xmm0[7],zero,zero,zero,xmm0[8],zero,zero,zero,xmm0[9],zero,zero,zero,xmm0[10],zero,zero,zero,xmm0[11],zero,zero,zero,xmm0[12],zero,zero,zero,xmm0[13],zero,zero,zero,xmm0[14],zero,zero,zero,xmm0[15],zero,zero,zero
+; AVX512-NEXT:    vextracti128 $1, %ymm0, %xmm1
+; AVX512-NEXT:    vpmovzxbd {{.*#+}} zmm1 = xmm1[0],zero,zero,zero,xmm1[1],zero,zero,zero,xmm1[2],zero,zero,zero,xmm1[3],zero,zero,zero,xmm1[4],zero,zero,zero,xmm1[5],zero,zero,zero,xmm1[6],zero,zero,zero,xmm1[7],zero,zero,zero,xmm1[8],zero,zero,zero,xmm1[9],zero,zero,zero,xmm1[10],zero,zero,zero,xmm1[11],zero,zero,zero,xmm1[12],zero,zero,zero,xmm1[13],zero,zero,zero,xmm1[14],zero,zero,zero,xmm1[15],zero,zero,zero
 ; AVX512-NEXT:    vplzcntd %zmm1, %zmm1
 ; AVX512-NEXT:    vpmovdb %zmm1, %xmm1
-; AVX512-NEXT:    vextracti128 $1, %ymm0, %xmm0
+; AVX512-NEXT:    vmovdqa {{.*#+}} xmm2 = [24,24,24,24,24,24,24,24,24,24,24,24,24,24,24,24]
+; AVX512-NEXT:    vpsubb %xmm2, %xmm1, %xmm1
 ; AVX512-NEXT:    vpmovzxbd {{.*#+}} zmm0 = xmm0[0],zero,zero,zero,xmm0[1],zero,zero,zero,xmm0[2],zero,zero,zero,xmm0[3],zero,zero,zero,xmm0[4],zero,zero,zero,xmm0[5],zero,zero,zero,xmm0[6],zero,zero,zero,xmm0[7],zero,zero,zero,xmm0[8],zero,zero,zero,xmm0[9],zero,zero,zero,xmm0[10],zero,zero,zero,xmm0[11],zero,zero,zero,xmm0[12],zero,zero,zero,xmm0[13],zero,zero,zero,xmm0[14],zero,zero,zero,xmm0[15],zero,zero,zero
 ; AVX512-NEXT:    vplzcntd %zmm0, %zmm0
 ; AVX512-NEXT:    vpmovdb %zmm0, %xmm0
-; AVX512-NEXT:    vinserti128 $1, %xmm0, %ymm1, %ymm0
-; AVX512-NEXT:    vpsubb {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %ymm0, %ymm0
+; AVX512-NEXT:    vpsubb %xmm2, %xmm0, %xmm0
+; AVX512-NEXT:    vinserti128 $1, %xmm1, %ymm0, %ymm0
 ; AVX512-NEXT:    retq
 ;
 ; X32-AVX-LABEL: testv32i8:
 ; X32-AVX:       # %bb.0:
-; X32-AVX-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; X32-AVX-NEXT:    # ymm1 = mem[0,1,0,1]
+; X32-AVX-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; X32-AVX-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; X32-AVX-NEXT:    vpsrlw $4, %ymm0, %ymm0
 ; X32-AVX-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}, %ymm0, %ymm0
@@ -1038,7 +1012,7 @@ define <32 x i8> @testv32i8u(<32 x i8> %in) nounwind {
 ; AVX1-NEXT:    vmovdqa {{.*#+}} xmm2 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX1-NEXT:    vpshufb %xmm1, %xmm2, %xmm3
 ; AVX1-NEXT:    vpsrlw $4, %xmm1, %xmm1
-; AVX1-NEXT:    vbroadcastss {{.*#+}} xmm4 = [15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15]
+; AVX1-NEXT:    vmovdqa {{.*#+}} xmm4 = [15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15]
 ; AVX1-NEXT:    vpand %xmm4, %xmm1, %xmm1
 ; AVX1-NEXT:    vpxor %xmm5, %xmm5, %xmm5
 ; AVX1-NEXT:    vpcmpeqb %xmm5, %xmm1, %xmm6
@@ -1057,8 +1031,7 @@ define <32 x i8> @testv32i8u(<32 x i8> %in) nounwind {
 ;
 ; AVX2-LABEL: testv32i8u:
 ; AVX2:       # %bb.0:
-; AVX2-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; AVX2-NEXT:    # ymm1 = mem[0,1,0,1]
+; AVX2-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX2-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; AVX2-NEXT:    vpsrlw $4, %ymm0, %ymm0
 ; AVX2-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %ymm0, %ymm0
@@ -1071,11 +1044,10 @@ define <32 x i8> @testv32i8u(<32 x i8> %in) nounwind {
 ;
 ; AVX512VL-LABEL: testv32i8u:
 ; AVX512VL:       # %bb.0:
-; AVX512VL-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; AVX512VL-NEXT:    # ymm1 = mem[0,1,0,1]
+; AVX512VL-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX512VL-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; AVX512VL-NEXT:    vpsrlw $4, %ymm0, %ymm0
-; AVX512VL-NEXT:    vpandd {{\.?LCPI[0-9]+_[0-9]+}}(%rip){1to8}, %ymm0, %ymm0
+; AVX512VL-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %ymm0, %ymm0
 ; AVX512VL-NEXT:    vpxor %xmm3, %xmm3, %xmm3
 ; AVX512VL-NEXT:    vpcmpeqb %ymm3, %ymm0, %ymm3
 ; AVX512VL-NEXT:    vpand %ymm3, %ymm2, %ymm2
@@ -1085,11 +1057,10 @@ define <32 x i8> @testv32i8u(<32 x i8> %in) nounwind {
 ;
 ; AVX512VLBWDQ-LABEL: testv32i8u:
 ; AVX512VLBWDQ:       # %bb.0:
-; AVX512VLBWDQ-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; AVX512VLBWDQ-NEXT:    # ymm1 = mem[0,1,0,1]
+; AVX512VLBWDQ-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; AVX512VLBWDQ-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; AVX512VLBWDQ-NEXT:    vpsrlw $4, %ymm0, %ymm0
-; AVX512VLBWDQ-NEXT:    vpandd {{\.?LCPI[0-9]+_[0-9]+}}(%rip){1to8}, %ymm0, %ymm0
+; AVX512VLBWDQ-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %ymm0, %ymm0
 ; AVX512VLBWDQ-NEXT:    vpxor %xmm3, %xmm3, %xmm3
 ; AVX512VLBWDQ-NEXT:    vpcmpeqb %ymm3, %ymm0, %ymm3
 ; AVX512VLBWDQ-NEXT:    vpand %ymm3, %ymm2, %ymm2
@@ -1099,21 +1070,22 @@ define <32 x i8> @testv32i8u(<32 x i8> %in) nounwind {
 ;
 ; AVX512-LABEL: testv32i8u:
 ; AVX512:       # %bb.0:
-; AVX512-NEXT:    vpmovzxbd {{.*#+}} zmm1 = xmm0[0],zero,zero,zero,xmm0[1],zero,zero,zero,xmm0[2],zero,zero,zero,xmm0[3],zero,zero,zero,xmm0[4],zero,zero,zero,xmm0[5],zero,zero,zero,xmm0[6],zero,zero,zero,xmm0[7],zero,zero,zero,xmm0[8],zero,zero,zero,xmm0[9],zero,zero,zero,xmm0[10],zero,zero,zero,xmm0[11],zero,zero,zero,xmm0[12],zero,zero,zero,xmm0[13],zero,zero,zero,xmm0[14],zero,zero,zero,xmm0[15],zero,zero,zero
+; AVX512-NEXT:    vextracti128 $1, %ymm0, %xmm1
+; AVX512-NEXT:    vpmovzxbd {{.*#+}} zmm1 = xmm1[0],zero,zero,zero,xmm1[1],zero,zero,zero,xmm1[2],zero,zero,zero,xmm1[3],zero,zero,zero,xmm1[4],zero,zero,zero,xmm1[5],zero,zero,zero,xmm1[6],zero,zero,zero,xmm1[7],zero,zero,zero,xmm1[8],zero,zero,zero,xmm1[9],zero,zero,zero,xmm1[10],zero,zero,zero,xmm1[11],zero,zero,zero,xmm1[12],zero,zero,zero,xmm1[13],zero,zero,zero,xmm1[14],zero,zero,zero,xmm1[15],zero,zero,zero
 ; AVX512-NEXT:    vplzcntd %zmm1, %zmm1
 ; AVX512-NEXT:    vpmovdb %zmm1, %xmm1
-; AVX512-NEXT:    vextracti128 $1, %ymm0, %xmm0
+; AVX512-NEXT:    vmovdqa {{.*#+}} xmm2 = [24,24,24,24,24,24,24,24,24,24,24,24,24,24,24,24]
+; AVX512-NEXT:    vpsubb %xmm2, %xmm1, %xmm1
 ; AVX512-NEXT:    vpmovzxbd {{.*#+}} zmm0 = xmm0[0],zero,zero,zero,xmm0[1],zero,zero,zero,xmm0[2],zero,zero,zero,xmm0[3],zero,zero,zero,xmm0[4],zero,zero,zero,xmm0[5],zero,zero,zero,xmm0[6],zero,zero,zero,xmm0[7],zero,zero,zero,xmm0[8],zero,zero,zero,xmm0[9],zero,zero,zero,xmm0[10],zero,zero,zero,xmm0[11],zero,zero,zero,xmm0[12],zero,zero,zero,xmm0[13],zero,zero,zero,xmm0[14],zero,zero,zero,xmm0[15],zero,zero,zero
 ; AVX512-NEXT:    vplzcntd %zmm0, %zmm0
 ; AVX512-NEXT:    vpmovdb %zmm0, %xmm0
-; AVX512-NEXT:    vinserti128 $1, %xmm0, %ymm1, %ymm0
-; AVX512-NEXT:    vpsubb {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %ymm0, %ymm0
+; AVX512-NEXT:    vpsubb %xmm2, %xmm0, %xmm0
+; AVX512-NEXT:    vinserti128 $1, %xmm1, %ymm0, %ymm0
 ; AVX512-NEXT:    retq
 ;
 ; X32-AVX-LABEL: testv32i8u:
 ; X32-AVX:       # %bb.0:
-; X32-AVX-NEXT:    vbroadcasti128 {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
-; X32-AVX-NEXT:    # ymm1 = mem[0,1,0,1]
+; X32-AVX-NEXT:    vmovdqa {{.*#+}} ymm1 = [4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0]
 ; X32-AVX-NEXT:    vpshufb %ymm0, %ymm1, %ymm2
 ; X32-AVX-NEXT:    vpsrlw $4, %ymm0, %ymm0
 ; X32-AVX-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}, %ymm0, %ymm0

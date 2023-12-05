@@ -8,29 +8,29 @@
 
 #include "ILogbTest.h"
 
-#include "src/__support/FPUtil/FPBits.h"
-#include "src/__support/FPUtil/ManipulationFunctions.h"
 #include "src/math/ilogbf.h"
-#include "test/UnitTest/FPMatcher.h"
-#include "test/UnitTest/Test.h"
+#include "utils/FPUtil/FPBits.h"
+#include "utils/FPUtil/ManipulationFunctions.h"
+#include "utils/FPUtil/TestHelpers.h"
+#include "utils/UnitTest/Test.h"
 #include <math.h>
 
 TEST_F(LlvmLibcILogbTest, SpecialNumbers_ilogbf) {
-  test_special_numbers<float>(&LIBC_NAMESPACE::ilogbf);
+  testSpecialNumbers<float>(&__llvm_libc::ilogbf);
 }
 
 TEST_F(LlvmLibcILogbTest, PowersOfTwo_ilogbf) {
-  test_powers_of_two<float>(&LIBC_NAMESPACE::ilogbf);
+  testPowersOfTwo<float>(&__llvm_libc::ilogbf);
 }
 
 TEST_F(LlvmLibcILogbTest, SomeIntegers_ilogbf) {
-  test_some_integers<float>(&LIBC_NAMESPACE::ilogbf);
+  testSomeIntegers<float>(&__llvm_libc::ilogbf);
 }
 
 TEST_F(LlvmLibcILogbTest, SubnormalRange_ilogbf) {
-  test_subnormal_range<float>(&LIBC_NAMESPACE::ilogbf);
+  testSubnormalRange<float>(&__llvm_libc::ilogbf);
 }
 
 TEST_F(LlvmLibcILogbTest, NormalRange_ilogbf) {
-  test_normal_range<float>(&LIBC_NAMESPACE::ilogbf);
+  testNormalRange<float>(&__llvm_libc::ilogbf);
 }

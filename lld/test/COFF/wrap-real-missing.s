@@ -6,7 +6,7 @@
 // Check that we error out properly with an undefined symbol, if
 // __real_foo is referenced and missing, even if the -lldmingw flag is set
 // (which otherwise tolerates certain cases of references to missing
-// sections, to tolerate certain GCC peculiarities).
+// sections, to tolerate certain GCC pecularities).
 
 // CHECK: error: undefined symbol: foo
 

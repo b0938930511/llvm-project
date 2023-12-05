@@ -21,7 +21,7 @@
 
 int a;
 
-void f(void) {
+void f() {
   a = 12345;
 }
 

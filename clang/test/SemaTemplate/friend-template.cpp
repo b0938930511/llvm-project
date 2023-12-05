@@ -329,12 +329,3 @@ namespace rdar12350696 {
     foo(b); // expected-note {{in instantiation}}
   }
 }
-
-namespace StackUseAfterScope {
-template <typename T> class Bar {};
-class Foo {
-  // Make sure this doesn't crash.
-  template <> friend class Bar<int>; // expected-error {{template specialization declaration cannot be a friend}}
-  bool aux;
-};
-}

@@ -13,7 +13,6 @@
 #ifndef LLVM_LIB_TARGET_X86_X86FRAMELOWERING_H
 #define LLVM_LIB_TARGET_X86_X86FRAMELOWERING_H
 
-#include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/TargetFrameLowering.h"
 #include "llvm/Support/TypeSize.h"
 
@@ -52,22 +51,17 @@ public:
   /// Emit target stack probe code. This is required for all
   /// large stack allocations on Windows. The caller is required to materialize
   /// the number of bytes to probe in RAX/EAX.
-  /// \p InstrNum optionally contains a debug-info instruction number for the
-  ///    new stack pointer.
   void emitStackProbe(MachineFunction &MF, MachineBasicBlock &MBB,
                       MachineBasicBlock::iterator MBBI, const DebugLoc &DL,
-                      bool InProlog,
-                      std::optional<MachineFunction::DebugInstrOperandPair>
-                          InstrNum = std::nullopt) const;
-
-  bool stackProbeFunctionModifiesSP() const override;
+                      bool InProlog) const;
 
   /// Replace a StackProbe inline-stub with the actual probe code inline.
   void inlineStackProbe(MachineFunction &MF,
                         MachineBasicBlock &PrologMBB) const override;
 
-  void emitCalleeSavedFrameMovesFullCFA(
-      MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI) const override;
+  void
+  emitCalleeSavedFrameMoves(MachineBasicBlock &MBB,
+                            MachineBasicBlock::iterator MBBI) const override;
 
   void emitCalleeSavedFrameMoves(MachineBasicBlock &MBB,
                                  MachineBasicBlock::iterator MBBI,
@@ -177,8 +171,7 @@ public:
 
   /// Wraps up getting a CFI index and building a MachineInstr for it.
   void BuildCFI(MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI,
-                const DebugLoc &DL, const MCCFIInstruction &CFIInst,
-                MachineInstr::MIFlag Flag = MachineInstr::NoFlags) const;
+                const DebugLoc &DL, const MCCFIInstruction &CFIInst) const;
 
   /// Sets up EBP and optionally ESI based on the incoming EBP value.  Only
   /// needed for 32-bit. Used in funclet prologues and at catchret destinations.
@@ -193,8 +186,6 @@ public:
 
   Register getInitialCFARegister(const MachineFunction &MF) const override;
 
-  DwarfFrameBase getDwarfFrameBase(const MachineFunction &MF) const override;
-
   /// Return true if the function has a redzone (accessible bytes past the
   /// frame of the top of stack function) as part of it's ABI.
   bool has128ByteRedZone(const MachineFunction& MF) const;
@@ -207,10 +198,9 @@ private:
   uint64_t calculateMaxStackAlign(const MachineFunction &MF) const;
 
   /// Emit target stack probe as a call to a helper function
-  void emitStackProbeCall(
-      MachineFunction &MF, MachineBasicBlock &MBB,
-      MachineBasicBlock::iterator MBBI, const DebugLoc &DL, bool InProlog,
-      std::optional<MachineFunction::DebugInstrOperandPair> InstrNum) const;
+  void emitStackProbeCall(MachineFunction &MF, MachineBasicBlock &MBB,
+                          MachineBasicBlock::iterator MBBI, const DebugLoc &DL,
+                          bool InProlog) const;
 
   /// Emit target stack probe as an inline sequence.
   void emitStackProbeInline(MachineFunction &MF, MachineBasicBlock &MBB,
@@ -236,10 +226,6 @@ private:
                                        MachineBasicBlock::iterator MBBI,
                                        const DebugLoc &DL, uint64_t Offset,
                                        uint64_t Align) const;
-
-  /// Emit target zero call-used regs.
-  void emitZeroCallUsedRegs(BitVector RegsToZero,
-                            MachineBasicBlock &MBB) const override;
 
   void adjustFrameForMsvcCxxEh(MachineFunction &MF) const;
 

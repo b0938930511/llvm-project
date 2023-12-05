@@ -22,6 +22,7 @@
 
 namespace clang {
 
+class ASTContext;
 class Attr;
 
 /// AttrVec - A vector of Attr, which is how they are stored on the AST.

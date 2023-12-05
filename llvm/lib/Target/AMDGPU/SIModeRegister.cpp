@@ -17,7 +17,6 @@
 #include "GCNSubtarget.h"
 #include "MCTargetDesc/AMDGPUMCTargetDesc.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/CodeGen/MachineFunctionPass.h"
 #include <queue>
 
 #define DEBUG_TYPE "si-mode-register"
@@ -29,10 +28,10 @@ using namespace llvm;
 struct Status {
   // Mask is a bitmask where a '1' indicates the corresponding Mode bit has a
   // known value
-  unsigned Mask = 0;
-  unsigned Mode = 0;
+  unsigned Mask;
+  unsigned Mode;
 
-  Status() = default;
+  Status() : Mask(0), Mode(0){};
 
   Status(unsigned NewMask, unsigned NewMode) : Mask(NewMask), Mode(NewMode) {
     Mode &= Mask;
@@ -96,13 +95,13 @@ public:
 
   // In Phase 1 we record the first instruction that has a mode requirement,
   // which is used in Phase 3 if we need to insert a mode change.
-  MachineInstr *FirstInsertionPoint = nullptr;
+  MachineInstr *FirstInsertionPoint;
 
   // A flag to indicate whether an Exit value has been set (we can't tell by
   // examining the Exit value itself as all values may be valid results).
-  bool ExitSet = false;
+  bool ExitSet;
 
-  BlockData() = default;
+  BlockData() : FirstInsertionPoint(nullptr), ExitSet(false){};
 };
 
 namespace {
@@ -163,9 +162,7 @@ FunctionPass *llvm::createSIModeRegisterPass() { return new SIModeRegister(); }
 // double precision setting.
 Status SIModeRegister::getInstructionMode(MachineInstr &MI,
                                           const SIInstrInfo *TII) {
-  if (TII->usesFPDPRounding(MI) ||
-      MI.getOpcode() == AMDGPU::FPTRUNC_UPWARD_PSEUDO ||
-      MI.getOpcode() == AMDGPU::FPTRUNC_DOWNWARD_PSEUDO) {
+  if (TII->usesFPDPRounding(MI)) {
     switch (MI.getOpcode()) {
     case AMDGPU::V_INTERP_P1LL_F16:
     case AMDGPU::V_INTERP_P1LV_F16:
@@ -173,40 +170,6 @@ Status SIModeRegister::getInstructionMode(MachineInstr &MI,
       // f16 interpolation instructions need double precision round to zero
       return Status(FP_ROUND_MODE_DP(3),
                     FP_ROUND_MODE_DP(FP_ROUND_ROUND_TO_ZERO));
-    case AMDGPU::FPTRUNC_UPWARD_PSEUDO: {
-      // Replacing the pseudo by a real instruction in place
-      if (TII->getSubtarget().hasTrue16BitInsts()) {
-        MachineBasicBlock &MBB = *MI.getParent();
-        MachineInstrBuilder B(*MBB.getParent(), MI);
-        MI.setDesc(TII->get(AMDGPU::V_CVT_F16_F32_t16_e64));
-        MachineOperand Src0 = MI.getOperand(1);
-        MI.removeOperand(1);
-        B.addImm(0); // src0_modifiers
-        B.add(Src0); // re-add src0 operand
-        B.addImm(0); // clamp
-        B.addImm(0); // omod
-      } else
-        MI.setDesc(TII->get(AMDGPU::V_CVT_F16_F32_e32));
-      return Status(FP_ROUND_MODE_DP(3),
-                    FP_ROUND_MODE_DP(FP_ROUND_ROUND_TO_INF));
-    }
-    case AMDGPU::FPTRUNC_DOWNWARD_PSEUDO: {
-      // Replacing the pseudo by a real instruction in place
-      if (TII->getSubtarget().hasTrue16BitInsts()) {
-        MachineBasicBlock &MBB = *MI.getParent();
-        MachineInstrBuilder B(*MBB.getParent(), MI);
-        MI.setDesc(TII->get(AMDGPU::V_CVT_F16_F32_t16_e64));
-        MachineOperand Src0 = MI.getOperand(1);
-        MI.removeOperand(1);
-        B.addImm(0); // src0_modifiers
-        B.add(Src0); // re-add src0 operand
-        B.addImm(0); // clamp
-        B.addImm(0); // omod
-      } else
-        MI.setDesc(TII->get(AMDGPU::V_CVT_F16_F32_e32));
-      return Status(FP_ROUND_MODE_DP(3),
-                    FP_ROUND_MODE_DP(FP_ROUND_ROUND_TO_NEGINF));
-    }
     default:
       return DefaultStatus;
     }
@@ -222,10 +185,10 @@ Status SIModeRegister::getInstructionMode(MachineInstr &MI,
 void SIModeRegister::insertSetreg(MachineBasicBlock &MBB, MachineInstr *MI,
                                   const SIInstrInfo *TII, Status InstrMode) {
   while (InstrMode.Mask) {
-    unsigned Offset = llvm::countr_zero<unsigned>(InstrMode.Mask);
-    unsigned Width = llvm::countr_one<unsigned>(InstrMode.Mask >> Offset);
+    unsigned Offset = countTrailingZeros<unsigned>(InstrMode.Mask);
+    unsigned Width = countTrailingOnes<unsigned>(InstrMode.Mask >> Offset);
     unsigned Value = (InstrMode.Mode >> Offset) & ((1 << Width) - 1);
-    BuildMI(MBB, MI, nullptr, TII->get(AMDGPU::S_SETREG_IMM32_B32))
+    BuildMI(MBB, MI, 0, TII->get(AMDGPU::S_SETREG_IMM32_B32))
         .addImm(Value)
         .addImm(((Width - 1) << AMDGPU::Hwreg::WIDTH_M1_SHIFT_) |
                 (Offset << AMDGPU::Hwreg::OFFSET_SHIFT_) |
@@ -262,7 +225,7 @@ void SIModeRegister::processBlockPhase1(MachineBasicBlock &MBB,
   // RequirePending is used to indicate whether we are collecting the initial
   // requirements for the block, and need to defer the first InsertionPoint to
   // Phase 3. It is set to false once we have set FirstInsertionPoint, or when
-  // we discover an explicit setreg that means this block doesn't have any
+  // we discover an explict setreg that means this block doesn't have any
   // initial requirements.
   bool RequirePending = true;
   Status IPChange;
@@ -410,8 +373,12 @@ void SIModeRegister::processBlockPhase2(MachineBasicBlock &MBB,
     BlockInfo[ThisBlock]->Exit = TmpStatus;
     // Add the successors to the work list so we can propagate the changed exit
     // status.
-    for (MachineBasicBlock *Succ : MBB.successors())
-      Phase2List.push(Succ);
+    for (MachineBasicBlock::succ_iterator S = MBB.succ_begin(),
+                                          E = MBB.succ_end();
+         S != E; S = std::next(S)) {
+      MachineBasicBlock &B = *(*S);
+      Phase2List.push(&B);
+    }
   }
   BlockInfo[ThisBlock]->ExitSet = ExitSet;
   if (RevisitRequired)

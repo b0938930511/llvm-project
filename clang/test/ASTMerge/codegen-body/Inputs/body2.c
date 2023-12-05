@@ -1,4 +1,4 @@
-__inline__ __attribute__ ((always_inline)) int f(void)
+__inline__ __attribute__ ((always_inline)) int f()
 {
   return 2;
 }

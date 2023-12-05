@@ -30,16 +30,15 @@ namespace process_freebsd {
 class NativeProcessFreeBSD : public NativeProcessELF,
                              private NativeProcessSoftwareSingleStep {
 public:
-  class Manager : public NativeProcessProtocol::Manager {
+  class Factory : public NativeProcessProtocol::Factory {
   public:
-    using NativeProcessProtocol::Manager::Manager;
+    llvm::Expected<std::unique_ptr<NativeProcessProtocol>>
+    Launch(ProcessLaunchInfo &launch_info, NativeDelegate &native_delegate,
+           MainLoop &mainloop) const override;
 
     llvm::Expected<std::unique_ptr<NativeProcessProtocol>>
-    Launch(ProcessLaunchInfo &launch_info,
-           NativeDelegate &native_delegate) override;
-
-    llvm::Expected<std::unique_ptr<NativeProcessProtocol>>
-    Attach(lldb::pid_t pid, NativeDelegate &native_delegate) override;
+    Attach(lldb::pid_t pid, NativeDelegate &native_delegate,
+           MainLoop &mainloop) const override;
 
     Extension GetSupportedExtensions() const override;
   };
@@ -91,8 +90,6 @@ public:
                               int data = 0, int *result = nullptr);
 
   bool SupportHardwareSingleStepping() const;
-
-  llvm::Expected<std::string> SaveCore(llvm::StringRef path_hint) override;
 
 protected:
   llvm::Expected<llvm::ArrayRef<uint8_t>>

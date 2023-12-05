@@ -10,25 +10,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "mlir/Dialect/SCF/Transforms/Passes.h"
-
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/SCF/Transforms/Transforms.h"
-#include "mlir/Dialect/SCF/Utils/Utils.h"
-#include "mlir/IR/IRMapping.h"
-
-namespace mlir {
-#define GEN_PASS_DEF_SCFFORLOOPRANGEFOLDING
-#include "mlir/Dialect/SCF/Transforms/Passes.h.inc"
-} // namespace mlir
+#include "PassDetail.h"
+#include "mlir/Dialect/SCF/Passes.h"
+#include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/SCF/Transforms.h"
+#include "mlir/Dialect/SCF/Utils.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/IR/BlockAndValueMapping.h"
 
 using namespace mlir;
 using namespace mlir::scf;
 
 namespace {
 struct ForLoopRangeFolding
-    : public impl::SCFForLoopRangeFoldingBase<ForLoopRangeFolding> {
+    : public SCFForLoopRangeFoldingBase<ForLoopRangeFolding> {
   void runOnOperation() override;
 };
 } // namespace
@@ -50,28 +45,28 @@ void ForLoopRangeFolding::runOnOperation() {
         break;
 
       Operation *user = *indVar.getUsers().begin();
-      if (!isa<arith::AddIOp, arith::MulIOp>(user))
+      if (!isa<AddIOp, MulIOp>(user))
         break;
 
       if (!llvm::all_of(user->getOperands(), canBeFolded))
         break;
 
       OpBuilder b(op);
-      IRMapping lbMap;
-      lbMap.map(indVar, op.getLowerBound());
-      IRMapping ubMap;
-      ubMap.map(indVar, op.getUpperBound());
-      IRMapping stepMap;
-      stepMap.map(indVar, op.getStep());
+      BlockAndValueMapping lbMap;
+      lbMap.map(indVar, op.lowerBound());
+      BlockAndValueMapping ubMap;
+      ubMap.map(indVar, op.upperBound());
+      BlockAndValueMapping stepMap;
+      stepMap.map(indVar, op.step());
 
-      if (isa<arith::AddIOp>(user)) {
+      if (isa<AddIOp>(user)) {
         Operation *lbFold = b.clone(*user, lbMap);
         Operation *ubFold = b.clone(*user, ubMap);
 
         op.setLowerBound(lbFold->getResult(0));
         op.setUpperBound(ubFold->getResult(0));
 
-      } else if (isa<arith::MulIOp>(user)) {
+      } else if (isa<MulIOp>(user)) {
         Operation *ubFold = b.clone(*user, ubMap);
         Operation *stepFold = b.clone(*user, stepMap);
 

@@ -1,15 +1,12 @@
 // RUN: %clang_cc1 -fsyntax-only -std=c2x -verify %s
 
-// This is the latest version of nodiscard that we support.
-_Static_assert(__has_c_attribute(nodiscard) == 202003L);
-
 struct [[nodiscard]] S1 { // ok
   int i;
 };
 struct [[nodiscard, nodiscard]] S2 { // ok
   int i;
 };
-struct [[nodiscard("Wrong")]] S3 {
+struct [[nodiscard("Wrong")]] S3 { // FIXME: may need an extension warning.
   int i;
 };
 
@@ -18,7 +15,7 @@ struct S3 get_s3(void);
 [[nodiscard]] int f1(void);
 enum [[nodiscard]] E1 { One };
 
-[[nodiscard]] int i; // expected-warning {{'nodiscard' attribute only applies to Objective-C methods, enums, structs, unions, classes, functions, function pointers, and typedefs}}
+[[nodiscard]] int i; // expected-warning {{'nodiscard' attribute only applies to Objective-C methods, enums, structs, unions, classes, functions, and function pointers}}
 
 struct [[nodiscard]] S4 {
   int i;
@@ -28,7 +25,7 @@ struct S4 get_s(void);
 enum [[nodiscard]] E2 { Two };
 enum E2 get_e(void);
 
-[[nodiscard]] int get_i(void);
+[[nodiscard]] int get_i();
 
 void f2(void) {
   get_s(); // expected-warning {{ignoring return value of function declared with 'nodiscard' attribute}}

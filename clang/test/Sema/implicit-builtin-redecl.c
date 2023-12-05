@@ -13,13 +13,13 @@ void f1(void) {
   calloc(0, 0, 0);
 }
 
-void f2(void) {
+void f2() {
   int index = 1;
 }
 
 static int index;
 
-int f3(void) {
+int f3() {
   return index << 2;
 }
 

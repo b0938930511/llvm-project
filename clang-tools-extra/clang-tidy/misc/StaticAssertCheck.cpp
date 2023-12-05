@@ -15,12 +15,13 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
-#include <optional>
 #include <string>
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::misc {
+namespace clang {
+namespace tidy {
+namespace misc {
 
 StaticAssertCheck::StaticAssertCheck(StringRef Name, ClangTidyContext *Context)
     : ClangTidyCheck(Name, Context) {}
@@ -138,10 +139,10 @@ SourceLocation StaticAssertCheck::getLastParenLoc(const ASTContext *ASTCtx,
   const LangOptions &Opts = ASTCtx->getLangOpts();
   const SourceManager &SM = ASTCtx->getSourceManager();
 
-  std::optional<llvm::MemoryBufferRef> Buffer =
+  llvm::Optional<llvm::MemoryBufferRef> Buffer =
       SM.getBufferOrNone(SM.getFileID(AssertLoc));
   if (!Buffer)
-    return {};
+    return SourceLocation();
 
   const char *BufferPos = SM.getCharacterData(AssertLoc);
 
@@ -152,7 +153,7 @@ SourceLocation StaticAssertCheck::getLastParenLoc(const ASTContext *ASTCtx,
   //        assert                          first left parenthesis
   if (Lexer.LexFromRawLexer(Token) || Lexer.LexFromRawLexer(Token) ||
       !Token.is(tok::l_paren))
-    return {};
+    return SourceLocation();
 
   unsigned int ParenCount = 1;
   while (ParenCount && !Lexer.LexFromRawLexer(Token)) {
@@ -165,4 +166,6 @@ SourceLocation StaticAssertCheck::getLastParenLoc(const ASTContext *ASTCtx,
   return Token.getLocation();
 }
 
-} // namespace clang::tidy::misc
+} // namespace misc
+} // namespace tidy
+} // namespace clang

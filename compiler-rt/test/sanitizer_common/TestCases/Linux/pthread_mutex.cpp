@@ -4,12 +4,7 @@
 
 #include <pthread.h>
 
-#if !defined(__GLIBC_PREREQ)
-#define __GLIBC_PREREQ(a, b) 0
-#endif
-
-#if defined(USE_GLIBC) && !__GLIBC_PREREQ(2, 34)
-// They were removed from GLIBC 2.34
+#ifdef USE_GLIBC
 extern "C" int __pthread_mutex_lock(pthread_mutex_t *__mutex);
 extern "C" int __pthread_mutex_unlock(pthread_mutex_t *__mutex);
 #define LOCK __pthread_mutex_lock

@@ -19,7 +19,7 @@
 #include "test_allocator.h"
 #include "min_allocator.h"
 
-TEST_CONSTEXPR_CXX20 bool tests()
+int main(int, char**)
 {
     {
     std::vector<bool, test_allocator<bool>> d({true, false, false, true}, test_allocator<bool>(3));
@@ -40,14 +40,5 @@ TEST_CONSTEXPR_CXX20 bool tests()
     assert(d[3] == true);
     }
 
-    return true;
-}
-
-int main(int, char**)
-{
-    tests();
-#if TEST_STD_VER > 17
-    static_assert(tests());
-#endif
-    return 0;
+  return 0;
 }

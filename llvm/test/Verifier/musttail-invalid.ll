@@ -23,10 +23,10 @@ define void @mismatched_intty(i32) {
   ret void
 }
 
-declare void @mismatched_vararg_callee(ptr, ...)
-define void @mismatched_vararg(ptr) {
+declare void @mismatched_vararg_callee(i8*, ...)
+define void @mismatched_vararg(i8*) {
 ; CHECK: mismatched varargs
-  musttail call void (ptr, ...) @mismatched_vararg_callee(ptr null)
+  musttail call void (i8*, ...) @mismatched_vararg_callee(i8* null)
   ret void
 }
 
@@ -39,10 +39,17 @@ define void @mismatched_retty(i32) {
   ret void
 }
 
-declare void @mismatched_byval_callee(ptr)
-define void @mismatched_byval(ptr byval({ i32 }) %a) {
+declare void @mismatched_byval_callee({ i32 }*)
+define void @mismatched_byval({ i32 }* byval({ i32 }) %a) {
 ; CHECK: mismatched ABI impacting function attributes
-  musttail call void @mismatched_byval_callee(ptr %a)
+  musttail call void @mismatched_byval_callee({ i32 }* %a)
+  ret void
+}
+
+declare void @mismatched_byval_callee2(ptr byval(i32))
+define void @mismatched_byval2(ptr byval(i64) %a) {
+; CHECK: mismatched ABI impacting function attributes
+  musttail call void @mismatched_byval_callee2(ptr byval(i32) %a)
   ret void
 }
 
@@ -53,17 +60,17 @@ define void @mismatched_inreg(i32 %a) {
   ret void
 }
 
-declare void @mismatched_sret_callee(ptr sret(i32))
-define void @mismatched_sret(ptr %a) {
+declare void @mismatched_sret_callee(i32* sret(i32))
+define void @mismatched_sret(i32* %a) {
 ; CHECK: mismatched ABI impacting function attributes
-  musttail call void @mismatched_sret_callee(ptr sret(i32) %a)
+  musttail call void @mismatched_sret_callee(i32* sret(i32) %a)
   ret void
 }
 
-declare void @mismatched_alignment_callee(ptr byval(i32) align 8)
-define void @mismatched_alignment(ptr byval(i32) align 4 %a) {
+declare void @mismatched_alignment_callee(i32* byval(i32) align 8)
+define void @mismatched_alignment(i32* byval(i32) align 4 %a) {
 ; CHECK: mismatched ABI impacting function attributes
-  musttail call void @mismatched_alignment_callee(ptr byval(i32) align 8 %a)
+  musttail call void @mismatched_alignment_callee(i32* byval(i32) align 8 %a)
   ret void
 }
 

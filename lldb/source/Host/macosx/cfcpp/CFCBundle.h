@@ -17,7 +17,7 @@ public:
   CFCBundle(const char *path = NULL);
   CFCBundle(CFURLRef url);
 
-  ~CFCBundle() override;
+  virtual ~CFCBundle();
 
   CFURLRef CopyExecutableURL() const;
 

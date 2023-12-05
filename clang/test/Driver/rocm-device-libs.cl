@@ -1,3 +1,4 @@
+// REQUIRES: clang-driver
 // REQUIRES: amdgpu-registered-target
 // REQUIRES: !system-windows
 

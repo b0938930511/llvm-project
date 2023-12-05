@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_CLANG_AST_ABSTRACTTYPEWRITER_H
-#define LLVM_CLANG_AST_ABSTRACTTYPEWRITER_H
+#ifndef CLANG_AST_ABSTRACTTYPEWRITER_H
+#define CLANG_AST_ABSTRACTTYPEWRITER_H
 
 #include "clang/AST/Type.h"
 #include "clang/AST/AbstractBasicWriter.h"

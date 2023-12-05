@@ -9,7 +9,6 @@
 #include "VEFixupKinds.h"
 #include "VEMCExpr.h"
 #include "VEMCTargetDesc.h"
-#include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCELFObjectWriter.h"
 #include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCObjectWriter.h"
@@ -25,13 +24,13 @@ public:
       : MCELFObjectTargetWriter(/* Is64Bit */ true, OSABI, ELF::EM_VE,
                                 /* HasRelocationAddend */ true) {}
 
-  ~VEELFObjectWriter() override = default;
+  ~VEELFObjectWriter() override {}
 
 protected:
   unsigned getRelocType(MCContext &Ctx, const MCValue &Target,
                         const MCFixup &Fixup, bool IsPCRel) const override;
 
-  bool needsRelocateWithSymbol(const MCValue &Val, const MCSymbol &Sym,
+  bool needsRelocateWithSymbol(const MCSymbol &Sym,
                                unsigned Type) const override;
 };
 } // namespace
@@ -47,29 +46,16 @@ unsigned VEELFObjectWriter::getRelocType(MCContext &Ctx, const MCValue &Target,
   if (IsPCRel) {
     switch (Fixup.getTargetKind()) {
     default:
-      Ctx.reportError(Fixup.getLoc(), "Unsupported pc-relative fixup kind");
-      return ELF::R_VE_NONE;
-    case FK_Data_1:
+      llvm_unreachable("Unimplemented fixup -> relocation");
     case FK_PCRel_1:
-      Ctx.reportError(Fixup.getLoc(),
-                      "1-byte pc-relative data relocation is not supported");
-      return ELF::R_VE_NONE;
-    case FK_Data_2:
+      llvm_unreachable("Unimplemented fixup fk_data_1 -> relocation");
     case FK_PCRel_2:
-      Ctx.reportError(Fixup.getLoc(),
-                      "2-byte pc-relative data relocation is not supported");
-      return ELF::R_VE_NONE;
-    case FK_Data_4:
+      llvm_unreachable("Unimplemented fixup fk_data_2 -> relocation");
+    // FIXME: relative kind?
     case FK_PCRel_4:
-      return ELF::R_VE_SREL32;
-    case FK_Data_8:
+      return ELF::R_VE_REFLONG;
     case FK_PCRel_8:
-      Ctx.reportError(Fixup.getLoc(),
-                      "8-byte pc-relative data relocation is not supported");
-      return ELF::R_VE_NONE;
-    case VE::fixup_ve_reflong:
-    case VE::fixup_ve_srel32:
-      return ELF::R_VE_SREL32;
+      return ELF::R_VE_REFQUAD;
     case VE::fixup_ve_pc_hi32:
       return ELF::R_VE_PC_HI32;
     case VE::fixup_ve_pc_lo32:
@@ -79,36 +65,25 @@ unsigned VEELFObjectWriter::getRelocType(MCContext &Ctx, const MCValue &Target,
 
   switch (Fixup.getTargetKind()) {
   default:
-    Ctx.reportError(Fixup.getLoc(), "Unknown ELF relocation type");
-    return ELF::R_VE_NONE;
+    llvm_unreachable("Unimplemented fixup -> relocation");
   case FK_Data_1:
-    Ctx.reportError(Fixup.getLoc(), "1-byte data relocation is not supported");
-    return ELF::R_VE_NONE;
+    llvm_unreachable("Unimplemented fixup fk_data_1 -> relocation");
   case FK_Data_2:
-    Ctx.reportError(Fixup.getLoc(), "2-byte data relocation is not supported");
-    return ELF::R_VE_NONE;
+    llvm_unreachable("Unimplemented fixup fk_data_2 -> relocation");
   case FK_Data_4:
     return ELF::R_VE_REFLONG;
   case FK_Data_8:
     return ELF::R_VE_REFQUAD;
   case VE::fixup_ve_reflong:
     return ELF::R_VE_REFLONG;
-  case VE::fixup_ve_srel32:
-    Ctx.reportError(Fixup.getLoc(),
-                    "A non pc-relative srel32 relocation is not supported");
-    return ELF::R_VE_NONE;
   case VE::fixup_ve_hi32:
     return ELF::R_VE_HI32;
   case VE::fixup_ve_lo32:
     return ELF::R_VE_LO32;
   case VE::fixup_ve_pc_hi32:
-    Ctx.reportError(Fixup.getLoc(),
-                    "A non pc-relative pc_hi32 relocation is not supported");
-    return ELF::R_VE_NONE;
+    llvm_unreachable("Unimplemented fixup pc_hi32 -> relocation");
   case VE::fixup_ve_pc_lo32:
-    Ctx.reportError(Fixup.getLoc(),
-                    "A non pc-relative pc_lo32 relocation is not supported");
-    return ELF::R_VE_NONE;
+    llvm_unreachable("Unimplemented fixup pc_lo32 -> relocation");
   case VE::fixup_ve_got_hi32:
     return ELF::R_VE_GOT_HI32;
   case VE::fixup_ve_got_lo32:
@@ -134,8 +109,7 @@ unsigned VEELFObjectWriter::getRelocType(MCContext &Ctx, const MCValue &Target,
   return ELF::R_VE_NONE;
 }
 
-bool VEELFObjectWriter::needsRelocateWithSymbol(const MCValue &,
-                                                const MCSymbol &,
+bool VEELFObjectWriter::needsRelocateWithSymbol(const MCSymbol &Sym,
                                                 unsigned Type) const {
   switch (Type) {
   default:

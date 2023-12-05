@@ -12,10 +12,10 @@
 // RUN: not %clang -c --target=powerpc-ibm-aix -fsyntax-only %s \
 // RUN: 2>&1 | FileCheck %s
 
-// RUN: %clang -c --target=powerpc64-ibm-aix -fsyntax-only %s \
-// RUN: 2>&1
+// RUN: not %clang -c --target=powerpc64-ibm-aix -fsyntax-only %s \
+// RUN: 2>&1 | FileCheck %s
 
-void a(void) {
+void a() {
   __int128_t s;
   __uint128_t t;
 }

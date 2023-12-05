@@ -10,6 +10,7 @@
 #define LLVM_LIB_EXECUTIONENGINE_RUNTIMEDYLD_TARGETS_RUNTIMEDYLDELFMIPS_H
 
 #include "../RuntimeDyldELF.h"
+#include <string>
 
 #define DEBUG_TYPE "dyld"
 

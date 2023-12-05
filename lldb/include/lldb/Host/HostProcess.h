@@ -37,12 +37,14 @@ public:
   ~HostProcess();
 
   Status Terminate();
+  Status GetMainModule(FileSpec &file_spec) const;
 
   lldb::pid_t GetProcessId() const;
   bool IsRunning() const;
 
   llvm::Expected<HostThread>
-  StartMonitoring(const Host::MonitorChildProcessCallback &callback);
+  StartMonitoring(const Host::MonitorChildProcessCallback &callback,
+                  bool monitor_signals);
 
   HostNativeProcessBase &GetNativeProcess();
   const HostNativeProcessBase &GetNativeProcess() const;

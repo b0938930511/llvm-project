@@ -13,7 +13,9 @@
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::performance {
+namespace clang {
+namespace tidy {
+namespace performance {
 
 static bool areTypesCompatible(QualType Left, QualType Right) {
   if (const auto *LeftRefType = Left->getAs<ReferenceType>())
@@ -66,8 +68,9 @@ void InefficientAlgorithmCheck::check(const MatchFinder::MatchResult &Result) {
     PtrToContainer = true;
   }
   const llvm::StringRef IneffContName = IneffCont->getName();
-  const bool Unordered = IneffContName.contains("unordered");
-  const bool Maplike = IneffContName.contains("map");
+  const bool Unordered =
+      IneffContName.find("unordered") != llvm::StringRef::npos;
+  const bool Maplike = IneffContName.find("map") != llvm::StringRef::npos;
 
   // Store if the key type of the container is compatible with the value
   // that is searched for.
@@ -81,7 +84,8 @@ void InefficientAlgorithmCheck::check(const MatchFinder::MatchResult &Result) {
     const Expr *Arg = AlgCall->getArg(3);
     const QualType AlgCmp =
         Arg->getType().getUnqualifiedType().getCanonicalType();
-    const unsigned CmpPosition = IneffContName.contains("map") ? 2 : 1;
+    const unsigned CmpPosition =
+        (IneffContName.find("map") == llvm::StringRef::npos) ? 1 : 2;
     const QualType ContainerCmp = IneffCont->getTemplateArgs()[CmpPosition]
                                       .getAsType()
                                       .getUnqualifiedType()
@@ -146,4 +150,6 @@ void InefficientAlgorithmCheck::check(const MatchFinder::MatchResult &Result) {
       << Hint;
 }
 
-} // namespace clang::tidy::performance
+} // namespace performance
+} // namespace tidy
+} // namespace clang

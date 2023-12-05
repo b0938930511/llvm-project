@@ -3,7 +3,6 @@ set(LLVM_LINK_COMPONENTS
   AllTargetsDescs
   AllTargetsDisassemblers
   AllTargetsInfos
-  DebugInfoDWARF
   Core
   MC
   IPO
@@ -12,7 +11,6 @@ set(LLVM_LINK_COMPONENTS
   ProfileData
   Support
   Symbolize
-  TargetParser
   )
 
 add_llvm_tool(llvm-profgen
@@ -21,5 +19,4 @@ add_llvm_tool(llvm-profgen
   CSPreInliner.cpp
   ProfiledBinary.cpp
   ProfileGenerator.cpp
-  MissingFrameInferrer.cpp
   )

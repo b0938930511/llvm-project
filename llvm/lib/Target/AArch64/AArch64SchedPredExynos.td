@@ -109,7 +109,10 @@ def ExynosScaledIdxFn   : TIIPredicate<"isExynosScaledAddr",
 def ExynosScaledIdxPred : MCSchedPredicate<ExynosScaledIdxFn>;
 
 // Identify FP instructions.
-def ExynosFPPred : MCSchedPredicate<CheckFpOrNEON>;
+def ExynosFPPred : MCSchedPredicate<CheckAny<[CheckHForm,
+                                              CheckSForm,
+                                              CheckDForm,
+                                              CheckQForm]>>;
 
 // Identify 128-bit NEON instructions.
 def ExynosQFormPred : MCSchedPredicate<CheckQForm>;
@@ -125,12 +128,22 @@ def ExynosResetFn   : TIIPredicate<
                              MCReturnStatement<TruePred>>,
                            MCOpcodeSwitchCase<
                              [ORRWri, ORRXri],
-                             MCReturnStatement<CheckIsReg1Zero>>],
+                             MCReturnStatement<
+                               CheckAll<
+                                 [CheckIsRegOperand<1>,
+                                  CheckAny<
+                                    [CheckRegOperand<1, WZR>,
+                                     CheckRegOperand<1, XZR>]>]>>>],
                           MCReturnStatement<
                             CheckAny<
                               [IsCopyIdiomFn,
                                IsZeroFPIdiomFn]>>>>;
 def ExynosResetPred : MCSchedPredicate<ExynosResetFn>;
+
+// Identify EXTR as the alias for ROR (immediate).
+def ExynosRotateRightImmPred : MCSchedPredicate<
+                                 CheckAll<[CheckOpcode<[EXTRWrri, EXTRXrri]>,
+                                           CheckSameRegOperand<1, 2>]>>;
 
 // Identify cheap arithmetic and logic immediate instructions.
 def ExynosCheapFn : TIIPredicate<

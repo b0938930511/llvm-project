@@ -11,13 +11,14 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Type.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
-#include <optional>
 #include <sstream>
 
 using namespace clang::ast_matchers;
 namespace optutils = clang::tidy::utils::options;
 
-namespace clang::tidy::readability {
+namespace clang {
+namespace tidy {
+namespace readability {
 
 namespace {
 struct DefaultHeuristicConfiguration {
@@ -89,40 +90,41 @@ struct AllHeuristicsBoundsWellConfigured {
                                   1>::Value;
 };
 
-static_assert(AllHeuristicsBoundsWellConfigured::Value);
+static_assert(AllHeuristicsBoundsWellConfigured::Value, "");
 } // namespace
 
-static constexpr llvm::StringLiteral DefaultAbbreviations = "addr=address;"
-                                                            "arr=array;"
-                                                            "attr=attribute;"
-                                                            "buf=buffer;"
-                                                            "cl=client;"
-                                                            "cnt=count;"
-                                                            "col=column;"
-                                                            "cpy=copy;"
-                                                            "dest=destination;"
-                                                            "dist=distance"
-                                                            "dst=distance;"
-                                                            "elem=element;"
-                                                            "hght=height;"
-                                                            "i=index;"
-                                                            "idx=index;"
-                                                            "len=length;"
-                                                            "ln=line;"
-                                                            "lst=list;"
-                                                            "nr=number;"
-                                                            "num=number;"
-                                                            "pos=position;"
-                                                            "ptr=pointer;"
-                                                            "ref=reference;"
-                                                            "src=source;"
-                                                            "srv=server;"
-                                                            "stmt=statement;"
-                                                            "str=string;"
-                                                            "val=value;"
-                                                            "var=variable;"
-                                                            "vec=vector;"
-                                                            "wdth=width";
+static const std::string DefaultAbbreviations =
+    optutils::serializeStringList({"addr=address",
+                                   "arr=array",
+                                   "attr=attribute",
+                                   "buf=buffer",
+                                   "cl=client",
+                                   "cnt=count",
+                                   "col=column",
+                                   "cpy=copy",
+                                   "dest=destination",
+                                   "dist=distance"
+                                   "dst=distance",
+                                   "elem=element",
+                                   "hght=height",
+                                   "i=index",
+                                   "idx=index",
+                                   "len=length",
+                                   "ln=line",
+                                   "lst=list",
+                                   "nr=number",
+                                   "num=number",
+                                   "pos=position",
+                                   "ptr=pointer",
+                                   "ref=reference",
+                                   "src=source",
+                                   "srv=server",
+                                   "stmt=statement",
+                                   "str=string",
+                                   "val=value",
+                                   "var=variable",
+                                   "vec=vector",
+                                   "wdth=width"});
 
 static constexpr std::size_t SmallVectorSize =
     SuspiciousCallArgumentCheck::SmallVectorSize;
@@ -137,11 +139,11 @@ static bool applyEqualityHeuristic(StringRef Arg, StringRef Param) {
 static bool applyAbbreviationHeuristic(
     const llvm::StringMap<std::string> &AbbreviationDictionary, StringRef Arg,
     StringRef Param) {
-  if (AbbreviationDictionary.contains(Arg) &&
+  if (AbbreviationDictionary.find(Arg) != AbbreviationDictionary.end() &&
       Param.equals(AbbreviationDictionary.lookup(Arg)))
     return true;
 
-  if (AbbreviationDictionary.contains(Param) &&
+  if (AbbreviationDictionary.find(Param) != AbbreviationDictionary.end() &&
       Arg.equals(AbbreviationDictionary.lookup(Param)))
     return true;
 
@@ -154,7 +156,7 @@ static bool applyPrefixHeuristic(StringRef Arg, StringRef Param,
   StringRef Shorter = Arg.size() < Param.size() ? Arg : Param;
   StringRef Longer = Arg.size() >= Param.size() ? Arg : Param;
 
-  if (Longer.starts_with_insensitive(Shorter))
+  if (Longer.startswith_insensitive(Shorter))
     return percentage(Shorter.size(), Longer.size()) > Threshold;
 
   return false;
@@ -166,7 +168,7 @@ static bool applySuffixHeuristic(StringRef Arg, StringRef Param,
   StringRef Shorter = Arg.size() < Param.size() ? Arg : Param;
   StringRef Longer = Arg.size() >= Param.size() ? Arg : Param;
 
-  if (Longer.ends_with_insensitive(Shorter))
+  if (Longer.endswith_insensitive(Shorter))
     return percentage(Shorter.size(), Longer.size()) > Threshold;
 
   return false;
@@ -239,7 +241,7 @@ static bool applyJaroWinklerHeuristic(StringRef Arg, StringRef Param,
   std::ptrdiff_t L = 0;
   for (std::ptrdiff_t I = 0; I < ParamLen; ++I) {
     if (ParamFlags[I] == 1) {
-      std::ptrdiff_t J = 0;
+      std::ptrdiff_t J;
       for (J = L; J < ArgLen; ++J)
         if (ArgFlags[J] == 1) {
           L = J + 1;
@@ -412,9 +414,9 @@ static bool areTypesCompatible(QualType ArgType, QualType ParamType,
   // Arithmetic types are interconvertible, except scoped enums.
   if (ParamType->isArithmeticType() && ArgType->isArithmeticType()) {
     if ((ParamType->isEnumeralType() &&
-         ParamType->castAs<EnumType>()->getDecl()->isScoped()) ||
+         ParamType->getAs<EnumType>()->getDecl()->isScoped()) ||
         (ArgType->isEnumeralType() &&
-         ArgType->castAs<EnumType>()->getDecl()->isScoped()))
+         ArgType->getAs<EnumType>()->getDecl()->isScoped()))
       return false;
 
     return true;
@@ -525,12 +527,12 @@ SuspiciousCallArgumentCheck::SuspiciousCallArgumentCheck(
                        GetBoundOpt(H, BoundKind::SimilarAbove)));
   }
 
-  for (StringRef Abbreviation : optutils::parseStringList(
+  for (const std::string &Abbreviation : optutils::parseStringList(
            Options.get("Abbreviations", DefaultAbbreviations))) {
-    auto KeyAndValue = Abbreviation.split("=");
+    auto KeyAndValue = StringRef{Abbreviation}.split("=");
     assert(!KeyAndValue.first.empty() && !KeyAndValue.second.empty());
     AbbreviationDictionary.insert(
-        std::make_pair(KeyAndValue.first, KeyAndValue.second.str()));
+        std::make_pair(KeyAndValue.first.str(), KeyAndValue.second.str()));
   }
 }
 
@@ -551,7 +553,7 @@ void SuspiciousCallArgumentCheck::storeOptions(
     SmallString<32> Key = HeuristicToString[Idx];
     Key.append(BK == BoundKind::DissimilarBelow ? "DissimilarBelow"
                                                 : "SimilarAbove");
-    Options.store(Opts, Key, *getBound(H, BK));
+    Options.store(Opts, Key, getBound(H, BK).getValue());
   };
 
   for (std::size_t Idx = 0; Idx < HeuristicCount; ++Idx) {
@@ -572,21 +574,20 @@ void SuspiciousCallArgumentCheck::storeOptions(
       Abbreviations.emplace_back(EqualSignJoined.str());
   }
   Options.store(Opts, "Abbreviations",
-                optutils::serializeStringList(std::vector<StringRef>(
-                    Abbreviations.begin(), Abbreviations.end())));
+                optutils::serializeStringList(Abbreviations));
 }
 
 bool SuspiciousCallArgumentCheck::isHeuristicEnabled(Heuristic H) const {
   return llvm::is_contained(AppliedHeuristics, H);
 }
 
-std::optional<int8_t>
-SuspiciousCallArgumentCheck::getBound(Heuristic H, BoundKind BK) const {
+Optional<int8_t> SuspiciousCallArgumentCheck::getBound(Heuristic H,
+                                                       BoundKind BK) const {
   auto Idx = static_cast<std::size_t>(H);
   assert(Idx < HeuristicCount);
 
   if (!Defaults[Idx].hasBounds())
-    return std::nullopt;
+    return None;
 
   switch (BK) {
   case BoundKind::DissimilarBelow:
@@ -711,28 +712,23 @@ void SuspiciousCallArgumentCheck::setArgNamesAndTypes(
 
   for (std::size_t I = InitialArgIndex, J = MatchedCallExpr->getNumArgs();
        I < J; ++I) {
-    assert(ArgTypes.size() == I - InitialArgIndex &&
-           ArgNames.size() == ArgTypes.size() &&
-           "Every iteration must put an element into the vectors!");
-
     if (const auto *ArgExpr = dyn_cast<DeclRefExpr>(
             MatchedCallExpr->getArg(I)->IgnoreUnlessSpelledInSource())) {
       if (const auto *Var = dyn_cast<VarDecl>(ArgExpr->getDecl())) {
         ArgTypes.push_back(Var->getType());
         ArgNames.push_back(Var->getName());
-        continue;
+      } else if (const auto *FCall =
+                     dyn_cast<FunctionDecl>(ArgExpr->getDecl())) {
+        ArgTypes.push_back(FCall->getType());
+        ArgNames.push_back(FCall->getName());
+      } else {
+        ArgTypes.push_back(QualType());
+        ArgNames.push_back(StringRef());
       }
-      if (const auto *FCall = dyn_cast<FunctionDecl>(ArgExpr->getDecl())) {
-        if (FCall->getNameInfo().getName().isIdentifier()) {
-          ArgTypes.push_back(FCall->getType());
-          ArgNames.push_back(FCall->getName());
-          continue;
-        }
-      }
+    } else {
+      ArgTypes.push_back(QualType());
+      ArgNames.push_back(StringRef());
     }
-
-    ArgTypes.push_back(QualType());
-    ArgNames.push_back(StringRef());
   }
 }
 
@@ -781,8 +777,8 @@ bool SuspiciousCallArgumentCheck::areNamesSimilar(StringRef Arg,
                                                   StringRef Param, Heuristic H,
                                                   BoundKind BK) const {
   int8_t Threshold = -1;
-  if (std::optional<int8_t> GotBound = getBound(H, BK))
-    Threshold = *GotBound;
+  if (Optional<int8_t> GotBound = getBound(H, BK))
+    Threshold = GotBound.getValue();
 
   switch (H) {
   case Heuristic::Equality:
@@ -805,4 +801,6 @@ bool SuspiciousCallArgumentCheck::areNamesSimilar(StringRef Arg,
   llvm_unreachable("Unhandled heuristic kind");
 }
 
-} // namespace clang::tidy::readability
+} // namespace readability
+} // namespace tidy
+} // namespace clang

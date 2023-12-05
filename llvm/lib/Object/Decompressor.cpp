@@ -7,9 +7,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Object/Decompressor.h"
-#include "llvm/ADT/StringExtras.h"
 #include "llvm/BinaryFormat/ELF.h"
-#include "llvm/Object/ObjectFile.h"
+#include "llvm/Object/ELFObjectFile.h"
 #include "llvm/Support/Compression.h"
 #include "llvm/Support/DataExtractor.h"
 #include "llvm/Support/Endian.h"
@@ -20,8 +19,13 @@ using namespace object;
 
 Expected<Decompressor> Decompressor::create(StringRef Name, StringRef Data,
                                             bool IsLE, bool Is64Bit) {
+  if (!zlib::isAvailable())
+    return createError("zlib is not available");
+
   Decompressor D(Data);
-  if (Error Err = D.consumeCompressedHeader(Is64Bit, IsLE))
+  Error Err = isGnuStyle(Name) ? D.consumeCompressedGnuHeader()
+                               : D.consumeCompressedZLibHeader(Is64Bit, IsLE);
+  if (Err)
     return std::move(Err);
   return D;
 }
@@ -29,7 +33,23 @@ Expected<Decompressor> Decompressor::create(StringRef Name, StringRef Data,
 Decompressor::Decompressor(StringRef Data)
     : SectionData(Data), DecompressedSize(0) {}
 
-Error Decompressor::consumeCompressedHeader(bool Is64Bit, bool IsLittleEndian) {
+Error Decompressor::consumeCompressedGnuHeader() {
+  if (!SectionData.startswith("ZLIB"))
+    return createError("corrupted compressed section header");
+
+  SectionData = SectionData.substr(4);
+
+  // Consume uncompressed section size (big-endian 8 bytes).
+  if (SectionData.size() < 8)
+    return createError("corrupted uncompressed section size");
+  DecompressedSize = read64be(SectionData.data());
+  SectionData = SectionData.substr(8);
+
+  return Error::success();
+}
+
+Error Decompressor::consumeCompressedZLibHeader(bool Is64Bit,
+                                                bool IsLittleEndian) {
   using namespace ELF;
   uint64_t HdrSize = Is64Bit ? sizeof(Elf64_Chdr) : sizeof(Elf32_Chdr);
   if (SectionData.size() < HdrSize)
@@ -37,21 +57,10 @@ Error Decompressor::consumeCompressedHeader(bool Is64Bit, bool IsLittleEndian) {
 
   DataExtractor Extractor(SectionData, IsLittleEndian, 0);
   uint64_t Offset = 0;
-  auto ChType = Extractor.getUnsigned(&Offset, Is64Bit ? sizeof(Elf64_Word)
-                                                       : sizeof(Elf32_Word));
-  switch (ChType) {
-  case ELFCOMPRESS_ZLIB:
-    CompressionType = DebugCompressionType::Zlib;
-    break;
-  case ELFCOMPRESS_ZSTD:
-    CompressionType = DebugCompressionType::Zstd;
-    break;
-  default:
-    return createError("unsupported compression type (" + Twine(ChType) + ")");
-  }
-  if (const char *Reason = llvm::compression::getReasonIfUnsupported(
-          compression::formatFor(CompressionType)))
-    return createError(Reason);
+  if (Extractor.getUnsigned(&Offset, Is64Bit ? sizeof(Elf64_Word)
+                                             : sizeof(Elf32_Word)) !=
+      ELFCOMPRESS_ZLIB)
+    return createError("unsupported compression type");
 
   // Skip Elf64_Chdr::ch_reserved field.
   if (Is64Bit)
@@ -63,8 +72,27 @@ Error Decompressor::consumeCompressedHeader(bool Is64Bit, bool IsLittleEndian) {
   return Error::success();
 }
 
-Error Decompressor::decompress(MutableArrayRef<uint8_t> Output) {
-  return compression::decompress(CompressionType,
-                                 arrayRefFromStringRef(SectionData),
-                                 Output.data(), Output.size());
+bool Decompressor::isGnuStyle(StringRef Name) {
+  return Name.startswith(".zdebug");
+}
+
+bool Decompressor::isCompressed(const object::SectionRef &Section) {
+  if (Section.isCompressed())
+    return true;
+
+  Expected<StringRef> SecNameOrErr = Section.getName();
+  if (SecNameOrErr)
+    return isGnuStyle(*SecNameOrErr);
+
+  consumeError(SecNameOrErr.takeError());
+  return false;
+}
+
+bool Decompressor::isCompressedELFSection(uint64_t Flags, StringRef Name) {
+  return (Flags & ELF::SHF_COMPRESSED) || isGnuStyle(Name);
+}
+
+Error Decompressor::decompress(MutableArrayRef<char> Buffer) {
+  size_t Size = Buffer.size();
+  return zlib::uncompress(SectionData, Buffer.data(), Size);
 }

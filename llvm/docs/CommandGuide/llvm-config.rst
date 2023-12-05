@@ -29,75 +29,50 @@ To link against the JIT:
 OPTIONS
 -------
 
-**--assertion-mode**
+**--version**
 
- Print the assertion mode used when LLVM was built (ON or OFF).
+ Print the version number of LLVM.
+
+**-help**
+
+ Print a summary of **llvm-config** arguments.
+
+**--prefix**
+
+ Print the installation prefix for LLVM.
+
+**--src-root**
+
+ Print the source root from which LLVM was built.
+
+**--obj-root**
+
+ Print the object root used to build LLVM.
 
 **--bindir**
 
  Print the installation directory for LLVM binaries.
 
-**--build-mode**
-
- Print the build mode used when LLVM was built (e.g. Debug or Release).
-
-**--build-system**
-
- Print the build system used to build LLVM (e.g. `cmake` or `gn`).
-
-**--cflags**
-
- Print the C compiler flags needed to use LLVM headers.
-
-**--cmakedir**
-
- Print the installation directory for LLVM CMake modules.
-
-**--components**
-
- Print all valid component names.
-
-**--cppflags**
-
- Print the C preprocessor flags needed to use LLVM headers.
-
-**--cxxflags**
-
- Print the C++ compiler flags needed to use LLVM headers.
-
-**--has-rtti**
-
- Print whether or not LLVM was built with rtti (YES or NO).
-
-**--help**
-
- Print a summary of **llvm-config** arguments.
-
-**--host-target**
-
- Print the target triple used to configure LLVM.
-
-**--ignore-libllvm**
-
- Ignore libLLVM and link component libraries instead.
-
 **--includedir**
 
  Print the installation directory for LLVM headers.
-
-**--ldflags**
-
- Print the flags needed to link against LLVM libraries.
 
 **--libdir**
 
  Print the installation directory for LLVM libraries.
 
-**--libfiles**
+**--cxxflags**
 
- Similar to **--libs**, but print the full path to each library file.  This is
- useful when creating makefile dependencies, to ensure that a tool is relinked if
- any library it uses changes.
+ Print the C++ compiler flags needed to use LLVM headers.
+
+**--ldflags**
+
+ Print the flags needed to link against LLVM libraries.
+
+**--libs**
+
+ Print all the libraries needed to link against the specified LLVM
+ *components*, including any dependencies.
 
 **--libnames**
 
@@ -105,43 +80,23 @@ OPTIONS
  without **-l** or pathnames.  Useful for linking against a not-yet-installed
  copy of LLVM.
 
-**--libs**
+**--libfiles**
 
- Print all the libraries needed to link against the specified LLVM
- *components*, including any dependencies.
+ Similar to **--libs**, but print the full path to each library file.  This is
+ useful when creating makefile dependencies, to ensure that a tool is relinked if
+ any library it uses changes.
 
-**--link-shared**
+**--components**
 
- Link the components as shared libraries.
-
-**--link-static**
-
- Link the component libraries statically.
-
-**--obj-root**
-
- Print the object root used to build LLVM.
-
-**--prefix**
-
- Print the installation prefix for LLVM.
-
-**--shared-mode**
-
- Print how the provided components can be collectively linked (`shared` or `static`).
-
-**--system-libs**
-
- Print all the system libraries needed to link against the specified LLVM
- *components*, including any dependencies.
+ Print all valid component names.
 
 **--targets-built**
 
  Print the component names for all targets supported by this copy of LLVM.
 
-**--version**
+**--build-mode**
 
- Print the version number of LLVM.
+ Print the build mode used when LLVM was built (e.g. Debug or Release)
 
 
 COMPONENTS

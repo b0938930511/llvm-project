@@ -15,7 +15,7 @@
 
 static unsigned ProfileDumped = 0;
 
-COMPILER_RT_VISIBILITY unsigned lprofProfileDumped(void) {
+COMPILER_RT_VISIBILITY unsigned lprofProfileDumped() {
   return ProfileDumped;
 }
 

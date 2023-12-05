@@ -56,11 +56,6 @@ private:
   bool runOnMachineFunction(MachineFunction &) override;
   void releaseMemory() override;
   void getAnalysisUsage(AnalysisUsage &) const override;
-
-  MachineFunctionProperties getSetProperties() const override {
-    return MachineFunctionProperties().set(
-        MachineFunctionProperties::Property::TracksDebugUserValues);
-  }
 };
 
 } // end namespace llvm

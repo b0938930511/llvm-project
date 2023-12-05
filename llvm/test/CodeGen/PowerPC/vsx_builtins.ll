@@ -2,7 +2,7 @@
 ; RUN: llc -relocation-model=static -verify-machineinstrs -mcpu=pwr9 \
 ; RUN:     -mtriple=powerpc64le-unknown-linux-gnu \
 ; RUN:     -ppc-vsr-nums-as-vr -ppc-asm-full-reg-names < %s | FileCheck %s \
-; RUN:     --check-prefixes=CHECK,CHECK-P9UP
+; RUN:     --check-prefixes=CHECK,CHECK-P9
 ; RUN: llc -verify-machineinstrs -mcpu=pwr9 -mattr=-power9-vector \
 ; RUN:     -mtriple=powerpc64le-unknown-linux-gnu \
 ; RUN:     -ppc-vsr-nums-as-vr -ppc-asm-full-reg-names < %s | FileCheck %s \
@@ -14,7 +14,7 @@
 ; RUN: llc -verify-machineinstrs -mcpu=pwr9 \
 ; RUN:     -mtriple=powerpc64-unknown-linux-gnu \
 ; RUN:     -ppc-vsr-nums-as-vr -ppc-asm-full-reg-names < %s | FileCheck %s \
-; RUN:     --check-prefixes=CHECK,CHECK-P9UP
+; RUN:     --check-prefixes=CHECK,CHECK-P9
 ; RUN: llc -verify-machineinstrs -mcpu=pwr9 -mattr=-power9-vector \
 ; RUN:     -mtriple=powerpc64-unknown-linux-gnu \
 ; RUN:     -ppc-vsr-nums-as-vr -ppc-asm-full-reg-names < %s | FileCheck %s \
@@ -23,66 +23,58 @@
 ; RUN:     -mtriple=powerpc64-unknown-linux-gnu \
 ; RUN:     -ppc-vsr-nums-as-vr -ppc-asm-full-reg-names < %s | FileCheck %s \
 ; RUN:     --check-prefixes=CHECK,CHECK-INTRIN
-; RUN: llc -verify-machineinstrs -mcpu=pwr10 \
-; RUN:     -mtriple=powerpc64-unknown-linux-gnu \
-; RUN:     -ppc-vsr-nums-as-vr -ppc-asm-full-reg-names < %s | FileCheck %s \
-; RUN:     --check-prefixes=CHECK,CHECK-P9UP
-; RUN: llc -verify-machineinstrs -mcpu=pwr10 \
-; RUN:     -mtriple=powerpc64le-unknown-linux-gnu \
-; RUN:     -ppc-vsr-nums-as-vr -ppc-asm-full-reg-names < %s | FileCheck %s \
-; RUN:     --check-prefixes=CHECK,CHECK-P9UP
 
 ; Function Attrs: nounwind readnone
-define <4 x i32> @test1(ptr %a) {
+define <4 x i32> @test1(i8* %a) {
 ; CHECK-LABEL: test1:
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    lxvw4x v2, 0, r3
 ; CHECK-NEXT:    blr
   entry:
-    %0 = tail call <4 x i32> @llvm.ppc.vsx.lxvw4x.be(ptr %a)
+    %0 = tail call <4 x i32> @llvm.ppc.vsx.lxvw4x.be(i8* %a)
       ret <4 x i32> %0
 }
 ; Function Attrs: nounwind readnone
-declare <4 x i32> @llvm.ppc.vsx.lxvw4x.be(ptr)
+declare <4 x i32> @llvm.ppc.vsx.lxvw4x.be(i8*)
 
 ; Function Attrs: nounwind readnone
-define <2 x double> @test2(ptr %a) {
+define <2 x double> @test2(i8* %a) {
 ; CHECK-LABEL: test2:
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    lxvd2x v2, 0, r3
 ; CHECK-NEXT:    blr
   entry:
-    %0 = tail call <2 x double> @llvm.ppc.vsx.lxvd2x.be(ptr %a)
+    %0 = tail call <2 x double> @llvm.ppc.vsx.lxvd2x.be(i8* %a)
       ret <2 x double> %0
 }
 ; Function Attrs: nounwind readnone
-declare <2 x double> @llvm.ppc.vsx.lxvd2x.be(ptr)
+declare <2 x double> @llvm.ppc.vsx.lxvd2x.be(i8*)
 
 ; Function Attrs: nounwind readnone
-define void @test3(<4 x i32> %a, ptr %b) {
+define void @test3(<4 x i32> %a, i8* %b) {
 ; CHECK-LABEL: test3:
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    stxvw4x v2, 0, r5
 ; CHECK-NEXT:    blr
   entry:
-    tail call void @llvm.ppc.vsx.stxvw4x.be(<4 x i32> %a, ptr %b)
+    tail call void @llvm.ppc.vsx.stxvw4x.be(<4 x i32> %a, i8* %b)
     ret void
 }
 ; Function Attrs: nounwind readnone
-declare void @llvm.ppc.vsx.stxvw4x.be(<4 x i32>, ptr)
+declare void @llvm.ppc.vsx.stxvw4x.be(<4 x i32>, i8*)
 
 ; Function Attrs: nounwind readnone
-define void @test4(<2 x double> %a, ptr %b) {
+define void @test4(<2 x double> %a, i8* %b) {
 ; CHECK-LABEL: test4:
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    stxvd2x v2, 0, r5
 ; CHECK-NEXT:    blr
   entry:
-    tail call void @llvm.ppc.vsx.stxvd2x.be(<2 x double> %a, ptr %b)
+    tail call void @llvm.ppc.vsx.stxvd2x.be(<2 x double> %a, i8* %b)
     ret void
 }
 ; Function Attrs: nounwind readnone
-declare void @llvm.ppc.vsx.stxvd2x.be(<2 x double>, ptr)
+declare void @llvm.ppc.vsx.stxvd2x.be(<2 x double>, i8*)
 
 define i32 @test_vec_test_swdiv(<2 x double> %a, <2 x double> %b) {
 ; CHECK-LABEL: test_vec_test_swdiv:
@@ -171,11 +163,11 @@ entry:
 }
 
 ; Function Attrs: nounwind readnone
-define <2 x double> @test_lxvd2x(ptr %a) {
-; CHECK-P9UP-LABEL: test_lxvd2x:
-; CHECK-P9UP:       # %bb.0: # %entry
-; CHECK-P9UP-NEXT:    lxv v2, 0(r3)
-; CHECK-P9UP-NEXT:    blr
+define <2 x double> @test_lxvd2x(i8* %a) {
+; CHECK-P9-LABEL: test_lxvd2x:
+; CHECK-P9:       # %bb.0: # %entry
+; CHECK-P9-NEXT:    lxv v2, 0(r3)
+; CHECK-P9-NEXT:    blr
 ;
 ; CHECK-NOINTRIN-LABEL: test_lxvd2x:
 ; CHECK-NOINTRIN:       # %bb.0: # %entry
@@ -188,18 +180,18 @@ define <2 x double> @test_lxvd2x(ptr %a) {
 ; CHECK-INTRIN-NEXT:    lxvd2x v2, 0, r3
 ; CHECK-INTRIN-NEXT:    blr
 entry:
-  %0 = tail call <2 x double> @llvm.ppc.vsx.lxvd2x(ptr %a)
+  %0 = tail call <2 x double> @llvm.ppc.vsx.lxvd2x(i8* %a)
   ret <2 x double> %0
 }
 ; Function Attrs: nounwind readnone
-declare <2 x double> @llvm.ppc.vsx.lxvd2x(ptr)
+declare <2 x double> @llvm.ppc.vsx.lxvd2x(i8*)
 
 ; Function Attrs: nounwind readnone
-define void @test_stxvd2x(<2 x double> %a, ptr %b) {
-; CHECK-P9UP-LABEL: test_stxvd2x:
-; CHECK-P9UP:       # %bb.0: # %entry
-; CHECK-P9UP-NEXT:    stxv v2, 0(r5)
-; CHECK-P9UP-NEXT:    blr
+define void @test_stxvd2x(<2 x double> %a, i8* %b) {
+; CHECK-P9-LABEL: test_stxvd2x:
+; CHECK-P9:       # %bb.0: # %entry
+; CHECK-P9-NEXT:    stxv v2, 0(r5)
+; CHECK-P9-NEXT:    blr
 ;
 ; CHECK-NOINTRIN-LABEL: test_stxvd2x:
 ; CHECK-NOINTRIN:       # %bb.0: # %entry
@@ -212,8 +204,8 @@ define void @test_stxvd2x(<2 x double> %a, ptr %b) {
 ; CHECK-INTRIN-NEXT:    stxvd2x v2, 0, r5
 ; CHECK-INTRIN-NEXT:    blr
 entry:
-  tail call void @llvm.ppc.vsx.stxvd2x(<2 x double> %a, ptr %b)
+  tail call void @llvm.ppc.vsx.stxvd2x(<2 x double> %a, i8* %b)
   ret void
 }
 ; Function Attrs: nounwind readnone
-declare void @llvm.ppc.vsx.stxvd2x(<2 x double>, ptr)
+declare void @llvm.ppc.vsx.stxvd2x(<2 x double>, i8*)

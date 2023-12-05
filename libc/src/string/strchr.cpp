@@ -9,13 +9,17 @@
 #include "src/string/strchr.h"
 
 #include "src/__support/common.h"
-#include "src/string/string_utils.h"
 
-namespace LIBC_NAMESPACE {
+namespace __llvm_libc {
 
 // TODO: Look at performance benefits of comparing words.
 LLVM_LIBC_FUNCTION(char *, strchr, (const char *src, int c)) {
-  return internal::strchr_implementation(src, c);
+  unsigned char *str =
+      const_cast<unsigned char *>(reinterpret_cast<const unsigned char *>(src));
+  const unsigned char ch = c;
+  for (; *str && *str != ch; ++str)
+    ;
+  return *str == ch ? reinterpret_cast<char *>(str) : nullptr;
 }
 
-} // namespace LIBC_NAMESPACE
+} // namespace __llvm_libc

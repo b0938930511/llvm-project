@@ -14,7 +14,6 @@
 
 #include "lldb/Host/Config.h"
 #include "lldb/Host/MainLoop.h"
-#include "lldb/Utility/LLDBLog.h"
 #include "lldb/Utility/Log.h"
 
 #include "llvm/Config/llvm-config.h"
@@ -54,7 +53,9 @@ static Status GetLastSocketError() {
   return EC;
 }
 
-static const int kType = SOCK_STREAM;
+namespace {
+const int kType = SOCK_STREAM;
+}
 
 TCPSocket::TCPSocket(bool should_close, bool child_processes_inherit)
     : Socket(ProtocolTcp, should_close, child_processes_inherit) {}
@@ -149,35 +150,32 @@ Status TCPSocket::CreateSocket(int domain) {
 
 Status TCPSocket::Connect(llvm::StringRef name) {
 
-  Log *log = GetLog(LLDBLog::Communication);
-  LLDB_LOG(log, "Connect to host/port {0}", name);
+  Log *log(lldb_private::GetLogIfAnyCategoriesSet(LIBLLDB_LOG_COMMUNICATION));
+  LLDB_LOGF(log, "TCPSocket::%s (host/port = %s)", __FUNCTION__, name.data());
 
   Status error;
-  llvm::Expected<HostAndPort> host_port = DecodeHostAndPort(name);
-  if (!host_port)
-    return Status(host_port.takeError());
+  std::string host_str;
+  std::string port_str;
+  int32_t port = INT32_MIN;
+  if (!DecodeHostAndPort(name, host_str, port_str, port, &error))
+    return error;
 
-  std::vector<SocketAddress> addresses =
-      SocketAddress::GetAddressInfo(host_port->hostname.c_str(), nullptr,
-                                    AF_UNSPEC, SOCK_STREAM, IPPROTO_TCP);
+  std::vector<SocketAddress> addresses = SocketAddress::GetAddressInfo(
+      host_str.c_str(), nullptr, AF_UNSPEC, SOCK_STREAM, IPPROTO_TCP);
   for (SocketAddress &address : addresses) {
     error = CreateSocket(address.GetFamily());
     if (error.Fail())
       continue;
 
-    address.SetPort(host_port->port);
+    address.SetPort(port);
 
-    if (llvm::sys::RetryAfterSignal(-1, ::connect, GetNativeSocket(),
-                                    &address.sockaddr(),
-                                    address.GetLength()) == -1) {
-      Close();
+    if (-1 == llvm::sys::RetryAfterSignal(-1, ::connect,
+          GetNativeSocket(), &address.sockaddr(), address.GetLength())) {
+      CLOSE_SOCKET(GetNativeSocket());
       continue;
     }
 
-    if (SetOptionNoDelay() == -1) {
-      Close();
-      continue;
-    }
+    SetOptionNoDelay();
 
     error.Clear();
     return error;
@@ -188,55 +186,54 @@ Status TCPSocket::Connect(llvm::StringRef name) {
 }
 
 Status TCPSocket::Listen(llvm::StringRef name, int backlog) {
-  Log *log = GetLog(LLDBLog::Connection);
-  LLDB_LOG(log, "Listen to {0}", name);
+  Log *log(lldb_private::GetLogIfAnyCategoriesSet(LIBLLDB_LOG_CONNECTION));
+  LLDB_LOGF(log, "TCPSocket::%s (%s)", __FUNCTION__, name.data());
 
   Status error;
-  llvm::Expected<HostAndPort> host_port = DecodeHostAndPort(name);
-  if (!host_port)
-    return Status(host_port.takeError());
+  std::string host_str;
+  std::string port_str;
+  int32_t port = INT32_MIN;
+  if (!DecodeHostAndPort(name, host_str, port_str, port, &error))
+    return error;
 
-  if (host_port->hostname == "*")
-    host_port->hostname = "0.0.0.0";
+  if (host_str == "*")
+    host_str = "0.0.0.0";
   std::vector<SocketAddress> addresses = SocketAddress::GetAddressInfo(
-      host_port->hostname.c_str(), nullptr, AF_UNSPEC, SOCK_STREAM, IPPROTO_TCP);
+      host_str.c_str(), nullptr, AF_UNSPEC, SOCK_STREAM, IPPROTO_TCP);
   for (SocketAddress &address : addresses) {
     int fd = Socket::CreateSocket(address.GetFamily(), kType, IPPROTO_TCP,
                                   m_child_processes_inherit, error);
-    if (error.Fail() || fd < 0)
+    if (error.Fail())
       continue;
 
     // enable local address reuse
     int option_value = 1;
     set_socket_option_arg_type option_value_p =
         reinterpret_cast<set_socket_option_arg_type>(&option_value);
-    if (::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, option_value_p,
-                     sizeof(option_value)) == -1) {
-      CLOSE_SOCKET(fd);
-      continue;
-    }
+    ::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, option_value_p,
+                 sizeof(option_value));
 
     SocketAddress listen_address = address;
     if(!listen_address.IsLocalhost())
-      listen_address.SetToAnyAddress(address.GetFamily(), host_port->port);
+      listen_address.SetToAnyAddress(address.GetFamily(), port);
     else
-      listen_address.SetPort(host_port->port);
+      listen_address.SetPort(port);
 
     int err =
         ::bind(fd, &listen_address.sockaddr(), listen_address.GetLength());
-    if (err != -1)
+    if (-1 != err)
       err = ::listen(fd, backlog);
 
-    if (err == -1) {
+    if (-1 == err) {
       error = GetLastSocketError();
       CLOSE_SOCKET(fd);
       continue;
     }
 
-    if (host_port->port == 0) {
+    if (port == 0) {
       socklen_t sa_len = address.GetLength();
       if (getsockname(fd, &address.sockaddr(), &sa_len) == 0)
-        host_port->port = address.GetPort();
+        port = address.GetPort();
     }
     m_listen_sockets[fd] = address;
   }
@@ -261,8 +258,8 @@ Status TCPSocket::Accept(Socket *&conn_socket) {
     return error;
   }
 
-  NativeSocket sock = kInvalidSocketValue;
-  NativeSocket listen_sock = kInvalidSocketValue;
+  int sock = -1;
+  int listen_sock = -1;
   lldb_private::SocketAddress AcceptAddr;
   MainLoop accept_loop;
   std::vector<MainLoopBase::ReadHandleUP> handles;
@@ -294,10 +291,7 @@ Status TCPSocket::Accept(Socket *&conn_socket) {
 
     lldb_private::SocketAddress &AddrIn = m_listen_sockets[listen_sock];
     if (!AddrIn.IsAnyAddr() && AcceptAddr != AddrIn) {
-      if (sock != kInvalidSocketValue) {
-        CLOSE_SOCKET(sock);
-        sock = kInvalidSocketValue;
-      }
+      CLOSE_SOCKET(sock);
       llvm::errs() << llvm::formatv(
           "error: rejecting incoming connection from {0} (expecting {1})",
           AcceptAddr.GetIPAddress(), AddrIn.GetIPAddress());

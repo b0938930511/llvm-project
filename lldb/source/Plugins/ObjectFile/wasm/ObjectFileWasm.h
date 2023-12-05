@@ -11,7 +11,6 @@
 
 #include "lldb/Symbol/ObjectFile.h"
 #include "lldb/Utility/ArchSpec.h"
-#include <optional>
 
 namespace lldb_private {
 namespace wasm {
@@ -25,18 +24,18 @@ public:
   static void Initialize();
   static void Terminate();
 
-  static llvm::StringRef GetPluginNameStatic() { return "wasm"; }
+  static ConstString GetPluginNameStatic();
   static const char *GetPluginDescriptionStatic() {
     return "WebAssembly object file reader.";
   }
 
   static ObjectFile *
-  CreateInstance(const lldb::ModuleSP &module_sp, lldb::DataBufferSP data_sp,
+  CreateInstance(const lldb::ModuleSP &module_sp, lldb::DataBufferSP &data_sp,
                  lldb::offset_t data_offset, const FileSpec *file,
                  lldb::offset_t file_offset, lldb::offset_t length);
 
   static ObjectFile *CreateMemoryInstance(const lldb::ModuleSP &module_sp,
-                                          lldb::WritableDataBufferSP data_sp,
+                                          lldb::DataBufferSP &data_sp,
                                           const lldb::ProcessSP &process_sp,
                                           lldb::addr_t header_addr);
 
@@ -49,7 +48,8 @@ public:
 
   /// PluginInterface protocol.
   /// \{
-  llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
+  ConstString GetPluginName() override { return GetPluginNameStatic(); }
+  uint32_t GetPluginVersion() override { return 1; }
   /// \}
 
   /// LLVM RTTI support
@@ -79,7 +79,7 @@ public:
     return AddressClass::eInvalid;
   }
 
-  void ParseSymtab(lldb_private::Symtab &symtab) override;
+  Symtab *GetSymtab() override;
 
   bool IsStripped() override { return !!GetExternalDebugInfoFileSpec(); }
 
@@ -109,14 +109,14 @@ public:
   /// custom section named "external_debug_info", whose payload is an UTF-8
   /// encoded string that points to a Wasm module that contains the debug
   /// information for this module.
-  std::optional<FileSpec> GetExternalDebugInfoFileSpec();
+  llvm::Optional<FileSpec> GetExternalDebugInfoFileSpec();
 
 private:
-  ObjectFileWasm(const lldb::ModuleSP &module_sp, lldb::DataBufferSP data_sp,
+  ObjectFileWasm(const lldb::ModuleSP &module_sp, lldb::DataBufferSP &data_sp,
                  lldb::offset_t data_offset, const FileSpec *file,
                  lldb::offset_t offset, lldb::offset_t length);
   ObjectFileWasm(const lldb::ModuleSP &module_sp,
-                 lldb::WritableDataBufferSP header_data_sp,
+                 lldb::DataBufferSP &header_data_sp,
                  const lldb::ProcessSP &process_sp, lldb::addr_t header_addr);
 
   /// Wasm section decoding routines.

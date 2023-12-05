@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 
@@ -15,8 +16,6 @@ namespace {
 /// This pass illustrates the IR def-use chains through printing.
 struct TestOperationEqualPass
     : public PassWrapper<TestOperationEqualPass, OperationPass<ModuleOp>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TestOperationEqualPass)
-
   StringRef getArgument() const final { return "test-operations-equality"; }
   StringRef getDescription() const final { return "Test operations equality."; }
   void runOnOperation() override {
@@ -28,21 +27,26 @@ struct TestOperationEqualPass
                          << opCount;
       return signalPassFailure();
     }
+    DenseMap<Value, Value> valuesMap;
+    auto mapValue = [&](Value lhs, Value rhs) {
+      auto insertion = valuesMap.insert({lhs, rhs});
+      return success(insertion.first->second == rhs);
+    };
 
     Operation *first = &module.getBody()->front();
     llvm::outs() << first->getName().getStringRef() << " with attr "
-                 << first->getDiscardableAttrDictionary();
+                 << first->getAttrDictionary();
     OperationEquivalence::Flags flags{};
     if (!first->hasAttr("strict_loc_check"))
       flags |= OperationEquivalence::IgnoreLocations;
     if (OperationEquivalence::isEquivalentTo(first, &module.getBody()->back(),
-                                             flags))
+                                             mapValue, mapValue, flags))
       llvm::outs() << " compares equals.\n";
     else
       llvm::outs() << " compares NOT equals!\n";
   }
 };
-} // namespace
+} // end anonymous namespace
 
 namespace mlir {
 void registerTestOperationEqualPass() {

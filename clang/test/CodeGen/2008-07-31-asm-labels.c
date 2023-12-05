@@ -10,13 +10,13 @@
 
 void pipe() asm("_thisIsNotAPipe");
 
-void f0(void) {
+void f0() {
   pipe();
 }
 
 void pipe(int);
 
-void f1(void) {
+void f1() {
   pipe(1);
 }
 
@@ -28,6 +28,6 @@ void pipe(int arg) {
 
 // PR3698
 extern int g0 asm("_renamed");
-int f2(void) {
+int f2() {
   return g0;
 }

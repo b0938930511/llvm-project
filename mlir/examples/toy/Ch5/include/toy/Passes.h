@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef TOY_PASSES_H
-#define TOY_PASSES_H
+#ifndef MLIR_TUTORIAL_TOY_PASSES_H
+#define MLIR_TUTORIAL_TOY_PASSES_H
 
 #include <memory>
 
@@ -25,7 +25,7 @@ std::unique_ptr<Pass> createShapeInferencePass();
 /// for a subset of the Toy IR (e.g. matmul).
 std::unique_ptr<mlir::Pass> createLowerToAffinePass();
 
-} // namespace toy
-} // namespace mlir
+} // end namespace toy
+} // end namespace mlir
 
-#endif // TOY_PASSES_H
+#endif // MLIR_TUTORIAL_TOY_PASSES_H

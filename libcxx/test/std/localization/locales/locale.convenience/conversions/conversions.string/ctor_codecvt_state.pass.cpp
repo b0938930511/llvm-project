@@ -8,13 +8,9 @@
 
 // <locale>
 
-// ADDITIONAL_COMPILE_FLAGS: -D_LIBCPP_DISABLE_DEPRECATION_WARNINGS -D_LIBCPP_ENABLE_CXX26_REMOVED_CODECVT
-
 // wstring_convert<Codecvt, Elem, Wide_alloc, Byte_alloc>
 
 // wstring_convert(Codecvt* pcvt, state_type state);
-
-// XFAIL: no-wide-characters
 
 #include <locale>
 #include <codecvt>

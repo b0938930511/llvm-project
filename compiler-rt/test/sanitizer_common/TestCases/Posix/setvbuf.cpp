@@ -1,6 +1,6 @@
 // RUN: %clangxx -O0 -g %s -o %t && %run %t 2>&1 | FileCheck %s
 
-// UNSUPPORTED: target={{.*solaris.*}}
+// UNSUPPORTED: solaris
 
 #include <stdio.h>
 
@@ -25,8 +25,6 @@ void test_setbuf() {
   print_something();
 
   print_one_byte(buf);
-
-  setbuf(stdout, NULL);
 }
 
 void test_setbuffer() {
@@ -36,15 +34,11 @@ void test_setbuffer() {
 
   print_something();
 
-  // Ensure that interceptor reads correct size
-  // (not BUFSIZ as by default, hence BUFSIZ/2).
-  setbuffer(stdout, buf, BUFSIZ / 2);
+  setbuffer(stdout, buf, BUFSIZ);
 
   print_something();
 
   print_one_byte(buf);
-
-  setbuffer(stdout, NULL, 0);
 }
 
 void test_setlinebuf() {
@@ -71,8 +65,6 @@ void test_setvbuf() {
   print_something();
 
   print_one_byte(buf);
-
-  setvbuf(stdout, NULL, _IONBF, 0);
 }
 
 int main(void) {

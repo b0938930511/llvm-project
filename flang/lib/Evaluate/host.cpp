@@ -36,7 +36,7 @@ void HostFloatingPointEnvironment::SetUpHostFloatingPointEnvironment(
   hasSubnormalFlushingHardwareControl_ = true;
   originalMxcsr = _mm_getcsr();
   unsigned int currentMxcsr{originalMxcsr};
-  if (context.targetCharacteristics().areSubnormalsFlushedToZero()) {
+  if (context.flushSubnormalsToZero()) {
     currentMxcsr |= 0x8000;
     currentMxcsr |= 0x0040;
   } else {
@@ -46,14 +46,14 @@ void HostFloatingPointEnvironment::SetUpHostFloatingPointEnvironment(
 #elif defined(__aarch64__)
 #if defined(__GNU_LIBRARY__)
   hasSubnormalFlushingHardwareControl_ = true;
-  if (context.targetCharacteristics().areSubnormalsFlushedToZero()) {
+  if (context.flushSubnormalsToZero()) {
     currentFenv.__fpcr |= (1U << 24); // control register
   } else {
     currentFenv.__fpcr &= ~(1U << 24); // control register
   }
 #elif defined(__BIONIC__)
   hasSubnormalFlushingHardwareControl_ = true;
-  if (context.targetCharacteristics().areSubnormalsFlushedToZero()) {
+  if (context.flushSubnormalsToZero()) {
     currentFenv.__control |= (1U << 24); // control register
   } else {
     currentFenv.__control &= ~(1U << 24); // control register
@@ -85,7 +85,7 @@ void HostFloatingPointEnvironment::SetUpHostFloatingPointEnvironment(
   _mm_setcsr(currentMxcsr);
 #endif
 
-  switch (context.targetCharacteristics().roundingMode().mode) {
+  switch (context.rounding().mode) {
   case common::RoundingMode::TiesToEven:
     fesetround(FE_TONEAREST);
     break;
@@ -102,7 +102,7 @@ void HostFloatingPointEnvironment::SetUpHostFloatingPointEnvironment(
     fesetround(FE_TONEAREST);
     context.messages().Say(
         "TiesAwayFromZero rounding mode is not available when folding constants"
-        " with host runtime; using TiesToEven instead"_warn_en_US);
+        " with host runtime; using TiesToEven instead"_en_US);
     break;
   }
   flags_.clear();
@@ -141,8 +141,7 @@ void HostFloatingPointEnvironment::CheckAndRestoreFloatingPointEnvironment(
   }
 
   if (!flags_.empty()) {
-    RealFlagWarnings(
-        context, flags_, "evaluation of intrinsic function or operation");
+    RealFlagWarnings(context, flags_, "intrinsic function");
   }
   errno = 0;
   if (fesetenv(&originalFenv_) != 0) {

@@ -21,8 +21,8 @@ class APSIntType {
   bool IsUnsigned;
 
 public:
-  constexpr APSIntType(uint32_t Width, bool Unsigned)
-      : BitWidth(Width), IsUnsigned(Unsigned) {}
+  APSIntType(uint32_t Width, bool Unsigned)
+    : BitWidth(Width), IsUnsigned(Unsigned) {}
 
   /* implicit */ APSIntType(const llvm::APSInt &Value)
     : BitWidth(Value.getBitWidth()), IsUnsigned(Value.isUnsigned()) {}

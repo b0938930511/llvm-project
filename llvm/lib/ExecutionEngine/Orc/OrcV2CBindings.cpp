@@ -27,6 +27,42 @@ class InProgressLookupState;
 
 class OrcV2CAPIHelper {
 public:
+  using PoolEntry = SymbolStringPtr::PoolEntry;
+  using PoolEntryPtr = SymbolStringPtr::PoolEntryPtr;
+
+  // Move from SymbolStringPtr to PoolEntryPtr (no change in ref count).
+  static PoolEntryPtr moveFromSymbolStringPtr(SymbolStringPtr S) {
+    PoolEntryPtr Result = nullptr;
+    std::swap(Result, S.S);
+    return Result;
+  }
+
+  // Move from a PoolEntryPtr to a SymbolStringPtr (no change in ref count).
+  static SymbolStringPtr moveToSymbolStringPtr(PoolEntryPtr P) {
+    SymbolStringPtr S;
+    S.S = P;
+    return S;
+  }
+
+  // Copy a pool entry to a SymbolStringPtr (increments ref count).
+  static SymbolStringPtr copyToSymbolStringPtr(PoolEntryPtr P) {
+    return SymbolStringPtr(P);
+  }
+
+  static PoolEntryPtr getRawPoolEntryPtr(const SymbolStringPtr &S) {
+    return S.S;
+  }
+
+  static void retainPoolEntry(PoolEntryPtr P) {
+    SymbolStringPtr S(P);
+    S.S = nullptr;
+  }
+
+  static void releasePoolEntry(PoolEntryPtr P) {
+    SymbolStringPtr S;
+    S.S = P;
+  }
+
   static InProgressLookupState *extractLookupState(LookupState &LS) {
     return LS.IPLS.release();
   }
@@ -39,16 +75,10 @@ public:
 } // namespace orc
 } // namespace llvm
 
-inline LLVMOrcSymbolStringPoolEntryRef wrap(SymbolStringPoolEntryUnsafe E) {
-  return reinterpret_cast<LLVMOrcSymbolStringPoolEntryRef>(E.rawPtr());
-}
-
-inline SymbolStringPoolEntryUnsafe unwrap(LLVMOrcSymbolStringPoolEntryRef E) {
-  return reinterpret_cast<SymbolStringPoolEntryUnsafe::PoolEntry *>(E);
-}
-
 DEFINE_SIMPLE_CONVERSION_FUNCTIONS(ExecutionSession, LLVMOrcExecutionSessionRef)
 DEFINE_SIMPLE_CONVERSION_FUNCTIONS(SymbolStringPool, LLVMOrcSymbolStringPoolRef)
+DEFINE_SIMPLE_CONVERSION_FUNCTIONS(OrcV2CAPIHelper::PoolEntry,
+                                   LLVMOrcSymbolStringPoolEntryRef)
 DEFINE_SIMPLE_CONVERSION_FUNCTIONS(MaterializationUnit,
                                    LLVMOrcMaterializationUnitRef)
 DEFINE_SIMPLE_CONVERSION_FUNCTIONS(MaterializationResponsibility,
@@ -76,6 +106,82 @@ DEFINE_SIMPLE_CONVERSION_FUNCTIONS(LLJITBuilder, LLVMOrcLLJITBuilderRef)
 DEFINE_SIMPLE_CONVERSION_FUNCTIONS(LLJIT, LLVMOrcLLJITRef)
 DEFINE_SIMPLE_CONVERSION_FUNCTIONS(TargetMachine, LLVMTargetMachineRef)
 
+namespace llvm {
+namespace orc {
+
+class CAPIDefinitionGenerator final : public DefinitionGenerator {
+public:
+  CAPIDefinitionGenerator(
+      void *Ctx,
+      LLVMOrcCAPIDefinitionGeneratorTryToGenerateFunction TryToGenerate)
+      : Ctx(Ctx), TryToGenerate(TryToGenerate) {}
+
+  Error tryToGenerate(LookupState &LS, LookupKind K, JITDylib &JD,
+                      JITDylibLookupFlags JDLookupFlags,
+                      const SymbolLookupSet &LookupSet) override {
+
+    // Take the lookup state.
+    LLVMOrcLookupStateRef LSR = ::wrap(OrcV2CAPIHelper::extractLookupState(LS));
+
+    // Translate the lookup kind.
+    LLVMOrcLookupKind CLookupKind;
+    switch (K) {
+    case LookupKind::Static:
+      CLookupKind = LLVMOrcLookupKindStatic;
+      break;
+    case LookupKind::DLSym:
+      CLookupKind = LLVMOrcLookupKindDLSym;
+      break;
+    }
+
+    // Translate the JITDylibSearchFlags.
+    LLVMOrcJITDylibLookupFlags CJDLookupFlags;
+    switch (JDLookupFlags) {
+    case JITDylibLookupFlags::MatchExportedSymbolsOnly:
+      CJDLookupFlags = LLVMOrcJITDylibLookupFlagsMatchExportedSymbolsOnly;
+      break;
+    case JITDylibLookupFlags::MatchAllSymbols:
+      CJDLookupFlags = LLVMOrcJITDylibLookupFlagsMatchAllSymbols;
+      break;
+    }
+
+    // Translate the lookup set.
+    std::vector<LLVMOrcCLookupSetElement> CLookupSet;
+    CLookupSet.reserve(LookupSet.size());
+    for (auto &KV : LookupSet) {
+      LLVMOrcSymbolLookupFlags SLF;
+      LLVMOrcSymbolStringPoolEntryRef Name =
+        ::wrap(OrcV2CAPIHelper::getRawPoolEntryPtr(KV.first));
+      switch (KV.second) {
+      case SymbolLookupFlags::RequiredSymbol:
+        SLF = LLVMOrcSymbolLookupFlagsRequiredSymbol;
+        break;
+      case SymbolLookupFlags::WeaklyReferencedSymbol:
+        SLF = LLVMOrcSymbolLookupFlagsWeaklyReferencedSymbol;
+        break;
+      }
+      CLookupSet.push_back({Name, SLF});
+    }
+
+    // Run the C TryToGenerate function.
+    auto Err = unwrap(TryToGenerate(::wrap(this), Ctx, &LSR, CLookupKind,
+                                    ::wrap(&JD), CJDLookupFlags,
+                                    CLookupSet.data(), CLookupSet.size()));
+
+    // Restore the lookup state.
+    OrcV2CAPIHelper::resetLookupState(LS, ::unwrap(LSR));
+
+    return Err;
+  }
+
+private:
+  void *Ctx;
+  LLVMOrcCAPIDefinitionGeneratorTryToGenerateFunction TryToGenerate;
+};
+
+} // end namespace orc
+} // end namespace llvm
+
 namespace {
 
 class OrcCAPIMaterializationUnit : public llvm::orc::MaterializationUnit {
@@ -86,8 +192,8 @@ public:
       LLVMOrcMaterializationUnitMaterializeFunction Materialize,
       LLVMOrcMaterializationUnitDiscardFunction Discard,
       LLVMOrcMaterializationUnitDestroyFunction Destroy)
-      : llvm::orc::MaterializationUnit(
-            Interface(std::move(InitialSymbolFlags), std::move(InitSymbol))),
+      : llvm::orc::MaterializationUnit(std::move(InitialSymbolFlags),
+                                       std::move(InitSymbol)),
         Name(std::move(Name)), Ctx(Ctx), Materialize(Materialize),
         Discard(Discard), Destroy(Destroy) {}
 
@@ -106,7 +212,7 @@ public:
 
 private:
   void discard(const JITDylib &JD, const SymbolStringPtr &Name) override {
-    Discard(Ctx, wrap(&JD), wrap(SymbolStringPoolEntryUnsafe::from(Name)));
+    Discard(Ctx, wrap(&JD), wrap(OrcV2CAPIHelper::getRawPoolEntryPtr(Name)));
   }
 
   std::string Name;
@@ -154,8 +260,8 @@ static SymbolMap toSymbolMap(LLVMOrcCSymbolMapPairs Syms, size_t NumPairs) {
   SymbolMap SM;
   for (size_t I = 0; I != NumPairs; ++I) {
     JITSymbolFlags Flags = toJITSymbolFlags(Syms[I].Sym.Flags);
-    SM[unwrap(Syms[I].Name).moveToSymbolStringPtr()] = {
-        ExecutorAddr(Syms[I].Sym.Address), Flags};
+    SM[OrcV2CAPIHelper::moveToSymbolStringPtr(unwrap(Syms[I].Name))] =
+        JITEvaluatedSymbol(Syms[I].Sym.Address, Flags);
   }
   return SM;
 }
@@ -169,140 +275,14 @@ toSymbolDependenceMap(LLVMOrcCDependenceMapPairs Pairs, size_t NumPairs) {
 
     for (size_t J = 0; J != Pairs[I].Names.Length; ++J) {
       auto Sym = Pairs[I].Names.Symbols[J];
-      Names.insert(unwrap(Sym).moveToSymbolStringPtr());
+      Names.insert(OrcV2CAPIHelper::moveToSymbolStringPtr(unwrap(Sym)));
     }
     SDM[JD] = Names;
   }
   return SDM;
 }
 
-static LookupKind toLookupKind(LLVMOrcLookupKind K) {
-  switch (K) {
-  case LLVMOrcLookupKindStatic:
-    return LookupKind::Static;
-  case LLVMOrcLookupKindDLSym:
-    return LookupKind::DLSym;
-  }
-  llvm_unreachable("unrecognized LLVMOrcLookupKind value");
-}
-
-static LLVMOrcLookupKind fromLookupKind(LookupKind K) {
-  switch (K) {
-  case LookupKind::Static:
-    return LLVMOrcLookupKindStatic;
-  case LookupKind::DLSym:
-    return LLVMOrcLookupKindDLSym;
-  }
-  llvm_unreachable("unrecognized LookupKind value");
-}
-
-static JITDylibLookupFlags
-toJITDylibLookupFlags(LLVMOrcJITDylibLookupFlags LF) {
-  switch (LF) {
-  case LLVMOrcJITDylibLookupFlagsMatchExportedSymbolsOnly:
-    return JITDylibLookupFlags::MatchExportedSymbolsOnly;
-  case LLVMOrcJITDylibLookupFlagsMatchAllSymbols:
-    return JITDylibLookupFlags::MatchAllSymbols;
-  }
-  llvm_unreachable("unrecognized LLVMOrcJITDylibLookupFlags value");
-}
-
-static LLVMOrcJITDylibLookupFlags
-fromJITDylibLookupFlags(JITDylibLookupFlags LF) {
-  switch (LF) {
-  case JITDylibLookupFlags::MatchExportedSymbolsOnly:
-    return LLVMOrcJITDylibLookupFlagsMatchExportedSymbolsOnly;
-  case JITDylibLookupFlags::MatchAllSymbols:
-    return LLVMOrcJITDylibLookupFlagsMatchAllSymbols;
-  }
-  llvm_unreachable("unrecognized JITDylibLookupFlags value");
-}
-
-static SymbolLookupFlags toSymbolLookupFlags(LLVMOrcSymbolLookupFlags SLF) {
-  switch (SLF) {
-  case LLVMOrcSymbolLookupFlagsRequiredSymbol:
-    return SymbolLookupFlags::RequiredSymbol;
-  case LLVMOrcSymbolLookupFlagsWeaklyReferencedSymbol:
-    return SymbolLookupFlags::WeaklyReferencedSymbol;
-  }
-  llvm_unreachable("unrecognized LLVMOrcSymbolLookupFlags value");
-}
-
-static LLVMOrcSymbolLookupFlags fromSymbolLookupFlags(SymbolLookupFlags SLF) {
-  switch (SLF) {
-  case SymbolLookupFlags::RequiredSymbol:
-    return LLVMOrcSymbolLookupFlagsRequiredSymbol;
-  case SymbolLookupFlags::WeaklyReferencedSymbol:
-    return LLVMOrcSymbolLookupFlagsWeaklyReferencedSymbol;
-  }
-  llvm_unreachable("unrecognized SymbolLookupFlags value");
-}
-
-static LLVMJITEvaluatedSymbol
-fromExecutorSymbolDef(const ExecutorSymbolDef &S) {
-  return {S.getAddress().getValue(), fromJITSymbolFlags(S.getFlags())};
-}
-
 } // end anonymous namespace
-
-namespace llvm {
-namespace orc {
-
-class CAPIDefinitionGenerator final : public DefinitionGenerator {
-public:
-  CAPIDefinitionGenerator(
-      LLVMOrcDisposeCAPIDefinitionGeneratorFunction Dispose, void *Ctx,
-      LLVMOrcCAPIDefinitionGeneratorTryToGenerateFunction TryToGenerate)
-      : Dispose(Dispose), Ctx(Ctx), TryToGenerate(TryToGenerate) {}
-
-  ~CAPIDefinitionGenerator() {
-    if (Dispose)
-      Dispose(Ctx);
-  }
-
-  Error tryToGenerate(LookupState &LS, LookupKind K, JITDylib &JD,
-                      JITDylibLookupFlags JDLookupFlags,
-                      const SymbolLookupSet &LookupSet) override {
-
-    // Take the lookup state.
-    LLVMOrcLookupStateRef LSR = ::wrap(OrcV2CAPIHelper::extractLookupState(LS));
-
-    // Translate the lookup kind.
-    LLVMOrcLookupKind CLookupKind = fromLookupKind(K);
-
-    // Translate the JITDylibLookupFlags.
-    LLVMOrcJITDylibLookupFlags CJDLookupFlags =
-        fromJITDylibLookupFlags(JDLookupFlags);
-
-    // Translate the lookup set.
-    std::vector<LLVMOrcCLookupSetElement> CLookupSet;
-    CLookupSet.reserve(LookupSet.size());
-    for (auto &KV : LookupSet) {
-      LLVMOrcSymbolStringPoolEntryRef Name =
-          ::wrap(SymbolStringPoolEntryUnsafe::from(KV.first));
-      LLVMOrcSymbolLookupFlags SLF = fromSymbolLookupFlags(KV.second);
-      CLookupSet.push_back({Name, SLF});
-    }
-
-    // Run the C TryToGenerate function.
-    auto Err = unwrap(TryToGenerate(::wrap(this), Ctx, &LSR, CLookupKind,
-                                    ::wrap(&JD), CJDLookupFlags,
-                                    CLookupSet.data(), CLookupSet.size()));
-
-    // Restore the lookup state.
-    OrcV2CAPIHelper::resetLookupState(LS, ::unwrap(LSR));
-
-    return Err;
-  }
-
-private:
-  LLVMOrcDisposeCAPIDefinitionGeneratorFunction Dispose;
-  void *Ctx;
-  LLVMOrcCAPIDefinitionGeneratorTryToGenerateFunction TryToGenerate;
-};
-
-} // end namespace orc
-} // end namespace llvm
 
 void LLVMOrcExecutionSessionSetErrorReporter(
     LLVMOrcExecutionSessionRef ES, LLVMOrcErrorReporterFunction ReportError,
@@ -323,55 +303,20 @@ void LLVMOrcSymbolStringPoolClearDeadEntries(LLVMOrcSymbolStringPoolRef SSP) {
 
 LLVMOrcSymbolStringPoolEntryRef
 LLVMOrcExecutionSessionIntern(LLVMOrcExecutionSessionRef ES, const char *Name) {
-  return wrap(SymbolStringPoolEntryUnsafe::take(unwrap(ES)->intern(Name)));
-}
-
-void LLVMOrcExecutionSessionLookup(
-    LLVMOrcExecutionSessionRef ES, LLVMOrcLookupKind K,
-    LLVMOrcCJITDylibSearchOrder SearchOrder, size_t SearchOrderSize,
-    LLVMOrcCLookupSet Symbols, size_t SymbolsSize,
-    LLVMOrcExecutionSessionLookupHandleResultFunction HandleResult, void *Ctx) {
-  assert(ES && "ES cannot be null");
-  assert(SearchOrder && "SearchOrder cannot be null");
-  assert(Symbols && "Symbols cannot be null");
-  assert(HandleResult && "HandleResult cannot be null");
-
-  JITDylibSearchOrder SO;
-  for (size_t I = 0; I != SearchOrderSize; ++I)
-    SO.push_back({unwrap(SearchOrder[I].JD),
-                  toJITDylibLookupFlags(SearchOrder[I].JDLookupFlags)});
-
-  SymbolLookupSet SLS;
-  for (size_t I = 0; I != SymbolsSize; ++I)
-    SLS.add(unwrap(Symbols[I].Name).moveToSymbolStringPtr(),
-            toSymbolLookupFlags(Symbols[I].LookupFlags));
-
-  unwrap(ES)->lookup(
-      toLookupKind(K), SO, std::move(SLS), SymbolState::Ready,
-      [HandleResult, Ctx](Expected<SymbolMap> Result) {
-        if (Result) {
-          SmallVector<LLVMOrcCSymbolMapPair> CResult;
-          for (auto &KV : *Result)
-            CResult.push_back(LLVMOrcCSymbolMapPair{
-                wrap(SymbolStringPoolEntryUnsafe::from(KV.first)),
-                fromExecutorSymbolDef(KV.second)});
-          HandleResult(LLVMErrorSuccess, CResult.data(), CResult.size(), Ctx);
-        } else
-          HandleResult(wrap(Result.takeError()), nullptr, 0, Ctx);
-      },
-      NoDependenciesToRegister);
+  return wrap(
+      OrcV2CAPIHelper::moveFromSymbolStringPtr(unwrap(ES)->intern(Name)));
 }
 
 void LLVMOrcRetainSymbolStringPoolEntry(LLVMOrcSymbolStringPoolEntryRef S) {
-  unwrap(S).retain();
+  OrcV2CAPIHelper::retainPoolEntry(unwrap(S));
 }
 
 void LLVMOrcReleaseSymbolStringPoolEntry(LLVMOrcSymbolStringPoolEntryRef S) {
-  unwrap(S).release();
+  OrcV2CAPIHelper::releasePoolEntry(unwrap(S));
 }
 
 const char *LLVMOrcSymbolStringPoolEntryStr(LLVMOrcSymbolStringPoolEntryRef S) {
-  return unwrap(S).rawPtr()->getKey().data();
+  return unwrap(S)->getKey().data();
 }
 
 LLVMOrcResourceTrackerRef
@@ -421,10 +366,10 @@ LLVMOrcMaterializationUnitRef LLVMOrcCreateCustomMaterializationUnit(
     LLVMOrcMaterializationUnitDestroyFunction Destroy) {
   SymbolFlagsMap SFM;
   for (size_t I = 0; I != NumSyms; ++I)
-    SFM[unwrap(Syms[I].Name).moveToSymbolStringPtr()] =
+    SFM[OrcV2CAPIHelper::moveToSymbolStringPtr(unwrap(Syms[I].Name))] =
         toJITSymbolFlags(Syms[I].Flags);
 
-  auto IS = unwrap(InitSym).moveToSymbolStringPtr();
+  auto IS = OrcV2CAPIHelper::moveToSymbolStringPtr(unwrap(InitSym));
 
   return wrap(new OrcCAPIMaterializationUnit(
       Name, std::move(SFM), std::move(IS), Ctx, Materialize, Discard, Destroy));
@@ -445,8 +390,9 @@ LLVMOrcMaterializationUnitRef LLVMOrcLazyReexports(
   for (size_t I = 0; I != NumPairs; ++I) {
     auto pair = CallableAliases[I];
     JITSymbolFlags Flags = toJITSymbolFlags(pair.Entry.Flags);
-    SymbolStringPtr Name = unwrap(pair.Entry.Name).moveToSymbolStringPtr();
-    SAM[unwrap(pair.Name).moveToSymbolStringPtr()] =
+    SymbolStringPtr Name =
+        OrcV2CAPIHelper::moveToSymbolStringPtr(unwrap(pair.Entry.Name));
+    SAM[OrcV2CAPIHelper::moveToSymbolStringPtr(unwrap(pair.Name))] =
         SymbolAliasMapEntry(Name, Flags);
   }
 
@@ -479,7 +425,7 @@ LLVMOrcCSymbolFlagsMapPairs LLVMOrcMaterializationResponsibilityGetSymbols(
       safe_malloc(Symbols.size() * sizeof(LLVMOrcCSymbolFlagsMapPair)));
   size_t I = 0;
   for (auto const &pair : Symbols) {
-    auto Name = wrap(SymbolStringPoolEntryUnsafe::from(pair.first));
+    auto Name = wrap(OrcV2CAPIHelper::getRawPoolEntryPtr(pair.first));
     auto Flags = pair.second;
     Result[I] = {Name, fromJITSymbolFlags(Flags)};
     I++;
@@ -496,7 +442,7 @@ LLVMOrcSymbolStringPoolEntryRef
 LLVMOrcMaterializationResponsibilityGetInitializerSymbol(
     LLVMOrcMaterializationResponsibilityRef MR) {
   auto Sym = unwrap(MR)->getInitializerSymbol();
-  return wrap(SymbolStringPoolEntryUnsafe::from(Sym));
+  return wrap(OrcV2CAPIHelper::getRawPoolEntryPtr(Sym));
 }
 
 LLVMOrcSymbolStringPoolEntryRef *
@@ -509,7 +455,7 @@ LLVMOrcMaterializationResponsibilityGetRequestedSymbols(
           Symbols.size() * sizeof(LLVMOrcSymbolStringPoolEntryRef)));
   size_t I = 0;
   for (auto &Name : Symbols) {
-    Result[I] = wrap(SymbolStringPoolEntryUnsafe::from(Name));
+    Result[I] = wrap(OrcV2CAPIHelper::getRawPoolEntryPtr(Name));
     I++;
   }
   *NumSymbols = Symbols.size();
@@ -537,7 +483,7 @@ LLVMErrorRef LLVMOrcMaterializationResponsibilityDefineMaterializing(
     LLVMOrcCSymbolFlagsMapPairs Syms, size_t NumSyms) {
   SymbolFlagsMap SFM;
   for (size_t I = 0; I != NumSyms; ++I)
-    SFM[unwrap(Syms[I].Name).moveToSymbolStringPtr()] =
+    SFM[OrcV2CAPIHelper::moveToSymbolStringPtr(unwrap(Syms[I].Name))] =
         toJITSymbolFlags(Syms[I].Flags);
 
   return wrap(unwrap(MR)->defineMaterializing(std::move(SFM)));
@@ -556,7 +502,7 @@ LLVMErrorRef LLVMOrcMaterializationResponsibilityDelegate(
     LLVMOrcMaterializationResponsibilityRef *Result) {
   SymbolNameSet Syms;
   for (size_t I = 0; I != NumSymbols; I++) {
-    Syms.insert(unwrap(Symbols[I]).moveToSymbolStringPtr());
+    Syms.insert(OrcV2CAPIHelper::moveToSymbolStringPtr(unwrap(Symbols[I])));
   }
   auto OtherMR = unwrap(MR)->delegate(Syms);
 
@@ -573,7 +519,7 @@ void LLVMOrcMaterializationResponsibilityAddDependencies(
     LLVMOrcCDependenceMapPairs Dependencies, size_t NumPairs) {
 
   SymbolDependenceMap SDM = toSymbolDependenceMap(Dependencies, NumPairs);
-  auto Sym = unwrap(Name).moveToSymbolStringPtr();
+  auto Sym = OrcV2CAPIHelper::moveToSymbolStringPtr(unwrap(Name));
   unwrap(MR)->addDependencies(Sym, SDM);
 }
 
@@ -643,17 +589,9 @@ void LLVMOrcJITDylibAddGenerator(LLVMOrcJITDylibRef JD,
 }
 
 LLVMOrcDefinitionGeneratorRef LLVMOrcCreateCustomCAPIDefinitionGenerator(
-    LLVMOrcCAPIDefinitionGeneratorTryToGenerateFunction F, void *Ctx,
-    LLVMOrcDisposeCAPIDefinitionGeneratorFunction Dispose) {
-  auto DG = std::make_unique<CAPIDefinitionGenerator>(Dispose, Ctx, F);
+    LLVMOrcCAPIDefinitionGeneratorTryToGenerateFunction F, void *Ctx) {
+  auto DG = std::make_unique<CAPIDefinitionGenerator>(Ctx, F);
   return wrap(DG.release());
-}
-
-void LLVMOrcLookupStateContinueLookup(LLVMOrcLookupStateRef S,
-                                      LLVMErrorRef Err) {
-  LookupState LS;
-  OrcV2CAPIHelper::resetLookupState(LS, ::unwrap(S));
-  LS.continueLookup(unwrap(Err));
 }
 
 LLVMErrorRef LLVMOrcCreateDynamicLibrarySearchGeneratorForProcess(
@@ -666,61 +604,18 @@ LLVMErrorRef LLVMOrcCreateDynamicLibrarySearchGeneratorForProcess(
   DynamicLibrarySearchGenerator::SymbolPredicate Pred;
   if (Filter)
     Pred = [=](const SymbolStringPtr &Name) -> bool {
-      return Filter(FilterCtx, wrap(SymbolStringPoolEntryUnsafe::from(Name)));
+      return Filter(FilterCtx, wrap(OrcV2CAPIHelper::getRawPoolEntryPtr(Name)));
     };
 
   auto ProcessSymsGenerator =
       DynamicLibrarySearchGenerator::GetForCurrentProcess(GlobalPrefix, Pred);
 
   if (!ProcessSymsGenerator) {
-    *Result = nullptr;
+    *Result = 0;
     return wrap(ProcessSymsGenerator.takeError());
   }
 
   *Result = wrap(ProcessSymsGenerator->release());
-  return LLVMErrorSuccess;
-}
-
-LLVMErrorRef LLVMOrcCreateDynamicLibrarySearchGeneratorForPath(
-    LLVMOrcDefinitionGeneratorRef *Result, const char *FileName,
-    char GlobalPrefix, LLVMOrcSymbolPredicate Filter, void *FilterCtx) {
-  assert(Result && "Result can not be null");
-  assert(FileName && "FileName can not be null");
-  assert((Filter || !FilterCtx) &&
-         "if Filter is null then FilterCtx must also be null");
-
-  DynamicLibrarySearchGenerator::SymbolPredicate Pred;
-  if (Filter)
-    Pred = [=](const SymbolStringPtr &Name) -> bool {
-      return Filter(FilterCtx, wrap(SymbolStringPoolEntryUnsafe::from(Name)));
-    };
-
-  auto LibrarySymsGenerator =
-      DynamicLibrarySearchGenerator::Load(FileName, GlobalPrefix, Pred);
-
-  if (!LibrarySymsGenerator) {
-    *Result = nullptr;
-    return wrap(LibrarySymsGenerator.takeError());
-  }
-
-  *Result = wrap(LibrarySymsGenerator->release());
-  return LLVMErrorSuccess;
-}
-
-LLVMErrorRef LLVMOrcCreateStaticLibrarySearchGeneratorForPath(
-    LLVMOrcDefinitionGeneratorRef *Result, LLVMOrcObjectLayerRef ObjLayer,
-    const char *FileName) {
-  assert(Result && "Result can not be null");
-  assert(FileName && "Filename can not be null");
-  assert(ObjLayer && "ObjectLayer can not be null");
-
-  auto LibrarySymsGenerator =
-      StaticLibraryDefinitionGenerator::Load(*unwrap(ObjLayer), FileName);
-  if (!LibrarySymsGenerator) {
-    *Result = nullptr;
-    return wrap(LibrarySymsGenerator.takeError());
-  }
-  *Result = wrap(LibrarySymsGenerator->release());
   return LLVMErrorSuccess;
 }
 
@@ -762,7 +657,7 @@ LLVMErrorRef LLVMOrcJITTargetMachineBuilderDetectHost(
 
   auto JTMB = JITTargetMachineBuilder::detectHost();
   if (!JTMB) {
-    Result = nullptr;
+    Result = 0;
     return wrap(JTMB.takeError());
   }
 
@@ -815,9 +710,9 @@ LLVMErrorRef LLVMOrcObjectLayerAddObjectFile(LLVMOrcObjectLayerRef ObjLayer,
       *unwrap(JD), std::unique_ptr<MemoryBuffer>(unwrap(ObjBuffer))));
 }
 
-LLVMErrorRef LLVMOrcObjectLayerAddObjectFileWithRT(LLVMOrcObjectLayerRef ObjLayer,
-                                                   LLVMOrcResourceTrackerRef RT,
-                                                   LLVMMemoryBufferRef ObjBuffer) {
+LLVMErrorRef LLVMOrcLLJITAddObjectFileWithRT(LLVMOrcObjectLayerRef ObjLayer,
+                                             LLVMOrcResourceTrackerRef RT,
+                                             LLVMMemoryBufferRef ObjBuffer) {
   return wrap(
       unwrap(ObjLayer)->add(ResourceTrackerSP(unwrap(RT)),
                             std::unique_ptr<MemoryBuffer>(unwrap(ObjBuffer))));
@@ -848,10 +743,7 @@ void LLVMOrcIRTransformLayerSetTransform(
               assert(!TSMRef && "TSMRef was not reset to null on error");
               return unwrap(Err);
             }
-            assert(TSMRef && "Transform succeeded, but TSMRef was set to null");
-            ThreadSafeModule Result = std::move(*unwrap(TSMRef));
-            LLVMOrcDisposeThreadSafeModule(TSMRef);
-            return std::move(Result);
+            return std::move(*unwrap(TSMRef));
           });
 }
 
@@ -929,7 +821,7 @@ LLVMErrorRef LLVMOrcCreateLLJIT(LLVMOrcLLJITRef *Result,
   LLVMOrcDisposeLLJITBuilder(Builder);
 
   if (!J) {
-    Result = nullptr;
+    Result = 0;
     return wrap(J.takeError());
   }
 
@@ -960,7 +852,7 @@ char LLVMOrcLLJITGetGlobalPrefix(LLVMOrcLLJITRef J) {
 
 LLVMOrcSymbolStringPoolEntryRef
 LLVMOrcLLJITMangleAndIntern(LLVMOrcLLJITRef J, const char *UnmangledName) {
-  return wrap(SymbolStringPoolEntryUnsafe::take(
+  return wrap(OrcV2CAPIHelper::moveFromSymbolStringPtr(
       unwrap(J)->mangleAndIntern(UnmangledName)));
 }
 
@@ -1004,7 +896,7 @@ LLVMErrorRef LLVMOrcLLJITLookup(LLVMOrcLLJITRef J,
     return wrap(Sym.takeError());
   }
 
-  *Result = Sym->getValue();
+  *Result = Sym->getAddress();
   return LLVMErrorSuccess;
 }
 
@@ -1023,116 +915,6 @@ LLVMOrcCreateRTDyldObjectLinkingLayerWithSectionMemoryManager(
   assert(ES && "ES must not be null");
   return wrap(new RTDyldObjectLinkingLayer(
       *unwrap(ES), [] { return std::make_unique<SectionMemoryManager>(); }));
-}
-
-LLVMOrcObjectLayerRef
-LLVMOrcCreateRTDyldObjectLinkingLayerWithMCJITMemoryManagerLikeCallbacks(
-    LLVMOrcExecutionSessionRef ES, void *CreateContextCtx,
-    LLVMMemoryManagerCreateContextCallback CreateContext,
-    LLVMMemoryManagerNotifyTerminatingCallback NotifyTerminating,
-    LLVMMemoryManagerAllocateCodeSectionCallback AllocateCodeSection,
-    LLVMMemoryManagerAllocateDataSectionCallback AllocateDataSection,
-    LLVMMemoryManagerFinalizeMemoryCallback FinalizeMemory,
-    LLVMMemoryManagerDestroyCallback Destroy) {
-
-  struct MCJITMemoryManagerLikeCallbacks {
-    MCJITMemoryManagerLikeCallbacks() = default;
-    MCJITMemoryManagerLikeCallbacks(
-        void *CreateContextCtx,
-        LLVMMemoryManagerCreateContextCallback CreateContext,
-        LLVMMemoryManagerNotifyTerminatingCallback NotifyTerminating,
-        LLVMMemoryManagerAllocateCodeSectionCallback AllocateCodeSection,
-        LLVMMemoryManagerAllocateDataSectionCallback AllocateDataSection,
-        LLVMMemoryManagerFinalizeMemoryCallback FinalizeMemory,
-        LLVMMemoryManagerDestroyCallback Destroy)
-        : CreateContextCtx(CreateContextCtx), CreateContext(CreateContext),
-          NotifyTerminating(NotifyTerminating),
-          AllocateCodeSection(AllocateCodeSection),
-          AllocateDataSection(AllocateDataSection),
-          FinalizeMemory(FinalizeMemory), Destroy(Destroy) {}
-
-    MCJITMemoryManagerLikeCallbacks(MCJITMemoryManagerLikeCallbacks &&Other) {
-      std::swap(CreateContextCtx, Other.CreateContextCtx);
-      std::swap(CreateContext, Other.CreateContext);
-      std::swap(NotifyTerminating, Other.NotifyTerminating);
-      std::swap(AllocateCodeSection, Other.AllocateCodeSection);
-      std::swap(AllocateDataSection, Other.AllocateDataSection);
-      std::swap(FinalizeMemory, Other.FinalizeMemory);
-      std::swap(Destroy, Other.Destroy);
-    }
-
-    ~MCJITMemoryManagerLikeCallbacks() {
-      if (NotifyTerminating)
-        NotifyTerminating(CreateContextCtx);
-    }
-
-    void *CreateContextCtx = nullptr;
-    LLVMMemoryManagerCreateContextCallback CreateContext = nullptr;
-    LLVMMemoryManagerNotifyTerminatingCallback NotifyTerminating = nullptr;
-    LLVMMemoryManagerAllocateCodeSectionCallback AllocateCodeSection = nullptr;
-    LLVMMemoryManagerAllocateDataSectionCallback AllocateDataSection = nullptr;
-    LLVMMemoryManagerFinalizeMemoryCallback FinalizeMemory = nullptr;
-    LLVMMemoryManagerDestroyCallback Destroy = nullptr;
-  };
-
-  class MCJITMemoryManagerLikeCallbacksMemMgr : public RTDyldMemoryManager {
-  public:
-    MCJITMemoryManagerLikeCallbacksMemMgr(
-        const MCJITMemoryManagerLikeCallbacks &CBs)
-        : CBs(CBs) {
-      Opaque = CBs.CreateContext(CBs.CreateContextCtx);
-    }
-    ~MCJITMemoryManagerLikeCallbacksMemMgr() override { CBs.Destroy(Opaque); }
-
-    uint8_t *allocateCodeSection(uintptr_t Size, unsigned Alignment,
-                                 unsigned SectionID,
-                                 StringRef SectionName) override {
-      return CBs.AllocateCodeSection(Opaque, Size, Alignment, SectionID,
-                                     SectionName.str().c_str());
-    }
-
-    uint8_t *allocateDataSection(uintptr_t Size, unsigned Alignment,
-                                 unsigned SectionID, StringRef SectionName,
-                                 bool isReadOnly) override {
-      return CBs.AllocateDataSection(Opaque, Size, Alignment, SectionID,
-                                     SectionName.str().c_str(), isReadOnly);
-    }
-
-    bool finalizeMemory(std::string *ErrMsg) override {
-      char *ErrMsgCString = nullptr;
-      bool Result = CBs.FinalizeMemory(Opaque, &ErrMsgCString);
-      assert((Result || !ErrMsgCString) &&
-             "Did not expect an error message if FinalizeMemory succeeded");
-      if (ErrMsgCString) {
-        if (ErrMsg)
-          *ErrMsg = ErrMsgCString;
-        free(ErrMsgCString);
-      }
-      return Result;
-    }
-
-  private:
-    const MCJITMemoryManagerLikeCallbacks &CBs;
-    void *Opaque = nullptr;
-  };
-
-  assert(ES && "ES must not be null");
-  assert(CreateContext && "CreateContext must not be null");
-  assert(NotifyTerminating && "NotifyTerminating must not be null");
-  assert(AllocateCodeSection && "AllocateCodeSection must not be null");
-  assert(AllocateDataSection && "AllocateDataSection must not be null");
-  assert(FinalizeMemory && "FinalizeMemory must not be null");
-  assert(Destroy && "Destroy must not be null");
-
-  MCJITMemoryManagerLikeCallbacks CBs(
-      CreateContextCtx, CreateContext, NotifyTerminating, AllocateCodeSection,
-      AllocateDataSection, FinalizeMemory, Destroy);
-
-  return wrap(new RTDyldObjectLinkingLayer(*unwrap(ES), [CBs = std::move(CBs)] {
-    return std::make_unique<MCJITMemoryManagerLikeCallbacksMemMgr>(CBs);
-  }));
-
-  return nullptr;
 }
 
 void LLVMOrcRTDyldObjectLinkingLayerRegisterJITEventListener(
@@ -1166,8 +948,8 @@ LLVMErrorRef LLVMOrcCreateLocalLazyCallThroughManager(
     const char *TargetTriple, LLVMOrcExecutionSessionRef ES,
     LLVMOrcJITTargetAddress ErrorHandlerAddr,
     LLVMOrcLazyCallThroughManagerRef *Result) {
-  auto LCTM = createLocalLazyCallThroughManager(
-      Triple(TargetTriple), *unwrap(ES), ExecutorAddr(ErrorHandlerAddr));
+  auto LCTM = createLocalLazyCallThroughManager(Triple(TargetTriple),
+                                                *unwrap(ES), ErrorHandlerAddr);
 
   if (!LCTM)
     return wrap(LCTM.takeError());

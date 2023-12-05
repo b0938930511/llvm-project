@@ -86,8 +86,9 @@ private:
       StatusReplace, StatusScratch, DataList)
 
   template <typename R, typename T> std::optional<R> GetConstExpr(const T &x) {
-    using DefaultCharConstantType = evaluate::Ascii;
-    if (const SomeExpr * expr{GetExpr(context_, x)}) {
+    using DefaultCharConstantType =
+        evaluate::Type<common::TypeCategory::Character, 1>;
+    if (const SomeExpr * expr{GetExpr(x)}) {
       const auto foldExpr{
           evaluate::Fold(context_.foldingContext(), common::Clone(*expr))};
       if constexpr (std::is_same_v<R, std::string>) {
@@ -125,16 +126,6 @@ private:
   void CheckForDefinableVariable(const A &var, const std::string &s) const;
 
   void CheckForPureSubprogram() const;
-
-  parser::Message *CheckForBadIoType(const evaluate::DynamicType &,
-      common::DefinedIo, parser::CharBlock) const;
-  void CheckForBadIoType(
-      const SomeExpr &, common::DefinedIo, parser::CharBlock) const;
-  parser::Message *CheckForBadIoType(
-      const Symbol &, common::DefinedIo, parser::CharBlock) const;
-
-  void CheckNamelist(
-      const Symbol &, common::DefinedIo, parser::CharBlock) const;
 
   void Init(IoStmtKind s) {
     stmt_ = s;

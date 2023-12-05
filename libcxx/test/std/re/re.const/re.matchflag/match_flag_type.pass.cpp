@@ -1,3 +1,4 @@
+// -*- C++ -*-
 //===----------------------------------------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -11,7 +12,7 @@
 // namespace regex_constants
 // {
 //
-// enum match_flag_type  // bitmask type
+// emum match_flag_type  // bitmask type
 // {
 //     match_default     = 0,
 //     match_not_bol     = unspecified,

@@ -18,10 +18,9 @@
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
-#include "llvm/IRPrinter/IRPrintingPasses.h"
 #include "llvm/IRReader/IRReader.h"
-#include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileSystem.h"
@@ -31,14 +30,8 @@
 #include "llvm/Support/SystemUtils.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Transforms/IPO.h"
-#include "llvm/Transforms/IPO/BlockExtractor.h"
-#include "llvm/Transforms/IPO/ExtractGV.h"
-#include "llvm/Transforms/IPO/GlobalDCE.h"
-#include "llvm/Transforms/IPO/StripDeadPrototypes.h"
-#include "llvm/Transforms/IPO/StripSymbols.h"
 #include <memory>
 #include <utility>
-
 using namespace llvm;
 
 cl::OptionCategory ExtractCat("llvm-extract Options");
@@ -72,7 +65,8 @@ static cl::opt<bool>
 // ExtractFuncs - The functions to extract from the module.
 static cl::list<std::string>
     ExtractFuncs("func", cl::desc("Specify function to extract"),
-                 cl::value_desc("function"), cl::cat(ExtractCat));
+                 cl::ZeroOrMore, cl::value_desc("function"),
+                 cl::cat(ExtractCat));
 
 // ExtractRegExpFuncs - The functions, matched via regular expression, to
 // extract from the module.
@@ -80,7 +74,8 @@ static cl::list<std::string>
     ExtractRegExpFuncs("rfunc",
                        cl::desc("Specify function(s) to extract using a "
                                 "regular expression"),
-                       cl::value_desc("rfunction"), cl::cat(ExtractCat));
+                       cl::ZeroOrMore, cl::value_desc("rfunction"),
+                       cl::cat(ExtractCat));
 
 // ExtractBlocks - The blocks to extract from the module.
 static cl::list<std::string> ExtractBlocks(
@@ -94,12 +89,14 @@ static cl::list<std::string> ExtractBlocks(
         "  --bb=f:bb1;bb2 will extract one function with both bb1 and bb2;\n"
         "  --bb=f:bb1 --bb=f:bb2 will extract two functions, one with bb1, one "
         "with bb2."),
-    cl::value_desc("function:bb1[;bb2...]"), cl::cat(ExtractCat));
+    cl::ZeroOrMore, cl::value_desc("function:bb1[;bb2...]"),
+    cl::cat(ExtractCat));
 
 // ExtractAlias - The alias to extract from the module.
 static cl::list<std::string>
     ExtractAliases("alias", cl::desc("Specify alias to extract"),
-                   cl::value_desc("alias"), cl::cat(ExtractCat));
+                   cl::ZeroOrMore, cl::value_desc("alias"),
+                   cl::cat(ExtractCat));
 
 // ExtractRegExpAliases - The aliases, matched via regular expression, to
 // extract from the module.
@@ -107,12 +104,14 @@ static cl::list<std::string>
     ExtractRegExpAliases("ralias",
                          cl::desc("Specify alias(es) to extract using a "
                                   "regular expression"),
-                         cl::value_desc("ralias"), cl::cat(ExtractCat));
+                         cl::ZeroOrMore, cl::value_desc("ralias"),
+                         cl::cat(ExtractCat));
 
 // ExtractGlobals - The globals to extract from the module.
 static cl::list<std::string>
     ExtractGlobals("glob", cl::desc("Specify global to extract"),
-                   cl::value_desc("global"), cl::cat(ExtractCat));
+                   cl::ZeroOrMore, cl::value_desc("global"),
+                   cl::cat(ExtractCat));
 
 // ExtractRegExpGlobals - The globals, matched via regular expression, to
 // extract from the module...
@@ -120,7 +119,8 @@ static cl::list<std::string>
     ExtractRegExpGlobals("rglob",
                          cl::desc("Specify global(s) to extract using a "
                                   "regular expression"),
-                         cl::value_desc("rglobal"), cl::cat(ExtractCat));
+                         cl::ZeroOrMore, cl::value_desc("rglobal"),
+                         cl::cat(ExtractCat));
 
 static cl::opt<bool> OutputAssembly("S",
                                     cl::desc("Write output as LLVM assembly"),
@@ -323,22 +323,9 @@ int main(int argc, char **argv) {
 
   {
     std::vector<GlobalValue *> Gvs(GVs.begin(), GVs.end());
-    LoopAnalysisManager LAM;
-    FunctionAnalysisManager FAM;
-    CGSCCAnalysisManager CGAM;
-    ModuleAnalysisManager MAM;
-
-    PassBuilder PB;
-
-    PB.registerModuleAnalyses(MAM);
-    PB.registerCGSCCAnalyses(CGAM);
-    PB.registerFunctionAnalyses(FAM);
-    PB.registerLoopAnalyses(LAM);
-    PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
-
-    ModulePassManager PM;
-    PM.addPass(ExtractGVPass(Gvs, DeleteFn, KeepConstInit));
-    PM.run(*M, MAM);
+    legacy::PassManager Extract;
+    Extract.add(createGVExtractionPass(Gvs, DeleteFn, KeepConstInit));
+    Extract.run(*M);
 
     // Now that we have all the GVs we want, mark the module as fully
     // materialized.
@@ -350,9 +337,9 @@ int main(int argc, char **argv) {
   // functions.
   if (!ExtractBlocks.empty()) {
     // Figure out which BasicBlocks we should extract.
-    std::vector<std::vector<BasicBlock *>> GroupOfBBs;
+    SmallVector<SmallVector<BasicBlock *, 16>, 4> GroupOfBBs;
     for (auto &P : BBMap) {
-      std::vector<BasicBlock *> BBs;
+      SmallVector<BasicBlock *, 16> BBs;
       for (StringRef BBName : P.second) {
         // The function has been materialized, so add its matching basic blocks
         // to the block extractor list, or fail if a name is not found.
@@ -370,45 +357,19 @@ int main(int argc, char **argv) {
       GroupOfBBs.push_back(BBs);
     }
 
-    LoopAnalysisManager LAM;
-    FunctionAnalysisManager FAM;
-    CGSCCAnalysisManager CGAM;
-    ModuleAnalysisManager MAM;
-
-    PassBuilder PB;
-
-    PB.registerModuleAnalyses(MAM);
-    PB.registerCGSCCAnalyses(CGAM);
-    PB.registerFunctionAnalyses(FAM);
-    PB.registerLoopAnalyses(LAM);
-    PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
-
-    ModulePassManager PM;
-    PM.addPass(BlockExtractorPass(std::move(GroupOfBBs), true));
-    PM.run(*M, MAM);
+    legacy::PassManager PM;
+    PM.add(createBlockExtractorPass(GroupOfBBs, true));
+    PM.run(*M);
   }
 
   // In addition to deleting all other functions, we also want to spiff it
   // up a little bit.  Do this now.
+  legacy::PassManager Passes;
 
-  LoopAnalysisManager LAM;
-  FunctionAnalysisManager FAM;
-  CGSCCAnalysisManager CGAM;
-  ModuleAnalysisManager MAM;
-
-  PassBuilder PB;
-
-  PB.registerModuleAnalyses(MAM);
-  PB.registerCGSCCAnalyses(CGAM);
-  PB.registerFunctionAnalyses(FAM);
-  PB.registerLoopAnalyses(LAM);
-  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
-
-  ModulePassManager PM;
   if (!DeleteFn)
-    PM.addPass(GlobalDCEPass());
-  PM.addPass(StripDeadDebugInfoPass());
-  PM.addPass(StripDeadPrototypesPass());
+    Passes.add(createGlobalDCEPass());           // Delete unreachable globals
+  Passes.add(createStripDeadDebugInfoPass());    // Remove dead debug info
+  Passes.add(createStripDeadPrototypesPass());   // Remove dead func decls
 
   std::error_code EC;
   ToolOutputFile Out(OutputFilename, EC, sys::fs::OF_None);
@@ -418,11 +379,12 @@ int main(int argc, char **argv) {
   }
 
   if (OutputAssembly)
-    PM.addPass(PrintModulePass(Out.os(), "", PreserveAssemblyUseListOrder));
+    Passes.add(
+        createPrintModulePass(Out.os(), "", PreserveAssemblyUseListOrder));
   else if (Force || !CheckBitcodeOutputToConsole(Out.os()))
-    PM.addPass(BitcodeWriterPass(Out.os(), PreserveBitcodeUseListOrder));
+    Passes.add(createBitcodeWriterPass(Out.os(), PreserveBitcodeUseListOrder));
 
-  PM.run(*M, MAM);
+  Passes.run(*M.get());
 
   // Declare success.
   Out.keep();

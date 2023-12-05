@@ -5,6 +5,6 @@
 
 // expected-no-diagnostics
 
-int foo(void) {
+int foo() {
   return MyEnumCst;
 }

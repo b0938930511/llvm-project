@@ -25,9 +25,7 @@ def ThunderX3T110Model : SchedMachineModel {
   let CompleteModel         =   1;
 
   list<Predicate> UnsupportedFeatures = !listconcat(SVEUnsupported.F,
-                                                    PAUnsupported.F,
-                                                    SMEUnsupported.F,
-                                                    [HasMTE]);
+                                                    PAUnsupported.F);
   // FIXME: Remove when all errors have been fixed.
   let FullInstRWOverlapCheck = 0;
 }
@@ -143,14 +141,14 @@ def THX3T110Write_7Cyc_I1 : SchedWriteRes<[THX3T110I1]> {
 // 23 cycles on I1.
 def THX3T110Write_23Cyc_I1 : SchedWriteRes<[THX3T110I1]> {
   let Latency = 23;
-  let ReleaseAtCycles = [13, 23];
+  let ResourceCycles = [13, 23];
   let NumMicroOps = 4;
 }
 
 // 39 cycles on I1.
 def THX3T110Write_39Cyc_I1 : SchedWriteRes<[THX3T110I1]> {
   let Latency = 39;
-  let ReleaseAtCycles = [13, 39];
+  let ResourceCycles = [13, 39];
   let NumMicroOps = 4;
 }
 
@@ -278,14 +276,14 @@ def THX3T110Write_10Cyc_F01 : SchedWriteRes<[THX3T110FP0123]> {
 def THX3T110Write_16Cyc_F01 : SchedWriteRes<[THX3T110FP0123]> {
   let Latency = 16;
   let NumMicroOps = 3;
-  let ReleaseAtCycles = [8];
+  let ResourceCycles = [8];
 }
 
 // 23 cycles on F0/F1/F2/F3.
 def THX3T110Write_23Cyc_F01 : SchedWriteRes<[THX3T110FP0123]> {
   let Latency = 23;
   let NumMicroOps = 3;
-  let ReleaseAtCycles = [11];
+  let ResourceCycles = [11];
 }
 
 // 1 cycle on LS0/LS1.
@@ -304,7 +302,7 @@ def THX3T110Write_2Cyc_LS01 : SchedWriteRes<[THX3T110LS]> {
 def THX3T110Write_4Cyc_LS01 : SchedWriteRes<[THX3T110LS]> {
   let Latency = 4;
   let NumMicroOps = 2;
-  let ReleaseAtCycles = [2];
+  let ResourceCycles = [2];
 }
 
 // 5 cycles on LS0/LS1.
@@ -326,7 +324,7 @@ def THX3T110Write_6Cyc_LS01 : SchedWriteRes<[THX3T110LS]> {
 def THX3T110Write_4_5Cyc_LS01 : SchedWriteRes<[THX3T110LS]> {
   let Latency = 4;
   let NumMicroOps = 2;
-  let ReleaseAtCycles = [4, 5];
+  let ResourceCycles = [4, 5];
 }
 
 // 4 + 8 cycles on LS0/LS1.
@@ -336,7 +334,7 @@ def THX3T110Write_4_5Cyc_LS01 : SchedWriteRes<[THX3T110LS]> {
 def THX3T110Write_4_8Cyc_LS01 : SchedWriteRes<[THX3T110LS]> {
   let Latency = 4;
   let NumMicroOps = 2;
-  let ReleaseAtCycles = [4, 8];
+  let ResourceCycles = [4, 8];
 }
 
 // 11 cycles on LS0/LS1 and I1.
@@ -607,7 +605,7 @@ def THX3T110Write_3_4Cyc_F23_F0123 :
   SchedWriteRes<[THX3T110FP23, THX3T110FP0123]> {
   let Latency = 3;
   let NumMicroOps = 2;
-  let ReleaseAtCycles = [3, 4];
+  let ResourceCycles = [3, 4];
 }
 
 
@@ -623,7 +621,6 @@ def : ReadAdvance<ReadID,      0>;
 def : ReadAdvance<ReadExtrHi,  0>;
 def : ReadAdvance<ReadAdrBase, 0>;
 def : ReadAdvance<ReadVLD,     0>;
-def : ReadAdvance<ReadST,      0>;
 
 //===----------------------------------------------------------------------===//
 // 3. Instruction Tables.
@@ -678,7 +675,7 @@ def : InstRW<[THX3T110Write_1Cyc_I23],
 // Address generation
 def : WriteRes<WriteI,       [THX3T110I0123]> {
   let Latency = 1;
-  let ReleaseAtCycles = [1];
+  let ResourceCycles = [1];
   let NumMicroOps = 2;
 }
 
@@ -700,7 +697,7 @@ def : InstRW<[WriteI], (instrs COPY)>;
 // ALU, extend and/or shift
 def : WriteRes<WriteISReg,   [THX3T110I0123]> {
   let Latency = 2;
-  let ReleaseAtCycles = [2];
+  let ResourceCycles = [2];
   let NumMicroOps = 2;
 }
 
@@ -719,7 +716,7 @@ def : InstRW<[WriteISReg],
 
 def : WriteRes<WriteIEReg,   [THX3T110I0123]> {
   let Latency = 1;
-  let ReleaseAtCycles = [1];
+  let ResourceCycles = [1];
   let NumMicroOps = 2;
 }
 
@@ -762,14 +759,14 @@ def : WriteRes<WriteIS,      [THX3T110I0123]> {
 // Latency range of 13-23/13-39.
 def : WriteRes<WriteID32,    [THX3T110I1]> {
   let Latency = 39;
-  let ReleaseAtCycles = [39];
+  let ResourceCycles = [39];
   let NumMicroOps = 4;
 }
 
 // Divide, X-form
 def : WriteRes<WriteID64,    [THX3T110I1]> {
   let Latency = 23;
-  let ReleaseAtCycles = [23];
+  let ResourceCycles = [23];
   let NumMicroOps = 4;
 }
 
@@ -1218,36 +1215,36 @@ def : WriteRes<WriteFCmp,    [THX3T110FP0123]> {
 // FP Mul, Div, Sqrt
 def : WriteRes<WriteFDiv, [THX3T110FP0123]> {
   let Latency = 22;
-  let ReleaseAtCycles = [19];
+  let ResourceCycles = [19];
 }
 
 def THX3T110XWriteFDiv : SchedWriteRes<[THX3T110FP0123]> {
   let Latency = 16;
-  let ReleaseAtCycles = [8];
+  let ResourceCycles = [8];
   let NumMicroOps = 4;
 }
 
 def THX3T110XWriteFDivSP : SchedWriteRes<[THX3T110FP0123]> {
   let Latency = 16;
-  let ReleaseAtCycles = [8];
+  let ResourceCycles = [8];
   let NumMicroOps = 4;
 }
 
 def THX3T110XWriteFDivDP : SchedWriteRes<[THX3T110FP0123]> {
   let Latency = 23;
-  let ReleaseAtCycles = [12];
+  let ResourceCycles = [12];
   let NumMicroOps = 4;
 }
 
 def THX3T110XWriteFSqrtSP : SchedWriteRes<[THX3T110FP0123]> {
   let Latency = 16;
-  let ReleaseAtCycles = [8];
+  let ResourceCycles = [8];
   let NumMicroOps = 4;
 }
 
 def THX3T110XWriteFSqrtDP : SchedWriteRes<[THX3T110FP0123]> {
   let Latency = 23;
-  let ReleaseAtCycles = [12];
+  let ResourceCycles = [12];
   let NumMicroOps = 4;
 }
 
@@ -1271,19 +1268,19 @@ def : InstRW<[THX3T110Write_23Cyc_F01], (instregex "^FDIVDrr", "^FSQRTDr")>;
 // FP multiply accumulate
 def : WriteRes<WriteFMul, [THX3T110FP0123]> {
   let Latency = 6;
-  let ReleaseAtCycles = [2];
+  let ResourceCycles = [2];
   let NumMicroOps = 3;
 }
 
 def THX3T110XWriteFMul : SchedWriteRes<[THX3T110FP0123]> {
   let Latency = 6;
-  let ReleaseAtCycles = [2];
+  let ResourceCycles = [2];
   let NumMicroOps = 3;
 }
 
 def THX3T110XWriteFMulAcc : SchedWriteRes<[THX3T110FP0123]> {
   let Latency = 6;
-  let ReleaseAtCycles = [2];
+  let ResourceCycles = [2];
   let NumMicroOps = 3;
 }
 
@@ -1359,15 +1356,10 @@ def : InstRW<[THX3T110Write_5Cyc_F01], (instrs FMOVXDHighr, FMOVDXHighr)>;
 // ASIMD shift by register, basic, Q-form
 // ASIMD shift by register, complex, D-form
 // ASIMD shift by register, complex, Q-form
-def : WriteRes<WriteVd, [THX3T110FP0123]> {
+def : WriteRes<WriteV, [THX3T110FP0123]> {
   let Latency = 5;
   let NumMicroOps = 4;
-  let ReleaseAtCycles = [4];
-}
-def : WriteRes<WriteVq, [THX3T110FP0123]> {
-  let Latency = 5;
-  let NumMicroOps = 4;
-  let ReleaseAtCycles = [4];
+  let ResourceCycles = [4];
 }
 
 // ASIMD arith, reduce, 4H/4S
@@ -1610,7 +1602,7 @@ def : InstRW<[THX3T110Write_3_4Cyc_F23_F0123],
 // ASIMD duplicate, gen reg
 // ASIMD duplicate, element
 def : InstRW<[THX3T110Write_5Cyc_F0123], (instregex "^DUPv")>;
-def : InstRW<[THX3T110Write_5Cyc_F0123], (instregex "^DUP(i8|i16|i32|i64)$")>;
+def : InstRW<[THX3T110Write_5Cyc_F0123], (instregex "^CPY")>;
 def : InstRW<[THX3T110Write_5Cyc_F0123], (instregex "^DUPv.+gpr")>;
 
 // ASIMD extract

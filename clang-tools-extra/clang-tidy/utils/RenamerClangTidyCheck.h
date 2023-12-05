@@ -1,4 +1,4 @@
-//===--- RenamerClangTidyCheck.h - clang-tidy -------------------*- C++ -*-===//
+//===--- RenamderClangTidyCheck.h - clang-tidy ------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -13,7 +13,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/FunctionExtras.h"
-#include <optional>
+#include "llvm/ADT/Optional.h"
 #include <string>
 #include <utility>
 
@@ -32,13 +32,14 @@ public:
 
   /// Derived classes should not implement any matching logic themselves; this
   /// class will do the matching and call the derived class'
-  /// getDeclFailureInfo() and getMacroFailureInfo() for determining whether a
+  /// GetDeclFailureInfo() and GetMacroFailureInfo() for determining whether a
   /// given identifier passes or fails the check.
-  void registerMatchers(ast_matchers::MatchFinder *Finder) final;
-  void check(const ast_matchers::MatchFinder::MatchResult &Result) final;
+  void registerMatchers(ast_matchers::MatchFinder *Finder) override final;
+  void
+  check(const ast_matchers::MatchFinder::MatchResult &Result) override final;
   void registerPPCallbacks(const SourceManager &SM, Preprocessor *PP,
-                           Preprocessor *ModuleExpanderPP) final;
-  void onEndOfTranslationUnit() final;
+                           Preprocessor *ModuleExpanderPP) override final;
+  void onEndOfTranslationUnit() override final;
 
   /// Derived classes that override this function should call this method from
   /// the overridden method.
@@ -86,11 +87,11 @@ public:
     ///
     /// e.g.: if the identifier was used or declared within a macro we won't
     /// offer a fixup for safety reasons.
-    bool shouldFix() const {
+    bool ShouldFix() const {
       return FixStatus == ShouldFixStatus::ShouldFix && !Info.Fixup.empty();
     }
 
-    bool shouldNotify() const {
+    bool ShouldNotify() const {
       return FixStatus < ShouldFixStatus::IgnoreFailureThreshold;
     }
 
@@ -102,39 +103,36 @@ public:
     NamingCheckFailure() = default;
   };
 
-  using NamingCheckId = std::pair<SourceLocation, StringRef>;
+  using NamingCheckId = std::pair<SourceLocation, std::string>;
 
   using NamingCheckFailureMap =
       llvm::DenseMap<NamingCheckId, NamingCheckFailure>;
 
   /// Check Macros for style violations.
-  void checkMacro(const SourceManager &SourceMgr, const Token &MacroNameTok,
+  void checkMacro(SourceManager &sourceMgr, const Token &MacroNameTok,
                   const MacroInfo *MI);
 
   /// Add a usage of a macro if it already has a violation.
   void expandMacro(const Token &MacroNameTok, const MacroInfo *MI);
 
   void addUsage(const RenamerClangTidyCheck::NamingCheckId &Decl,
-                SourceRange Range, const SourceManager *SourceMgr = nullptr);
+                SourceRange Range, SourceManager *SourceMgr = nullptr);
 
   /// Convenience method when the usage to be added is a NamedDecl.
   void addUsage(const NamedDecl *Decl, SourceRange Range,
-                const SourceManager *SourceMgr = nullptr);
-
-  void checkNamedDecl(const NamedDecl *Decl, const SourceManager &SourceMgr);
+                SourceManager *SourceMgr = nullptr);
 
 protected:
   /// Overridden by derived classes, returns information about if and how a Decl
-  /// failed the check. A 'std::nullopt' result means the Decl did not fail the
-  /// check.
-  virtual std::optional<FailureInfo>
-  getDeclFailureInfo(const NamedDecl *Decl, const SourceManager &SM) const = 0;
+  /// failed the check. A 'None' result means the Decl did not fail the check.
+  virtual llvm::Optional<FailureInfo>
+  GetDeclFailureInfo(const NamedDecl *Decl, const SourceManager &SM) const = 0;
 
   /// Overridden by derived classes, returns information about if and how a
-  /// macro failed the check. A 'std::nullopt' result means the macro did not
-  /// fail the check.
-  virtual std::optional<FailureInfo>
-  getMacroFailureInfo(const Token &MacroNameTok,
+  /// macro failed the check. A 'None' result means the macro did not fail the
+  /// check.
+  virtual llvm::Optional<FailureInfo>
+  GetMacroFailureInfo(const Token &MacroNameTok,
                       const SourceManager &SM) const = 0;
 
   /// Represents customized diagnostic text and how arguments should be applied.
@@ -153,7 +151,7 @@ protected:
   /// that should be emitted for the given failure. The base class will then
   /// further customize the diagnostic by adding info about whether the fix-it
   /// can be automatically applied or not.
-  virtual DiagInfo getDiagInfo(const NamingCheckId &ID,
+  virtual DiagInfo GetDiagInfo(const NamingCheckId &ID,
                                const NamingCheckFailure &Failure) const = 0;
 
 private:

@@ -14,16 +14,16 @@ entry:
   ret void
 }
 
-; CTOR:      .section      .ctors,"aw"
+; CTOR:      .section      .ctors,#alloc,#write
 ; CTOR-NEXT: .p2align      2
 ; CTOR-NEXT: .word  f
-; CTOR-NEXT: .section      .ctors.65520,"aGw"
+; CTOR-NEXT: .section      .ctors.65520,#alloc,#write
 ; CTOR-NEXT: .p2align      2
 ; CTOR-NEXT: .word  g
 
-; INIT-ARRAY:    .section  .init_array.15,"aGw"
+; INIT-ARRAY:    .section  .init_array.15,#alloc,#write
 ; INIT-ARRAY-NEXT: .p2align  2
 ; INIT-ARRAY-NEXT: .word g
-; INIT-ARRAY-NEXT: .section  .init_array,"aw"
+; INIT-ARRAY-NEXT: .section  .init_array,#alloc,#write
 ; INIT-ARRAY-NEXT: .p2align  2
 ; INIT-ARRAY-NEXT: .word f

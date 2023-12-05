@@ -15,8 +15,8 @@
 #include "BitstreamRemarkParser.h"
 #include "YAMLRemarkParser.h"
 #include "llvm-c/Remarks.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CBindingWrapping.h"
-#include <optional>
 
 using namespace llvm;
 using namespace llvm::remarks;
@@ -87,8 +87,8 @@ llvm::remarks::createRemarkParser(Format ParserFormat, StringRef Buf,
 
 Expected<std::unique_ptr<RemarkParser>>
 llvm::remarks::createRemarkParserFromMeta(
-    Format ParserFormat, StringRef Buf, std::optional<ParsedStringTable> StrTab,
-    std::optional<StringRef> ExternalFilePrependPath) {
+    Format ParserFormat, StringRef Buf, Optional<ParsedStringTable> StrTab,
+    Optional<StringRef> ExternalFilePrependPath) {
   switch (ParserFormat) {
   // Depending on the metadata, the format can be either yaml or yaml-strtab,
   // regardless of the input argument.
@@ -110,16 +110,16 @@ namespace {
 // Wrapper that holds the state needed to interact with the C API.
 struct CParser {
   std::unique_ptr<RemarkParser> TheParser;
-  std::optional<std::string> Err;
+  Optional<std::string> Err;
 
   CParser(Format ParserFormat, StringRef Buf,
-          std::optional<ParsedStringTable> StrTab = std::nullopt)
+          Optional<ParsedStringTable> StrTab = None)
       : TheParser(cantFail(
             StrTab ? createRemarkParser(ParserFormat, Buf, std::move(*StrTab))
                    : createRemarkParser(ParserFormat, Buf))) {}
 
   void handleError(Error E) { Err.emplace(toString(std::move(E))); }
-  bool hasError() const { return Err.has_value(); }
+  bool hasError() const { return Err.hasValue(); }
   const char *getMessage() const { return Err ? Err->c_str() : nullptr; };
 };
 } // namespace

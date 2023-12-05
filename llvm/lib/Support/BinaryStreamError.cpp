@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Support/BinaryStreamError.h"
-#include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace llvm;
 

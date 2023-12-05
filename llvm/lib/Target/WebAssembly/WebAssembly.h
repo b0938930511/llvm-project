@@ -25,7 +25,9 @@ class ModulePass;
 class FunctionPass;
 
 // LLVM IR passes.
-ModulePass *createWebAssemblyLowerEmscriptenEHSjLj();
+ModulePass *createWebAssemblyLowerEmscriptenEHSjLj(bool EnableEH,
+                                                   bool EnableSjLj);
+ModulePass *createWebAssemblyLowerGlobalDtors();
 ModulePass *createWebAssemblyAddMissingPrototypes();
 ModulePass *createWebAssemblyFixFunctionBitcasts();
 FunctionPass *createWebAssemblyOptimizeReturned();
@@ -33,13 +35,14 @@ FunctionPass *createWebAssemblyLowerRefTypesIntPtrConv();
 
 // ISel and immediate followup passes.
 FunctionPass *createWebAssemblyISelDag(WebAssemblyTargetMachine &TM,
-                                       CodeGenOptLevel OptLevel);
+                                       CodeGenOpt::Level OptLevel);
 FunctionPass *createWebAssemblyArgumentMove();
 FunctionPass *createWebAssemblySetP2AlignOperands();
 
 // Late passes.
 FunctionPass *createWebAssemblyReplacePhysRegs();
 FunctionPass *createWebAssemblyNullifyDebugValueLists();
+FunctionPass *createWebAssemblyPrepareForLiveIntervals();
 FunctionPass *createWebAssemblyOptimizeLiveIntervals();
 FunctionPass *createWebAssemblyMemIntrinsicResults();
 FunctionPass *createWebAssemblyRegStackify();
@@ -54,35 +57,36 @@ FunctionPass *createWebAssemblyLowerBrUnless();
 FunctionPass *createWebAssemblyRegNumbering();
 FunctionPass *createWebAssemblyDebugFixup();
 FunctionPass *createWebAssemblyPeephole();
-ModulePass *createWebAssemblyMCLowerPrePass();
+FunctionPass *createWebAssemblyMCLowerPrePass();
 
 // PassRegistry initialization declarations.
+void initializeWebAssemblyAddMissingPrototypesPass(PassRegistry &);
+void initializeWebAssemblyLowerEmscriptenEHSjLjPass(PassRegistry &);
+void initializeLowerGlobalDtorsPass(PassRegistry &);
 void initializeFixFunctionBitcastsPass(PassRegistry &);
 void initializeOptimizeReturnedPass(PassRegistry &);
-void initializeWebAssemblyAddMissingPrototypesPass(PassRegistry &);
 void initializeWebAssemblyArgumentMovePass(PassRegistry &);
-void initializeWebAssemblyCFGSortPass(PassRegistry &);
-void initializeWebAssemblyCFGStackifyPass(PassRegistry &);
-void initializeWebAssemblyDAGToDAGISelPass(PassRegistry &);
-void initializeWebAssemblyDebugFixupPass(PassRegistry &);
-void initializeWebAssemblyExceptionInfoPass(PassRegistry &);
-void initializeWebAssemblyExplicitLocalsPass(PassRegistry &);
+void initializeWebAssemblySetP2AlignOperandsPass(PassRegistry &);
+void initializeWebAssemblyReplacePhysRegsPass(PassRegistry &);
+void initializeWebAssemblyNullifyDebugValueListsPass(PassRegistry &);
+void initializeWebAssemblyPrepareForLiveIntervalsPass(PassRegistry &);
+void initializeWebAssemblyOptimizeLiveIntervalsPass(PassRegistry &);
+void initializeWebAssemblyMemIntrinsicResultsPass(PassRegistry &);
+void initializeWebAssemblyRegStackifyPass(PassRegistry &);
+void initializeWebAssemblyRegColoringPass(PassRegistry &);
 void initializeWebAssemblyFixBrTableDefaultsPass(PassRegistry &);
 void initializeWebAssemblyFixIrreducibleControlFlowPass(PassRegistry &);
 void initializeWebAssemblyLateEHPreparePass(PassRegistry &);
+void initializeWebAssemblyExceptionInfoPass(PassRegistry &);
+void initializeWebAssemblyCFGSortPass(PassRegistry &);
+void initializeWebAssemblyCFGStackifyPass(PassRegistry &);
+void initializeWebAssemblyExplicitLocalsPass(PassRegistry &);
 void initializeWebAssemblyLowerBrUnlessPass(PassRegistry &);
-void initializeWebAssemblyLowerEmscriptenEHSjLjPass(PassRegistry &);
-void initializeWebAssemblyLowerRefTypesIntPtrConvPass(PassRegistry &);
-void initializeWebAssemblyMCLowerPrePassPass(PassRegistry &);
-void initializeWebAssemblyMemIntrinsicResultsPass(PassRegistry &);
-void initializeWebAssemblyNullifyDebugValueListsPass(PassRegistry &);
-void initializeWebAssemblyOptimizeLiveIntervalsPass(PassRegistry &);
-void initializeWebAssemblyPeepholePass(PassRegistry &);
-void initializeWebAssemblyRegColoringPass(PassRegistry &);
 void initializeWebAssemblyRegNumberingPass(PassRegistry &);
-void initializeWebAssemblyRegStackifyPass(PassRegistry &);
-void initializeWebAssemblyReplacePhysRegsPass(PassRegistry &);
-void initializeWebAssemblySetP2AlignOperandsPass(PassRegistry &);
+void initializeWebAssemblyDebugFixupPass(PassRegistry &);
+void initializeWebAssemblyPeepholePass(PassRegistry &);
+void initializeWebAssemblyMCLowerPrePassPass(PassRegistry &);
+void initializeWebAssemblyLowerRefTypesIntPtrConvPass(PassRegistry &);
 
 namespace WebAssembly {
 enum TargetIndex {

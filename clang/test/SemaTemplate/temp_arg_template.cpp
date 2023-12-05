@@ -1,5 +1,6 @@
-// RUN: %clang_cc1 -fsyntax-only -verify=expected,precxx17 %std_cxx98-14 %s
-// RUN: %clang_cc1 -fsyntax-only -verify=expected,cxx17 -std=c++17 %s
+// RUN: %clang_cc1 -fsyntax-only -verify %s
+// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s
+// RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s
 
 template<template<typename T> class X> struct A; // expected-note 2{{previous template template parameter is here}}
 
@@ -18,7 +19,7 @@ namespace N {
 template<class, class> struct TooMany; // expected-note{{too many template parameters in template template argument}}
 
 
-A<X> *a1;
+A<X> *a1; 
 A<N::Z> *a2;
 A< ::N::Z> *a3;
 
@@ -41,25 +42,24 @@ A<::N::Z> *a10;
 
 // Do not do a digraph correction here.
 A<: :N::Z> *a11;  // expected-error{{expected expression}} \
-                     precxx17-error{{a type specifier is required for all declarations}} \
-                     cxx17-error{{expected unqualified-id}}
+          expected-error{{C++ requires a type specifier for all declarations}}
 
 // PR7807
 namespace N {
-  template <typename, typename = int>
+  template <typename, typename = int> 
   struct X
   { };
 
-  template <typename ,int>
+  template <typename ,int> 
   struct Y
   { X<int> const_ref(); };
 
-  template <template<typename,int> class TT, typename T, int N>
+  template <template<typename,int> class TT, typename T, int N> 
   int operator<<(int, TT<T, N> a) { // expected-note{{candidate template ignored}}
     0 << a.const_ref(); // expected-error{{invalid operands to binary expression ('int' and 'X<int>')}}
   }
 
-  void f0( Y<int,1> y){ 1 << y; } // expected-note{{in instantiation of function template specialization 'N::operator<<<N::Y, int, 1>' requested here}}
+  void f0( Y<int,1> y){ 1 << y; } // expected-note{{in instantiation of function template specialization 'N::operator<<<Y, int, 1>' requested here}}
 }
 
 // PR12179
@@ -104,8 +104,7 @@ void foo() {
 namespace CheckDependentNonTypeParamTypes {
   template<template<typename T, typename U, T v> class X> struct A {
     void f() {
-      X<int, void*, 3> x; // precxx17-error {{does not refer to any declaration}} \
-                             cxx17-error {{value of type 'int' is not implicitly convertible to 'void *'}}
+      X<int, void*, 3> x; // expected-error {{does not refer to any declaration}}
     }
     void g() {
       X<int, long, 3> x;
@@ -124,7 +123,7 @@ namespace CheckDependentNonTypeParamTypes {
     }
   };
 
-  template<typename T, typename U, U v> struct B { // precxx17-note {{parameter}}
+  template<typename T, typename U, U v> struct B { // expected-note {{parameter}}
     static const U value = v;
   };
 

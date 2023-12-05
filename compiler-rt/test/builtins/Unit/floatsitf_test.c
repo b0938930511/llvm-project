@@ -8,12 +8,12 @@
 
 #include "fp_test.h"
 
-COMPILER_RT_ABI long double __floatsitf(si_int a);
+long COMPILER_RT_ABI double __floatsitf(int a);
 
-int test__floatsitf(si_int a, uint64_t expectedHi, uint64_t expectedLo)
+int test__floatsitf(int a, uint64_t expectedHi, uint64_t expectedLo)
 {
     long double x = __floatsitf(a);
-    int ret = compareResultF128(x, expectedHi, expectedLo);
+    int ret = compareResultLD(x, expectedHi, expectedLo);
 
     if (ret)
     {

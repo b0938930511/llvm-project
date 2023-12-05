@@ -12,6 +12,7 @@
 // RUN: FileCheck %s -check-prefix=WRONG < %t/98
 // RUN: FileCheck %s -check-prefix=WRONG < %t/11
 // WRONG-NOT: CommentXMLInvalid
+// rdar://12378714
 
 /**
  * \brief plain c++ class
@@ -48,7 +49,7 @@ protected:
 // CHECK: <Declaration>Test()</Declaration>
 // CHECK: <Declaration>unsigned int getID() const</Declaration>
 // CHECK: <Declaration>~Test(){{( noexcept)?}}</Declaration>
-// CHECK: <Declaration>data *reserved</Declaration>
+// CHECK: <Declaration>Test::data *reserved</Declaration>
 
 
 class S {
@@ -148,7 +149,7 @@ namespace test3 {
   };
 }
 // CHECK: <Declaration>void f(const T &amp;t = T())</Declaration>
-// CHECK: <Declaration>friend void vector&lt;A&gt;::f(const A &amp;)</Declaration>
+// CHECK: <Declaration>friend void vector&lt;A&gt;::f(const test3::A &amp;)</Declaration>
 
 class MyClass
 {

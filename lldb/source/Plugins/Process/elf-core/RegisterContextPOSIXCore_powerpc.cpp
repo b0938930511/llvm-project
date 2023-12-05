@@ -92,7 +92,7 @@ bool RegisterContextCorePOSIX_powerpc::ReadRegister(
 }
 
 bool RegisterContextCorePOSIX_powerpc::ReadAllRegisterValues(
-    lldb::WritableDataBufferSP &data_sp) {
+    lldb::DataBufferSP &data_sp) {
   return false;
 }
 

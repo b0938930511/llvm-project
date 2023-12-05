@@ -12,8 +12,6 @@
 
 // const charT* tolower(charT* low, const charT* high) const;
 
-// XFAIL: no-wide-characters
-
 #include <locale>
 #include <string>
 #include <cassert>

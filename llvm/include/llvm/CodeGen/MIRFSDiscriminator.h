@@ -17,21 +17,33 @@
 #ifndef LLVM_CODEGEN_MIRFSDISCRIMINATOR_H
 #define LLVM_CODEGEN_MIRFSDISCRIMINATOR_H
 
-#include "llvm/ADT/StringRef.h"
+#include "llvm/Analysis/ProfileSummaryInfo.h"
+#include "llvm/CodeGen/MachineBasicBlock.h"
+#include "llvm/CodeGen/MachineBlockFrequencyInfo.h"
+#include "llvm/CodeGen/MachineBranchProbabilityInfo.h"
+#include "llvm/CodeGen/MachineDominators.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
-#include "llvm/Support/Discriminator.h"
+#include "llvm/CodeGen/MachineInstr.h"
+#include "llvm/CodeGen/MachineLoopInfo.h"
+#include "llvm/CodeGen/MachineOptimizationRemarkEmitter.h"
+#include "llvm/CodeGen/MachinePostDominators.h"
+#include "llvm/CodeGen/Passes.h"
+#include "llvm/IR/DebugInfoMetadata.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/Module.h"
+#include "llvm/InitializePasses.h"
+#include "llvm/ProfileData/InstrProf.h"
+#include "llvm/ProfileData/SampleProf.h"
+#include "llvm/ProfileData/SampleProfReader.h"
 
 #include <cassert>
-#include <cstdint>
 
 namespace llvm {
-class MachineFunction;
 
 using namespace sampleprof;
 class MIRAddFSDiscriminators : public MachineFunctionPass {
-  MachineFunction *MF = nullptr;
-  FSDiscriminatorPass Pass;
+  MachineFunction *MF;
   unsigned LowBit;
   unsigned HighBit;
 
@@ -39,14 +51,10 @@ public:
   static char ID;
   /// PassNum is the sequence number this pass is called, start from 1.
   MIRAddFSDiscriminators(FSDiscriminatorPass P = FSDiscriminatorPass::Pass1)
-      : MachineFunctionPass(ID), Pass(P) {
+      : MachineFunctionPass(ID) {
     LowBit = getFSPassBitBegin(P);
     HighBit = getFSPassBitEnd(P);
     assert(LowBit < HighBit && "HighBit needs to be greater than Lowbit");
-  }
-
-  StringRef getPassName() const override {
-    return "Add FS discriminators in MIR";
   }
 
   /// getNumFSBBs() - Return the number of machine BBs that have FS samples.

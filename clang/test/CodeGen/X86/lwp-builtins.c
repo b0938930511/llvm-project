@@ -4,13 +4,13 @@
 
 void test_llwpcb(void *ptr) {
   // CHECK-LABEL: @test_llwpcb
-  // CHECK: call void @llvm.x86.llwpcb(ptr %{{.*}})
+  // CHECK: call void @llvm.x86.llwpcb(i8* %{{.*}})
   __llwpcb(ptr);
 }
 
-void* test_slwpcb(void) {
+void* test_slwpcb() {
   // CHECK-LABEL: @test_slwpcb
-  // CHECK: call ptr @llvm.x86.slwpcb()
+  // CHECK: call i8* @llvm.x86.slwpcb()
   return __slwpcb();
 }
 

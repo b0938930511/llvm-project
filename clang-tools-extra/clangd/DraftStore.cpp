@@ -7,21 +7,22 @@
 //===----------------------------------------------------------------------===//
 
 #include "DraftStore.h"
+#include "SourceCode.h"
 #include "support/Logger.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/Errc.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include <memory>
-#include <optional>
 
 namespace clang {
 namespace clangd {
 
-std::optional<DraftStore::Draft> DraftStore::getDraft(PathRef File) const {
+llvm::Optional<DraftStore::Draft> DraftStore::getDraft(PathRef File) const {
   std::lock_guard<std::mutex> Lock(Mutex);
 
   auto It = Drafts.find(File);
   if (It == Drafts.end())
-    return std::nullopt;
+    return None;
 
   return It->second.D;
 }

@@ -11,11 +11,13 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::performance {
+namespace clang {
+namespace tidy {
+namespace performance {
 
 /// Finds local variables that cannot be automatically moved due to constness.
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/performance/no-automatic-move.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/performance-no-automatic-move.html
 class NoAutomaticMoveCheck : public ClangTidyCheck {
 public:
   NoAutomaticMoveCheck(StringRef Name, ClangTidyContext *Context);
@@ -27,9 +29,11 @@ public:
   void storeOptions(ClangTidyOptions::OptionMap &Opts) override;
 
 private:
-  const std::vector<StringRef> AllowedTypes;
+  const std::vector<std::string> AllowedTypes;
 };
 
-} // namespace clang::tidy::performance
+} // namespace performance
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_PERFORMANCE_NOAUTOMATICMOVECHECK_H

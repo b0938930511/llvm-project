@@ -42,11 +42,6 @@ static cl::opt<bool> RemoveTUReplacementFiles(
              "merging/replacing."),
     cl::init(false), cl::cat(ReplacementCategory));
 
-static cl::opt<bool> IgnoreInsertConflict(
-    "ignore-insert-conflict",
-    cl::desc("Ignore insert conflict and keep running to fix."),
-    cl::init(false), cl::cat(ReplacementCategory));
-
 static cl::opt<bool> DoFormat(
     "format",
     cl::desc("Enable formatting of code changed by applying replacements.\n"
@@ -91,7 +86,7 @@ static void printVersion(raw_ostream &OS) {
 }
 
 int main(int argc, char **argv) {
-  cl::HideUnrelatedOptions(ArrayRef(VisibleCategories));
+  cl::HideUnrelatedOptions(makeArrayRef(VisibleCategories));
 
   cl::SetVersionPrinter(printVersion);
   cl::ParseCommandLineOptions(argc, argv);
@@ -136,7 +131,7 @@ int main(int argc, char **argv) {
   SourceManager SM(Diagnostics, Files);
 
   FileToChangesMap Changes;
-  if (!mergeAndDeduplicate(TURs, TUDs, Changes, SM, IgnoreInsertConflict))
+  if (!mergeAndDeduplicate(TURs, TUDs, Changes, SM))
     return 1;
 
   tooling::ApplyChangesSpec Spec;
@@ -146,8 +141,8 @@ int main(int argc, char **argv) {
                          : tooling::ApplyChangesSpec::kNone;
 
   for (const auto &FileChange : Changes) {
-    FileEntryRef Entry = FileChange.first;
-    StringRef FileName = Entry.getName();
+    const FileEntry *Entry = FileChange.first;
+    StringRef FileName = Entry->getName();
     llvm::Expected<std::string> NewFileData =
         applyChanges(FileName, FileChange.second, Spec, Diagnostics);
     if (!NewFileData) {

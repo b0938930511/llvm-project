@@ -30,10 +30,10 @@ void testA(A *a) {
 #endif
 }
 
-void testB(void) {
+void testB() {
   B b; // Note: redundant error silenced
 }
 
-void testDef(void) {
+void testDef() {
   [def defMethod];
 }

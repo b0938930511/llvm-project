@@ -37,12 +37,7 @@ int main() {
   return 0;
 }
 
-// Required for dyld macOS 12.0+
-#if (__APPLE__)
-__attribute__((weak))
-#endif
-extern "C" void
-__asan_on_error() {
+void __asan_on_error() {
   int present = __asan_report_present();
   void *addr = __asan_get_report_address();
   const char *description = __asan_get_report_description();

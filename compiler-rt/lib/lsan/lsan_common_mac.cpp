@@ -15,55 +15,38 @@
 #include "sanitizer_common/sanitizer_libc.h"
 #include "lsan_common.h"
 
-#if CAN_SANITIZE_LEAKS && SANITIZER_APPLE
+#if CAN_SANITIZE_LEAKS && SANITIZER_MAC
 
-#  include <mach/mach.h>
-#  include <mach/vm_statistics.h>
-#  include <pthread.h>
+#include "sanitizer_common/sanitizer_allocator_internal.h"
+#include "lsan_allocator.h"
 
-#  include "lsan_allocator.h"
-#  include "sanitizer_common/sanitizer_allocator_internal.h"
+#include <pthread.h>
+
+#include <mach/mach.h>
+
+// Only introduced in Mac OS X 10.9.
+#ifdef VM_MEMORY_OS_ALLOC_ONCE
+static const int kSanitizerVmMemoryOsAllocOnce = VM_MEMORY_OS_ALLOC_ONCE;
+#else
+static const int kSanitizerVmMemoryOsAllocOnce = 73;
+#endif
+
 namespace __lsan {
-
-class ThreadContextLsanBase;
-
-enum class SeenRegion {
-  None = 0,
-  AllocOnce = 1 << 0,
-  LibDispatch = 1 << 1,
-  Foundation = 1 << 2,
-  All = AllocOnce | LibDispatch | Foundation
-};
-
-inline SeenRegion operator|(SeenRegion left, SeenRegion right) {
-  return static_cast<SeenRegion>(static_cast<int>(left) |
-                                 static_cast<int>(right));
-}
-
-inline SeenRegion &operator|=(SeenRegion &left, const SeenRegion &right) {
-  left = left | right;
-  return left;
-}
-
-struct RegionScanState {
-  SeenRegion seen_regions = SeenRegion::None;
-  bool in_libdispatch = false;
-};
 
 typedef struct {
   int disable_counter;
-  ThreadContextLsanBase *current_thread;
+  u32 current_thread_id;
   AllocatorCache cache;
 } thread_local_data_t;
 
 static pthread_key_t key;
 static pthread_once_t key_once = PTHREAD_ONCE_INIT;
 
-// The main thread destructor requires the current thread,
-// so we can't destroy it until it's been used and reset.
+// The main thread destructor requires the current thread id,
+// so we can't destroy it until it's been used and reset to invalid tid
 void restore_tid_data(void *ptr) {
   thread_local_data_t *data = (thread_local_data_t *)ptr;
-  if (data->current_thread)
+  if (data->current_thread_id != kInvalidTid)
     pthread_setspecific(key, data);
 }
 
@@ -78,7 +61,7 @@ static thread_local_data_t *get_tls_val(bool alloc) {
   if (ptr == NULL && alloc) {
     ptr = (thread_local_data_t *)InternalAlloc(sizeof(*ptr));
     ptr->disable_counter = 0;
-    ptr->current_thread = nullptr;
+    ptr->current_thread_id = kInvalidTid;
     ptr->cache = AllocatorCache();
     pthread_setspecific(key, ptr);
   }
@@ -101,14 +84,12 @@ void EnableInThisThread() {
   --*disable_counter;
 }
 
-ThreadContextLsanBase *GetCurrentThread() {
+u32 GetCurrentThread() {
   thread_local_data_t *data = get_tls_val(false);
-  return data ? data->current_thread : nullptr;
+  return data ? data->current_thread_id : kInvalidTid;
 }
 
-void SetCurrentThread(ThreadContextLsanBase *tctx) {
-  get_tls_val(true)->current_thread = tctx;
-}
+void SetCurrentThread(u32 tid) { get_tls_val(true)->current_thread_id = tid; }
 
 AllocatorCache *GetAllocatorCache() { return &get_tls_val(true)->cache; }
 
@@ -162,50 +143,31 @@ void ProcessGlobalRegions(Frontier *frontier) {
 }
 
 void ProcessPlatformSpecificAllocations(Frontier *frontier) {
+  unsigned depth = 1;
+  vm_size_t size = 0;
   vm_address_t address = 0;
   kern_return_t err = KERN_SUCCESS;
+  mach_msg_type_number_t count = VM_REGION_SUBMAP_INFO_COUNT_64;
 
-  InternalMmapVector<Region> mapped_regions;
-  bool use_root_regions = flags()->use_root_regions && HasRootRegions();
+  InternalMmapVector<RootRegion> const *root_regions = GetRootRegions();
 
-  RegionScanState scan_state;
   while (err == KERN_SUCCESS) {
-    vm_size_t size = 0;
-    unsigned depth = 1;
     struct vm_region_submap_info_64 info;
-    mach_msg_type_number_t count = VM_REGION_SUBMAP_INFO_COUNT_64;
     err = vm_region_recurse_64(mach_task_self(), &address, &size, &depth,
                                (vm_region_info_t)&info, &count);
 
     uptr end_address = address + size;
-    if (info.user_tag == VM_MEMORY_OS_ALLOC_ONCE) {
-      // libxpc stashes some pointers in the Kernel Alloc Once page,
-      // make sure not to report those as leaks.
-      scan_state.seen_regions |= SeenRegion::AllocOnce;
-      ScanRangeForPointers(address, end_address, frontier, "GLOBAL",
-                           kReachable);
-    } else if (info.user_tag == VM_MEMORY_FOUNDATION) {
-      // Objective-C block trampolines use the Foundation region.
-      scan_state.seen_regions |= SeenRegion::Foundation;
-      ScanRangeForPointers(address, end_address, frontier, "GLOBAL",
-                           kReachable);
-    } else if (info.user_tag == VM_MEMORY_LIBDISPATCH) {
-      // Dispatch continuations use the libdispatch region. Empirically, there
-      // can be more than one region with this tag, so we'll optimistically
-      // assume that they're continguous. Otherwise, we would need to scan every
-      // region to ensure we find them all.
-      scan_state.in_libdispatch = true;
-      ScanRangeForPointers(address, end_address, frontier, "GLOBAL",
-                           kReachable);
-    } else if (scan_state.in_libdispatch) {
-      scan_state.seen_regions |= SeenRegion::LibDispatch;
-      scan_state.in_libdispatch = false;
-    }
 
-    // Recursing over the full memory map is very slow, break out
-    // early if we don't need the full iteration.
-    if (scan_state.seen_regions == SeenRegion::All && !use_root_regions) {
-      break;
+    // libxpc stashes some pointers in the Kernel Alloc Once page,
+    // make sure not to report those as leaks.
+    if (info.user_tag == kSanitizerVmMemoryOsAllocOnce) {
+      ScanRangeForPointers(address, end_address, frontier, "GLOBAL",
+                           kReachable);
+
+      // Recursing over the full memory map is very slow, break out
+      // early if we don't need the full iteration.
+      if (!flags()->use_root_regions || !root_regions->size())
+        break;
     }
 
     // This additional root region scan is required on Darwin in order to
@@ -215,12 +177,15 @@ void ProcessPlatformSpecificAllocations(Frontier *frontier) {
     //
     // TODO(fjricci) - remove this once sanitizer_procmaps_mac has the same
     // behavior as sanitizer_procmaps_linux and traverses all memory regions
-    if (use_root_regions && (info.protection & kProtectionRead))
-      mapped_regions.push_back({address, end_address});
+    if (flags()->use_root_regions) {
+      for (uptr i = 0; i < root_regions->size(); i++) {
+        ScanRootRegion(frontier, (*root_regions)[i], address, end_address,
+                       info.protection & kProtectionRead);
+      }
+    }
 
     address = end_address;
   }
-  ScanRootRegions(frontier, mapped_regions);
 }
 
 // On darwin, we can intercept _exit gracefully, and return a failing exit code
@@ -230,10 +195,13 @@ void HandleLeaks() {}
 
 void LockStuffAndStopTheWorld(StopTheWorldCallback callback,
                               CheckForLeaksParam *argument) {
-  ScopedStopTheWorldLock lock;
+  LockThreadRegistry();
+  LockAllocator();
   StopTheWorld(callback, argument);
+  UnlockAllocator();
+  UnlockThreadRegistry();
 }
 
-}  // namespace __lsan
+} // namespace __lsan
 
-#endif // CAN_SANITIZE_LEAKS && SANITIZER_APPLE
+#endif // CAN_SANITIZE_LEAKS && SANITIZER_MAC

@@ -17,6 +17,7 @@
 
 namespace llvm {
 namespace pdb {
+class ModuleDebugStreamRef;
 
 class YAMLOutputStyle : public OutputStyle {
 public:

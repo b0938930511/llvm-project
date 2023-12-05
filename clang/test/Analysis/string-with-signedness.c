@@ -5,6 +5,6 @@
 void *strcpy(unsigned char *, unsigned char *);
 
 unsigned char a, b;
-void testUnsignedStrcpy(void) {
+void testUnsignedStrcpy() {
   strcpy(&a, &b);
 }

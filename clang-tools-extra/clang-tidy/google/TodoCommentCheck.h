@@ -11,14 +11,17 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::google::readability {
+namespace clang {
+namespace tidy {
+namespace google {
+namespace readability {
 
 /// Finds TODO comments without a username or bug number.
 ///
 /// Corresponding cpplint.py check: 'readability/todo'
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/google/readability-todo.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/google-readability-todo.html
 class TodoCommentCheck : public ClangTidyCheck {
 public:
   TodoCommentCheck(StringRef Name, ClangTidyContext *Context);
@@ -32,6 +35,9 @@ private:
   std::unique_ptr<TodoCommentHandler> Handler;
 };
 
-} // namespace clang::tidy::google::readability
+} // namespace readability
+} // namespace google
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_GOOGLE_TODOCOMMENTCHECK_H

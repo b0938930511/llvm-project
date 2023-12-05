@@ -6,13 +6,13 @@
 // word-aligned address and then loaded into r0 with an LDR instruction
 
 extern union Us { short s; } us;
-union Us callee_us(void) { return us; }
+union Us callee_us() { return us; }
 // CHECK-LABEL: callee_us()
 // CHECK: zext i16
 // CHECK: shl 
 // CHECK: ret i32
 
-void caller_us(void) {
+void caller_us() {
   us = callee_us();
 // CHECK-LABEL: caller_us()
 // CHECK: call i32
@@ -21,13 +21,13 @@ void caller_us(void) {
 }
 
 extern struct Ss { short s; } ss;
-struct Ss callee_ss(void) { return ss; }
+struct Ss callee_ss() { return ss; }
 // CHECK-LABEL: callee_ss()
 // CHECK: zext i16
 // CHECK: shl 
 // CHECK: ret i32
 
-void caller_ss(void) {
+void caller_ss() {
   ss = callee_ss();
 // CHECK-LABEL: caller_ss()
 // CHECK: call i32

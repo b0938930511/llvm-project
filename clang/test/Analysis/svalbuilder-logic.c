@@ -9,8 +9,8 @@ int SValBuilderLogicNoCrash(int *x) {
 
 // http://llvm.org/bugs/show_bug.cgi?id=15863
 // Don't crash when mixing 'bool' and 'int' in implicit comparisons to 0.
-void pr15863(void) {
-  extern int getBool(void);
+void pr15863() {
+  extern int getBool();
   _Bool a = getBool();
   (void)!a; // no-warning
 }

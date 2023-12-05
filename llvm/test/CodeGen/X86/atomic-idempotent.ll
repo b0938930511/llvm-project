@@ -11,18 +11,18 @@
 ; This is explained (with the motivation for such an optimization) in
 ; http://www.hpl.hp.com/techreports/2012/HPL-2012-68.pdf
 
-define i8 @add8(ptr %p) {
+define i8 @add8(i8* %p) {
 ; X64-LABEL: add8:
 ; X64:       # %bb.0:
 ; X64-NEXT:    mfence
-; X64-NEXT:    movzbl (%rdi), %eax
+; X64-NEXT:    movb (%rdi), %al
 ; X64-NEXT:    retq
 ;
 ; X86-SSE2-LABEL: add8:
 ; X86-SSE2:       # %bb.0:
 ; X86-SSE2-NEXT:    movl {{[0-9]+}}(%esp), %eax
 ; X86-SSE2-NEXT:    mfence
-; X86-SSE2-NEXT:    movzbl (%eax), %eax
+; X86-SSE2-NEXT:    movb (%eax), %al
 ; X86-SSE2-NEXT:    retl
 ;
 ; X86-SLM-LABEL: add8:
@@ -42,11 +42,11 @@ define i8 @add8(ptr %p) {
 ; X86-ATOM-NEXT:    nop
 ; X86-ATOM-NEXT:    nop
 ; X86-ATOM-NEXT:    retl
-  %1 = atomicrmw add ptr %p, i8 0 monotonic
+  %1 = atomicrmw add i8* %p, i8 0 monotonic
   ret i8 %1
 }
 
-define i16 @or16(ptr %p) {
+define i16 @or16(i16* %p) {
 ; X64-LABEL: or16:
 ; X64:       # %bb.0:
 ; X64-NEXT:    mfence
@@ -83,11 +83,11 @@ define i16 @or16(ptr %p) {
 ; X86-ATOM-NEXT:    jne .LBB1_1
 ; X86-ATOM-NEXT:  # %bb.2: # %atomicrmw.end
 ; X86-ATOM-NEXT:    retl
-  %1 = atomicrmw or ptr %p, i16 0 acquire
+  %1 = atomicrmw or i16* %p, i16 0 acquire
   ret i16 %1
 }
 
-define i32 @xor32(ptr %p) {
+define i32 @xor32(i32* %p) {
 ; X64-LABEL: xor32:
 ; X64:       # %bb.0:
 ; X64-NEXT:    mfence
@@ -124,11 +124,11 @@ define i32 @xor32(ptr %p) {
 ; X86-ATOM-NEXT:    jne .LBB2_1
 ; X86-ATOM-NEXT:  # %bb.2: # %atomicrmw.end
 ; X86-ATOM-NEXT:    retl
-  %1 = atomicrmw xor ptr %p, i32 0 release
+  %1 = atomicrmw xor i32* %p, i32 0 release
   ret i32 %1
 }
 
-define i64 @sub64(ptr %p) {
+define i64 @sub64(i64* %p) {
 ; X64-LABEL: sub64:
 ; X64:       # %bb.0:
 ; X64-NEXT:    mfence
@@ -159,11 +159,11 @@ define i64 @sub64(ptr %p) {
 ; X86-NEXT:    popl %ebx
 ; X86-NEXT:    .cfi_def_cfa_offset 4
 ; X86-NEXT:    retl
-  %1 = atomicrmw sub ptr %p, i64 0 seq_cst
+  %1 = atomicrmw sub i64* %p, i64 0 seq_cst
   ret i64 %1
 }
 
-define i128 @or128(ptr %p) {
+define i128 @or128(i128* %p) {
 ; X64-LABEL: or128:
 ; X64:       # %bb.0:
 ; X64-NEXT:    pushq %rax
@@ -182,10 +182,12 @@ define i128 @or128(ptr %p) {
 ; X86-SSE2-NEXT:    .cfi_offset %ebp, -8
 ; X86-SSE2-NEXT:    movl %esp, %ebp
 ; X86-SSE2-NEXT:    .cfi_def_cfa_register %ebp
+; X86-SSE2-NEXT:    pushl %edi
 ; X86-SSE2-NEXT:    pushl %esi
-; X86-SSE2-NEXT:    andl $-16, %esp
-; X86-SSE2-NEXT:    subl $32, %esp
-; X86-SSE2-NEXT:    .cfi_offset %esi, -12
+; X86-SSE2-NEXT:    andl $-8, %esp
+; X86-SSE2-NEXT:    subl $16, %esp
+; X86-SSE2-NEXT:    .cfi_offset %esi, -16
+; X86-SSE2-NEXT:    .cfi_offset %edi, -12
 ; X86-SSE2-NEXT:    movl 8(%ebp), %esi
 ; X86-SSE2-NEXT:    movl %esp, %eax
 ; X86-SSE2-NEXT:    pushl $0
@@ -196,11 +198,18 @@ define i128 @or128(ptr %p) {
 ; X86-SSE2-NEXT:    pushl %eax
 ; X86-SSE2-NEXT:    calll __sync_fetch_and_or_16
 ; X86-SSE2-NEXT:    addl $20, %esp
-; X86-SSE2-NEXT:    movaps (%esp), %xmm0
-; X86-SSE2-NEXT:    movaps %xmm0, (%esi)
+; X86-SSE2-NEXT:    movl (%esp), %eax
+; X86-SSE2-NEXT:    movl {{[0-9]+}}(%esp), %ecx
+; X86-SSE2-NEXT:    movl {{[0-9]+}}(%esp), %edx
+; X86-SSE2-NEXT:    movl {{[0-9]+}}(%esp), %edi
+; X86-SSE2-NEXT:    movl %edi, 8(%esi)
+; X86-SSE2-NEXT:    movl %edx, 12(%esi)
+; X86-SSE2-NEXT:    movl %eax, (%esi)
+; X86-SSE2-NEXT:    movl %ecx, 4(%esi)
 ; X86-SSE2-NEXT:    movl %esi, %eax
-; X86-SSE2-NEXT:    leal -4(%ebp), %esp
+; X86-SSE2-NEXT:    leal -8(%ebp), %esp
 ; X86-SSE2-NEXT:    popl %esi
+; X86-SSE2-NEXT:    popl %edi
 ; X86-SSE2-NEXT:    popl %ebp
 ; X86-SSE2-NEXT:    .cfi_def_cfa %esp, 4
 ; X86-SSE2-NEXT:    retl $4
@@ -214,7 +223,7 @@ define i128 @or128(ptr %p) {
 ; X86-SLM-NEXT:    .cfi_def_cfa_register %ebp
 ; X86-SLM-NEXT:    pushl %edi
 ; X86-SLM-NEXT:    pushl %esi
-; X86-SLM-NEXT:    andl $-16, %esp
+; X86-SLM-NEXT:    andl $-8, %esp
 ; X86-SLM-NEXT:    subl $16, %esp
 ; X86-SLM-NEXT:    .cfi_offset %esi, -16
 ; X86-SLM-NEXT:    .cfi_offset %edi, -12
@@ -254,7 +263,7 @@ define i128 @or128(ptr %p) {
 ; X86-ATOM-NEXT:    .cfi_def_cfa_register %ebp
 ; X86-ATOM-NEXT:    pushl %edi
 ; X86-ATOM-NEXT:    pushl %esi
-; X86-ATOM-NEXT:    andl $-16, %esp
+; X86-ATOM-NEXT:    andl $-8, %esp
 ; X86-ATOM-NEXT:    leal -{{[0-9]+}}(%esp), %esp
 ; X86-ATOM-NEXT:    .cfi_offset %esi, -16
 ; X86-ATOM-NEXT:    .cfi_offset %edi, -12
@@ -284,12 +293,12 @@ define i128 @or128(ptr %p) {
 ; X86-ATOM-NEXT:    popl %ebp
 ; X86-ATOM-NEXT:    .cfi_def_cfa %esp, 4
 ; X86-ATOM-NEXT:    retl $4
-  %1 = atomicrmw or ptr %p, i128 0 monotonic
+  %1 = atomicrmw or i128* %p, i128 0 monotonic
   ret i128 %1
 }
 
 ; For 'and', the idempotent value is (-1)
-define i32 @and32 (ptr %p) {
+define i32 @and32 (i32* %p) {
 ; X64-LABEL: and32:
 ; X64:       # %bb.0:
 ; X64-NEXT:    mfence
@@ -326,11 +335,11 @@ define i32 @and32 (ptr %p) {
 ; X86-ATOM-NEXT:    jne .LBB5_1
 ; X86-ATOM-NEXT:  # %bb.2: # %atomicrmw.end
 ; X86-ATOM-NEXT:    retl
-  %1 = atomicrmw and ptr %p, i32 -1 acq_rel
+  %1 = atomicrmw and i32* %p, i32 -1 acq_rel
   ret i32 %1
 }
 
-define void @or32_nouse_monotonic(ptr %p) {
+define void @or32_nouse_monotonic(i32* %p) {
 ; X64-LABEL: or32_nouse_monotonic:
 ; X64:       # %bb.0:
 ; X64-NEXT:    #MEMBARRIER
@@ -350,15 +359,13 @@ define void @or32_nouse_monotonic(ptr %p) {
 ; X86-ATOM-NEXT:    nop
 ; X86-ATOM-NEXT:    nop
 ; X86-ATOM-NEXT:    nop
-; X86-ATOM-NEXT:    nop
-; X86-ATOM-NEXT:    nop
 ; X86-ATOM-NEXT:    retl
-  atomicrmw or ptr %p, i32 0 monotonic
+  atomicrmw or i32* %p, i32 0 monotonic
   ret void
 }
 
 
-define void @or32_nouse_acquire(ptr %p) {
+define void @or32_nouse_acquire(i32* %p) {
 ; X64-LABEL: or32_nouse_acquire:
 ; X64:       # %bb.0:
 ; X64-NEXT:    #MEMBARRIER
@@ -378,14 +385,12 @@ define void @or32_nouse_acquire(ptr %p) {
 ; X86-ATOM-NEXT:    nop
 ; X86-ATOM-NEXT:    nop
 ; X86-ATOM-NEXT:    nop
-; X86-ATOM-NEXT:    nop
-; X86-ATOM-NEXT:    nop
 ; X86-ATOM-NEXT:    retl
-  atomicrmw or ptr %p, i32 0 acquire
+  atomicrmw or i32* %p, i32 0 acquire
   ret void
 }
 
-define void @or32_nouse_release(ptr %p) {
+define void @or32_nouse_release(i32* %p) {
 ; X64-LABEL: or32_nouse_release:
 ; X64:       # %bb.0:
 ; X64-NEXT:    #MEMBARRIER
@@ -405,14 +410,12 @@ define void @or32_nouse_release(ptr %p) {
 ; X86-ATOM-NEXT:    nop
 ; X86-ATOM-NEXT:    nop
 ; X86-ATOM-NEXT:    nop
-; X86-ATOM-NEXT:    nop
-; X86-ATOM-NEXT:    nop
 ; X86-ATOM-NEXT:    retl
-  atomicrmw or ptr %p, i32 0 release
+  atomicrmw or i32* %p, i32 0 release
   ret void
 }
 
-define void @or32_nouse_acq_rel(ptr %p) {
+define void @or32_nouse_acq_rel(i32* %p) {
 ; X64-LABEL: or32_nouse_acq_rel:
 ; X64:       # %bb.0:
 ; X64-NEXT:    #MEMBARRIER
@@ -432,14 +435,12 @@ define void @or32_nouse_acq_rel(ptr %p) {
 ; X86-ATOM-NEXT:    nop
 ; X86-ATOM-NEXT:    nop
 ; X86-ATOM-NEXT:    nop
-; X86-ATOM-NEXT:    nop
-; X86-ATOM-NEXT:    nop
 ; X86-ATOM-NEXT:    retl
-  atomicrmw or ptr %p, i32 0 acq_rel
+  atomicrmw or i32* %p, i32 0 acq_rel
   ret void
 }
 
-define void @or32_nouse_seq_cst(ptr %p) {
+define void @or32_nouse_seq_cst(i32* %p) {
 ; X64-LABEL: or32_nouse_seq_cst:
 ; X64:       # %bb.0:
 ; X64-NEXT:    lock orl $0, -{{[0-9]+}}(%rsp)
@@ -460,12 +461,12 @@ define void @or32_nouse_seq_cst(ptr %p) {
 ; X86-ATOM-NEXT:    nop
 ; X86-ATOM-NEXT:    nop
 ; X86-ATOM-NEXT:    retl
-  atomicrmw or ptr %p, i32 0 seq_cst
+  atomicrmw or i32* %p, i32 0 seq_cst
   ret void
 }
 
 ; TODO: The value isn't used on 32 bit, so the cmpxchg8b is unneeded
-define void @or64_nouse_seq_cst(ptr %p) {
+define void @or64_nouse_seq_cst(i64* %p) {
 ; X64-LABEL: or64_nouse_seq_cst:
 ; X64:       # %bb.0:
 ; X64-NEXT:    lock orl $0, -{{[0-9]+}}(%rsp)
@@ -495,12 +496,12 @@ define void @or64_nouse_seq_cst(ptr %p) {
 ; X86-NEXT:    popl %ebx
 ; X86-NEXT:    .cfi_def_cfa_offset 4
 ; X86-NEXT:    retl
-  atomicrmw or ptr %p, i64 0 seq_cst
+  atomicrmw or i64* %p, i64 0 seq_cst
   ret void
 }
 
 ; TODO: Don't need to lower as sync_and_fetch call
-define void @or128_nouse_seq_cst(ptr %p) {
+define void @or128_nouse_seq_cst(i128* %p) {
 ; X64-LABEL: or128_nouse_seq_cst:
 ; X64:       # %bb.0:
 ; X64-NEXT:    pushq %rax
@@ -519,8 +520,8 @@ define void @or128_nouse_seq_cst(ptr %p) {
 ; X86-SSE2-NEXT:    .cfi_offset %ebp, -8
 ; X86-SSE2-NEXT:    movl %esp, %ebp
 ; X86-SSE2-NEXT:    .cfi_def_cfa_register %ebp
-; X86-SSE2-NEXT:    andl $-16, %esp
-; X86-SSE2-NEXT:    subl $32, %esp
+; X86-SSE2-NEXT:    andl $-8, %esp
+; X86-SSE2-NEXT:    subl $16, %esp
 ; X86-SSE2-NEXT:    movl %esp, %eax
 ; X86-SSE2-NEXT:    pushl $0
 ; X86-SSE2-NEXT:    pushl $0
@@ -542,8 +543,8 @@ define void @or128_nouse_seq_cst(ptr %p) {
 ; X86-SLM-NEXT:    .cfi_offset %ebp, -8
 ; X86-SLM-NEXT:    movl %esp, %ebp
 ; X86-SLM-NEXT:    .cfi_def_cfa_register %ebp
-; X86-SLM-NEXT:    andl $-16, %esp
-; X86-SLM-NEXT:    subl $32, %esp
+; X86-SLM-NEXT:    andl $-8, %esp
+; X86-SLM-NEXT:    subl $16, %esp
 ; X86-SLM-NEXT:    movl 8(%ebp), %eax
 ; X86-SLM-NEXT:    movl %esp, %ecx
 ; X86-SLM-NEXT:    pushl $0
@@ -566,7 +567,7 @@ define void @or128_nouse_seq_cst(ptr %p) {
 ; X86-ATOM-NEXT:    .cfi_offset %ebp, -8
 ; X86-ATOM-NEXT:    leal (%esp), %ebp
 ; X86-ATOM-NEXT:    .cfi_def_cfa_register %ebp
-; X86-ATOM-NEXT:    andl $-16, %esp
+; X86-ATOM-NEXT:    andl $-8, %esp
 ; X86-ATOM-NEXT:    leal -{{[0-9]+}}(%esp), %esp
 ; X86-ATOM-NEXT:    movl 8(%ebp), %eax
 ; X86-ATOM-NEXT:    movl %esp, %ecx
@@ -582,12 +583,12 @@ define void @or128_nouse_seq_cst(ptr %p) {
 ; X86-ATOM-NEXT:    popl %ebp
 ; X86-ATOM-NEXT:    .cfi_def_cfa %esp, 4
 ; X86-ATOM-NEXT:    retl
-  atomicrmw or ptr %p, i128 0 seq_cst
+  atomicrmw or i128* %p, i128 0 seq_cst
   ret void
 }
 
 
-define void @or16_nouse_seq_cst(ptr %p) {
+define void @or16_nouse_seq_cst(i16* %p) {
 ; X64-LABEL: or16_nouse_seq_cst:
 ; X64:       # %bb.0:
 ; X64-NEXT:    lock orl $0, -{{[0-9]+}}(%rsp)
@@ -608,11 +609,11 @@ define void @or16_nouse_seq_cst(ptr %p) {
 ; X86-ATOM-NEXT:    nop
 ; X86-ATOM-NEXT:    nop
 ; X86-ATOM-NEXT:    retl
-  atomicrmw or ptr %p, i16 0 seq_cst
+  atomicrmw or i16* %p, i16 0 seq_cst
   ret void
 }
 
-define void @or8_nouse_seq_cst(ptr %p) {
+define void @or8_nouse_seq_cst(i8* %p) {
 ; X64-LABEL: or8_nouse_seq_cst:
 ; X64:       # %bb.0:
 ; X64-NEXT:    lock orl $0, -{{[0-9]+}}(%rsp)
@@ -633,6 +634,6 @@ define void @or8_nouse_seq_cst(ptr %p) {
 ; X86-ATOM-NEXT:    nop
 ; X86-ATOM-NEXT:    nop
 ; X86-ATOM-NEXT:    retl
-  atomicrmw or ptr %p, i8 0 seq_cst
+  atomicrmw or i8* %p, i8 0 seq_cst
   ret void
 }

@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
+// UNSUPPORTED: libcpp-no-concepts
 
 // template<class T>
 // concept destructible = is_nothrow_destructible_v<T>;
@@ -73,3 +74,6 @@ void test() {
   test<int>();
   test<double>();
 }
+
+// Required for MSVC internal test runner compatibility.
+int main(int, char**) { return 0; }

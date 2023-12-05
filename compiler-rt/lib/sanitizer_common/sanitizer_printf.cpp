@@ -20,6 +20,10 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+#if defined(__x86_64__)
+#  include <emmintrin.h>
+#endif
+
 #if SANITIZER_WINDOWS && defined(_MSC_VER) && _MSC_VER < 1800 &&               \
       !defined(va_copy)
 # define va_copy(dst, src) ((dst) = (src))
@@ -128,8 +132,8 @@ static int AppendPointer(char **buff, const char *buff_end, u64 ptr_value) {
 int VSNPrintf(char *buff, int buff_length,
               const char *format, va_list args) {
   static const char *kPrintfFormatsHelp =
-      "Supported Printf formats: %([0-9]*)?(z|l|ll)?{d,u,x,X}; %p; "
-      "%[-]([0-9]*)?(\\.\\*)?s; %c\nProvided format: ";
+      "Supported Printf formats: %([0-9]*)?(z|ll)?{d,u,x,X,V}; %p; "
+      "%[-]([0-9]*)?(\\.\\*)?s; %c\n";
   RAW_CHECK(format);
   RAW_CHECK(buff_length > 0);
   const char *buff_end = &buff[buff_length - 1];
@@ -160,11 +164,9 @@ int VSNPrintf(char *buff, int buff_length,
     }
     bool have_z = (*cur == 'z');
     cur += have_z;
-    bool have_l = cur[0] == 'l' && cur[1] != 'l';
-    cur += have_l;
-    bool have_ll = cur[0] == 'l' && cur[1] == 'l';
+    bool have_ll = !have_z && (cur[0] == 'l' && cur[1] == 'l');
     cur += have_ll * 2;
-    const bool have_length = have_z || have_l || have_ll;
+    const bool have_length = have_z || have_ll;
     const bool have_flags = have_width || have_length;
     // At the moment only %s supports precision and left-justification.
     CHECK(!((precision >= 0 || left_justified) && *cur != 's'));
@@ -172,7 +174,6 @@ int VSNPrintf(char *buff, int buff_length,
       case 'd': {
         s64 dval = have_ll  ? va_arg(args, s64)
                    : have_z ? va_arg(args, sptr)
-                   : have_l ? va_arg(args, long)
                             : va_arg(args, int);
         result += AppendSignedDecimal(&buff, buff_end, dval, width,
                                       pad_with_zero);
@@ -183,20 +184,26 @@ int VSNPrintf(char *buff, int buff_length,
       case 'X': {
         u64 uval = have_ll  ? va_arg(args, u64)
                    : have_z ? va_arg(args, uptr)
-                   : have_l ? va_arg(args, unsigned long)
                             : va_arg(args, unsigned);
         bool uppercase = (*cur == 'X');
         result += AppendUnsigned(&buff, buff_end, uval, (*cur == 'u') ? 10 : 16,
                                  width, pad_with_zero, uppercase);
         break;
       }
+      case 'V': {
+        for (uptr i = 0; i < 16; i++) {
+          unsigned x = va_arg(args, unsigned);
+          result += AppendUnsigned(&buff, buff_end, x, 16, 2, true, false);
+        }
+        break;
+      }
       case 'p': {
-        RAW_CHECK_VA(!have_flags, kPrintfFormatsHelp, format);
+        RAW_CHECK_MSG(!have_flags, kPrintfFormatsHelp);
         result += AppendPointer(&buff, buff_end, va_arg(args, uptr));
         break;
       }
       case 's': {
-        RAW_CHECK_VA(!have_length, kPrintfFormatsHelp, format);
+        RAW_CHECK_MSG(!have_length, kPrintfFormatsHelp);
         // Only left-justified width is supported.
         CHECK(!have_width || left_justified);
         result += AppendString(&buff, buff_end, left_justified ? -width : width,
@@ -204,17 +211,17 @@ int VSNPrintf(char *buff, int buff_length,
         break;
       }
       case 'c': {
-        RAW_CHECK_VA(!have_flags, kPrintfFormatsHelp, format);
+        RAW_CHECK_MSG(!have_flags, kPrintfFormatsHelp);
         result += AppendChar(&buff, buff_end, va_arg(args, int));
         break;
       }
       case '%' : {
-        RAW_CHECK_VA(!have_flags, kPrintfFormatsHelp, format);
+        RAW_CHECK_MSG(!have_flags, kPrintfFormatsHelp);
         result += AppendChar(&buff, buff_end, '%');
         break;
       }
       default: {
-        RAW_CHECK_VA(false, kPrintfFormatsHelp, format);
+        RAW_CHECK_MSG(false, kPrintfFormatsHelp);
       }
     }
   }
@@ -310,6 +317,7 @@ static void NOINLINE SharedPrintfCode(bool append_pid, const char *format,
                            format, args);
 }
 
+FORMAT(1, 2)
 void Printf(const char *format, ...) {
   va_list args;
   va_start(args, format);
@@ -318,6 +326,7 @@ void Printf(const char *format, ...) {
 }
 
 // Like Printf, but prints the current PID before the output string.
+FORMAT(1, 2)
 void Report(const char *format, ...) {
   va_list args;
   va_start(args, format);
@@ -329,6 +338,7 @@ void Report(const char *format, ...) {
 // Returns the number of symbols that should have been written to buffer
 // (not including trailing '\0'). Thus, the string is truncated
 // iff return value is not less than "length".
+FORMAT(3, 4)
 int internal_snprintf(char *buffer, uptr length, const char *format, ...) {
   va_list args;
   va_start(args, format);
@@ -337,14 +347,8 @@ int internal_snprintf(char *buffer, uptr length, const char *format, ...) {
   return needed_length;
 }
 
-void InternalScopedString::Append(const char *str) {
-  uptr prev_len = length();
-  uptr str_len = internal_strlen(str);
-  buffer_.resize(prev_len + str_len + 1);
-  internal_memcpy(buffer_.data() + prev_len, str, str_len + 1);
-}
-
-void InternalScopedString::AppendF(const char *format, ...) {
+FORMAT(2, 3)
+void InternalScopedString::append(const char *format, ...) {
   uptr prev_len = length();
 
   while (true) {

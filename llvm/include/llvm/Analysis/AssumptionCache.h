@@ -29,7 +29,6 @@ namespace llvm {
 class AssumeInst;
 class Function;
 class raw_ostream;
-class TargetTransformInfo;
 class Value;
 
 /// A cache of \@llvm.assume calls within a function.
@@ -59,8 +58,6 @@ private:
   ///
   /// We track this to lazily populate our assumptions.
   Function &F;
-
-  TargetTransformInfo *TTI;
 
   /// Vector of weak value handles to calls of the \@llvm.assume
   /// intrinsic.
@@ -106,8 +103,7 @@ private:
 public:
   /// Construct an AssumptionCache from a function by scanning all of
   /// its instructions.
-  AssumptionCache(Function &F, TargetTransformInfo *TTI = nullptr)
-      : F(F), TTI(TTI) {}
+  AssumptionCache(Function &F) : F(F) {}
 
   /// This cache is designed to be self-updating and so it should never be
   /// invalidated.
@@ -178,7 +174,9 @@ class AssumptionAnalysis : public AnalysisInfoMixin<AssumptionAnalysis> {
 public:
   using Result = AssumptionCache;
 
-  AssumptionCache run(Function &F, FunctionAnalysisManager &);
+  AssumptionCache run(Function &F, FunctionAnalysisManager &) {
+    return AssumptionCache(F);
+  }
 };
 
 /// Printer pass for the \c AssumptionAnalysis results.

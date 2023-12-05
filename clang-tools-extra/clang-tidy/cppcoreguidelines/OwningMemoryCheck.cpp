@@ -17,7 +17,19 @@
 using namespace clang::ast_matchers;
 using namespace clang::ast_matchers::internal;
 
-namespace clang::tidy::cppcoreguidelines {
+namespace clang {
+namespace tidy {
+namespace cppcoreguidelines {
+
+// FIXME: Copied from 'NoMallocCheck.cpp'. Has to be refactored into 'util' or
+// something like that.
+namespace {
+Matcher<FunctionDecl> hasAnyListedName(const std::string &FunctionNames) {
+  const std::vector<std::string> NameList =
+      utils::options::parseStringList(FunctionNames);
+  return hasAnyName(std::vector<StringRef>(NameList.begin(), NameList.end()));
+}
+} // namespace
 
 void OwningMemoryCheck::storeOptions(ClangTidyOptions::OptionMap &Opts) {
   Options.store(Opts, "LegacyResourceProducers", LegacyResourceProducers);
@@ -30,10 +42,9 @@ void OwningMemoryCheck::registerMatchers(MatchFinder *Finder) {
   const auto OwnerDecl = typeAliasTemplateDecl(hasName("::gsl::owner"));
   const auto IsOwnerType = hasType(OwnerDecl);
 
-  const auto LegacyCreatorFunctions =
-      hasAnyName(utils::options::parseStringList(LegacyResourceProducers));
+  const auto LegacyCreatorFunctions = hasAnyListedName(LegacyResourceProducers);
   const auto LegacyConsumerFunctions =
-      hasAnyName(utils::options::parseStringList(LegacyResourceConsumers));
+      hasAnyListedName(LegacyResourceConsumers);
 
   // Legacy functions that are use for resource management but cannot be
   // updated to use `gsl::owner<>`, like standard C memory management.
@@ -41,7 +52,7 @@ void OwningMemoryCheck::registerMatchers(MatchFinder *Finder) {
       callExpr(callee(functionDecl(LegacyCreatorFunctions)));
   // C-style functions like `::malloc()` sometimes create owners as void*
   // which is expected to be cast to the correct type in C++. This case
-  // must be caught explicitly.
+  // must be catched explicitly.
   const auto LegacyOwnerCast =
       castExpr(hasSourceExpression(CreatesLegacyOwner));
   // Functions that do manual resource management but cannot be updated to use
@@ -123,9 +134,14 @@ void OwningMemoryCheck::registerMatchers(MatchFinder *Finder) {
   // Matching on initialization operations where the initial value is a newly
   // created owner, but the LHS is not an owner.
   Finder->addMatcher(
-      traverse(TK_AsIs, namedDecl(varDecl(hasInitializer(CreatesOwner),
-                                          unless(IsOwnerType))
-                                      .bind("bad_owner_creation_variable"))),
+      traverse(
+          TK_AsIs,
+          namedDecl(
+              varDecl(eachOf(allOf(hasInitializer(CreatesOwner),
+                                   unless(IsOwnerType)),
+                             allOf(hasInitializer(ConsideredOwner),
+                                   hasType(autoType().bind("deduced_type")))))
+                  .bind("bad_owner_creation_variable"))),
       this);
 
   // Match on all function calls that expect owners as arguments, but didn't
@@ -308,6 +324,13 @@ bool OwningMemoryCheck::handleAssignmentFromNewOwner(const BoundNodes &Nodes) {
 
     // FIXME: FixitHint to rewrite the type of the initialized variable
     // as 'gsl::owner<OriginalType>'
+
+    // If the type of the variable was deduced, the wrapping owner typedef is
+    // eliminated, therefore the check emits a special note for that case.
+    if (Nodes.getNodeAs<AutoType>("deduced_type")) {
+      diag(BadOwnerInitialization->getBeginLoc(),
+           "type deduction did not result in an owner", DiagnosticIDs::Note);
+    }
     return true;
   }
 
@@ -368,4 +391,6 @@ bool OwningMemoryCheck::handleOwnerMembers(const BoundNodes &Nodes) {
   return false;
 }
 
-} // namespace clang::tidy::cppcoreguidelines
+} // namespace cppcoreguidelines
+} // namespace tidy
+} // namespace clang

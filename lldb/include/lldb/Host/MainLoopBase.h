@@ -11,10 +11,8 @@
 
 #include "lldb/Utility/IOObject.h"
 #include "lldb/Utility/Status.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <functional>
-#include <mutex>
 
 namespace lldb_private {
 
@@ -28,17 +26,14 @@ namespace lldb_private {
 // of the monitoring. When this handle is destroyed, the callback is
 // deregistered.
 //
-// Since this class is primarily intended to be used for single-threaded
-// processing, it does not attempt to perform any internal synchronisation and
-// any concurrent accesses must be protected  externally. However, it is
-// perfectly legitimate to have more than one instance of this class running on
-// separate threads, or even a single thread.
+// This class simply defines the interface common for all platforms, actual
+// implementations are platform-specific.
 class MainLoopBase {
 private:
   class ReadHandle;
 
 public:
-  MainLoopBase() : m_terminate_request(false) {}
+  MainLoopBase() = default;
   virtual ~MainLoopBase() = default;
 
   typedef std::unique_ptr<ReadHandle> ReadHandleUP;
@@ -47,37 +42,25 @@ public:
 
   virtual ReadHandleUP RegisterReadObject(const lldb::IOObjectSP &object_sp,
                                           const Callback &callback,
-                                          Status &error) = 0;
-
-  // Add a pending callback that will be executed once after all the pending
-  // events are processed. The callback will be executed even if termination
-  // was requested.
-  void AddPendingCallback(const Callback &callback);
+                                          Status &error) {
+    llvm_unreachable("Not implemented");
+  }
 
   // Waits for registered events and invoke the proper callbacks. Returns when
   // all callbacks deregister themselves or when someone requests termination.
   virtual Status Run() { llvm_unreachable("Not implemented"); }
 
-  // This should only be performed from a callback. Do not attempt to terminate
-  // the processing from another thread.
-  virtual void RequestTermination() { m_terminate_request = true; }
+  // Requests the exit of the Run() function.
+  virtual void RequestTermination() { llvm_unreachable("Not implemented"); }
 
 protected:
   ReadHandleUP CreateReadHandle(const lldb::IOObjectSP &object_sp) {
     return ReadHandleUP(new ReadHandle(*this, object_sp->GetWaitableHandle()));
   }
 
-  virtual void UnregisterReadObject(IOObject::WaitableHandle handle) = 0;
-
-  // Interrupt the loop that is currently waiting for events and execute
-  // the current pending callbacks immediately.
-  virtual void TriggerPendingCallbacks() = 0;
-
-  void ProcessPendingCallbacks();
-
-  std::mutex m_callback_mutex;
-  std::vector<Callback> m_pending_callbacks;
-  bool m_terminate_request : 1;
+  virtual void UnregisterReadObject(IOObject::WaitableHandle handle) {
+    llvm_unreachable("Not implemented");
+  }
 
 private:
   class ReadHandle {

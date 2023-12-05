@@ -11,10 +11,3 @@
 using namespace llvm;
 
 void LanaiMachineFunctionInfo::anchor() {}
-
-MachineFunctionInfo *LanaiMachineFunctionInfo::clone(
-    BumpPtrAllocator &Allocator, MachineFunction &DestMF,
-    const DenseMap<MachineBasicBlock *, MachineBasicBlock *> &Src2DstMBB)
-    const {
-  return DestMF.cloneInfo<LanaiMachineFunctionInfo>(*this);
-}

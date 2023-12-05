@@ -7,6 +7,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "TestFS.h"
+#include "TestTU.h"
+#include "TweakTesting.h"
 #include "refactor/Tweak.h"
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/DiagnosticIDs.h"
@@ -16,8 +18,11 @@
 #include "clang/Basic/LLVM.h"
 #include "clang/Basic/SourceLocation.h"
 #include "clang/Basic/SourceManager.h"
+#include "clang/Rewrite/Core/Rewriter.h"
 #include "clang/Tooling/Core/Replacement.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"

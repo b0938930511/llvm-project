@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/DebugInfo/CodeView/DebugSymbolsSubsection.h"
-#include "llvm/Support/BinaryStreamWriter.h"
 
 using namespace llvm;
 using namespace llvm::codeview;

@@ -8,7 +8,6 @@
 
 #include "gwp_asan/tests/harness.h"
 
-#include <algorithm>
 #include <set>
 #include <vector>
 

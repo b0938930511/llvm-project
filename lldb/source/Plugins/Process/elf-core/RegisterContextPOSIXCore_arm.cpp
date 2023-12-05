@@ -55,7 +55,7 @@ bool RegisterContextCorePOSIX_arm::ReadRegister(const RegisterInfo *reg_info,
 }
 
 bool RegisterContextCorePOSIX_arm::ReadAllRegisterValues(
-    lldb::WritableDataBufferSP &data_sp) {
+    lldb::DataBufferSP &data_sp) {
   return false;
 }
 

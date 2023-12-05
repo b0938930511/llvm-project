@@ -1,8 +1,6 @@
 add_llvm_component_library(LLVMPasses
-  OptimizationLevel.cpp
   PassBuilder.cpp
   PassBuilderBindings.cpp
-  PassBuilderPipelines.cpp
   PassPlugin.cpp
   StandardInstrumentations.cpp
 
@@ -16,13 +14,10 @@ add_llvm_component_library(LLVMPasses
   LINK_COMPONENTS
   AggressiveInstCombine
   Analysis
-  CodeGen
   Core
   Coroutines
-  HipStdPar
   IPO
   InstCombine
-  IRPrinter
   ObjCARC
   Scalar
   Support

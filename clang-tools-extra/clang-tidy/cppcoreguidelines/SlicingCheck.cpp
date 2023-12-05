@@ -14,7 +14,9 @@
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::cppcoreguidelines {
+namespace clang {
+namespace tidy {
+namespace cppcoreguidelines {
 
 void SlicingCheck::registerMatchers(MatchFinder *Finder) {
   // When we see:
@@ -40,15 +42,12 @@ void SlicingCheck::registerMatchers(MatchFinder *Finder) {
   const auto HasTypeDerivedFromBaseDecl =
       anyOf(hasType(IsDerivedFromBaseDecl),
             hasType(references(IsDerivedFromBaseDecl)));
-  const auto IsCallToBaseClass = hasParent(cxxConstructorDecl(
-      ofClass(isSameOrDerivedFrom(equalsBoundNode("DerivedDecl"))),
-      hasAnyConstructorInitializer(allOf(
-          isBaseInitializer(), withInitializer(equalsBoundNode("Call"))))));
+  const auto IsWithinDerivedCtor =
+      hasParent(cxxConstructorDecl(ofClass(equalsBoundNode("DerivedDecl"))));
 
   // Assignment slicing: "a = b;" and "a = std::move(b);" variants.
   const auto SlicesObjectInAssignment =
-      callExpr(expr().bind("Call"),
-               callee(cxxMethodDecl(anyOf(isCopyAssignmentOperator(),
+      callExpr(callee(cxxMethodDecl(anyOf(isCopyAssignmentOperator(),
                                           isMoveAssignmentOperator()),
                                     OfBaseClass)),
                hasArgument(1, HasTypeDerivedFromBaseDecl));
@@ -56,23 +55,23 @@ void SlicingCheck::registerMatchers(MatchFinder *Finder) {
   // Construction slicing: "A a{b};" and "f(b);" variants. Note that in case of
   // slicing the letter will create a temporary and therefore call a ctor.
   const auto SlicesObjectInCtor = cxxConstructExpr(
-      expr().bind("Call"),
       hasDeclaration(cxxConstructorDecl(
           anyOf(isCopyConstructor(), isMoveConstructor()), OfBaseClass)),
       hasArgument(0, HasTypeDerivedFromBaseDecl),
       // We need to disable matching on the call to the base copy/move
       // constructor in DerivedDecl's constructors.
-      unless(IsCallToBaseClass));
+      unless(IsWithinDerivedCtor));
 
-  Finder->addMatcher(
-      traverse(TK_AsIs, expr(SlicesObjectInAssignment).bind("Call")), this);
-  Finder->addMatcher(traverse(TK_AsIs, SlicesObjectInCtor), this);
+  Finder->addMatcher(traverse(TK_AsIs, expr(anyOf(SlicesObjectInAssignment,
+                                                  SlicesObjectInCtor))
+                                           .bind("Call")),
+                     this);
 }
 
 /// Warns on methods overridden in DerivedDecl with respect to BaseDecl.
 /// FIXME: this warns on all overrides outside of the sliced path in case of
 /// multiple inheritance.
-void SlicingCheck::diagnoseSlicedOverriddenMethods(
+void SlicingCheck::DiagnoseSlicedOverriddenMethods(
     const Expr &Call, const CXXRecordDecl &DerivedDecl,
     const CXXRecordDecl &BaseDecl) {
   if (DerivedDecl.getCanonicalDecl() == BaseDecl.getCanonicalDecl())
@@ -93,7 +92,7 @@ void SlicingCheck::diagnoseSlicedOverriddenMethods(
     if (const auto *BaseRecordType = Base.getType()->getAs<RecordType>()) {
       if (const auto *BaseRecord = cast_or_null<CXXRecordDecl>(
               BaseRecordType->getDecl()->getDefinition()))
-        diagnoseSlicedOverriddenMethods(Call, *BaseRecord, BaseDecl);
+        DiagnoseSlicedOverriddenMethods(Call, *BaseRecord, BaseDecl);
     }
   }
 }
@@ -116,7 +115,7 @@ void SlicingCheck::check(const MatchFinder::MatchResult &Result) {
   //   class A { virtual void f(); };
   //   class B : public A {};
   // because in that case calling A::f is the same as calling B::f.
-  diagnoseSlicedOverriddenMethods(*Call, *DerivedDecl, *BaseDecl);
+  DiagnoseSlicedOverriddenMethods(*Call, *DerivedDecl, *BaseDecl);
 
   // Warn when slicing member variables.
   const auto &BaseLayout =
@@ -132,4 +131,6 @@ void SlicingCheck::check(const MatchFinder::MatchResult &Result) {
   }
 }
 
-} // namespace clang::tidy::cppcoreguidelines
+} // namespace cppcoreguidelines
+} // namespace tidy
+} // namespace clang

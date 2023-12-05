@@ -14,7 +14,7 @@ namespace llvm {
 namespace orc {
 
 int runAsMain(int (*Main)(int, char *[]), ArrayRef<std::string> Args,
-              std::optional<StringRef> ProgramName) {
+              Optional<StringRef> ProgramName) {
   std::vector<std::unique_ptr<char[]>> ArgVStorage;
   std::vector<char *> ArgV;
 
@@ -38,10 +38,6 @@ int runAsMain(int (*Main)(int, char *[]), ArrayRef<std::string> Args,
 
   return Main(Args.size() + !!ProgramName, ArgV.data());
 }
-
-int runAsVoidFunction(int (*Func)(void)) { return Func(); }
-
-int runAsIntFunction(int (*Func)(int), int Arg) { return Func(Arg); }
 
 } // End namespace orc.
 } // End namespace llvm.

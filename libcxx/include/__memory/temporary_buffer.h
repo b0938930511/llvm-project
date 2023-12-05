@@ -11,19 +11,21 @@
 #define _LIBCPP___MEMORY_TEMPORARY_BUFFER_H
 
 #include <__config>
-#include <__type_traits/alignment_of.h>
-#include <__utility/pair.h>
 #include <cstddef>
 #include <new>
+#include <utility> // pair
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
-#  pragma GCC system_header
+#pragma GCC system_header
 #endif
+
+_LIBCPP_PUSH_MACROS
+#include <__undef_macros>
 
 _LIBCPP_BEGIN_NAMESPACE_STD
 
 template <class _Tp>
-_LIBCPP_NODISCARD_EXT _LIBCPP_HIDE_FROM_ABI _LIBCPP_NO_CFI _LIBCPP_DEPRECATED_IN_CXX17
+_LIBCPP_NODISCARD_EXT _LIBCPP_NO_CFI
 pair<_Tp*, ptrdiff_t>
 get_temporary_buffer(ptrdiff_t __n) _NOEXCEPT
 {
@@ -38,7 +40,8 @@ get_temporary_buffer(ptrdiff_t __n) _NOEXCEPT
 #if !defined(_LIBCPP_HAS_NO_ALIGNED_ALLOCATION)
     if (__is_overaligned_for_new(_LIBCPP_ALIGNOF(_Tp)))
         {
-            align_val_t __al = align_val_t(_LIBCPP_ALIGNOF(_Tp));
+            align_val_t __al =
+                align_val_t(alignment_of<_Tp>::value);
             __r.first = static_cast<_Tp*>(::operator new(
                 __n * sizeof(_Tp), __al, nothrow));
         } else {
@@ -67,7 +70,7 @@ get_temporary_buffer(ptrdiff_t __n) _NOEXCEPT
 }
 
 template <class _Tp>
-inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_DEPRECATED_IN_CXX17
+inline _LIBCPP_INLINE_VISIBILITY
 void return_temporary_buffer(_Tp* __p) _NOEXCEPT
 {
   _VSTD::__libcpp_deallocate_unsized((void*)__p, _LIBCPP_ALIGNOF(_Tp));
@@ -75,12 +78,12 @@ void return_temporary_buffer(_Tp* __p) _NOEXCEPT
 
 struct __return_temporary_buffer
 {
-_LIBCPP_SUPPRESS_DEPRECATED_PUSH
     template <class _Tp>
-    _LIBCPP_HIDE_FROM_ABI void operator()(_Tp* __p) const {_VSTD::return_temporary_buffer(__p);}
-_LIBCPP_SUPPRESS_DEPRECATED_POP
+    _LIBCPP_INLINE_VISIBILITY void operator()(_Tp* __p) const {_VSTD::return_temporary_buffer(__p);}
 };
 
 _LIBCPP_END_NAMESPACE_STD
+
+_LIBCPP_POP_MACROS
 
 #endif // _LIBCPP___MEMORY_TEMPORARY_BUFFER_H

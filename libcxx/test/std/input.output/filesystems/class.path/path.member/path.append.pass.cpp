@@ -6,11 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-// UNSUPPORTED: c++03, c++11, c++14
-// UNSUPPORTED: availability-filesystem-missing
+// UNSUPPORTED: c++03
 
 // These tests require locale for non-char paths
-// UNSUPPORTED: no-localization
+// UNSUPPORTED: libcpp-has-no-localization
 
 // <filesystem>
 
@@ -24,7 +23,8 @@
 // template <class InputIterator>
 //      path& append(InputIterator first, InputIterator last);
 
-#include <filesystem>
+
+#include "filesystem_include.h"
 #include <type_traits>
 #include <string_view>
 #include <cassert>
@@ -33,12 +33,11 @@
 // to an intermediate path object, causing allocations in cases where no
 // allocations are done on other platforms.
 
-#include "../path_helper.h"
-#include "count_new.h"
-#include "make_string.h"
-#include "test_iterators.h"
 #include "test_macros.h"
-namespace fs = std::filesystem;
+#include "test_iterators.h"
+#include "count_new.h"
+#include "filesystem_test_helper.h"
+
 
 struct AppendOperatorTestcase {
   MultiStringType lhs;
@@ -195,23 +194,22 @@ void doAppendSourceAllocTest(AppendOperatorTestcase const& TC)
   // For "char" no allocations will be performed because no conversion is
   // required.
   // On Windows, the append method is more complex and uses intermediate
-  // path objects, which causes extra allocations. This is checked by comparing
-  // path::value_type with "char" - on Windows, it's wchar_t.
-#if TEST_SUPPORTS_LIBRARY_INTERNAL_ALLOCATIONS
-  // Only check allocations if we can pick up allocations done within the
-  // library implementation.
-  bool ExpectNoAllocations = std::is_same<CharT, char>::value &&
-                             std::is_same<path::value_type, char>::value;
+  // path objects, which causes extra allocations.
+  // In DLL builds on Windows, the overridden operator new won't pick up
+  // allocations done within the DLL, so the RequireAllocationGuard below
+  // won't necessarily see allocations in the cases where they're expected.
+#ifdef _WIN32
+  bool DisableAllocations = false;
+#else
+  bool DisableAllocations = std::is_same<CharT, char>::value;
 #endif
   {
     path LHS(L); PathReserve(LHS, ReserveSize);
     InputIter RHS(R);
     {
-      RequireAllocationGuard g(0); // require "at least zero" allocations by default
-#if TEST_SUPPORTS_LIBRARY_INTERNAL_ALLOCATIONS
-      if (ExpectNoAllocations)
-        g.requireExactly(0);
-#endif
+      RequireAllocationGuard  g; // requires 1 or more allocations occur by default
+      if (DisableAllocations) g.requireExactly(0);
+      else TEST_ONLY_WIN32_DLL(g.requireAtLeast(0));
       LHS /= RHS;
     }
     assert(PathEq(LHS, E));
@@ -221,11 +219,9 @@ void doAppendSourceAllocTest(AppendOperatorTestcase const& TC)
     InputIter RHS(R);
     InputIter REnd(StrEnd(R));
     {
-      RequireAllocationGuard g(0); // require "at least zero" allocations by default
-#if TEST_SUPPORTS_LIBRARY_INTERNAL_ALLOCATIONS
-      if (ExpectNoAllocations)
-        g.requireExactly(0);
-#endif
+      RequireAllocationGuard g;
+      if (DisableAllocations) g.requireExactly(0);
+      else TEST_ONLY_WIN32_DLL(g.requireAtLeast(0));
       LHS.append(RHS, REnd);
     }
     assert(PathEq(LHS, E));
@@ -360,7 +356,7 @@ void test_sfinae()
     static_assert(has_append<It>(), "");
   }
   {
-    using It = cpp17_output_iterator<const char*>;
+    using It = output_iterator<const char*>;
     static_assert(!has_append<It>(), "");
 
   }
@@ -387,18 +383,14 @@ int main(int, char**)
       assert(&Res == &LHS);
     }
     doAppendSourceTest<char>    (TC);
-#ifndef TEST_HAS_NO_WIDE_CHARACTERS
     doAppendSourceTest<wchar_t> (TC);
-#endif
     doAppendSourceTest<char16_t>(TC);
     doAppendSourceTest<char32_t>(TC);
   }
   for (auto const & TC : LongLHSCases) {
     (void)TC;
     LIBCPP_ONLY(doAppendSourceAllocTest<char>(TC));
-#ifndef TEST_HAS_NO_WIDE_CHARACTERS
     LIBCPP_ONLY(doAppendSourceAllocTest<wchar_t>(TC));
-#endif
   }
   test_sfinae();
 

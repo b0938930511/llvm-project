@@ -1,3 +1,4 @@
+// -*- C++ -*-
 //===----------------------------------------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -11,7 +12,7 @@
 // namespace regex_constants
 // {
 //
-// enum syntax_option_type  // bitmask type
+// emum syntax_option_type  // bitmask type
 // {
 //     icase      = unspecified,
 //     nosubs     = unspecified,
@@ -38,8 +39,7 @@ int main(int, char**)
     assert(std::regex_constants::nosubs != 0);
     assert(std::regex_constants::optimize != 0);
     assert(std::regex_constants::collate != 0);
-#if !defined _LIBCPP_VERSION || defined _LIBCPP_ABI_REGEX_CONSTANTS_NONZERO
-    // https://llvm.org/PR35967
+#ifdef _LIBCPP_ABI_REGEX_CONSTANTS_NONZERO  // https://llvm.org/PR35967
     assert(std::regex_constants::ECMAScript != 0);
 #else
     assert(std::regex_constants::ECMAScript == 0);

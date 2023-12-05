@@ -23,12 +23,10 @@
 #include "clang/Tooling/DiagnosticsYaml.h"
 #include "clang/Tooling/ReplacementsYaml.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
-#include <optional>
 
 using namespace llvm;
 using namespace clang;
@@ -138,11 +136,11 @@ std::error_code collectReplacementsFromDirectory(
 ///
 /// \returns A map mapping FileEntry to a set of Replacement targeting that
 /// file.
-static llvm::DenseMap<FileEntryRef, std::vector<tooling::Replacement>>
+static llvm::DenseMap<const FileEntry *, std::vector<tooling::Replacement>>
 groupReplacements(const TUReplacements &TUs, const TUDiagnostics &TUDs,
                   const clang::SourceManager &SM) {
-  llvm::StringSet<> Warned;
-  llvm::DenseMap<FileEntryRef, std::vector<tooling::Replacement>>
+  std::set<StringRef> Warned;
+  llvm::DenseMap<const FileEntry *, std::vector<tooling::Replacement>>
       GroupedReplacements;
 
   // Deduplicate identical replacements in diagnostics unless they are from the
@@ -154,18 +152,10 @@ groupReplacements(const TUReplacements &TUs, const TUDiagnostics &TUDs,
       DiagReplacements;
 
   auto AddToGroup = [&](const tooling::Replacement &R,
-                        const tooling::TranslationUnitDiagnostics *SourceTU,
-                        const std::optional<std::string> BuildDir) {
+                        const tooling::TranslationUnitDiagnostics *SourceTU) {
     // Use the file manager to deduplicate paths. FileEntries are
-    // automatically canonicalized. Since relative paths can come from different
-    // build directories, make them absolute immediately.
-    SmallString<128> Path = R.getFilePath();
-    if (BuildDir)
-      llvm::sys::fs::make_absolute(*BuildDir, Path);
-    else
-      SM.getFileManager().makeAbsolutePath(Path);
-
-    if (auto Entry = SM.getFileManager().getOptionalFileRef(Path)) {
+    // automatically canonicalized.
+    if (auto Entry = SM.getFileManager().getFile(R.getFilePath())) {
       if (SourceTU) {
         auto &Replaces = DiagReplacements[*Entry];
         auto It = Replaces.find(R);
@@ -176,7 +166,7 @@ groupReplacements(const TUReplacements &TUs, const TUDiagnostics &TUDs,
           return;
       }
       GroupedReplacements[*Entry].push_back(R);
-    } else if (Warned.insert(Path).second) {
+    } else if (Warned.insert(R.getFilePath()).second) {
       errs() << "Described file '" << R.getFilePath()
              << "' doesn't exist. Ignoring...\n";
     }
@@ -184,20 +174,21 @@ groupReplacements(const TUReplacements &TUs, const TUDiagnostics &TUDs,
 
   for (const auto &TU : TUs)
     for (const tooling::Replacement &R : TU.Replacements)
-      AddToGroup(R, nullptr, {});
+      AddToGroup(R, nullptr);
 
   for (const auto &TU : TUDs)
     for (const auto &D : TU.Diagnostics)
       if (const auto *ChoosenFix = tooling::selectFirstFix(D)) {
         for (const auto &Fix : *ChoosenFix)
           for (const tooling::Replacement &R : Fix.second)
-            AddToGroup(R, &TU, D.BuildDirectory);
+            AddToGroup(R, &TU);
       }
 
   // Sort replacements per file to keep consistent behavior when
   // clang-apply-replacements run on differents machine.
   for (auto &FileAndReplacements : GroupedReplacements) {
-    llvm::sort(FileAndReplacements.second);
+    llvm::sort(FileAndReplacements.second.begin(),
+               FileAndReplacements.second.end());
   }
 
   return GroupedReplacements;
@@ -205,17 +196,17 @@ groupReplacements(const TUReplacements &TUs, const TUDiagnostics &TUDs,
 
 bool mergeAndDeduplicate(const TUReplacements &TUs, const TUDiagnostics &TUDs,
                          FileToChangesMap &FileChanges,
-                         clang::SourceManager &SM, bool IgnoreInsertConflict) {
+                         clang::SourceManager &SM) {
   auto GroupedReplacements = groupReplacements(TUs, TUDs, SM);
   bool ConflictDetected = false;
 
   // To report conflicting replacements on corresponding file, all replacements
   // are stored into 1 big AtomicChange.
   for (const auto &FileAndReplacements : GroupedReplacements) {
-    FileEntryRef Entry = FileAndReplacements.first;
+    const FileEntry *Entry = FileAndReplacements.first;
     const SourceLocation BeginLoc =
         SM.getLocForStartOfFile(SM.getOrCreateFileID(Entry, SrcMgr::C_User));
-    tooling::AtomicChange FileChange(Entry.getName(), Entry.getName());
+    tooling::AtomicChange FileChange(Entry->getName(), Entry->getName());
     for (const auto &R : FileAndReplacements.second) {
       llvm::Error Err =
           FileChange.replace(SM, BeginLoc.getLocWithOffset(R.getOffset()),
@@ -234,24 +225,7 @@ bool mergeAndDeduplicate(const TUReplacements &TUs, const TUDiagnostics &TUDs,
         // For now, printing directly the error reported by `AtomicChange` is
         // the easiest solution.
         errs() << llvm::toString(std::move(Err)) << "\n";
-        if (IgnoreInsertConflict) {
-          tooling::Replacements &Replacements = FileChange.getReplacements();
-          unsigned NewOffset =
-              Replacements.getShiftedCodePosition(R.getOffset());
-          unsigned NewLength = Replacements.getShiftedCodePosition(
-                                   R.getOffset() + R.getLength()) -
-                               NewOffset;
-          if (NewLength == R.getLength()) {
-            tooling::Replacement RR = tooling::Replacement(
-                R.getFilePath(), NewOffset, NewLength, R.getReplacementText());
-            Replacements = Replacements.merge(tooling::Replacements(RR));
-          } else {
-            llvm::errs()
-                << "Can't resolve conflict, skipping the replacement.\n";
-            ConflictDetected = true;
-          }
-        } else
-          ConflictDetected = true;
+        ConflictDetected = true;
       }
     }
     FileChanges.try_emplace(Entry,

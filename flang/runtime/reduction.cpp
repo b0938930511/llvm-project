@@ -12,10 +12,11 @@
 // DOT_PRODUCT, FINDLOC, MATMUL, SUM, and PRODUCT are in their own eponymous
 // source files.
 // NORM2, MAXLOC, MINLOC, MAXVAL, and MINVAL are in extrema.cpp.
+//
+// TODO: IALL, IANY
 
-#include "flang/Runtime/reduction.h"
+#include "reduction.h"
 #include "reduction-templates.h"
-#include "flang/Runtime/descriptor.h"
 #include <cinttypes>
 
 namespace Fortran::runtime {
@@ -228,7 +229,7 @@ inline auto GetTotalLogicalReduction(const Descriptor &x, const char *source,
     typename ACCUMULATOR::Type {
   Terminator terminator{source, line};
   if (dim < 0 || dim > 1) {
-    terminator.Crash("%s: bad DIM=%d for ARRAY with rank=1", intrinsic, dim);
+    terminator.Crash("%s: bad DIM=%d", intrinsic, dim);
   }
   SubscriptValue xAt[maxRank];
   x.GetLowerBounds(xAt);
@@ -263,7 +264,7 @@ template <LogicalReduction REDUCTION> struct LogicalReduceHelper {
         Terminator &terminator, const char *intrinsic) const {
       // Standard requires result to have same LOGICAL kind as argument.
       CreatePartialReductionResult(
-          result, x, x.ElementBytes(), dim, terminator, intrinsic, x.type());
+          result, x, dim, terminator, intrinsic, x.type());
       SubscriptValue at[maxRank];
       result.GetLowerBounds(at);
       INTERNAL_CHECK(result.rank() == 0 || at[0] == 1);
@@ -310,11 +311,8 @@ private:
 template <int KIND> struct CountDimension {
   void operator()(Descriptor &result, const Descriptor &x, int dim,
       Terminator &terminator) const {
-    // Element size of the descriptor descriptor is the size
-    // of {TypeCategory::Integer, KIND}.
-    CreatePartialReductionResult(result, x,
-        Descriptor::BytesFor(TypeCategory::Integer, KIND), dim, terminator,
-        "COUNT", TypeCode{TypeCategory::Integer, KIND});
+    CreatePartialReductionResult(result, x, dim, terminator, "COUNT",
+        TypeCode{TypeCategory::Integer, KIND});
     SubscriptValue at[maxRank];
     result.GetLowerBounds(at);
     INTERNAL_CHECK(result.rank() == 0 || at[0] == 1);

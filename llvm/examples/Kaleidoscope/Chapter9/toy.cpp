@@ -1,4 +1,3 @@
-#include "../include/KaleidoscopeJIT.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Analysis/BasicAliasAnalysis.h"
 #include "llvm/Analysis/Passes.h"
@@ -8,14 +7,15 @@
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/Support/Host.h"
 #include "llvm/Support/TargetSelect.h"
-#include "llvm/TargetParser/Host.h"
 #include "llvm/Transforms/Scalar.h"
 #include <cctype>
 #include <cstdio>
 #include <map>
 #include <string>
 #include <vector>
+#include "../include/KaleidoscopeJIT.h"
 
 using namespace llvm;
 using namespace llvm::orc;
@@ -477,7 +477,7 @@ static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
   getNextToken(); // eat (
   std::vector<std::unique_ptr<ExprAST>> Args;
   if (CurTok != ')') {
-    while (true) {
+    while (1) {
       if (auto Arg = ParseExpression())
         Args.push_back(std::move(Arg));
       else
@@ -587,7 +587,7 @@ static std::unique_ptr<ExprAST> ParseVarExpr() {
   if (CurTok != tok_identifier)
     return LogError("expected identifier after var");
 
-  while (true) {
+  while (1) {
     std::string Name = IdentifierStr;
     getNextToken(); // eat identifier.
 
@@ -671,7 +671,7 @@ static std::unique_ptr<ExprAST> ParseUnary() {
 static std::unique_ptr<ExprAST> ParseBinOpRHS(int ExprPrec,
                                               std::unique_ptr<ExprAST> LHS) {
   // If this is a binop, find its precedence.
-  while (true) {
+  while (1) {
     int TokPrec = GetTokPrecedence();
 
     // If this is a binop that binds at least as tightly as the current binop,
@@ -799,8 +799,8 @@ static std::unique_ptr<FunctionAST> ParseDefinition() {
 static std::unique_ptr<FunctionAST> ParseTopLevelExpr() {
   SourceLocation FnLoc = CurLoc;
   if (auto E = ParseExpression()) {
-    // Make the top-level expression be our "main" function.
-    auto Proto = std::make_unique<PrototypeAST>(FnLoc, "main",
+    // Make an anonymous proto.
+    auto Proto = std::make_unique<PrototypeAST>(FnLoc, "__anon_expr",
                                                  std::vector<std::string>());
     return std::make_unique<FunctionAST>(std::move(Proto), std::move(E));
   }
@@ -852,7 +852,7 @@ void DebugInfo::emitLocation(ExprAST *AST) {
       Scope->getContext(), AST->getLine(), AST->getCol(), Scope));
 }
 
-static DISubroutineType *CreateFunctionType(unsigned NumArgs) {
+static DISubroutineType *CreateFunctionType(unsigned NumArgs, DIFile *Unit) {
   SmallVector<Metadata *, 8> EltTys;
   DIType *DblTy = KSDbgInfo.getDoubleTy();
 
@@ -1037,7 +1037,7 @@ Value *IfExprAST::codegen() {
   ThenBB = Builder->GetInsertBlock();
 
   // Emit else block.
-  TheFunction->insert(TheFunction->end(), ElseBB);
+  TheFunction->getBasicBlockList().push_back(ElseBB);
   Builder->SetInsertPoint(ElseBB);
 
   Value *ElseV = Else->codegen();
@@ -1049,7 +1049,7 @@ Value *IfExprAST::codegen() {
   ElseBB = Builder->GetInsertBlock();
 
   // Emit merge block.
-  TheFunction->insert(TheFunction->end(), MergeBB);
+  TheFunction->getBasicBlockList().push_back(MergeBB);
   Builder->SetInsertPoint(MergeBB);
   PHINode *PN = Builder->CreatePHI(Type::getDoubleTy(*TheContext), 2, "iftmp");
 
@@ -1253,7 +1253,7 @@ Function *FunctionAST::codegen() {
   unsigned ScopeLine = LineNo;
   DISubprogram *SP = DBuilder->createFunction(
       FContext, P.getName(), StringRef(), Unit, LineNo,
-      CreateFunctionType(TheFunction->arg_size()), ScopeLine,
+      CreateFunctionType(TheFunction->arg_size(), Unit), ScopeLine,
       DINode::FlagPrototyped, DISubprogram::SPFlagDefinition);
   TheFunction->setSubprogram(SP);
 
@@ -1365,7 +1365,7 @@ static void HandleTopLevelExpression() {
 
 /// top ::= definition | external | expression | ';'
 static void MainLoop() {
-  while (true) {
+  while (1) {
     switch (CurTok) {
     case tok_eof:
       return;
@@ -1447,7 +1447,7 @@ int main() {
   // but we'd like actual source locations.
   KSDbgInfo.TheCU = DBuilder->createCompileUnit(
       dwarf::DW_LANG_C, DBuilder->createFile("fib.ks", "."),
-      "Kaleidoscope Compiler", false, "", 0);
+      "Kaleidoscope Compiler", 0, "", 0);
 
   // Run the main "interpreter loop" now.
   MainLoop();

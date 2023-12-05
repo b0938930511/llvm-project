@@ -19,6 +19,7 @@ class raw_ostream;
 
 namespace clang {
 class DiagnosticConsumer;
+class DiagnosticsEngine;
 class DiagnosticOptions;
 
 namespace serialized_diags {

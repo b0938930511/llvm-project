@@ -5,11 +5,11 @@
 extern "C" {
 #endif
 
-void t1(void);
+void t1();
 
-void use(void) { t1(); }
+void use() { t1(); }
 
-__attribute__((nodebug)) void t1(void) {
+__attribute__((nodebug)) void t1() {
   int a = 10;
   a++;
 }

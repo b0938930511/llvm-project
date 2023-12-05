@@ -14,7 +14,7 @@
 - (id)getObject;
 @end
 
-id getNil(void) {
+id getNil() {
   return 0;
 }
 
@@ -106,7 +106,7 @@ void testPropertyReturningNull(SomeClass *sc) {
 }
 @end
 
-void testClassPropertyReturningNull(void) {
+void testClassPropertyReturningNull() {
   int *result = SomeClass.classPropertyReturningNull;
   *result = 1;
 #ifndef SUPPRESSED

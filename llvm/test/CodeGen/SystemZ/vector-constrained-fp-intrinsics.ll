@@ -31,11 +31,11 @@ define <2 x double> @constrained_vector_fdiv_v2f64() #0 {
 ; S390X-LABEL: constrained_vector_fdiv_v2f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    larl %r1, .LCPI1_0
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI1_1
-; S390X-NEXT:    ld %f2, 0(%r1)
+; S390X-NEXT:    ldeb %f2, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI1_2
-; S390X-NEXT:    ld %f0, 0(%r1)
+; S390X-NEXT:    ldeb %f0, 0(%r1)
 ; S390X-NEXT:    ddbr %f2, %f1
 ; S390X-NEXT:    ddbr %f0, %f1
 ; S390X-NEXT:    br %r14
@@ -97,15 +97,15 @@ entry:
   ret <3 x float> %div
 }
 
-define void @constrained_vector_fdiv_v3f64(ptr %a) #0 {
+define void @constrained_vector_fdiv_v3f64(<3 x double>* %a) #0 {
 ; S390X-LABEL: constrained_vector_fdiv_v3f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    larl %r1, .LCPI3_1
-; S390X-NEXT:    ld %f0, 0(%r1)
+; S390X-NEXT:    ldeb %f0, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI3_2
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI3_0
-; S390X-NEXT:    ld %f2, 0(%r1)
+; S390X-NEXT:    ldeb %f2, 0(%r1)
 ; S390X-NEXT:    ddb %f1, 0(%r2)
 ; S390X-NEXT:    ddb %f0, 8(%r2)
 ; S390X-NEXT:    ddb %f2, 16(%r2)
@@ -117,7 +117,7 @@ define void @constrained_vector_fdiv_v3f64(ptr %a) #0 {
 ; SZ13-LABEL: constrained_vector_fdiv_v3f64:
 ; SZ13:       # %bb.0: # %entry
 ; SZ13-NEXT:    larl %r1, .LCPI3_0
-; SZ13-NEXT:    ld %f1, 0(%r1)
+; SZ13-NEXT:    ldeb %f1, 0(%r1)
 ; SZ13-NEXT:    ddb %f1, 16(%r2)
 ; SZ13-NEXT:    larl %r1, .LCPI3_1
 ; SZ13-NEXT:    vl %v0, 0(%r2), 4
@@ -127,13 +127,13 @@ define void @constrained_vector_fdiv_v3f64(ptr %a) #0 {
 ; SZ13-NEXT:    vst %v0, 0(%r2), 4
 ; SZ13-NEXT:    br %r14
 entry:
-  %b = load <3 x double>, ptr %a
+  %b = load <3 x double>, <3 x double>* %a
   %div = call <3 x double> @llvm.experimental.constrained.fdiv.v3f64(
            <3 x double> <double 1.000000e+00, double 2.000000e+00, double 3.000000e+00>,
            <3 x double> %b,
            metadata !"round.dynamic",
            metadata !"fpexcept.strict") #0
-  store <3 x double> %div, ptr %a
+  store <3 x double> %div, <3 x double>* %a
   ret void
 }
 
@@ -141,15 +141,15 @@ define <4 x double> @constrained_vector_fdiv_v4f64() #0 {
 ; S390X-LABEL: constrained_vector_fdiv_v4f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    larl %r1, .LCPI4_0
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI4_1
-; S390X-NEXT:    ld %f6, 0(%r1)
+; S390X-NEXT:    ldeb %f6, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI4_2
-; S390X-NEXT:    ld %f4, 0(%r1)
+; S390X-NEXT:    ldeb %f4, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI4_3
-; S390X-NEXT:    ld %f2, 0(%r1)
+; S390X-NEXT:    ldeb %f2, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI4_4
-; S390X-NEXT:    ld %f0, 0(%r1)
+; S390X-NEXT:    ldeb %f0, 0(%r1)
 ; S390X-NEXT:    ddbr %f6, %f1
 ; S390X-NEXT:    ddbr %f4, %f1
 ; S390X-NEXT:    ddbr %f2, %f1
@@ -231,13 +231,13 @@ define <2 x double> @constrained_vector_frem_v2f64() #0 {
 ; S390X-NEXT:    .cfi_offset %f8, -168
 ; S390X-NEXT:    .cfi_offset %f9, -176
 ; S390X-NEXT:    larl %r1, .LCPI6_0
-; S390X-NEXT:    ld %f0, 0(%r1)
+; S390X-NEXT:    ldeb %f0, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI6_1
-; S390X-NEXT:    ld %f8, 0(%r1)
+; S390X-NEXT:    ldeb %f8, 0(%r1)
 ; S390X-NEXT:    ldr %f2, %f8
 ; S390X-NEXT:    brasl %r14, fmod@PLT
 ; S390X-NEXT:    larl %r1, .LCPI6_2
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    ldr %f9, %f0
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    ldr %f2, %f8
@@ -258,7 +258,7 @@ define <2 x double> @constrained_vector_frem_v2f64() #0 {
 ; SZ13-NEXT:    std %f8, 176(%r15) # 8-byte Folded Spill
 ; SZ13-NEXT:    .cfi_offset %f8, -168
 ; SZ13-NEXT:    larl %r1, .LCPI6_0
-; SZ13-NEXT:    ld %f8, 0(%r1)
+; SZ13-NEXT:    ldeb %f8, 0(%r1)
 ; SZ13-NEXT:    vgmg %v0, 1, 1
 ; SZ13-NEXT:    ldr %f2, %f8
 ; SZ13-NEXT:    brasl %r14, fmod@PLT
@@ -365,7 +365,7 @@ entry:
   ret <3 x float> %rem
 }
 
-define void @constrained_vector_frem_v3f64(ptr %a) #0 {
+define void @constrained_vector_frem_v3f64(<3 x double>* %a) #0 {
 ; S390X-LABEL: constrained_vector_frem_v3f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    stmg %r13, %r15, 104(%r15)
@@ -384,17 +384,17 @@ define void @constrained_vector_frem_v3f64(ptr %a) #0 {
 ; S390X-NEXT:    ld %f8, 0(%r2)
 ; S390X-NEXT:    ld %f2, 16(%r2)
 ; S390X-NEXT:    larl %r1, .LCPI8_0
-; S390X-NEXT:    ld %f0, 0(%r1)
+; S390X-NEXT:    ldeb %f0, 0(%r1)
 ; S390X-NEXT:    ld %f9, 8(%r2)
 ; S390X-NEXT:    brasl %r14, fmod@PLT
 ; S390X-NEXT:    larl %r1, .LCPI8_1
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    ldr %f10, %f0
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    ldr %f2, %f9
 ; S390X-NEXT:    brasl %r14, fmod@PLT
 ; S390X-NEXT:    larl %r1, .LCPI8_2
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    ldr %f9, %f0
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    ldr %f2, %f8
@@ -422,38 +422,38 @@ define void @constrained_vector_frem_v3f64(ptr %a) #0 {
 ; SZ13-NEXT:    ld %f8, 16(%r2)
 ; SZ13-NEXT:    vgmg %v0, 2, 11
 ; SZ13-NEXT:    lgr %r13, %r2
-; SZ13-NEXT:    vst %v2, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v2, 160(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    # kill: def $f2d killed $f2d killed $v2
 ; SZ13-NEXT:    brasl %r14, fmod@PLT
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    vl %v0, 176(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vl %v0, 160(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    vrepg %v2, %v0, 1
 ; SZ13-NEXT:    vgmg %v0, 1, 1
 ; SZ13-NEXT:    # kill: def $f2d killed $f2d killed $v2
 ; SZ13-NEXT:    brasl %r14, fmod@PLT
-; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v0, %v1, %v0
 ; SZ13-NEXT:    larl %r1, .LCPI8_0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    ldr %f2, %f8
 ; SZ13-NEXT:    brasl %r14, fmod@PLT
 ; SZ13-NEXT:    std %f0, 16(%r13)
-; SZ13-NEXT:    vl %v0, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v0, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    ld %f8, 192(%r15) # 8-byte Folded Reload
 ; SZ13-NEXT:    vst %v0, 0(%r13), 4
 ; SZ13-NEXT:    lmg %r13, %r15, 304(%r15)
 ; SZ13-NEXT:    br %r14
 entry:
-  %b = load <3 x double>, ptr %a
+  %b = load <3 x double>, <3 x double>* %a
   %rem = call <3 x double> @llvm.experimental.constrained.frem.v3f64(
            <3 x double> <double 1.000000e+00, double 2.000000e+00, double 3.000000e+00>,
            <3 x double> %b,
            metadata !"round.dynamic",
            metadata !"fpexcept.strict") #0
-  store <3 x double> %rem, ptr %a
+  store <3 x double> %rem, <3 x double>* %a
   ret void
 }
 
@@ -474,25 +474,25 @@ define <4 x double> @constrained_vector_frem_v4f64() #0 {
 ; S390X-NEXT:    .cfi_offset %f10, -184
 ; S390X-NEXT:    .cfi_offset %f11, -192
 ; S390X-NEXT:    larl %r1, .LCPI9_0
-; S390X-NEXT:    ld %f0, 0(%r1)
+; S390X-NEXT:    ldeb %f0, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI9_1
-; S390X-NEXT:    ld %f8, 0(%r1)
+; S390X-NEXT:    ldeb %f8, 0(%r1)
 ; S390X-NEXT:    ldr %f2, %f8
 ; S390X-NEXT:    brasl %r14, fmod@PLT
 ; S390X-NEXT:    larl %r1, .LCPI9_2
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    ldr %f9, %f0
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    ldr %f2, %f8
 ; S390X-NEXT:    brasl %r14, fmod@PLT
 ; S390X-NEXT:    larl %r1, .LCPI9_3
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    ldr %f10, %f0
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    ldr %f2, %f8
 ; S390X-NEXT:    brasl %r14, fmod@PLT
 ; S390X-NEXT:    larl %r1, .LCPI9_4
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    ldr %f11, %f0
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    ldr %f2, %f8
@@ -517,31 +517,31 @@ define <4 x double> @constrained_vector_frem_v4f64() #0 {
 ; SZ13-NEXT:    std %f8, 192(%r15) # 8-byte Folded Spill
 ; SZ13-NEXT:    .cfi_offset %f8, -168
 ; SZ13-NEXT:    larl %r1, .LCPI9_0
-; SZ13-NEXT:    ld %f8, 0(%r1)
+; SZ13-NEXT:    ldeb %f8, 0(%r1)
 ; SZ13-NEXT:    vgmg %v0, 1, 1
 ; SZ13-NEXT:    ldr %f2, %f8
 ; SZ13-NEXT:    brasl %r14, fmod@PLT
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    vgmg %v0, 2, 11
 ; SZ13-NEXT:    ldr %f2, %f8
 ; SZ13-NEXT:    brasl %r14, fmod@PLT
-; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v0, %v0, %v1
 ; SZ13-NEXT:    larl %r1, .LCPI9_1
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    ldr %f2, %f8
 ; SZ13-NEXT:    brasl %r14, fmod@PLT
 ; SZ13-NEXT:    larl %r1, .LCPI9_2
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    ldr %f2, %f8
 ; SZ13-NEXT:    brasl %r14, fmod@PLT
-; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
-; SZ13-NEXT:    vl %v24, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v24, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    ld %f8, 192(%r15) # 8-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v26, %v0, %v1
@@ -586,12 +586,13 @@ define <2 x double> @constrained_vector_fmul_v2f64() #0 {
 ; S390X-LABEL: constrained_vector_fmul_v2f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    larl %r1, .LCPI11_0
-; S390X-NEXT:    ld %f0, 0(%r1)
+; S390X-NEXT:    ldeb %f2, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI11_1
-; S390X-NEXT:    ldr %f2, %f0
-; S390X-NEXT:    mdb %f2, 0(%r1)
+; S390X-NEXT:    ld %f1, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI11_2
-; S390X-NEXT:    mdb %f0, 0(%r1)
+; S390X-NEXT:    ldeb %f0, 0(%r1)
+; S390X-NEXT:    mdbr %f2, %f1
+; S390X-NEXT:    mdbr %f0, %f1
 ; S390X-NEXT:    br %r14
 ;
 ; SZ13-LABEL: constrained_vector_fmul_v2f64:
@@ -650,7 +651,7 @@ entry:
   ret <3 x float> %mul
 }
 
-define void @constrained_vector_fmul_v3f64(ptr %a) #0 {
+define void @constrained_vector_fmul_v3f64(<3 x double>* %a) #0 {
 ; S390X-LABEL: constrained_vector_fmul_v3f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    larl %r1, .LCPI13_0
@@ -678,14 +679,14 @@ define void @constrained_vector_fmul_v3f64(ptr %a) #0 {
 ; SZ13-NEXT:    std %f1, 16(%r2)
 ; SZ13-NEXT:    br %r14
 entry:
-  %b = load <3 x double>, ptr %a
+  %b = load <3 x double>, <3 x double>* %a
   %mul = call <3 x double> @llvm.experimental.constrained.fmul.v3f64(
            <3 x double> <double 0x7FEFFFFFFFFFFFFF, double 0x7FEFFFFFFFFFFFFF,
                         double 0x7FEFFFFFFFFFFFFF>,
            <3 x double> %b,
            metadata !"round.dynamic",
            metadata !"fpexcept.strict") #0
-  store <3 x double> %mul, ptr %a
+  store <3 x double> %mul, <3 x double>* %a
   ret void
 }
 
@@ -693,18 +694,19 @@ define <4 x double> @constrained_vector_fmul_v4f64() #0 {
 ; S390X-LABEL: constrained_vector_fmul_v4f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    larl %r1, .LCPI14_0
-; S390X-NEXT:    ld %f0, 0(%r1)
+; S390X-NEXT:    ldeb %f6, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI14_1
-; S390X-NEXT:    ldr %f6, %f0
-; S390X-NEXT:    mdb %f6, 0(%r1)
+; S390X-NEXT:    ld %f1, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI14_2
-; S390X-NEXT:    ldr %f4, %f0
-; S390X-NEXT:    mdb %f4, 0(%r1)
+; S390X-NEXT:    ldeb %f4, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI14_3
-; S390X-NEXT:    ldr %f2, %f0
-; S390X-NEXT:    mdb %f2, 0(%r1)
+; S390X-NEXT:    ldeb %f2, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI14_4
-; S390X-NEXT:    mdb %f0, 0(%r1)
+; S390X-NEXT:    ldeb %f0, 0(%r1)
+; S390X-NEXT:    mdbr %f6, %f1
+; S390X-NEXT:    mdbr %f4, %f1
+; S390X-NEXT:    mdbr %f2, %f1
+; S390X-NEXT:    mdbr %f0, %f1
 ; S390X-NEXT:    br %r14
 ;
 ; SZ13-LABEL: constrained_vector_fmul_v4f64:
@@ -758,12 +760,13 @@ define <2 x double> @constrained_vector_fadd_v2f64() #0 {
 ; S390X-LABEL: constrained_vector_fadd_v2f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    larl %r1, .LCPI16_0
-; S390X-NEXT:    ld %f0, 0(%r1)
-; S390X-NEXT:    larl %r1, .LCPI16_1
-; S390X-NEXT:    ldr %f2, %f0
-; S390X-NEXT:    adb %f2, 0(%r1)
+; S390X-NEXT:    ld %f1, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI16_2
-; S390X-NEXT:    adb %f0, 0(%r1)
+; S390X-NEXT:    ldeb %f0, 0(%r1)
+; S390X-NEXT:    larl %r1, .LCPI16_1
+; S390X-NEXT:    ldr %f2, %f1
+; S390X-NEXT:    adb %f2, 0(%r1)
+; S390X-NEXT:    adbr %f0, %f1
 ; S390X-NEXT:    br %r14
 ;
 ; SZ13-LABEL: constrained_vector_fadd_v2f64:
@@ -820,7 +823,7 @@ entry:
   ret <3 x float> %add
 }
 
-define void @constrained_vector_fadd_v3f64(ptr %a) #0 {
+define void @constrained_vector_fadd_v3f64(<3 x double>* %a) #0 {
 ; S390X-LABEL: constrained_vector_fadd_v3f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    larl %r1, .LCPI18_0
@@ -848,14 +851,14 @@ define void @constrained_vector_fadd_v3f64(ptr %a) #0 {
 ; SZ13-NEXT:    std %f1, 16(%r2)
 ; SZ13-NEXT:    br %r14
 entry:
-  %b = load <3 x double>, ptr %a
+  %b = load <3 x double>, <3 x double>* %a
   %add = call <3 x double> @llvm.experimental.constrained.fadd.v3f64(
            <3 x double> <double 0x7FEFFFFFFFFFFFFF, double 0x7FEFFFFFFFFFFFFF,
                          double 0x7FEFFFFFFFFFFFFF>,
            <3 x double> %b,
            metadata !"round.dynamic",
            metadata !"fpexcept.strict") #0
-  store <3 x double> %add, ptr %a
+  store <3 x double> %add, <3 x double>* %a
   ret void
 }
 
@@ -863,18 +866,19 @@ define <4 x double> @constrained_vector_fadd_v4f64() #0 {
 ; S390X-LABEL: constrained_vector_fadd_v4f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    larl %r1, .LCPI19_0
-; S390X-NEXT:    ld %f0, 0(%r1)
+; S390X-NEXT:    ld %f1, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI19_1
-; S390X-NEXT:    ldr %f6, %f0
+; S390X-NEXT:    ldr %f2, %f1
+; S390X-NEXT:    ldr %f6, %f1
 ; S390X-NEXT:    adb %f6, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI19_2
-; S390X-NEXT:    ldr %f4, %f0
-; S390X-NEXT:    adb %f4, 0(%r1)
-; S390X-NEXT:    larl %r1, .LCPI19_3
-; S390X-NEXT:    ldr %f2, %f0
-; S390X-NEXT:    adb %f2, 0(%r1)
+; S390X-NEXT:    ldeb %f4, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI19_4
-; S390X-NEXT:    adb %f0, 0(%r1)
+; S390X-NEXT:    ldeb %f0, 0(%r1)
+; S390X-NEXT:    larl %r1, .LCPI19_3
+; S390X-NEXT:    adb %f2, 0(%r1)
+; S390X-NEXT:    adbr %f4, %f1
+; S390X-NEXT:    adbr %f0, %f1
 ; S390X-NEXT:    br %r14
 ;
 ; SZ13-LABEL: constrained_vector_fadd_v4f64:
@@ -929,11 +933,12 @@ define <2 x double> @constrained_vector_fsub_v2f64() #0 {
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    larl %r1, .LCPI21_0
 ; S390X-NEXT:    ld %f0, 0(%r1)
+; S390X-NEXT:    larl %r1, .LCPI21_2
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI21_1
 ; S390X-NEXT:    ldr %f2, %f0
 ; S390X-NEXT:    sdb %f2, 0(%r1)
-; S390X-NEXT:    larl %r1, .LCPI21_2
-; S390X-NEXT:    sdb %f0, 0(%r1)
+; S390X-NEXT:    sdbr %f0, %f1
 ; S390X-NEXT:    br %r14
 ;
 ; SZ13-LABEL: constrained_vector_fsub_v2f64:
@@ -992,7 +997,7 @@ entry:
   ret <3 x float> %sub
 }
 
-define void @constrained_vector_fsub_v3f64(ptr %a) #0 {
+define void @constrained_vector_fsub_v3f64(<3 x double>* %a) #0 {
 ; S390X-LABEL: constrained_vector_fsub_v3f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    larl %r1, .LCPI23_0
@@ -1018,14 +1023,14 @@ define void @constrained_vector_fsub_v3f64(ptr %a) #0 {
 ; SZ13-NEXT:    std %f2, 16(%r2)
 ; SZ13-NEXT:    br %r14
 entry:
-  %b = load <3 x double>, ptr %a
+  %b = load <3 x double>, <3 x double>* %a
   %sub = call <3 x double> @llvm.experimental.constrained.fsub.v3f64(
            <3 x double> <double 0xFFEFFFFFFFFFFFFF, double 0xFFEFFFFFFFFFFFFF,
                          double 0xFFEFFFFFFFFFFFFF>,
            <3 x double> %b,
            metadata !"round.dynamic",
            metadata !"fpexcept.strict") #0
-  store <3 x double> %sub, ptr %a
+  store <3 x double> %sub, <3 x double>* %a
   ret void
 }
 
@@ -1038,13 +1043,15 @@ define <4 x double> @constrained_vector_fsub_v4f64() #0 {
 ; S390X-NEXT:    ldr %f6, %f0
 ; S390X-NEXT:    sdb %f6, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI24_2
-; S390X-NEXT:    ldr %f4, %f0
-; S390X-NEXT:    sdb %f4, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
+; S390X-NEXT:    larl %r1, .LCPI24_4
+; S390X-NEXT:    ldeb %f3, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI24_3
 ; S390X-NEXT:    ldr %f2, %f0
 ; S390X-NEXT:    sdb %f2, 0(%r1)
-; S390X-NEXT:    larl %r1, .LCPI24_4
-; S390X-NEXT:    sdb %f0, 0(%r1)
+; S390X-NEXT:    ldr %f4, %f0
+; S390X-NEXT:    sdbr %f4, %f1
+; S390X-NEXT:    sdbr %f0, %f3
 ; S390X-NEXT:    br %r14
 ;
 ; SZ13-LABEL: constrained_vector_fsub_v4f64:
@@ -1093,9 +1100,10 @@ define <2 x double> @constrained_vector_sqrt_v2f64() #0 {
 ; S390X-LABEL: constrained_vector_sqrt_v2f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    larl %r1, .LCPI26_0
+; S390X-NEXT:    larl %r2, .LCPI26_1
+; S390X-NEXT:    ldeb %f0, 0(%r2)
 ; S390X-NEXT:    sqdb %f2, 0(%r1)
-; S390X-NEXT:    larl %r1, .LCPI26_1
-; S390X-NEXT:    sqdb %f0, 0(%r1)
+; S390X-NEXT:    sqdbr %f0, %f0
 ; S390X-NEXT:    br %r14
 ;
 ; SZ13-LABEL: constrained_vector_sqrt_v2f64:
@@ -1143,7 +1151,7 @@ entry:
   ret <3 x float> %sqrt
 }
 
-define void @constrained_vector_sqrt_v3f64(ptr %a) #0 {
+define void @constrained_vector_sqrt_v3f64(<3 x double>* %a) #0 {
 ; S390X-LABEL: constrained_vector_sqrt_v3f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    sqdb %f0, 0(%r2)
@@ -1163,12 +1171,12 @@ define void @constrained_vector_sqrt_v3f64(ptr %a) #0 {
 ; SZ13-NEXT:    vst %v0, 0(%r2), 4
 ; SZ13-NEXT:    br %r14
 entry:
-  %b = load <3 x double>, ptr %a
+  %b = load <3 x double>, <3 x double>* %a
   %sqrt = call <3 x double> @llvm.experimental.constrained.sqrt.v3f64(
                           <3 x double> %b,
                           metadata !"round.dynamic",
                           metadata !"fpexcept.strict") #0
-  store <3 x double> %sqrt, ptr %a
+  store <3 x double> %sqrt, <3 x double>* %a
   ret void
 }
 
@@ -1179,10 +1187,11 @@ define <4 x double> @constrained_vector_sqrt_v4f64() #0 {
 ; S390X-NEXT:    sqdb %f6, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI29_1
 ; S390X-NEXT:    sqdb %f4, 0(%r1)
+; S390X-NEXT:    larl %r1, .LCPI29_3
+; S390X-NEXT:    ldeb %f0, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI29_2
 ; S390X-NEXT:    sqdb %f2, 0(%r1)
-; S390X-NEXT:    larl %r1, .LCPI29_3
-; S390X-NEXT:    sqdb %f0, 0(%r1)
+; S390X-NEXT:    sqdbr %f0, %f0
 ; S390X-NEXT:    br %r14
 ;
 ; SZ13-LABEL: constrained_vector_sqrt_v4f64:
@@ -1259,7 +1268,7 @@ define <2 x double> @constrained_vector_pow_v2f64() #0 {
 ; S390X-NEXT:    larl %r1, .LCPI31_0
 ; S390X-NEXT:    ld %f0, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI31_1
-; S390X-NEXT:    ld %f8, 0(%r1)
+; S390X-NEXT:    ldeb %f8, 0(%r1)
 ; S390X-NEXT:    ldr %f2, %f8
 ; S390X-NEXT:    brasl %r14, pow@PLT
 ; S390X-NEXT:    larl %r1, .LCPI31_2
@@ -1286,7 +1295,7 @@ define <2 x double> @constrained_vector_pow_v2f64() #0 {
 ; SZ13-NEXT:    larl %r1, .LCPI31_0
 ; SZ13-NEXT:    ld %f0, 0(%r1)
 ; SZ13-NEXT:    larl %r1, .LCPI31_1
-; SZ13-NEXT:    ld %f8, 0(%r1)
+; SZ13-NEXT:    ldeb %f8, 0(%r1)
 ; SZ13-NEXT:    ldr %f2, %f8
 ; SZ13-NEXT:    brasl %r14, pow@PLT
 ; SZ13-NEXT:    larl %r1, .LCPI31_2
@@ -1395,7 +1404,7 @@ entry:
   ret <3 x float> %pow
 }
 
-define void @constrained_vector_pow_v3f64(ptr %a) #0 {
+define void @constrained_vector_pow_v3f64(<3 x double>* %a) #0 {
 ; S390X-LABEL: constrained_vector_pow_v3f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    stmg %r13, %r15, 104(%r15)
@@ -1416,7 +1425,7 @@ define void @constrained_vector_pow_v3f64(ptr %a) #0 {
 ; S390X-NEXT:    ld %f8, 0(%r2)
 ; S390X-NEXT:    ld %f0, 16(%r2)
 ; S390X-NEXT:    larl %r1, .LCPI33_0
-; S390X-NEXT:    ld %f9, 0(%r1)
+; S390X-NEXT:    ldeb %f9, 0(%r1)
 ; S390X-NEXT:    ld %f10, 8(%r2)
 ; S390X-NEXT:    ldr %f2, %f9
 ; S390X-NEXT:    brasl %r14, pow@PLT
@@ -1451,43 +1460,43 @@ define void @constrained_vector_pow_v3f64(ptr %a) #0 {
 ; SZ13-NEXT:    .cfi_offset %f8, -168
 ; SZ13-NEXT:    .cfi_offset %f9, -176
 ; SZ13-NEXT:    larl %r1, .LCPI33_0
-; SZ13-NEXT:    ld %f9, 0(%r1)
+; SZ13-NEXT:    ldeb %f9, 0(%r1)
 ; SZ13-NEXT:    vl %v0, 0(%r2), 4
 ; SZ13-NEXT:    ld %f8, 16(%r2)
 ; SZ13-NEXT:    ldr %f2, %f9
 ; SZ13-NEXT:    lgr %r13, %r2
-; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d killed $v0
 ; SZ13-NEXT:    brasl %r14, pow@PLT
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    vl %v0, 176(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vl %v0, 160(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    ldr %f2, %f9
 ; SZ13-NEXT:    vrepg %v0, %v0, 1
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d killed $v0
 ; SZ13-NEXT:    brasl %r14, pow@PLT
-; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v0, %v1, %v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    ldr %f0, %f8
 ; SZ13-NEXT:    ldr %f2, %f9
 ; SZ13-NEXT:    brasl %r14, pow@PLT
 ; SZ13-NEXT:    std %f0, 16(%r13)
-; SZ13-NEXT:    vl %v0, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v0, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    ld %f8, 200(%r15) # 8-byte Folded Reload
 ; SZ13-NEXT:    ld %f9, 192(%r15) # 8-byte Folded Reload
 ; SZ13-NEXT:    vst %v0, 0(%r13), 4
 ; SZ13-NEXT:    lmg %r13, %r15, 312(%r15)
 ; SZ13-NEXT:    br %r14
 entry:
-  %b = load <3 x double>, ptr %a
+  %b = load <3 x double>, <3 x double>* %a
   %pow = call <3 x double> @llvm.experimental.constrained.pow.v3f64(
                           <3 x double> %b,
                           <3 x double> <double 3.0, double 3.0, double 3.0>,
                           metadata !"round.dynamic",
                           metadata !"fpexcept.strict") #0
-  store <3 x double> %pow, ptr %a
+  store <3 x double> %pow, <3 x double>* %a
   ret void
 }
 
@@ -1510,7 +1519,7 @@ define <4 x double> @constrained_vector_pow_v4f64() #0 {
 ; S390X-NEXT:    larl %r1, .LCPI34_0
 ; S390X-NEXT:    ld %f0, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI34_1
-; S390X-NEXT:    ld %f8, 0(%r1)
+; S390X-NEXT:    ldeb %f8, 0(%r1)
 ; S390X-NEXT:    ldr %f2, %f8
 ; S390X-NEXT:    brasl %r14, pow@PLT
 ; S390X-NEXT:    larl %r1, .LCPI34_2
@@ -1553,31 +1562,31 @@ define <4 x double> @constrained_vector_pow_v4f64() #0 {
 ; SZ13-NEXT:    larl %r1, .LCPI34_0
 ; SZ13-NEXT:    ld %f0, 0(%r1)
 ; SZ13-NEXT:    larl %r1, .LCPI34_1
-; SZ13-NEXT:    ld %f8, 0(%r1)
+; SZ13-NEXT:    ldeb %f8, 0(%r1)
 ; SZ13-NEXT:    ldr %f2, %f8
 ; SZ13-NEXT:    brasl %r14, pow@PLT
 ; SZ13-NEXT:    larl %r1, .LCPI34_2
-; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
-; SZ13-NEXT:    ldr %f2, %f8
-; SZ13-NEXT:    brasl %r14, pow@PLT
-; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
-; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vmrhg %v0, %v0, %v1
-; SZ13-NEXT:    larl %r1, .LCPI34_3
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
-; SZ13-NEXT:    ldr %f2, %f8
-; SZ13-NEXT:    brasl %r14, pow@PLT
-; SZ13-NEXT:    larl %r1, .LCPI34_4
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    ld %f0, 0(%r1)
 ; SZ13-NEXT:    ldr %f2, %f8
 ; SZ13-NEXT:    brasl %r14, pow@PLT
 ; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
-; SZ13-NEXT:    vl %v24, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
+; SZ13-NEXT:    vmrhg %v0, %v0, %v1
+; SZ13-NEXT:    larl %r1, .LCPI34_3
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    ldr %f2, %f8
+; SZ13-NEXT:    brasl %r14, pow@PLT
+; SZ13-NEXT:    larl %r1, .LCPI34_4
+; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
+; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    ldr %f2, %f8
+; SZ13-NEXT:    brasl %r14, pow@PLT
+; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v24, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    ld %f8, 192(%r15) # 8-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v26, %v0, %v1
@@ -1764,7 +1773,7 @@ entry:
   ret <3 x float> %powi
 }
 
-define void @constrained_vector_powi_v3f64(ptr %a) #0 {
+define void @constrained_vector_powi_v3f64(<3 x double>* %a) #0 {
 ; S390X-LABEL: constrained_vector_powi_v3f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    stmg %r13, %r15, 104(%r15)
@@ -1778,7 +1787,7 @@ define void @constrained_vector_powi_v3f64(ptr %a) #0 {
 ; S390X-NEXT:    .cfi_offset %f8, -168
 ; S390X-NEXT:    .cfi_offset %f9, -176
 ; S390X-NEXT:    larl %r1, .LCPI38_0
-; S390X-NEXT:    ld %f0, 0(%r1)
+; S390X-NEXT:    ldeb %f0, 0(%r1)
 ; S390X-NEXT:    lgr %r13, %r2
 ; S390X-NEXT:    lghi %r2, 3
 ; S390X-NEXT:    brasl %r14, __powidf2@PLT
@@ -1818,7 +1827,7 @@ define void @constrained_vector_powi_v3f64(ptr %a) #0 {
 ; SZ13-NEXT:    larl %r1, .LCPI38_1
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    lghi %r2, 3
 ; SZ13-NEXT:    brasl %r14, __powidf2@PLT
 ; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
@@ -1835,13 +1844,13 @@ define void @constrained_vector_powi_v3f64(ptr %a) #0 {
 ; SZ13-NEXT:    lmg %r13, %r15, 280(%r15)
 ; SZ13-NEXT:    br %r14
 entry:
-  %b = load <3 x double>, ptr %a
+  %b = load <3 x double>, <3 x double>* %a
   %powi = call <3 x double> @llvm.experimental.constrained.powi.v3f64(
                           <3 x double> <double 42.0, double 42.1, double 42.2>,
                           i32 3,
                           metadata !"round.dynamic",
                           metadata !"fpexcept.strict") #0
-  store <3 x double> %powi, ptr %a
+  store <3 x double> %powi, <3 x double>* %a
   ret void
 }
 
@@ -1903,26 +1912,26 @@ define <4 x double> @constrained_vector_powi_v4f64() #0 {
 ; SZ13-NEXT:    brasl %r14, __powidf2@PLT
 ; SZ13-NEXT:    larl %r1, .LCPI39_1
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
-; SZ13-NEXT:    lghi %r2, 3
-; SZ13-NEXT:    brasl %r14, __powidf2@PLT
-; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
-; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vmrhg %v0, %v0, %v1
-; SZ13-NEXT:    larl %r1, .LCPI39_2
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
-; SZ13-NEXT:    lghi %r2, 3
-; SZ13-NEXT:    brasl %r14, __powidf2@PLT
-; SZ13-NEXT:    larl %r1, .LCPI39_3
-; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    ld %f0, 0(%r1)
 ; SZ13-NEXT:    lghi %r2, 3
 ; SZ13-NEXT:    brasl %r14, __powidf2@PLT
 ; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
-; SZ13-NEXT:    vl %v24, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
+; SZ13-NEXT:    vmrhg %v0, %v0, %v1
+; SZ13-NEXT:    larl %r1, .LCPI39_2
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    lghi %r2, 3
+; SZ13-NEXT:    brasl %r14, __powidf2@PLT
+; SZ13-NEXT:    larl %r1, .LCPI39_3
+; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
+; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    lghi %r2, 3
+; SZ13-NEXT:    brasl %r14, __powidf2@PLT
+; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v24, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v26, %v0, %v1
 ; SZ13-NEXT:    lmg %r14, %r15, 304(%r15)
@@ -1987,7 +1996,7 @@ define <2 x double> @constrained_vector_sin_v2f64() #0 {
 ; S390X-NEXT:    ld %f0, 0(%r1)
 ; S390X-NEXT:    brasl %r14, sin@PLT
 ; S390X-NEXT:    larl %r1, .LCPI41_1
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    ldr %f8, %f0
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    brasl %r14, sin@PLT
@@ -2009,7 +2018,7 @@ define <2 x double> @constrained_vector_sin_v2f64() #0 {
 ; SZ13-NEXT:    larl %r1, .LCPI41_1
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, sin@PLT
 ; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
@@ -2092,7 +2101,7 @@ entry:
   ret <3 x float> %sin
 }
 
-define void @constrained_vector_sin_v3f64(ptr %a) #0 {
+define void @constrained_vector_sin_v3f64(<3 x double>* %a) #0 {
 ; S390X-LABEL: constrained_vector_sin_v3f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    stmg %r13, %r15, 104(%r15)
@@ -2140,34 +2149,34 @@ define void @constrained_vector_sin_v3f64(ptr %a) #0 {
 ; SZ13-NEXT:    vl %v0, 0(%r2), 4
 ; SZ13-NEXT:    ld %f8, 16(%r2)
 ; SZ13-NEXT:    lgr %r13, %r2
-; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d killed $v0
 ; SZ13-NEXT:    brasl %r14, sin@PLT
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    vl %v0, 176(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vl %v0, 160(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    vrepg %v0, %v0, 1
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d killed $v0
 ; SZ13-NEXT:    brasl %r14, sin@PLT
-; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v0, %v1, %v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    ldr %f0, %f8
 ; SZ13-NEXT:    brasl %r14, sin@PLT
 ; SZ13-NEXT:    std %f0, 16(%r13)
-; SZ13-NEXT:    vl %v0, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v0, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    ld %f8, 192(%r15) # 8-byte Folded Reload
 ; SZ13-NEXT:    vst %v0, 0(%r13), 4
 ; SZ13-NEXT:    lmg %r13, %r15, 304(%r15)
 ; SZ13-NEXT:    br %r14
 entry:
-  %b = load <3 x double>, ptr %a
+  %b = load <3 x double>, <3 x double>* %a
   %sin = call <3 x double> @llvm.experimental.constrained.sin.v3f64(
                           <3 x double> %b,
                           metadata !"round.dynamic",
                           metadata !"fpexcept.strict") #0
-  store <3 x double> %sin, ptr %a
+  store <3 x double> %sin, <3 x double>* %a
   ret void
 }
 
@@ -2199,7 +2208,7 @@ define <4 x double> @constrained_vector_sin_v4f64() #0 {
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    brasl %r14, sin@PLT
 ; S390X-NEXT:    larl %r1, .LCPI44_3
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    ldr %f10, %f0
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    brasl %r14, sin@PLT
@@ -2224,23 +2233,23 @@ define <4 x double> @constrained_vector_sin_v4f64() #0 {
 ; SZ13-NEXT:    brasl %r14, sin@PLT
 ; SZ13-NEXT:    larl %r1, .LCPI44_1
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, sin@PLT
-; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v0, %v0, %v1
 ; SZ13-NEXT:    larl %r1, .LCPI44_2
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    ld %f0, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, sin@PLT
 ; SZ13-NEXT:    larl %r1, .LCPI44_3
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    ld %f0, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, sin@PLT
-; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
-; SZ13-NEXT:    vl %v24, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v24, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v26, %v0, %v1
 ; SZ13-NEXT:    lmg %r14, %r15, 304(%r15)
@@ -2304,7 +2313,7 @@ define <2 x double> @constrained_vector_cos_v2f64() #0 {
 ; S390X-NEXT:    ld %f0, 0(%r1)
 ; S390X-NEXT:    brasl %r14, cos@PLT
 ; S390X-NEXT:    larl %r1, .LCPI46_1
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    ldr %f8, %f0
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    brasl %r14, cos@PLT
@@ -2326,7 +2335,7 @@ define <2 x double> @constrained_vector_cos_v2f64() #0 {
 ; SZ13-NEXT:    larl %r1, .LCPI46_1
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, cos@PLT
 ; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
@@ -2409,7 +2418,7 @@ entry:
   ret <3 x float> %cos
 }
 
-define void @constrained_vector_cos_v3f64(ptr %a) #0 {
+define void @constrained_vector_cos_v3f64(<3 x double>* %a) #0 {
 ; S390X-LABEL: constrained_vector_cos_v3f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    stmg %r13, %r15, 104(%r15)
@@ -2457,34 +2466,34 @@ define void @constrained_vector_cos_v3f64(ptr %a) #0 {
 ; SZ13-NEXT:    vl %v0, 0(%r2), 4
 ; SZ13-NEXT:    ld %f8, 16(%r2)
 ; SZ13-NEXT:    lgr %r13, %r2
-; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d killed $v0
 ; SZ13-NEXT:    brasl %r14, cos@PLT
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    vl %v0, 176(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vl %v0, 160(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    vrepg %v0, %v0, 1
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d killed $v0
 ; SZ13-NEXT:    brasl %r14, cos@PLT
-; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v0, %v1, %v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    ldr %f0, %f8
 ; SZ13-NEXT:    brasl %r14, cos@PLT
 ; SZ13-NEXT:    std %f0, 16(%r13)
-; SZ13-NEXT:    vl %v0, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v0, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    ld %f8, 192(%r15) # 8-byte Folded Reload
 ; SZ13-NEXT:    vst %v0, 0(%r13), 4
 ; SZ13-NEXT:    lmg %r13, %r15, 304(%r15)
 ; SZ13-NEXT:    br %r14
 entry:
-  %b = load <3 x double>, ptr %a
+  %b = load <3 x double>, <3 x double>* %a
   %cos = call <3 x double> @llvm.experimental.constrained.cos.v3f64(
                           <3 x double> %b,
                           metadata !"round.dynamic",
                           metadata !"fpexcept.strict") #0
-  store <3 x double> %cos, ptr %a
+  store <3 x double> %cos, <3 x double>* %a
   ret void
 }
 
@@ -2516,7 +2525,7 @@ define <4 x double> @constrained_vector_cos_v4f64() #0 {
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    brasl %r14, cos@PLT
 ; S390X-NEXT:    larl %r1, .LCPI49_3
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    ldr %f10, %f0
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    brasl %r14, cos@PLT
@@ -2541,23 +2550,23 @@ define <4 x double> @constrained_vector_cos_v4f64() #0 {
 ; SZ13-NEXT:    brasl %r14, cos@PLT
 ; SZ13-NEXT:    larl %r1, .LCPI49_1
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, cos@PLT
-; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v0, %v0, %v1
 ; SZ13-NEXT:    larl %r1, .LCPI49_2
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    ld %f0, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, cos@PLT
 ; SZ13-NEXT:    larl %r1, .LCPI49_3
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    ld %f0, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, cos@PLT
-; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
-; SZ13-NEXT:    vl %v24, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v24, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v26, %v0, %v1
 ; SZ13-NEXT:    lmg %r14, %r15, 304(%r15)
@@ -2621,7 +2630,7 @@ define <2 x double> @constrained_vector_exp_v2f64() #0 {
 ; S390X-NEXT:    ld %f0, 0(%r1)
 ; S390X-NEXT:    brasl %r14, exp@PLT
 ; S390X-NEXT:    larl %r1, .LCPI51_1
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    ldr %f8, %f0
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    brasl %r14, exp@PLT
@@ -2643,7 +2652,7 @@ define <2 x double> @constrained_vector_exp_v2f64() #0 {
 ; SZ13-NEXT:    larl %r1, .LCPI51_1
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, exp@PLT
 ; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
@@ -2726,7 +2735,7 @@ entry:
   ret <3 x float> %exp
 }
 
-define void @constrained_vector_exp_v3f64(ptr %a) #0 {
+define void @constrained_vector_exp_v3f64(<3 x double>* %a) #0 {
 ; S390X-LABEL: constrained_vector_exp_v3f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    stmg %r13, %r15, 104(%r15)
@@ -2774,34 +2783,34 @@ define void @constrained_vector_exp_v3f64(ptr %a) #0 {
 ; SZ13-NEXT:    vl %v0, 0(%r2), 4
 ; SZ13-NEXT:    ld %f8, 16(%r2)
 ; SZ13-NEXT:    lgr %r13, %r2
-; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d killed $v0
 ; SZ13-NEXT:    brasl %r14, exp@PLT
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    vl %v0, 176(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vl %v0, 160(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    vrepg %v0, %v0, 1
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d killed $v0
 ; SZ13-NEXT:    brasl %r14, exp@PLT
-; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v0, %v1, %v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    ldr %f0, %f8
 ; SZ13-NEXT:    brasl %r14, exp@PLT
 ; SZ13-NEXT:    std %f0, 16(%r13)
-; SZ13-NEXT:    vl %v0, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v0, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    ld %f8, 192(%r15) # 8-byte Folded Reload
 ; SZ13-NEXT:    vst %v0, 0(%r13), 4
 ; SZ13-NEXT:    lmg %r13, %r15, 304(%r15)
 ; SZ13-NEXT:    br %r14
 entry:
-  %b = load <3 x double>, ptr %a
+  %b = load <3 x double>, <3 x double>* %a
   %exp = call <3 x double> @llvm.experimental.constrained.exp.v3f64(
                           <3 x double> %b,
                           metadata !"round.dynamic",
                           metadata !"fpexcept.strict") #0
-  store <3 x double> %exp, ptr %a
+  store <3 x double> %exp, <3 x double>* %a
   ret void
 }
 
@@ -2833,7 +2842,7 @@ define <4 x double> @constrained_vector_exp_v4f64() #0 {
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    brasl %r14, exp@PLT
 ; S390X-NEXT:    larl %r1, .LCPI54_3
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    ldr %f10, %f0
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    brasl %r14, exp@PLT
@@ -2858,23 +2867,23 @@ define <4 x double> @constrained_vector_exp_v4f64() #0 {
 ; SZ13-NEXT:    brasl %r14, exp@PLT
 ; SZ13-NEXT:    larl %r1, .LCPI54_1
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, exp@PLT
-; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v0, %v0, %v1
 ; SZ13-NEXT:    larl %r1, .LCPI54_2
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    ld %f0, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, exp@PLT
 ; SZ13-NEXT:    larl %r1, .LCPI54_3
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    ld %f0, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, exp@PLT
-; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
-; SZ13-NEXT:    vl %v24, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v24, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v26, %v0, %v1
 ; SZ13-NEXT:    lmg %r14, %r15, 304(%r15)
@@ -2935,7 +2944,7 @@ define <2 x double> @constrained_vector_exp2_v2f64() #0 {
 ; S390X-NEXT:    std %f8, 160(%r15) # 8-byte Folded Spill
 ; S390X-NEXT:    .cfi_offset %f8, -168
 ; S390X-NEXT:    larl %r1, .LCPI56_0
-; S390X-NEXT:    ld %f0, 0(%r1)
+; S390X-NEXT:    ldeb %f0, 0(%r1)
 ; S390X-NEXT:    brasl %r14, exp2@PLT
 ; S390X-NEXT:    larl %r1, .LCPI56_1
 ; S390X-NEXT:    ld %f1, 0(%r1)
@@ -2955,7 +2964,7 @@ define <2 x double> @constrained_vector_exp2_v2f64() #0 {
 ; SZ13-NEXT:    aghi %r15, -176
 ; SZ13-NEXT:    .cfi_def_cfa_offset 336
 ; SZ13-NEXT:    larl %r1, .LCPI56_0
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, exp2@PLT
 ; SZ13-NEXT:    larl %r1, .LCPI56_1
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
@@ -3043,7 +3052,7 @@ entry:
   ret <3 x float> %exp2
 }
 
-define void @constrained_vector_exp2_v3f64(ptr %a) #0 {
+define void @constrained_vector_exp2_v3f64(<3 x double>* %a) #0 {
 ; S390X-LABEL: constrained_vector_exp2_v3f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    stmg %r13, %r15, 104(%r15)
@@ -3091,34 +3100,34 @@ define void @constrained_vector_exp2_v3f64(ptr %a) #0 {
 ; SZ13-NEXT:    vl %v0, 0(%r2), 4
 ; SZ13-NEXT:    ld %f8, 16(%r2)
 ; SZ13-NEXT:    lgr %r13, %r2
-; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d killed $v0
 ; SZ13-NEXT:    brasl %r14, exp2@PLT
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    vl %v0, 176(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vl %v0, 160(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    vrepg %v0, %v0, 1
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d killed $v0
 ; SZ13-NEXT:    brasl %r14, exp2@PLT
-; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v0, %v1, %v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    ldr %f0, %f8
 ; SZ13-NEXT:    brasl %r14, exp2@PLT
 ; SZ13-NEXT:    std %f0, 16(%r13)
-; SZ13-NEXT:    vl %v0, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v0, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    ld %f8, 192(%r15) # 8-byte Folded Reload
 ; SZ13-NEXT:    vst %v0, 0(%r13), 4
 ; SZ13-NEXT:    lmg %r13, %r15, 304(%r15)
 ; SZ13-NEXT:    br %r14
 entry:
-  %b = load <3 x double>, ptr %a
+  %b = load <3 x double>, <3 x double>* %a
   %exp2 = call <3 x double> @llvm.experimental.constrained.exp2.v3f64(
                           <3 x double> %b,
                           metadata !"round.dynamic",
                           metadata !"fpexcept.strict") #0
-  store <3 x double> %exp2, ptr %a
+  store <3 x double> %exp2, <3 x double>* %a
   ret void
 }
 
@@ -3175,23 +3184,23 @@ define <4 x double> @constrained_vector_exp2_v4f64() #0 {
 ; SZ13-NEXT:    brasl %r14, exp2@PLT
 ; SZ13-NEXT:    larl %r1, .LCPI59_1
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
-; SZ13-NEXT:    brasl %r14, exp2@PLT
-; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
-; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vmrhg %v0, %v0, %v1
-; SZ13-NEXT:    larl %r1, .LCPI59_2
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
-; SZ13-NEXT:    brasl %r14, exp2@PLT
-; SZ13-NEXT:    larl %r1, .LCPI59_3
-; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    ld %f0, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, exp2@PLT
 ; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
-; SZ13-NEXT:    vl %v24, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
+; SZ13-NEXT:    vmrhg %v0, %v0, %v1
+; SZ13-NEXT:    larl %r1, .LCPI59_2
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    brasl %r14, exp2@PLT
+; SZ13-NEXT:    larl %r1, .LCPI59_3
+; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
+; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    brasl %r14, exp2@PLT
+; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v24, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v26, %v0, %v1
 ; SZ13-NEXT:    lmg %r14, %r15, 304(%r15)
@@ -3255,7 +3264,7 @@ define <2 x double> @constrained_vector_log_v2f64() #0 {
 ; S390X-NEXT:    ld %f0, 0(%r1)
 ; S390X-NEXT:    brasl %r14, log@PLT
 ; S390X-NEXT:    larl %r1, .LCPI61_1
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    ldr %f8, %f0
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    brasl %r14, log@PLT
@@ -3277,7 +3286,7 @@ define <2 x double> @constrained_vector_log_v2f64() #0 {
 ; SZ13-NEXT:    larl %r1, .LCPI61_1
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, log@PLT
 ; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
@@ -3360,7 +3369,7 @@ entry:
   ret <3 x float> %log
 }
 
-define void @constrained_vector_log_v3f64(ptr %a) #0 {
+define void @constrained_vector_log_v3f64(<3 x double>* %a) #0 {
 ; S390X-LABEL: constrained_vector_log_v3f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    stmg %r13, %r15, 104(%r15)
@@ -3408,34 +3417,34 @@ define void @constrained_vector_log_v3f64(ptr %a) #0 {
 ; SZ13-NEXT:    vl %v0, 0(%r2), 4
 ; SZ13-NEXT:    ld %f8, 16(%r2)
 ; SZ13-NEXT:    lgr %r13, %r2
-; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d killed $v0
 ; SZ13-NEXT:    brasl %r14, log@PLT
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    vl %v0, 176(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vl %v0, 160(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    vrepg %v0, %v0, 1
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d killed $v0
 ; SZ13-NEXT:    brasl %r14, log@PLT
-; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v0, %v1, %v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    ldr %f0, %f8
 ; SZ13-NEXT:    brasl %r14, log@PLT
 ; SZ13-NEXT:    std %f0, 16(%r13)
-; SZ13-NEXT:    vl %v0, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v0, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    ld %f8, 192(%r15) # 8-byte Folded Reload
 ; SZ13-NEXT:    vst %v0, 0(%r13), 4
 ; SZ13-NEXT:    lmg %r13, %r15, 304(%r15)
 ; SZ13-NEXT:    br %r14
 entry:
-  %b = load <3 x double>, ptr %a
+  %b = load <3 x double>, <3 x double>* %a
   %log = call <3 x double> @llvm.experimental.constrained.log.v3f64(
                           <3 x double> %b,
                           metadata !"round.dynamic",
                           metadata !"fpexcept.strict") #0
-  store <3 x double> %log, ptr %a
+  store <3 x double> %log, <3 x double>* %a
   ret void
 }
 
@@ -3467,7 +3476,7 @@ define <4 x double> @constrained_vector_log_v4f64() #0 {
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    brasl %r14, log@PLT
 ; S390X-NEXT:    larl %r1, .LCPI64_3
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    ldr %f10, %f0
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    brasl %r14, log@PLT
@@ -3492,23 +3501,23 @@ define <4 x double> @constrained_vector_log_v4f64() #0 {
 ; SZ13-NEXT:    brasl %r14, log@PLT
 ; SZ13-NEXT:    larl %r1, .LCPI64_1
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, log@PLT
-; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v0, %v0, %v1
 ; SZ13-NEXT:    larl %r1, .LCPI64_2
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    ld %f0, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, log@PLT
 ; SZ13-NEXT:    larl %r1, .LCPI64_3
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    ld %f0, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, log@PLT
-; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
-; SZ13-NEXT:    vl %v24, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v24, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v26, %v0, %v1
 ; SZ13-NEXT:    lmg %r14, %r15, 304(%r15)
@@ -3572,7 +3581,7 @@ define <2 x double> @constrained_vector_log10_v2f64() #0 {
 ; S390X-NEXT:    ld %f0, 0(%r1)
 ; S390X-NEXT:    brasl %r14, log10@PLT
 ; S390X-NEXT:    larl %r1, .LCPI66_1
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    ldr %f8, %f0
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    brasl %r14, log10@PLT
@@ -3594,7 +3603,7 @@ define <2 x double> @constrained_vector_log10_v2f64() #0 {
 ; SZ13-NEXT:    larl %r1, .LCPI66_1
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, log10@PLT
 ; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
@@ -3677,7 +3686,7 @@ entry:
   ret <3 x float> %log10
 }
 
-define void @constrained_vector_log10_v3f64(ptr %a) #0 {
+define void @constrained_vector_log10_v3f64(<3 x double>* %a) #0 {
 ; S390X-LABEL: constrained_vector_log10_v3f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    stmg %r13, %r15, 104(%r15)
@@ -3725,34 +3734,34 @@ define void @constrained_vector_log10_v3f64(ptr %a) #0 {
 ; SZ13-NEXT:    vl %v0, 0(%r2), 4
 ; SZ13-NEXT:    ld %f8, 16(%r2)
 ; SZ13-NEXT:    lgr %r13, %r2
-; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d killed $v0
 ; SZ13-NEXT:    brasl %r14, log10@PLT
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    vl %v0, 176(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vl %v0, 160(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    vrepg %v0, %v0, 1
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d killed $v0
 ; SZ13-NEXT:    brasl %r14, log10@PLT
-; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v0, %v1, %v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    ldr %f0, %f8
 ; SZ13-NEXT:    brasl %r14, log10@PLT
 ; SZ13-NEXT:    std %f0, 16(%r13)
-; SZ13-NEXT:    vl %v0, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v0, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    ld %f8, 192(%r15) # 8-byte Folded Reload
 ; SZ13-NEXT:    vst %v0, 0(%r13), 4
 ; SZ13-NEXT:    lmg %r13, %r15, 304(%r15)
 ; SZ13-NEXT:    br %r14
 entry:
-  %b = load <3 x double>, ptr %a
+  %b = load <3 x double>, <3 x double>* %a
   %log10 = call <3 x double> @llvm.experimental.constrained.log10.v3f64(
                           <3 x double> %b,
                           metadata !"round.dynamic",
                           metadata !"fpexcept.strict") #0
-  store <3 x double> %log10, ptr %a
+  store <3 x double> %log10, <3 x double>* %a
   ret void
 }
 
@@ -3784,7 +3793,7 @@ define <4 x double> @constrained_vector_log10_v4f64() #0 {
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    brasl %r14, log10@PLT
 ; S390X-NEXT:    larl %r1, .LCPI69_3
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    ldr %f10, %f0
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    brasl %r14, log10@PLT
@@ -3809,23 +3818,23 @@ define <4 x double> @constrained_vector_log10_v4f64() #0 {
 ; SZ13-NEXT:    brasl %r14, log10@PLT
 ; SZ13-NEXT:    larl %r1, .LCPI69_1
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, log10@PLT
-; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v0, %v0, %v1
 ; SZ13-NEXT:    larl %r1, .LCPI69_2
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    ld %f0, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, log10@PLT
 ; SZ13-NEXT:    larl %r1, .LCPI69_3
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    ld %f0, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, log10@PLT
-; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
-; SZ13-NEXT:    vl %v24, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v24, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v26, %v0, %v1
 ; SZ13-NEXT:    lmg %r14, %r15, 304(%r15)
@@ -3889,7 +3898,7 @@ define <2 x double> @constrained_vector_log2_v2f64() #0 {
 ; S390X-NEXT:    ld %f0, 0(%r1)
 ; S390X-NEXT:    brasl %r14, log2@PLT
 ; S390X-NEXT:    larl %r1, .LCPI71_1
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    ldr %f8, %f0
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    brasl %r14, log2@PLT
@@ -3911,7 +3920,7 @@ define <2 x double> @constrained_vector_log2_v2f64() #0 {
 ; SZ13-NEXT:    larl %r1, .LCPI71_1
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, log2@PLT
 ; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
@@ -3994,7 +4003,7 @@ entry:
   ret <3 x float> %log2
 }
 
-define void @constrained_vector_log2_v3f64(ptr %a) #0 {
+define void @constrained_vector_log2_v3f64(<3 x double>* %a) #0 {
 ; S390X-LABEL: constrained_vector_log2_v3f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    stmg %r13, %r15, 104(%r15)
@@ -4042,34 +4051,34 @@ define void @constrained_vector_log2_v3f64(ptr %a) #0 {
 ; SZ13-NEXT:    vl %v0, 0(%r2), 4
 ; SZ13-NEXT:    ld %f8, 16(%r2)
 ; SZ13-NEXT:    lgr %r13, %r2
-; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d killed $v0
 ; SZ13-NEXT:    brasl %r14, log2@PLT
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    vl %v0, 176(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vl %v0, 160(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    vrepg %v0, %v0, 1
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d killed $v0
 ; SZ13-NEXT:    brasl %r14, log2@PLT
-; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v0, %v1, %v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    ldr %f0, %f8
 ; SZ13-NEXT:    brasl %r14, log2@PLT
 ; SZ13-NEXT:    std %f0, 16(%r13)
-; SZ13-NEXT:    vl %v0, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v0, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    ld %f8, 192(%r15) # 8-byte Folded Reload
 ; SZ13-NEXT:    vst %v0, 0(%r13), 4
 ; SZ13-NEXT:    lmg %r13, %r15, 304(%r15)
 ; SZ13-NEXT:    br %r14
 entry:
-  %b = load <3 x double>, ptr %a
+  %b = load <3 x double>, <3 x double>* %a
   %log2 = call <3 x double> @llvm.experimental.constrained.log2.v3f64(
                           <3 x double> %b,
                           metadata !"round.dynamic",
                           metadata !"fpexcept.strict") #0
-  store <3 x double> %log2, ptr %a
+  store <3 x double> %log2, <3 x double>* %a
   ret void
 }
 
@@ -4101,7 +4110,7 @@ define <4 x double> @constrained_vector_log2_v4f64() #0 {
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    brasl %r14, log2@PLT
 ; S390X-NEXT:    larl %r1, .LCPI74_3
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    ldr %f10, %f0
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    brasl %r14, log2@PLT
@@ -4126,23 +4135,23 @@ define <4 x double> @constrained_vector_log2_v4f64() #0 {
 ; SZ13-NEXT:    brasl %r14, log2@PLT
 ; SZ13-NEXT:    larl %r1, .LCPI74_1
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, log2@PLT
-; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v0, %v0, %v1
 ; SZ13-NEXT:    larl %r1, .LCPI74_2
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    ld %f0, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, log2@PLT
 ; SZ13-NEXT:    larl %r1, .LCPI74_3
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    ld %f0, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, log2@PLT
-; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
-; SZ13-NEXT:    vl %v24, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v24, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v26, %v0, %v1
 ; SZ13-NEXT:    lmg %r14, %r15, 304(%r15)
@@ -4183,7 +4192,7 @@ define <2 x double> @constrained_vector_rint_v2f64() #0 {
 ; S390X-LABEL: constrained_vector_rint_v2f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    larl %r1, .LCPI76_0
-; S390X-NEXT:    ld %f0, 0(%r1)
+; S390X-NEXT:    ldeb %f0, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI76_1
 ; S390X-NEXT:    ld %f1, 0(%r1)
 ; S390X-NEXT:    fidbr %f2, 0, %f0
@@ -4241,7 +4250,7 @@ define <3 x float> @constrained_vector_rint_v3f32() #0 {
   ret <3 x float> %rint
 }
 
-define void @constrained_vector_rint_v3f64(ptr %a) #0 {
+define void @constrained_vector_rint_v3f64(<3 x double>* %a) #0 {
 ; S390X-LABEL: constrained_vector_rint_v3f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    ld %f0, 16(%r2)
@@ -4265,12 +4274,12 @@ define void @constrained_vector_rint_v3f64(ptr %a) #0 {
 ; SZ13-NEXT:    std %f1, 16(%r2)
 ; SZ13-NEXT:    br %r14
 entry:
-  %b = load <3 x double>, ptr %a
+  %b = load <3 x double>, <3 x double>* %a
   %rint = call <3 x double> @llvm.experimental.constrained.rint.v3f64(
                           <3 x double> %b,
                           metadata !"round.dynamic",
                           metadata !"fpexcept.strict") #0
-  store <3 x double> %rint, ptr %a
+  store <3 x double> %rint, <3 x double>* %a
   ret void
 }
 
@@ -4349,7 +4358,7 @@ define <2 x double> @constrained_vector_nearbyint_v2f64() #0 {
 ; S390X-NEXT:    std %f8, 160(%r15) # 8-byte Folded Spill
 ; S390X-NEXT:    .cfi_offset %f8, -168
 ; S390X-NEXT:    larl %r1, .LCPI81_0
-; S390X-NEXT:    ld %f0, 0(%r1)
+; S390X-NEXT:    ldeb %f0, 0(%r1)
 ; S390X-NEXT:    brasl %r14, nearbyint@PLT
 ; S390X-NEXT:    larl %r1, .LCPI81_1
 ; S390X-NEXT:    ld %f1, 0(%r1)
@@ -4430,7 +4439,7 @@ entry:
   ret <3 x float> %nearby
 }
 
-define void @constrained_vector_nearbyint_v3f64(ptr %a) #0 {
+define void @constrained_vector_nearbyint_v3f64(<3 x double>* %a) #0 {
 ; S390X-LABEL: constrained_vector_nearbyint_v3f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    stmg %r13, %r15, 104(%r15)
@@ -4475,12 +4484,12 @@ define void @constrained_vector_nearbyint_v3f64(ptr %a) #0 {
 ; SZ13-NEXT:    std %f1, 16(%r2)
 ; SZ13-NEXT:    br %r14
 entry:
-  %b = load <3 x double>, ptr %a
+  %b = load <3 x double>, <3 x double>* %a
   %nearby = call <3 x double> @llvm.experimental.constrained.nearbyint.v3f64(
                           <3 x double> %b,
                           metadata !"round.dynamic",
                           metadata !"fpexcept.strict") #0
-  store <3 x double> %nearby, ptr %a
+  store <3 x double> %nearby, <3 x double>* %a
   ret void
 }
 
@@ -4593,14 +4602,14 @@ define <2 x double> @constrained_vector_maxnum_v2f64() #0 {
 ; S390X-NEXT:    std %f8, 160(%r15) # 8-byte Folded Spill
 ; S390X-NEXT:    .cfi_offset %f8, -168
 ; S390X-NEXT:    larl %r1, .LCPI86_0
-; S390X-NEXT:    ld %f0, 0(%r1)
+; S390X-NEXT:    ldeb %f0, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI86_1
-; S390X-NEXT:    ld %f2, 0(%r1)
+; S390X-NEXT:    ldeb %f2, 0(%r1)
 ; S390X-NEXT:    brasl %r14, fmax@PLT
 ; S390X-NEXT:    larl %r1, .LCPI86_2
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI86_3
-; S390X-NEXT:    ld %f2, 0(%r1)
+; S390X-NEXT:    ldeb %f2, 0(%r1)
 ; S390X-NEXT:    ldr %f8, %f0
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    brasl %r14, fmax@PLT
@@ -4617,16 +4626,16 @@ define <2 x double> @constrained_vector_maxnum_v2f64() #0 {
 ; SZ13-NEXT:    aghi %r15, -176
 ; SZ13-NEXT:    .cfi_def_cfa_offset 336
 ; SZ13-NEXT:    larl %r1, .LCPI86_0
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    larl %r1, .LCPI86_1
-; SZ13-NEXT:    ld %f2, 0(%r1)
+; SZ13-NEXT:    ldeb %f2, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, fmax@PLT
 ; SZ13-NEXT:    larl %r1, .LCPI86_2
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    larl %r1, .LCPI86_3
-; SZ13-NEXT:    ld %f2, 0(%r1)
+; SZ13-NEXT:    ldeb %f2, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, fmax@PLT
 ; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
@@ -4726,7 +4735,7 @@ entry:
   ret <3 x float> %max
 }
 
-define void @constrained_vector_log10_maxnum_v3f64(ptr %a) #0 {
+define void @constrained_vector_log10_maxnum_v3f64(<3 x double>* %a) #0 {
 ; S390X-LABEL: constrained_vector_log10_maxnum_v3f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    stmg %r13, %r15, 104(%r15)
@@ -4745,16 +4754,16 @@ define void @constrained_vector_log10_maxnum_v3f64(ptr %a) #0 {
 ; S390X-NEXT:    ld %f8, 0(%r2)
 ; S390X-NEXT:    ld %f0, 16(%r2)
 ; S390X-NEXT:    larl %r1, .LCPI88_0
-; S390X-NEXT:    ld %f2, 0(%r1)
+; S390X-NEXT:    ldeb %f2, 0(%r1)
 ; S390X-NEXT:    ld %f9, 8(%r2)
 ; S390X-NEXT:    brasl %r14, fmax@PLT
 ; S390X-NEXT:    larl %r1, .LCPI88_1
-; S390X-NEXT:    ld %f2, 0(%r1)
+; S390X-NEXT:    ldeb %f2, 0(%r1)
 ; S390X-NEXT:    ldr %f10, %f0
 ; S390X-NEXT:    ldr %f0, %f9
 ; S390X-NEXT:    brasl %r14, fmax@PLT
 ; S390X-NEXT:    larl %r1, .LCPI88_2
-; S390X-NEXT:    ld %f2, 0(%r1)
+; S390X-NEXT:    ldeb %f2, 0(%r1)
 ; S390X-NEXT:    ldr %f9, %f0
 ; S390X-NEXT:    ldr %f0, %f8
 ; S390X-NEXT:    brasl %r14, fmax@PLT
@@ -4778,42 +4787,42 @@ define void @constrained_vector_log10_maxnum_v3f64(ptr %a) #0 {
 ; SZ13-NEXT:    std %f8, 192(%r15) # 8-byte Folded Spill
 ; SZ13-NEXT:    .cfi_offset %f8, -168
 ; SZ13-NEXT:    larl %r1, .LCPI88_0
+; SZ13-NEXT:    ldeb %f2, 0(%r1)
 ; SZ13-NEXT:    vl %v0, 0(%r2), 4
-; SZ13-NEXT:    ld %f2, 0(%r1)
 ; SZ13-NEXT:    ld %f8, 16(%r2)
 ; SZ13-NEXT:    lgr %r13, %r2
-; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d killed $v0
 ; SZ13-NEXT:    brasl %r14, fmax@PLT
 ; SZ13-NEXT:    larl %r1, .LCPI88_1
+; SZ13-NEXT:    ldeb %f2, 0(%r1)
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    vl %v0, 176(%r15), 3 # 16-byte Folded Reload
-; SZ13-NEXT:    ld %f2, 0(%r1)
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vl %v0, 160(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    vrepg %v0, %v0, 1
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d killed $v0
 ; SZ13-NEXT:    brasl %r14, fmax@PLT
-; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    larl %r1, .LCPI88_2
-; SZ13-NEXT:    ld %f2, 0(%r1)
+; SZ13-NEXT:    ldeb %f2, 0(%r1)
+; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v0, %v1, %v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    ldr %f0, %f8
 ; SZ13-NEXT:    brasl %r14, fmax@PLT
 ; SZ13-NEXT:    std %f0, 16(%r13)
-; SZ13-NEXT:    vl %v0, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v0, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    ld %f8, 192(%r15) # 8-byte Folded Reload
 ; SZ13-NEXT:    vst %v0, 0(%r13), 4
 ; SZ13-NEXT:    lmg %r13, %r15, 304(%r15)
 ; SZ13-NEXT:    br %r14
 entry:
-  %b = load <3 x double>, ptr %a
+  %b = load <3 x double>, <3 x double>* %a
   %max = call <3 x double> @llvm.experimental.constrained.maxnum.v3f64(
                           <3 x double> %b,
                           <3 x double> <double 40.0, double 41.0, double 42.0>,
                           metadata !"fpexcept.strict") #0
-  store <3 x double> %max, ptr %a
+  store <3 x double> %max, <3 x double>* %a
   ret void
 }
 
@@ -4832,28 +4841,28 @@ define <4 x double> @constrained_vector_maxnum_v4f64() #0 {
 ; S390X-NEXT:    .cfi_offset %f9, -176
 ; S390X-NEXT:    .cfi_offset %f10, -184
 ; S390X-NEXT:    larl %r1, .LCPI89_0
-; S390X-NEXT:    ld %f0, 0(%r1)
+; S390X-NEXT:    ldeb %f0, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI89_1
-; S390X-NEXT:    ld %f2, 0(%r1)
+; S390X-NEXT:    ldeb %f2, 0(%r1)
 ; S390X-NEXT:    brasl %r14, fmax@PLT
 ; S390X-NEXT:    larl %r1, .LCPI89_2
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI89_3
-; S390X-NEXT:    ld %f2, 0(%r1)
+; S390X-NEXT:    ldeb %f2, 0(%r1)
 ; S390X-NEXT:    ldr %f8, %f0
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    brasl %r14, fmax@PLT
 ; S390X-NEXT:    larl %r1, .LCPI89_4
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI89_5
-; S390X-NEXT:    ld %f2, 0(%r1)
+; S390X-NEXT:    ldeb %f2, 0(%r1)
 ; S390X-NEXT:    ldr %f9, %f0
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    brasl %r14, fmax@PLT
 ; S390X-NEXT:    larl %r1, .LCPI89_6
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI89_7
-; S390X-NEXT:    ld %f2, 0(%r1)
+; S390X-NEXT:    ldeb %f2, 0(%r1)
 ; S390X-NEXT:    ldr %f10, %f0
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    brasl %r14, fmax@PLT
@@ -4874,35 +4883,35 @@ define <4 x double> @constrained_vector_maxnum_v4f64() #0 {
 ; SZ13-NEXT:    aghi %r15, -192
 ; SZ13-NEXT:    .cfi_def_cfa_offset 352
 ; SZ13-NEXT:    larl %r1, .LCPI89_0
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    larl %r1, .LCPI89_1
-; SZ13-NEXT:    ld %f2, 0(%r1)
+; SZ13-NEXT:    ldeb %f2, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, fmax@PLT
 ; SZ13-NEXT:    larl %r1, .LCPI89_2
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    larl %r1, .LCPI89_3
-; SZ13-NEXT:    ld %f2, 0(%r1)
+; SZ13-NEXT:    ldeb %f2, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, fmax@PLT
-; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v0, %v0, %v1
 ; SZ13-NEXT:    larl %r1, .LCPI89_4
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    larl %r1, .LCPI89_5
-; SZ13-NEXT:    ld %f2, 0(%r1)
+; SZ13-NEXT:    ldeb %f2, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, fmax@PLT
 ; SZ13-NEXT:    larl %r1, .LCPI89_6
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    larl %r1, .LCPI89_7
-; SZ13-NEXT:    ld %f2, 0(%r1)
+; SZ13-NEXT:    ldeb %f2, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, fmax@PLT
-; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
-; SZ13-NEXT:    vl %v24, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v24, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v26, %v0, %v1
 ; SZ13-NEXT:    lmg %r14, %r15, 304(%r15)
@@ -4967,14 +4976,14 @@ define <2 x double> @constrained_vector_minnum_v2f64() #0 {
 ; S390X-NEXT:    std %f8, 160(%r15) # 8-byte Folded Spill
 ; S390X-NEXT:    .cfi_offset %f8, -168
 ; S390X-NEXT:    larl %r1, .LCPI91_0
-; S390X-NEXT:    ld %f0, 0(%r1)
+; S390X-NEXT:    ldeb %f0, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI91_1
-; S390X-NEXT:    ld %f2, 0(%r1)
+; S390X-NEXT:    ldeb %f2, 0(%r1)
 ; S390X-NEXT:    brasl %r14, fmin@PLT
 ; S390X-NEXT:    larl %r1, .LCPI91_2
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI91_3
-; S390X-NEXT:    ld %f2, 0(%r1)
+; S390X-NEXT:    ldeb %f2, 0(%r1)
 ; S390X-NEXT:    ldr %f8, %f0
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    brasl %r14, fmin@PLT
@@ -4991,16 +5000,16 @@ define <2 x double> @constrained_vector_minnum_v2f64() #0 {
 ; SZ13-NEXT:    aghi %r15, -176
 ; SZ13-NEXT:    .cfi_def_cfa_offset 336
 ; SZ13-NEXT:    larl %r1, .LCPI91_0
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    larl %r1, .LCPI91_1
-; SZ13-NEXT:    ld %f2, 0(%r1)
+; SZ13-NEXT:    ldeb %f2, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, fmin@PLT
 ; SZ13-NEXT:    larl %r1, .LCPI91_2
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    larl %r1, .LCPI91_3
-; SZ13-NEXT:    ld %f2, 0(%r1)
+; SZ13-NEXT:    ldeb %f2, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, fmin@PLT
 ; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
@@ -5100,7 +5109,7 @@ entry:
   ret <3 x float> %min
 }
 
-define void @constrained_vector_minnum_v3f64(ptr %a) #0 {
+define void @constrained_vector_minnum_v3f64(<3 x double>* %a) #0 {
 ; S390X-LABEL: constrained_vector_minnum_v3f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    stmg %r13, %r15, 104(%r15)
@@ -5121,7 +5130,7 @@ define void @constrained_vector_minnum_v3f64(ptr %a) #0 {
 ; S390X-NEXT:    ld %f8, 0(%r2)
 ; S390X-NEXT:    ld %f0, 16(%r2)
 ; S390X-NEXT:    larl %r1, .LCPI93_0
-; S390X-NEXT:    ld %f9, 0(%r1)
+; S390X-NEXT:    ldeb %f9, 0(%r1)
 ; S390X-NEXT:    ld %f10, 8(%r2)
 ; S390X-NEXT:    ldr %f2, %f9
 ; S390X-NEXT:    brasl %r14, fmin@PLT
@@ -5156,42 +5165,42 @@ define void @constrained_vector_minnum_v3f64(ptr %a) #0 {
 ; SZ13-NEXT:    .cfi_offset %f8, -168
 ; SZ13-NEXT:    .cfi_offset %f9, -176
 ; SZ13-NEXT:    larl %r1, .LCPI93_0
-; SZ13-NEXT:    ld %f9, 0(%r1)
+; SZ13-NEXT:    ldeb %f9, 0(%r1)
 ; SZ13-NEXT:    vl %v0, 0(%r2), 4
 ; SZ13-NEXT:    ld %f8, 16(%r2)
 ; SZ13-NEXT:    ldr %f2, %f9
 ; SZ13-NEXT:    lgr %r13, %r2
-; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d killed $v0
 ; SZ13-NEXT:    brasl %r14, fmin@PLT
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    vl %v0, 176(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vl %v0, 160(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    ldr %f2, %f9
 ; SZ13-NEXT:    vrepg %v0, %v0, 1
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d killed $v0
 ; SZ13-NEXT:    brasl %r14, fmin@PLT
-; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v0, %v1, %v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
 ; SZ13-NEXT:    ldr %f0, %f8
 ; SZ13-NEXT:    ldr %f2, %f9
 ; SZ13-NEXT:    brasl %r14, fmin@PLT
 ; SZ13-NEXT:    std %f0, 16(%r13)
-; SZ13-NEXT:    vl %v0, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v0, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    ld %f8, 200(%r15) # 8-byte Folded Reload
 ; SZ13-NEXT:    ld %f9, 192(%r15) # 8-byte Folded Reload
 ; SZ13-NEXT:    vst %v0, 0(%r13), 4
 ; SZ13-NEXT:    lmg %r13, %r15, 312(%r15)
 ; SZ13-NEXT:    br %r14
 entry:
- %b = load <3 x double>, ptr %a
+ %b = load <3 x double>, <3 x double>* %a
  %min = call <3 x double> @llvm.experimental.constrained.minnum.v3f64(
                           <3 x double> %b,
                           <3 x double> <double 3.0, double 3.0, double 3.0>,
                           metadata !"fpexcept.strict") #0
-  store <3 x double> %min, ptr %a
+  store <3 x double> %min, <3 x double>* %a
   ret void
 }
 
@@ -5210,28 +5219,28 @@ define <4 x double> @constrained_vector_minnum_v4f64() #0 {
 ; S390X-NEXT:    .cfi_offset %f9, -176
 ; S390X-NEXT:    .cfi_offset %f10, -184
 ; S390X-NEXT:    larl %r1, .LCPI94_0
-; S390X-NEXT:    ld %f0, 0(%r1)
+; S390X-NEXT:    ldeb %f0, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI94_1
-; S390X-NEXT:    ld %f2, 0(%r1)
+; S390X-NEXT:    ldeb %f2, 0(%r1)
 ; S390X-NEXT:    brasl %r14, fmin@PLT
 ; S390X-NEXT:    larl %r1, .LCPI94_2
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI94_3
-; S390X-NEXT:    ld %f2, 0(%r1)
+; S390X-NEXT:    ldeb %f2, 0(%r1)
 ; S390X-NEXT:    ldr %f8, %f0
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    brasl %r14, fmin@PLT
 ; S390X-NEXT:    larl %r1, .LCPI94_4
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI94_5
-; S390X-NEXT:    ld %f2, 0(%r1)
+; S390X-NEXT:    ldeb %f2, 0(%r1)
 ; S390X-NEXT:    ldr %f9, %f0
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    brasl %r14, fmin@PLT
 ; S390X-NEXT:    larl %r1, .LCPI94_6
-; S390X-NEXT:    ld %f1, 0(%r1)
+; S390X-NEXT:    ldeb %f1, 0(%r1)
 ; S390X-NEXT:    larl %r1, .LCPI94_7
-; S390X-NEXT:    ld %f2, 0(%r1)
+; S390X-NEXT:    ldeb %f2, 0(%r1)
 ; S390X-NEXT:    ldr %f10, %f0
 ; S390X-NEXT:    ldr %f0, %f1
 ; S390X-NEXT:    brasl %r14, fmin@PLT
@@ -5252,35 +5261,35 @@ define <4 x double> @constrained_vector_minnum_v4f64() #0 {
 ; SZ13-NEXT:    aghi %r15, -192
 ; SZ13-NEXT:    .cfi_def_cfa_offset 352
 ; SZ13-NEXT:    larl %r1, .LCPI94_0
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    larl %r1, .LCPI94_1
-; SZ13-NEXT:    ld %f2, 0(%r1)
+; SZ13-NEXT:    ldeb %f2, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, fmin@PLT
 ; SZ13-NEXT:    larl %r1, .LCPI94_2
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    larl %r1, .LCPI94_3
-; SZ13-NEXT:    ld %f2, 0(%r1)
+; SZ13-NEXT:    ldeb %f2, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, fmin@PLT
-; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v0, %v0, %v1
 ; SZ13-NEXT:    larl %r1, .LCPI94_4
-; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    larl %r1, .LCPI94_5
-; SZ13-NEXT:    ld %f2, 0(%r1)
+; SZ13-NEXT:    ldeb %f2, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, fmin@PLT
 ; SZ13-NEXT:    larl %r1, .LCPI94_6
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
-; SZ13-NEXT:    vst %v0, 176(%r15), 3 # 16-byte Folded Spill
-; SZ13-NEXT:    ld %f0, 0(%r1)
+; SZ13-NEXT:    vst %v0, 160(%r15), 3 # 16-byte Folded Spill
+; SZ13-NEXT:    ldeb %f0, 0(%r1)
 ; SZ13-NEXT:    larl %r1, .LCPI94_7
-; SZ13-NEXT:    ld %f2, 0(%r1)
+; SZ13-NEXT:    ldeb %f2, 0(%r1)
 ; SZ13-NEXT:    brasl %r14, fmin@PLT
-; SZ13-NEXT:    vl %v1, 176(%r15), 3 # 16-byte Folded Reload
-; SZ13-NEXT:    vl %v24, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v1, 160(%r15), 3 # 16-byte Folded Reload
+; SZ13-NEXT:    vl %v24, 176(%r15), 3 # 16-byte Folded Reload
 ; SZ13-NEXT:    # kill: def $f0d killed $f0d def $v0
 ; SZ13-NEXT:    vmrhg %v26, %v0, %v1
 ; SZ13-NEXT:    lmg %r14, %r15, 304(%r15)
@@ -5347,7 +5356,7 @@ entry:
   ret <2 x float> %result
 }
 
-define void @constrained_vector_fptrunc_v3f64(ptr %src, ptr %dest) #0 {
+define void @constrained_vector_fptrunc_v3f64(<3 x double>* %src, <3 x float>* %dest) #0 {
 ; S390X-LABEL: constrained_vector_fptrunc_v3f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    ld %f0, 0(%r2)
@@ -5378,12 +5387,12 @@ define void @constrained_vector_fptrunc_v3f64(ptr %src, ptr %dest) #0 {
 ; SZ13-NEXT:    vsteg %v1, 0(%r3), 0
 ; SZ13-NEXT:    br %r14
 entry:
-  %b = load <3 x double>, ptr %src
+  %b = load <3 x double>, <3 x double>* %src
   %result = call <3 x float> @llvm.experimental.constrained.fptrunc.v3f32.v3f64(
                                 <3 x double> %b,
                                 metadata !"round.dynamic",
                                 metadata !"fpexcept.strict") #0
-  store <3 x float> %result, ptr %dest
+  store <3 x float> %result, <3 x float>* %dest
   ret void
 }
 
@@ -5475,7 +5484,7 @@ entry:
   ret <2 x double> %result
 }
 
-define void @constrained_vector_fpext_v3f64(ptr %src, ptr %dest) #0 {
+define void @constrained_vector_fpext_v3f64(<3 x float>* %src, <3 x double>* %dest) #0 {
 ; S390X-LABEL: constrained_vector_fpext_v3f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    lg %r0, 0(%r2)
@@ -5502,11 +5511,11 @@ define void @constrained_vector_fpext_v3f64(ptr %src, ptr %dest) #0 {
 ; SZ13-NEXT:    vst %v1, 0(%r3), 4
 ; SZ13-NEXT:    br %r14
 entry:
-  %b = load <3 x float>, ptr %src
+  %b = load <3 x float>, <3 x float>* %src
   %result = call <3 x double> @llvm.experimental.constrained.fpext.v3f64.v3f32(
                               <3 x float> %b,
                               metadata !"fpexcept.strict") #0
-  store <3 x double> %result, ptr %dest
+  store <3 x double> %result, <3 x double>* %dest
   ret void
 }
 
@@ -5660,7 +5669,7 @@ entry:
   ret <3 x float> %ceil
 }
 
-define void @constrained_vector_ceil_v3f64(ptr %a) #0 {
+define void @constrained_vector_ceil_v3f64(<3 x double>* %a) #0 {
 ; S390X-LABEL: constrained_vector_ceil_v3f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    stmg %r13, %r15, 104(%r15)
@@ -5705,11 +5714,11 @@ define void @constrained_vector_ceil_v3f64(ptr %a) #0 {
 ; SZ13-NEXT:    std %f1, 16(%r2)
 ; SZ13-NEXT:    br %r14
 entry:
-  %b = load <3 x double>, ptr %a
+  %b = load <3 x double>, <3 x double>* %a
   %ceil = call <3 x double> @llvm.experimental.constrained.ceil.v3f64(
                           <3 x double> %b,
                           metadata !"fpexcept.strict") #0
-  store <3 x double> %ceil, ptr %a
+  store <3 x double> %ceil, <3 x double>* %a
   ret void
 }
 
@@ -5830,7 +5839,7 @@ entry:
   ret <3 x float> %floor
 }
 
-define void @constrained_vector_floor_v3f64(ptr %a) #0 {
+define void @constrained_vector_floor_v3f64(<3 x double>* %a) #0 {
 ; S390X-LABEL: constrained_vector_floor_v3f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    stmg %r13, %r15, 104(%r15)
@@ -5875,11 +5884,11 @@ define void @constrained_vector_floor_v3f64(ptr %a) #0 {
 ; SZ13-NEXT:    std %f1, 16(%r2)
 ; SZ13-NEXT:    br %r14
 entry:
-  %b = load <3 x double>, ptr %a
+  %b = load <3 x double>, <3 x double>* %a
   %floor = call <3 x double> @llvm.experimental.constrained.floor.v3f64(
                           <3 x double> %b,
                           metadata !"fpexcept.strict") #0
-  store <3 x double> %floor, ptr %a
+  store <3 x double> %floor, <3 x double>* %a
   ret void
 }
 
@@ -6000,7 +6009,7 @@ entry:
 }
 
 
-define void @constrained_vector_round_v3f64(ptr %a) #0 {
+define void @constrained_vector_round_v3f64(<3 x double>* %a) #0 {
 ; S390X-LABEL: constrained_vector_round_v3f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    stmg %r13, %r15, 104(%r15)
@@ -6045,11 +6054,11 @@ define void @constrained_vector_round_v3f64(ptr %a) #0 {
 ; SZ13-NEXT:    std %f1, 16(%r2)
 ; SZ13-NEXT:    br %r14
 entry:
-  %b = load <3 x double>, ptr %a
+  %b = load <3 x double>, <3 x double>* %a
   %round = call <3 x double> @llvm.experimental.constrained.round.v3f64(
                           <3 x double> %b,
                           metadata !"fpexcept.strict") #0
-  store <3 x double> %round, ptr %a
+  store <3 x double> %round, <3 x double>* %a
   ret void
 }
 
@@ -6169,7 +6178,7 @@ entry:
   ret <3 x float> %trunc
 }
 
-define void @constrained_vector_trunc_v3f64(ptr %a) #0 {
+define void @constrained_vector_trunc_v3f64(<3 x double>* %a) #0 {
 ; S390X-LABEL: constrained_vector_trunc_v3f64:
 ; S390X:       # %bb.0: # %entry
 ; S390X-NEXT:    stmg %r13, %r15, 104(%r15)
@@ -6214,11 +6223,11 @@ define void @constrained_vector_trunc_v3f64(ptr %a) #0 {
 ; SZ13-NEXT:    std %f1, 16(%r2)
 ; SZ13-NEXT:    br %r14
 entry:
-  %b = load <3 x double>, ptr %a
+  %b = load <3 x double>, <3 x double>* %a
   %trunc = call <3 x double> @llvm.experimental.constrained.trunc.v3f64(
                           <3 x double> %b,
                           metadata !"fpexcept.strict") #0
-  store <3 x double> %trunc, ptr %a
+  store <3 x double> %trunc, <3 x double>* %a
   ret void
 }
 

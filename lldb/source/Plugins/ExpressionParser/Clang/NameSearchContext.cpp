@@ -8,7 +8,6 @@
 
 #include "NameSearchContext.h"
 #include "ClangUtil.h"
-#include "lldb/Utility/LLDBLog.h"
 
 using namespace clang;
 using namespace lldb_private;
@@ -19,7 +18,8 @@ clang::NamedDecl *NameSearchContext::AddVarDecl(const CompilerType &type) {
   if (!type.IsValid())
     return nullptr;
 
-  auto lldb_ast = type.GetTypeSystem().dyn_cast_or_null<TypeSystemClang>();
+  TypeSystemClang *lldb_ast =
+      llvm::dyn_cast<TypeSystemClang>(type.GetTypeSystem());
   if (!lldb_ast)
     return nullptr;
 
@@ -45,7 +45,8 @@ clang::NamedDecl *NameSearchContext::AddFunDecl(const CompilerType &type,
   if (m_function_types.count(type))
     return nullptr;
 
-  auto lldb_ast = type.GetTypeSystem().dyn_cast_or_null<TypeSystemClang>();
+  TypeSystemClang *lldb_ast =
+      llvm::dyn_cast<TypeSystemClang>(type.GetTypeSystem());
   if (!lldb_ast)
     return nullptr;
 
@@ -62,10 +63,9 @@ clang::NamedDecl *NameSearchContext::AddFunDecl(const CompilerType &type,
   clang::DeclContext *context = const_cast<DeclContext *>(m_decl_context);
 
   if (extern_c) {
-    context = LinkageSpecDecl::Create(ast, context, SourceLocation(),
-                                      SourceLocation(),
-                                      clang::LinkageSpecLanguageIDs::C, false);
-    // FIXME: The LinkageSpecDecl here should be added to m_decl_context.
+    context = LinkageSpecDecl::Create(
+        ast, context, SourceLocation(), SourceLocation(),
+        clang::LinkageSpecDecl::LanguageIDs::lang_c, false);
   }
 
   // Pass the identifier info for functions the decl_name is needed for
@@ -105,7 +105,7 @@ clang::NamedDecl *NameSearchContext::AddFunDecl(const CompilerType &type,
 
     func_decl->setParams(ArrayRef<ParmVarDecl *>(parm_var_decls));
   } else {
-    Log *log = GetLog(LLDBLog::Expressions);
+    Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_EXPRESSIONS));
 
     LLDB_LOG(log, "Function type wasn't a FunctionProtoType");
   }

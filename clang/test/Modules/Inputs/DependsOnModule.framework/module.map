@@ -46,15 +46,6 @@ framework module DependsOnModule {
   explicit module CXX17 {
     requires cplusplus17
   }
-  explicit module CXX20 {
-    requires cplusplus20
-  }
-  explicit module CXX23 {
-    requires cplusplus23
-  }
-  explicit module CXX26 {
-    requires cplusplus26
-  }
   explicit module C99 {
     requires c99
   }
@@ -63,8 +54,5 @@ framework module DependsOnModule {
   }
   explicit module C17 {
     requires c17
-  }
-  explicit module C23 {
-    requires c23
   }
 }

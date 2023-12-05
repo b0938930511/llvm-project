@@ -8,7 +8,7 @@
 @interface SomeClass
 @end
 
-void simpleStrongPointerValue(void) {
+void simpleStrongPointerValue() {
   SomeClass *x;
   if (x) {}
 #if !__has_feature(objc_arc)
@@ -16,7 +16,7 @@ void simpleStrongPointerValue(void) {
 #endif
 }
 
-void simpleArray(void) {
+void simpleArray() {
   SomeClass *vlaArray[5];
 
   if (vlaArray[0]) {}
@@ -25,7 +25,7 @@ void simpleArray(void) {
 #endif
 }
 
-void variableLengthArray(void) {
+void variableLengthArray() {
    int count = 1;
    SomeClass * vlaArray[count];
 
@@ -35,7 +35,7 @@ void variableLengthArray(void) {
 #endif
 }
 
-void variableLengthArrayWithExplicitStrongAttribute(void) {
+void variableLengthArrayWithExplicitStrongAttribute() {
    int count = 1;
    __attribute__((objc_ownership(strong))) SomeClass * vlaArray[count];
 

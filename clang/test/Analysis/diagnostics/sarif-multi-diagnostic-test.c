@@ -30,7 +30,7 @@ int leak(int i) {
   return 0;
 }
 
-int unicode(void) {
+int unicode() {
   int løçål = 0;
   /* ☃ */ return 1 / løçål; // expected-warning {{Division by zero}}
 }

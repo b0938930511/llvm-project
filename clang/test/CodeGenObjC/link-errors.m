@@ -29,7 +29,7 @@
 @end
 
 
-int main(void) {
+int main() {
   id x = @protocol(P);
   [ A alloc ];
   [ A foo ];

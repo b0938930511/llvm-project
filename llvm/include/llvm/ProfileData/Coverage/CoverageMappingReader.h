@@ -56,10 +56,10 @@ public:
   using reference = value_type &;
 
   CoverageMappingIterator()
-      : Reader(nullptr), ReadErr(coveragemap_error::success) {}
+      : Reader(nullptr), Record(), ReadErr(coveragemap_error::success) {}
 
   CoverageMappingIterator(CoverageMappingReader *Reader)
-      : Reader(Reader), ReadErr(coveragemap_error::success) {
+      : Reader(Reader), Record(), ReadErr(coveragemap_error::success) {
     increment();
   }
 
@@ -205,15 +205,14 @@ public:
   static Expected<std::vector<std::unique_ptr<BinaryCoverageReader>>>
   create(MemoryBufferRef ObjectBuffer, StringRef Arch,
          SmallVectorImpl<std::unique_ptr<MemoryBuffer>> &ObjectFileBuffers,
-         StringRef CompilationDir = "",
-         SmallVectorImpl<object::BuildIDRef> *BinaryIDs = nullptr);
+         StringRef CompilationDir = "");
 
   static Expected<std::unique_ptr<BinaryCoverageReader>>
   createCoverageReaderFromBuffer(StringRef Coverage,
                                  FuncRecordsStorage &&FuncRecords,
                                  InstrProfSymtab &&ProfileNames,
                                  uint8_t BytesInAddress,
-                                 llvm::endianness Endian,
+                                 support::endianness Endian,
                                  StringRef CompilationDir = "");
 
   Error readNextRecord(CoverageMappingRecord &Record) override;

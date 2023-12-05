@@ -1,9 +1,10 @@
 // RUN: %clang_cc1 -triple x86_64-apple-darwin10 -emit-llvm -fexceptions -fobjc-exceptions -o - %s | FileCheck %s
 
+// rdar://problem/8535238
 // CHECK: declare void @objc_exception_rethrow()
 
-void protos(void) {
-  extern void foo(void);
+void protos() {
+  extern void foo();
   @try {
     foo();
   } @catch (id e) {
@@ -11,10 +12,11 @@ void protos(void) {
   }
 }
 
-void throwing(void) {
+void throwing() {
   @throw(@"error!");
 }
 
+// rdar://problem/9431547
 void die(void) __attribute__((nothrow, noreturn));
 void test2(void) {
   @try {

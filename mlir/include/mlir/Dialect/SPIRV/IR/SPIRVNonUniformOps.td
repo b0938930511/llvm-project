@@ -14,24 +14,29 @@
 #ifndef MLIR_DIALECT_SPIRV_IR_NON_UNIFORM_OPS
 #define MLIR_DIALECT_SPIRV_IR_NON_UNIFORM_OPS
 
-class SPIRV_GroupNonUniformArithmeticOp<string mnemonic, Type type,
-      list<Trait> traits = []> : SPIRV_Op<mnemonic, traits> {
+class SPV_GroupNonUniformArithmeticOp<string mnemonic, Type type,
+      list<OpTrait> traits = []> : SPV_Op<mnemonic, traits> {
 
   let arguments = (ins
-    SPIRV_ScopeAttr:$execution_scope,
-    SPIRV_GroupOperationAttr:$group_operation,
-    SPIRV_ScalarOrVectorOf<type>:$value,
-    Optional<SPIRV_Integer>:$cluster_size
+    SPV_ScopeAttr:$execution_scope,
+    SPV_GroupOperationAttr:$group_operation,
+    SPV_ScalarOrVectorOf<type>:$value,
+    Optional<SPV_Integer>:$cluster_size
   );
 
   let results = (outs
-    SPIRV_ScalarOrVectorOf<type>:$result
+    SPV_ScalarOrVectorOf<type>:$result
   );
+
+  let parser = [{ return parseGroupNonUniformArithmeticOp(parser, result); }];
+  let printer = [{ printGroupNonUniformArithmeticOp(getOperation(), p); }];
+  let verifier = [{ return ::verifyGroupNonUniformArithmeticOp(getOperation()); }];
+
 }
 
 // -----
 
-def SPIRV_GroupNonUniformBallotOp : SPIRV_Op<"GroupNonUniformBallot", []> {
+def SPV_GroupNonUniformBallotOp : SPV_Op<"GroupNonUniformBallot", []> {
   let summary = [{
     Result is a bitfield value combining the Predicate value from all
     invocations in the group that execute the same dynamic instance of this
@@ -53,27 +58,35 @@ def SPIRV_GroupNonUniformBallotOp : SPIRV_Op<"GroupNonUniformBallot", []> {
 
     Predicate must be a Boolean type.
 
+    <!-- End of AutoGen section -->
+
+    ```
+    scope ::= `"Workgroup"` | `"Subgroup"`
+    non-uniform-ballot-op ::= ssa-id `=` `spv.GroupNonUniformBallot` scope
+                              ssa-use `:` `vector` `<` 4 `x` `integer-type` `>`
+    ```
+
     #### Example:
 
     ```mlir
-    %0 = spirv.GroupNonUniformBallot "SubGroup" %predicate : vector<4xi32>
+    %0 = spv.GroupNonUniformBallot "SubGroup" %predicate : vector<4xi32>
     ```
   }];
 
   let availability = [
-    MinVersion<SPIRV_V_1_3>,
-    MaxVersion<SPIRV_V_1_6>,
+    MinVersion<SPV_V_1_3>,
+    MaxVersion<SPV_V_1_5>,
     Extension<[]>,
-    Capability<[SPIRV_C_GroupNonUniformBallot]>
+    Capability<[SPV_C_GroupNonUniformBallot]>
   ];
 
   let arguments = (ins
-    SPIRV_ScopeAttr:$execution_scope,
-    SPIRV_Bool:$predicate
+    SPV_ScopeAttr:$execution_scope,
+    SPV_Bool:$predicate
   );
 
   let results = (outs
-    SPIRV_IOrUIVec4:$result
+    SPV_IOrUIVec4:$result
   );
 
   let assemblyFormat = [{
@@ -83,8 +96,8 @@ def SPIRV_GroupNonUniformBallotOp : SPIRV_Op<"GroupNonUniformBallot", []> {
 
 // -----
 
-def SPIRV_GroupNonUniformBroadcastOp : SPIRV_Op<"GroupNonUniformBroadcast",
-  [Pure, AllTypesMatch<["value", "result"]>]> {
+def SPV_GroupNonUniformBroadcastOp : SPV_Op<"GroupNonUniformBroadcast",
+  [NoSideEffect, AllTypesMatch<["value", "result"]>]> {
   let summary = [{
     Result is the Value of the invocation identified by the id Id to all
     active invocations in the group.
@@ -96,7 +109,7 @@ def SPIRV_GroupNonUniformBroadcastOp : SPIRV_Op<"GroupNonUniformBroadcast",
 
     Execution must be Workgroup or Subgroup Scope.
 
-    The type of Value must be the same as Result Type.
+     The type of Value must be the same as Result Type.
 
     Id  must be a scalar of integer type, whose Signedness operand is 0.
 
@@ -106,33 +119,45 @@ def SPIRV_GroupNonUniformBroadcastOp : SPIRV_Op<"GroupNonUniformBroadcast",
     The resulting value is undefined if Id is an inactive invocation, or is
     greater than or equal to the size of the group.
 
+    <!-- End of AutoGen section -->
+
+    ```
+    scope ::= `"Workgroup"` | `"Subgroup"`
+    integer-float-scalar-vector-type ::= integer-type | float-type |
+                               `vector<` integer-literal `x` integer-type `>` |
+                               `vector<` integer-literal `x` float-type `>`
+    group-non-uniform-broadcast-op ::= ssa-id `=` 
+	            `spv.GroupNonUniformBroadcast` scope ssa_use,
+                ssa_use `:` integer-float-scalar-vector-type `,` integer-type
+    ```mlir
+
     #### Example:
 
-    ```mlir
+    ```
     %scalar_value = ... : f32
     %vector_value = ... : vector<4xf32>
     %id = ... : i32
-    %0 = spirv.GroupNonUniformBroadcast "Subgroup" %scalar_value, %id : f32, i32
-    %1 = spirv.GroupNonUniformBroadcast "Workgroup" %vector_value, %id :
+    %0 = spv.GroupNonUniformBroadcast "Subgroup" %scalar_value, %id : f32, i32
+    %1 = spv.GroupNonUniformBroadcast "Workgroup" %vector_value, %id :
       vector<4xf32>, i32
     ```
   }];
 
   let availability = [
-    MinVersion<SPIRV_V_1_3>,
-    MaxVersion<SPIRV_V_1_6>,
+    MinVersion<SPV_V_1_3>,
+    MaxVersion<SPV_V_1_5>,
     Extension<[]>,
-    Capability<[SPIRV_C_GroupNonUniformBallot]>
+    Capability<[SPV_C_GroupNonUniformBallot]>
   ];
 
   let arguments = (ins
-    SPIRV_ScopeAttr:$execution_scope,
-    SPIRV_Type:$value,
-    SPIRV_Integer:$id
+    SPV_ScopeAttr:$execution_scope,
+    SPV_Type:$value,
+    SPV_Integer:$id
   );
 
   let results = (outs
-    SPIRV_Type:$result
+    SPV_Type:$result
   );
 
   let assemblyFormat = [{
@@ -142,7 +167,7 @@ def SPIRV_GroupNonUniformBroadcastOp : SPIRV_Op<"GroupNonUniformBroadcast",
 
 // -----
 
-def SPIRV_GroupNonUniformElectOp : SPIRV_Op<"GroupNonUniformElect", []> {
+def SPV_GroupNonUniformElectOp : SPV_Op<"GroupNonUniformElect", []> {
   let summary = [{
     Result is true only in the active invocation with the lowest id in the
     group, otherwise result is false.
@@ -153,34 +178,44 @@ def SPIRV_GroupNonUniformElectOp : SPIRV_Op<"GroupNonUniformElect", []> {
 
     Execution must be Workgroup or Subgroup Scope.
 
+    <!-- End of AutoGen section -->
+
+    ```
+    scope ::= `"Workgroup"` | `"Subgroup"`
+    non-uniform-elect-op ::= ssa-id `=` `spv.GroupNonUniformElect` scope
+                             `:` `i1`
+    ```
+
     #### Example:
 
     ```mlir
-    %0 = spirv.GroupNonUniformElect : i1
+    %0 = spv.GroupNonUniformElect : i1
     ```
   }];
 
   let availability = [
-    MinVersion<SPIRV_V_1_3>,
-    MaxVersion<SPIRV_V_1_6>,
+    MinVersion<SPV_V_1_3>,
+    MaxVersion<SPV_V_1_5>,
     Extension<[]>,
-    Capability<[SPIRV_C_GroupNonUniform]>
+    Capability<[SPV_C_GroupNonUniform]>
   ];
 
   let arguments = (ins
-    SPIRV_ScopeAttr:$execution_scope
+    SPV_ScopeAttr:$execution_scope
   );
 
   let results = (outs
-    SPIRV_Bool:$result
+    SPV_Bool:$result
   );
+
+  let builders = [OpBuilder<(ins "spirv::Scope")>];
 
   let assemblyFormat = "$execution_scope attr-dict `:` type($result)";
 }
 
 // -----
 
-def SPIRV_GroupNonUniformFAddOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUniformFAdd", SPIRV_Float, []> {
+def SPV_GroupNonUniformFAddOp : SPV_GroupNonUniformArithmeticOp<"GroupNonUniformFAdd", SPV_Float, []> {
   let summary = [{
     A floating point add group operation of all Value operands contributed
     by active invocations in the group.
@@ -211,7 +246,7 @@ def SPIRV_GroupNonUniformFAddOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUni
     operation ::= `"Reduce"` | `"InclusiveScan"` | `"ExclusiveScan"` | ...
     float-scalar-vector-type ::= float-type |
                                  `vector<` integer-literal `x` float-type `>`
-    non-uniform-fadd-op ::= ssa-id `=` `spirv.GroupNonUniformFAdd` scope operation
+    non-uniform-fadd-op ::= ssa-id `=` `spv.GroupNonUniformFAdd` scope operation
                             ssa-use ( `cluster_size` `(` ssa_use `)` )?
                             `:` float-scalar-vector-type
     ```
@@ -219,25 +254,25 @@ def SPIRV_GroupNonUniformFAddOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUni
     #### Example:
 
     ```mlir
-    %four = spirv.Constant 4 : i32
+    %four = spv.Constant 4 : i32
     %scalar = ... : f32
     %vector = ... : vector<4xf32>
-    %0 = spirv.GroupNonUniformFAdd "Workgroup" "Reduce" %scalar : f32
-    %1 = spirv.GroupNonUniformFAdd "Subgroup" "ClusteredReduce" %vector cluster_size(%four) : vector<4xf32>
+    %0 = spv.GroupNonUniformFAdd "Workgroup" "Reduce" %scalar : f32
+    %1 = spv.GroupNonUniformFAdd "Subgroup" "ClusteredReduce" %vector cluster_size(%four) : vector<4xf32>
     ```
   }];
 
   let availability = [
-    MinVersion<SPIRV_V_1_3>,
-    MaxVersion<SPIRV_V_1_6>,
+    MinVersion<SPV_V_1_3>,
+    MaxVersion<SPV_V_1_5>,
     Extension<[]>,
-    Capability<[SPIRV_C_GroupNonUniformArithmetic, SPIRV_C_GroupNonUniformClustered, SPIRV_C_GroupNonUniformPartitionedNV]>
+    Capability<[SPV_C_GroupNonUniformArithmetic, SPV_C_GroupNonUniformClustered, SPV_C_GroupNonUniformPartitionedNV]>
   ];
 }
 
 // -----
 
-def SPIRV_GroupNonUniformFMaxOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUniformFMax", SPIRV_Float, []> {
+def SPV_GroupNonUniformFMaxOp : SPV_GroupNonUniformArithmeticOp<"GroupNonUniformFMax", SPV_Float, []> {
   let summary = [{
     A floating point maximum group operation of all Value operands
     contributed by active invocations in by group.
@@ -271,7 +306,7 @@ def SPIRV_GroupNonUniformFMaxOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUni
     operation ::= `"Reduce"` | `"InclusiveScan"` | `"ExclusiveScan"` | ...
     float-scalar-vector-type ::= float-type |
                                  `vector<` integer-literal `x` float-type `>`
-    non-uniform-fmax-op ::= ssa-id `=` `spirv.GroupNonUniformFMax` scope operation
+    non-uniform-fmax-op ::= ssa-id `=` `spv.GroupNonUniformFMax` scope operation
                             ssa-use ( `cluster_size` `(` ssa_use `)` )?
                             `:` float-scalar-vector-type
     ```
@@ -279,25 +314,25 @@ def SPIRV_GroupNonUniformFMaxOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUni
     #### Example:
 
     ```mlir
-    %four = spirv.Constant 4 : i32
+    %four = spv.Constant 4 : i32
     %scalar = ... : f32
     %vector = ... : vector<4xf32>
-    %0 = spirv.GroupNonUniformFMax "Workgroup" "Reduce" %scalar : f32
-    %1 = spirv.GroupNonUniformFMax "Subgroup" "ClusteredReduce" %vector cluster_size(%four) : vector<4xf32>
+    %0 = spv.GroupNonUniformFMax "Workgroup" "Reduce" %scalar : f32
+    %1 = spv.GroupNonUniformFMax "Subgroup" "ClusteredReduce" %vector cluster_size(%four) : vector<4xf32>
     ```
   }];
 
   let availability = [
-    MinVersion<SPIRV_V_1_3>,
-    MaxVersion<SPIRV_V_1_6>,
+    MinVersion<SPV_V_1_3>,
+    MaxVersion<SPV_V_1_5>,
     Extension<[]>,
-    Capability<[SPIRV_C_GroupNonUniformArithmetic, SPIRV_C_GroupNonUniformClustered, SPIRV_C_GroupNonUniformPartitionedNV]>
+    Capability<[SPV_C_GroupNonUniformArithmetic, SPV_C_GroupNonUniformClustered, SPV_C_GroupNonUniformPartitionedNV]>
   ];
 }
 
 // -----
 
-def SPIRV_GroupNonUniformFMinOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUniformFMin", SPIRV_Float, []> {
+def SPV_GroupNonUniformFMinOp : SPV_GroupNonUniformArithmeticOp<"GroupNonUniformFMin", SPV_Float, []> {
   let summary = [{
     A floating point minimum group operation of all Value operands
     contributed by active invocations in the group.
@@ -331,7 +366,7 @@ def SPIRV_GroupNonUniformFMinOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUni
     operation ::= `"Reduce"` | `"InclusiveScan"` | `"ExclusiveScan"` | ...
     float-scalar-vector-type ::= float-type |
                                  `vector<` integer-literal `x` float-type `>`
-    non-uniform-fmin-op ::= ssa-id `=` `spirv.GroupNonUniformFMin` scope operation
+    non-uniform-fmin-op ::= ssa-id `=` `spv.GroupNonUniformFMin` scope operation
                             ssa-use ( `cluster_size` `(` ssa_use `)` )?
                             `:` float-scalar-vector-type
     ```
@@ -339,25 +374,25 @@ def SPIRV_GroupNonUniformFMinOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUni
     #### Example:
 
     ```mlir
-    %four = spirv.Constant 4 : i32
+    %four = spv.Constant 4 : i32
     %scalar = ... : f32
     %vector = ... : vector<4xf32>
-    %0 = spirv.GroupNonUniformFMin "Workgroup" "Reduce" %scalar : f32
-    %1 = spirv.GroupNonUniformFMin "Subgroup" "ClusteredReduce" %vector cluster_size(%four) : vector<4xf32>
+    %0 = spv.GroupNonUniformFMin "Workgroup" "Reduce" %scalar : f32
+    %1 = spv.GroupNonUniformFMin "Subgroup" "ClusteredReduce" %vector cluster_size(%four) : vector<4xf32>
     ```
   }];
 
   let availability = [
-    MinVersion<SPIRV_V_1_3>,
-    MaxVersion<SPIRV_V_1_6>,
+    MinVersion<SPV_V_1_3>,
+    MaxVersion<SPV_V_1_5>,
     Extension<[]>,
-    Capability<[SPIRV_C_GroupNonUniformArithmetic, SPIRV_C_GroupNonUniformClustered, SPIRV_C_GroupNonUniformPartitionedNV]>
+    Capability<[SPV_C_GroupNonUniformArithmetic, SPV_C_GroupNonUniformClustered, SPV_C_GroupNonUniformPartitionedNV]>
   ];
 }
 
 // -----
 
-def SPIRV_GroupNonUniformFMulOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUniformFMul", SPIRV_Float, []> {
+def SPV_GroupNonUniformFMulOp : SPV_GroupNonUniformArithmeticOp<"GroupNonUniformFMul", SPV_Float, []> {
   let summary = [{
     A floating point multiply group operation of all Value operands
     contributed by active invocations in the group.
@@ -388,7 +423,7 @@ def SPIRV_GroupNonUniformFMulOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUni
     operation ::= `"Reduce"` | `"InclusiveScan"` | `"ExclusiveScan"` | ...
     float-scalar-vector-type ::= float-type |
                                  `vector<` integer-literal `x` float-type `>`
-    non-uniform-fmul-op ::= ssa-id `=` `spirv.GroupNonUniformFMul` scope operation
+    non-uniform-fmul-op ::= ssa-id `=` `spv.GroupNonUniformFMul` scope operation
                             ssa-use ( `cluster_size` `(` ssa_use `)` )?
                             `:` float-scalar-vector-type
     ```
@@ -396,25 +431,25 @@ def SPIRV_GroupNonUniformFMulOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUni
     #### Example:
 
     ```mlir
-    %four = spirv.Constant 4 : i32
+    %four = spv.Constant 4 : i32
     %scalar = ... : f32
     %vector = ... : vector<4xf32>
-    %0 = spirv.GroupNonUniformFMul "Workgroup" "Reduce" %scalar : f32
-    %1 = spirv.GroupNonUniformFMul "Subgroup" "ClusteredReduce" %vector cluster_size(%four) : vector<4xf32>
+    %0 = spv.GroupNonUniformFMul "Workgroup" "Reduce" %scalar : f32
+    %1 = spv.GroupNonUniformFMul "Subgroup" "ClusteredReduce" %vector cluster_size(%four) : vector<4xf32>
     ```
   }];
 
   let availability = [
-    MinVersion<SPIRV_V_1_3>,
-    MaxVersion<SPIRV_V_1_6>,
+    MinVersion<SPV_V_1_3>,
+    MaxVersion<SPV_V_1_5>,
     Extension<[]>,
-    Capability<[SPIRV_C_GroupNonUniformArithmetic, SPIRV_C_GroupNonUniformClustered, SPIRV_C_GroupNonUniformPartitionedNV]>
+    Capability<[SPV_C_GroupNonUniformArithmetic, SPV_C_GroupNonUniformClustered, SPV_C_GroupNonUniformPartitionedNV]>
   ];
 }
 
 // -----
 
-def SPIRV_GroupNonUniformIAddOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUniformIAdd", SPIRV_Integer, []> {
+def SPV_GroupNonUniformIAddOp : SPV_GroupNonUniformArithmeticOp<"GroupNonUniformIAdd", SPV_Integer, []> {
   let summary = [{
     An integer add group operation of all Value operands contributed by
     active invocations in the group.
@@ -443,7 +478,7 @@ def SPIRV_GroupNonUniformIAddOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUni
     operation ::= `"Reduce"` | `"InclusiveScan"` | `"ExclusiveScan"` | ...
     integer-scalar-vector-type ::= integer-type |
                                  `vector<` integer-literal `x` integer-type `>`
-    non-uniform-iadd-op ::= ssa-id `=` `spirv.GroupNonUniformIAdd` scope operation
+    non-uniform-iadd-op ::= ssa-id `=` `spv.GroupNonUniformIAdd` scope operation
                             ssa-use ( `cluster_size` `(` ssa_use `)` )?
                             `:` integer-scalar-vector-type
     ```
@@ -451,25 +486,25 @@ def SPIRV_GroupNonUniformIAddOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUni
     #### Example:
 
     ```mlir
-    %four = spirv.Constant 4 : i32
+    %four = spv.Constant 4 : i32
     %scalar = ... : i32
     %vector = ... : vector<4xi32>
-    %0 = spirv.GroupNonUniformIAdd "Workgroup" "Reduce" %scalar : i32
-    %1 = spirv.GroupNonUniformIAdd "Subgroup" "ClusteredReduce" %vector cluster_size(%four) : vector<4xi32>
+    %0 = spv.GroupNonUniformIAdd "Workgroup" "Reduce" %scalar : i32
+    %1 = spv.GroupNonUniformIAdd "Subgroup" "ClusteredReduce" %vector cluster_size(%four) : vector<4xi32>
     ```
   }];
 
   let availability = [
-    MinVersion<SPIRV_V_1_3>,
-    MaxVersion<SPIRV_V_1_6>,
+    MinVersion<SPV_V_1_3>,
+    MaxVersion<SPV_V_1_5>,
     Extension<[]>,
-    Capability<[SPIRV_C_GroupNonUniformArithmetic, SPIRV_C_GroupNonUniformClustered, SPIRV_C_GroupNonUniformPartitionedNV]>
+    Capability<[SPV_C_GroupNonUniformArithmetic, SPV_C_GroupNonUniformClustered, SPV_C_GroupNonUniformPartitionedNV]>
   ];
 }
 
 // -----
 
-def SPIRV_GroupNonUniformIMulOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUniformIMul", SPIRV_Integer, []> {
+def SPV_GroupNonUniformIMulOp : SPV_GroupNonUniformArithmeticOp<"GroupNonUniformIMul", SPV_Integer, []> {
   let summary = [{
     An integer multiply group operation of all Value operands contributed by
     active invocations in the group.
@@ -498,7 +533,7 @@ def SPIRV_GroupNonUniformIMulOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUni
     operation ::= `"Reduce"` | `"InclusiveScan"` | `"ExclusiveScan"` | ...
     integer-scalar-vector-type ::= integer-type |
                                  `vector<` integer-literal `x` integer-type `>`
-    non-uniform-imul-op ::= ssa-id `=` `spirv.GroupNonUniformIMul` scope operation
+    non-uniform-imul-op ::= ssa-id `=` `spv.GroupNonUniformIMul` scope operation
                             ssa-use ( `cluster_size` `(` ssa_use `)` )?
                             `:` integer-scalar-vector-type
     ```
@@ -506,26 +541,26 @@ def SPIRV_GroupNonUniformIMulOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUni
     #### Example:
 
     ```mlir
-    %four = spirv.Constant 4 : i32
+    %four = spv.Constant 4 : i32
     %scalar = ... : i32
     %vector = ... : vector<4xi32>
-    %0 = spirv.GroupNonUniformIMul "Workgroup" "Reduce" %scalar : i32
-    %1 = spirv.GroupNonUniformIMul "Subgroup" "ClusteredReduce" %vector cluster_size(%four) : vector<4xi32>
+    %0 = spv.GroupNonUniformIMul "Workgroup" "Reduce" %scalar : i32
+    %1 = spv.GroupNonUniformIMul "Subgroup" "ClusteredReduce" %vector cluster_size(%four) : vector<4xi32>
     ```
   }];
 
   let availability = [
-    MinVersion<SPIRV_V_1_3>,
-    MaxVersion<SPIRV_V_1_6>,
+    MinVersion<SPV_V_1_3>,
+    MaxVersion<SPV_V_1_5>,
     Extension<[]>,
-    Capability<[SPIRV_C_GroupNonUniformArithmetic, SPIRV_C_GroupNonUniformClustered, SPIRV_C_GroupNonUniformPartitionedNV]>
+    Capability<[SPV_C_GroupNonUniformArithmetic, SPV_C_GroupNonUniformClustered, SPV_C_GroupNonUniformPartitionedNV]>
   ];
 }
 
 // -----
 
-def SPIRV_GroupNonUniformSMaxOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUniformSMax",
-                                    SPIRV_Integer,
+def SPV_GroupNonUniformSMaxOp : SPV_GroupNonUniformArithmeticOp<"GroupNonUniformSMax",
+                                    SPV_Integer,
                                     [SignedOp]> {
   let summary = [{
     A signed integer maximum group operation of all Value operands
@@ -555,7 +590,7 @@ def SPIRV_GroupNonUniformSMaxOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUni
     operation ::= `"Reduce"` | `"InclusiveScan"` | `"ExclusiveScan"` | ...
     integer-scalar-vector-type ::= integer-type |
                                  `vector<` integer-literal `x` integer-type `>`
-    non-uniform-smax-op ::= ssa-id `=` `spirv.GroupNonUniformSMax` scope operation
+    non-uniform-smax-op ::= ssa-id `=` `spv.GroupNonUniformSMax` scope operation
                             ssa-use ( `cluster_size` `(` ssa_use `)` )?
                             `:` integer-scalar-vector-type
     ```
@@ -563,26 +598,26 @@ def SPIRV_GroupNonUniformSMaxOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUni
     #### Example:
 
     ```mlir
-    %four = spirv.Constant 4 : i32
+    %four = spv.Constant 4 : i32
     %scalar = ... : i32
     %vector = ... : vector<4xi32>
-    %0 = spirv.GroupNonUniformSMax "Workgroup" "Reduce" %scalar : i32
-    %1 = spirv.GroupNonUniformSMax "Subgroup" "ClusteredReduce" %vector cluster_size(%four) : vector<4xi32>
+    %0 = spv.GroupNonUniformSMax "Workgroup" "Reduce" %scalar : i32
+    %1 = spv.GroupNonUniformSMax "Subgroup" "ClusteredReduce" %vector cluster_size(%four) : vector<4xi32>
     ```
   }];
 
   let availability = [
-    MinVersion<SPIRV_V_1_3>,
-    MaxVersion<SPIRV_V_1_6>,
+    MinVersion<SPV_V_1_3>,
+    MaxVersion<SPV_V_1_5>,
     Extension<[]>,
-    Capability<[SPIRV_C_GroupNonUniformArithmetic, SPIRV_C_GroupNonUniformClustered, SPIRV_C_GroupNonUniformPartitionedNV]>
+    Capability<[SPV_C_GroupNonUniformArithmetic, SPV_C_GroupNonUniformClustered, SPV_C_GroupNonUniformPartitionedNV]>
   ];
 }
 
 // -----
 
-def SPIRV_GroupNonUniformSMinOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUniformSMin",
-                                    SPIRV_Integer,
+def SPV_GroupNonUniformSMinOp : SPV_GroupNonUniformArithmeticOp<"GroupNonUniformSMin",
+                                    SPV_Integer,
                                     [SignedOp]> {
   let summary = [{
     A signed integer minimum group operation of all Value operands
@@ -612,7 +647,7 @@ def SPIRV_GroupNonUniformSMinOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUni
     operation ::= `"Reduce"` | `"InclusiveScan"` | `"ExclusiveScan"` | ...
     integer-scalar-vector-type ::= integer-type |
                                  `vector<` integer-literal `x` integer-type `>`
-    non-uniform-smin-op ::= ssa-id `=` `spirv.GroupNonUniformSMin` scope operation
+    non-uniform-smin-op ::= ssa-id `=` `spv.GroupNonUniformSMin` scope operation
                             ssa-use ( `cluster_size` `(` ssa_use `)` )?
                             `:` integer-scalar-vector-type
     ```
@@ -620,241 +655,26 @@ def SPIRV_GroupNonUniformSMinOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUni
     #### Example:
 
     ```mlir
-    %four = spirv.Constant 4 : i32
+    %four = spv.Constant 4 : i32
     %scalar = ... : i32
     %vector = ... : vector<4xi32>
-    %0 = spirv.GroupNonUniformSMin "Workgroup" "Reduce" %scalar : i32
-    %1 = spirv.GroupNonUniformSMin "Subgroup" "ClusteredReduce" %vector cluster_size(%four) : vector<4xi32>
+    %0 = spv.GroupNonUniformSMin "Workgroup" "Reduce" %scalar : i32
+    %1 = spv.GroupNonUniformSMin "Subgroup" "ClusteredReduce" %vector cluster_size(%four) : vector<4xi32>
     ```
   }];
 
   let availability = [
-    MinVersion<SPIRV_V_1_3>,
-    MaxVersion<SPIRV_V_1_6>,
+    MinVersion<SPV_V_1_3>,
+    MaxVersion<SPV_V_1_5>,
     Extension<[]>,
-    Capability<[SPIRV_C_GroupNonUniformArithmetic, SPIRV_C_GroupNonUniformClustered, SPIRV_C_GroupNonUniformPartitionedNV]>
+    Capability<[SPV_C_GroupNonUniformArithmetic, SPV_C_GroupNonUniformClustered, SPV_C_GroupNonUniformPartitionedNV]>
   ];
 }
 
 // -----
 
-def SPIRV_GroupNonUniformShuffleOp : SPIRV_Op<"GroupNonUniformShuffle",
-    [Pure, AllTypesMatch<["value", "result"]>]> {
-  let summary = [{
-    Result is the Value of the invocation identified by the id Id.
-  }];
-
-  let description = [{
-    Result Type  must be a scalar or vector of floating-point type, integer
-    type, or Boolean type.
-
-    Execution is a Scope. It must be either Workgroup or Subgroup.
-
-     The type of Value must be the same as Result Type.
-
-    Id  must be a scalar of integer type, whose Signedness operand is 0.
-
-    The resulting value is undefined if Id is an inactive invocation, or is
-    greater than or equal to the size of the group.
-
-    <!-- End of AutoGen section -->
-
-    #### Example:
-
-    ```mlir
-    %0 = spirv.GroupNonUniformShuffle <Subgroup> %val, %id : f32, i32
-    ```
-  }];
-
-  let availability = [
-    MinVersion<SPIRV_V_1_3>,
-    MaxVersion<SPIRV_V_1_6>,
-    Extension<[]>,
-    Capability<[SPIRV_C_GroupNonUniformShuffle]>
-  ];
-
-  let arguments = (ins
-    SPIRV_ScopeAttr:$execution_scope,
-    SPIRV_ScalarOrVector:$value,
-    SPIRV_Integer:$id
-  );
-
-  let results = (outs
-    SPIRV_ScalarOrVector:$result
-  );
-
-  let assemblyFormat = [{
-    $execution_scope operands attr-dict `:` type($value) `,` type($id)
-  }];
-}
-
-// -----
-
-def SPIRV_GroupNonUniformShuffleDownOp : SPIRV_Op<"GroupNonUniformShuffleDown",
-    [Pure, AllTypesMatch<["value", "result"]>]> {
-  let summary = [{
-    Result is the Value of the invocation identified by the current
-    invocation’s id within the group + Delta.
-  }];
-
-  let description = [{
-    Result Type  must be a scalar or vector of floating-point type, integer
-    type, or Boolean type.
-
-    Execution is a Scope. It must be either Workgroup or Subgroup.
-
-     The type of Value must be the same as Result Type.
-
-    Delta  must be a scalar of integer type, whose Signedness operand is 0.
-
-    Delta is treated as unsigned and the resulting value is undefined if
-    Delta is greater than or equal to the size of the group, or if the
-    current invocation’s id within the group + Delta is either an inactive
-    invocation or greater than or equal to the size of the group.
-
-    <!-- End of AutoGen section -->
-
-    #### Example:
-
-    ```mlir
-    %0 = spirv.GroupNonUniformShuffleDown <Subgroup> %val, %delta : f32, i32
-    ```
-  }];
-
-  let availability = [
-    MinVersion<SPIRV_V_1_3>,
-    MaxVersion<SPIRV_V_1_6>,
-    Extension<[]>,
-    Capability<[SPIRV_C_GroupNonUniformShuffleRelative]>
-  ];
-
-  let arguments = (ins
-    SPIRV_ScopeAttr:$execution_scope,
-    SPIRV_ScalarOrVector:$value,
-    SPIRV_Integer:$delta
-  );
-
-  let results = (outs
-    SPIRV_Type:$result
-  );
-
-  let assemblyFormat = [{
-    $execution_scope operands attr-dict `:` type($value) `,` type($delta)
-  }];
-}
-
-// -----
-
-def SPIRV_GroupNonUniformShuffleUpOp : SPIRV_Op<"GroupNonUniformShuffleUp",
-    [Pure, AllTypesMatch<["value", "result"]>]> {
-  let summary = [{
-    Result is the Value of the invocation identified by the current
-    invocation’s id within the group - Delta.
-  }];
-
-  let description = [{
-    Result Type  must be a scalar or vector of floating-point type, integer
-    type, or Boolean type.
-
-    Execution is a Scope. It must be either Workgroup or Subgroup.
-
-     The type of Value must be the same as Result Type.
-
-    Delta  must be a scalar of integer type, whose Signedness operand is 0.
-
-    Delta is treated as unsigned and the resulting value is undefined if
-    Delta is greater than the current invocation’s id within the group or if
-    the selected lane is inactive.
-
-    <!-- End of AutoGen section -->
-
-    #### Example:
-
-    ```mlir
-    %0 = spirv.GroupNonUniformShuffleUp <Subgroup> %val, %delta : f32, i32
-    ```
-  }];
-
-  let availability = [
-    MinVersion<SPIRV_V_1_3>,
-    MaxVersion<SPIRV_V_1_6>,
-    Extension<[]>,
-    Capability<[SPIRV_C_GroupNonUniformShuffleRelative]>
-  ];
-
-  let arguments = (ins
-    SPIRV_ScopeAttr:$execution_scope,
-    SPIRV_ScalarOrVector:$value,
-    SPIRV_Integer:$delta
-  );
-
-  let results = (outs
-    SPIRV_Type:$result
-  );
-
-  let assemblyFormat = [{
-    $execution_scope operands attr-dict `:` type($value) `,` type($delta)
-  }];
-}
-
-// -----
-
-def SPIRV_GroupNonUniformShuffleXorOp : SPIRV_Op<"GroupNonUniformShuffleXor",
-    [Pure, AllTypesMatch<["value", "result"]>]> {
-  let summary = [{
-    Result is the Value of the invocation identified by the current
-    invocation’s id within the group xor’ed with Mask.
-  }];
-
-  let description = [{
-    Result Type  must be a scalar or vector of floating-point type, integer
-    type, or Boolean type.
-
-    Execution is a Scope. It must be either Workgroup or Subgroup.
-
-     The type of Value must be the same as Result Type.
-
-    Mask  must be a scalar of integer type, whose Signedness operand is 0.
-
-    The resulting value is undefined if current invocation’s id within the
-    group xor’ed with Mask is an inactive invocation, or is greater than or
-    equal to the size of the group.
-
-    <!-- End of AutoGen section -->
-
-    #### Example:
-
-    ```mlir
-    %0 = spirv.GroupNonUniformShuffleXor <Subgroup> %val, %mask : f32, i32
-    ```
-  }];
-
-  let availability = [
-    MinVersion<SPIRV_V_1_3>,
-    MaxVersion<SPIRV_V_1_6>,
-    Extension<[]>,
-    Capability<[SPIRV_C_GroupNonUniformShuffle]>
-  ];
-
-  let arguments = (ins
-    SPIRV_ScopeAttr:$execution_scope,
-    SPIRV_ScalarOrVector:$value,
-    SPIRV_Integer:$mask
-  );
-
-  let results = (outs
-    SPIRV_Type:$result
-  );
-
-  let assemblyFormat = [{
-    $execution_scope operands attr-dict `:` type($value) `,` type($mask)
-  }];
-}
-
-// -----
-
-def SPIRV_GroupNonUniformUMaxOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUniformUMax",
-                                    SPIRV_Integer,
+def SPV_GroupNonUniformUMaxOp : SPV_GroupNonUniformArithmeticOp<"GroupNonUniformUMax",
+                                    SPV_Integer,
                                     [UnsignedOp]> {
   let summary = [{
     An unsigned integer maximum group operation of all Value operands
@@ -885,7 +705,7 @@ def SPIRV_GroupNonUniformUMaxOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUni
     operation ::= `"Reduce"` | `"InclusiveScan"` | `"ExclusiveScan"` | ...
     integer-scalar-vector-type ::= integer-type |
                                  `vector<` integer-literal `x` integer-type `>`
-    non-uniform-umax-op ::= ssa-id `=` `spirv.GroupNonUniformUMax` scope operation
+    non-uniform-umax-op ::= ssa-id `=` `spv.GroupNonUniformUMax` scope operation
                             ssa-use ( `cluster_size` `(` ssa_use `)` )?
                             `:` integer-scalar-vector-type
     ```
@@ -893,26 +713,26 @@ def SPIRV_GroupNonUniformUMaxOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUni
     #### Example:
 
     ```mlir
-    %four = spirv.Constant 4 : i32
+    %four = spv.Constant 4 : i32
     %scalar = ... : i32
     %vector = ... : vector<4xi32>
-    %0 = spirv.GroupNonUniformUMax "Workgroup" "Reduce" %scalar : i32
-    %1 = spirv.GroupNonUniformUMax "Subgroup" "ClusteredReduce" %vector cluster_size(%four) : vector<4xi32>
+    %0 = spv.GroupNonUniformUMax "Workgroup" "Reduce" %scalar : i32
+    %1 = spv.GroupNonUniformUMax "Subgroup" "ClusteredReduce" %vector cluster_size(%four) : vector<4xi32>
     ```
   }];
 
   let availability = [
-    MinVersion<SPIRV_V_1_3>,
-    MaxVersion<SPIRV_V_1_6>,
+    MinVersion<SPV_V_1_3>,
+    MaxVersion<SPV_V_1_5>,
     Extension<[]>,
-    Capability<[SPIRV_C_GroupNonUniformArithmetic, SPIRV_C_GroupNonUniformClustered, SPIRV_C_GroupNonUniformPartitionedNV]>
+    Capability<[SPV_C_GroupNonUniformArithmetic, SPV_C_GroupNonUniformClustered, SPV_C_GroupNonUniformPartitionedNV]>
   ];
 }
 
 // -----
 
-def SPIRV_GroupNonUniformUMinOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUniformUMin",
-                                    SPIRV_Integer,
+def SPV_GroupNonUniformUMinOp : SPV_GroupNonUniformArithmeticOp<"GroupNonUniformUMin",
+                                    SPV_Integer,
                                     [UnsignedOp]> {
   let summary = [{
     An unsigned integer minimum group operation of all Value operands
@@ -943,7 +763,7 @@ def SPIRV_GroupNonUniformUMinOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUni
     operation ::= `"Reduce"` | `"InclusiveScan"` | `"ExclusiveScan"` | ...
     integer-scalar-vector-type ::= integer-type |
                                  `vector<` integer-literal `x` integer-type `>`
-    non-uniform-umin-op ::= ssa-id `=` `spirv.GroupNonUniformUMin` scope operation
+    non-uniform-umin-op ::= ssa-id `=` `spv.GroupNonUniformUMin` scope operation
                             ssa-use ( `cluster_size` `(` ssa_use `)` )?
                             `:` integer-scalar-vector-type
     ```
@@ -951,319 +771,19 @@ def SPIRV_GroupNonUniformUMinOp : SPIRV_GroupNonUniformArithmeticOp<"GroupNonUni
     #### Example:
 
     ```mlir
-    %four = spirv.Constant 4 : i32
+    %four = spv.Constant 4 : i32
     %scalar = ... : i32
     %vector = ... : vector<4xi32>
-    %0 = spirv.GroupNonUniformUMin "Workgroup" "Reduce" %scalar : i32
-    %1 = spirv.GroupNonUniformUMin "Subgroup" "ClusteredReduce" %vector cluster_size(%four) : vector<4xi32>
+    %0 = spv.GroupNonUniformUMin "Workgroup" "Reduce" %scalar : i32
+    %1 = spv.GroupNonUniformUMin "Subgroup" "ClusteredReduce" %vector cluster_size(%four) : vector<4xi32>
     ```
   }];
 
   let availability = [
-    MinVersion<SPIRV_V_1_3>,
-    MaxVersion<SPIRV_V_1_6>,
+    MinVersion<SPV_V_1_3>,
+    MaxVersion<SPV_V_1_5>,
     Extension<[]>,
-    Capability<[SPIRV_C_GroupNonUniformArithmetic, SPIRV_C_GroupNonUniformClustered, SPIRV_C_GroupNonUniformPartitionedNV]>
-  ];
-}
-
-// -----
-
-def SPIRV_GroupNonUniformBitwiseAndOp :
-  SPIRV_GroupNonUniformArithmeticOp<"GroupNonUniformBitwiseAnd",
-    SPIRV_Integer, []> {
-  let summary = [{
-    A bitwise `and` group operation of all Value operands contributed by active
-    invocations in the group.
-  }];
-
-  let description = [{
-    Result Type must be a scalar or vector of integer type.
-
-    Execution is a Scope. It must be either Workgroup or Subgroup.
-
-    The identity I for Operation is ~0. If Operation is ClusteredReduce,
-    ClusterSize must be present.
-
-    The type of Value must be the same as Result Type.
-
-    ClusterSize is the size of cluster to use. ClusterSize must be a scalar
-    of integer type, whose Signedness operand is 0. ClusterSize must come
-    from a constant instruction. ClusterSize must be at least 1, and must be
-    a power of 2. If ClusterSize is greater than the declared SubGroupSize,
-    executing this instruction results in undefined behavior.
-
-    <!-- End of AutoGen section -->
-
-    #### Example:
-
-    ```mlir
-    %four = spirv.Constant 4 : i32
-    %scalar = ... : i32
-    %vector = ... : vector<4xi32>
-    %0 = spirv.GroupNonUniformBitwiseAnd "Workgroup" "Reduce" %scalar : i32
-    %1 = spirv.GroupNonUniformBitwiseAnd "Subgroup" "ClusteredReduce"
-           %vector cluster_size(%four) : vector<4xi32>
-    ```
-  }];
-
-  let availability = [
-    MinVersion<SPIRV_V_1_3>,
-    MaxVersion<SPIRV_V_1_6>,
-    Extension<[]>,
-    Capability<[SPIRV_C_GroupNonUniformArithmetic,
-                SPIRV_C_GroupNonUniformClustered,
-                SPIRV_C_GroupNonUniformPartitionedNV]>
-  ];
-}
-
-// -----
-
-def SPIRV_GroupNonUniformBitwiseOrOp :
-  SPIRV_GroupNonUniformArithmeticOp<"GroupNonUniformBitwiseOr",
-    SPIRV_Integer, []> {
-  let summary = [{
-    A bitwise `or` group operation of all Value operands contributed by active
-    invocations in the group.
-  }];
-
-  let description = [{
-    Result Type must be a scalar or vector of integer type.
-
-    Execution is a Scope. It must be either Workgroup or Subgroup.
-
-    The identity I for Operation is 0. If Operation is ClusteredReduce,
-    ClusterSize must be present.
-
-    The type of Value must be the same as Result Type.
-
-    ClusterSize is the size of cluster to use. ClusterSize must be a scalar
-    of integer type, whose Signedness operand is 0. ClusterSize must come
-    from a constant instruction. ClusterSize must be at least 1, and must be
-    a power of 2. If ClusterSize is greater than the declared SubGroupSize,
-    executing this instruction results in undefined behavior.
-
-    <!-- End of AutoGen section -->
-
-    #### Example:
-
-    ```mlir
-    %four = spirv.Constant 4 : i32
-    %scalar = ... : i32
-    %vector = ... : vector<4xi32>
-    %0 = spirv.GroupNonUniformBitwiseOr "Workgroup" "Reduce" %scalar : i32
-    %1 = spirv.GroupNonUniformBitwiseOr "Subgroup" "ClusteredReduce"
-           %vector cluster_size(%four) : vector<4xi32>
-    ```
-  }];
-
-  let availability = [
-    MinVersion<SPIRV_V_1_3>,
-    MaxVersion<SPIRV_V_1_6>,
-    Extension<[]>,
-    Capability<[SPIRV_C_GroupNonUniformArithmetic,
-                SPIRV_C_GroupNonUniformClustered,
-                SPIRV_C_GroupNonUniformPartitionedNV]>
-  ];
-}
-
-// -----
-
-def SPIRV_GroupNonUniformBitwiseXorOp :
-  SPIRV_GroupNonUniformArithmeticOp<"GroupNonUniformBitwiseXor",
-    SPIRV_Integer, []> {
-  let summary = [{
-    A bitwise `xor` group operation of all Value operands contributed by active
-    invocations in the group.
-  }];
-
-  let description = [{
-    Result Type must be a scalar or vector of integer type.
-
-    Execution is a Scope. It must be either Workgroup or Subgroup.
-
-    The identity I for Operation is 0. If Operation is ClusteredReduce,
-    ClusterSize must be present.
-
-    The type of Value must be the same as Result Type.
-
-    ClusterSize is the size of cluster to use. ClusterSize must be a scalar
-    of integer type, whose Signedness operand is 0. ClusterSize must come
-    from a constant instruction. ClusterSize must be at least 1, and must be
-    a power of 2. If ClusterSize is greater than the declared SubGroupSize,
-    executing this instruction results in undefined behavior.
-
-    <!-- End of AutoGen section -->
-
-    #### Example:
-
-    ```mlir
-    %four = spirv.Constant 4 : i32
-    %scalar = ... : i32
-    %vector = ... : vector<4xi32>
-    %0 = spirv.GroupNonUniformBitwiseXor "Workgroup" "Reduce" %scalar : i32
-    %1 = spirv.GroupNonUniformBitwiseXor "Subgroup" "ClusteredReduce"
-           %vector cluster_size(%four) : vector<4xi32>
-    ```
-  }];
-
-  let availability = [
-    MinVersion<SPIRV_V_1_3>,
-    MaxVersion<SPIRV_V_1_6>,
-    Extension<[]>,
-    Capability<[SPIRV_C_GroupNonUniformArithmetic,
-                SPIRV_C_GroupNonUniformClustered,
-                SPIRV_C_GroupNonUniformPartitionedNV]>
-  ];
-}
-
-// -----
-
-def SPIRV_GroupNonUniformLogicalAndOp :
-  SPIRV_GroupNonUniformArithmeticOp<"GroupNonUniformLogicalAnd",
-    SPIRV_Bool, []> {
-  let summary = [{
-    A logical `and` group operation of all Value operands contributed by active
-    invocations in the group.
-  }];
-
-  let description = [{
-    Result Type must be a scalar or vector of Boolean type.
-
-    Execution is a Scope. It must be either Workgroup or Subgroup.
-
-    The identity I for Operation is ~0. If Operation is ClusteredReduce,
-    ClusterSize must be present.
-
-    The type of Value must be the same as Result Type.
-
-    ClusterSize is the size of cluster to use. ClusterSize must be a scalar
-    of integer type, whose Signedness operand is 0. ClusterSize must come
-    from a constant instruction. ClusterSize must be at least 1, and must be
-    a power of 2. If ClusterSize is greater than the declared SubGroupSize,
-    executing this instruction results in undefined behavior.
-
-    <!-- End of AutoGen section -->
-
-    #### Example:
-
-    ```mlir
-    %four = spirv.Constant 4 : i32
-    %scalar = ... : i1
-    %vector = ... : vector<4xi1>
-    %0 = spirv.GroupNonUniformLogicalAnd "Workgroup" "Reduce" %scalar : i1
-    %1 = spirv.GroupNonUniformLogicalAnd "Subgroup" "ClusteredReduce"
-           %vector cluster_size(%four) : vector<4xi1>
-    ```
-  }];
-
-  let availability = [
-    MinVersion<SPIRV_V_1_3>,
-    MaxVersion<SPIRV_V_1_6>,
-    Extension<[]>,
-    Capability<[SPIRV_C_GroupNonUniformArithmetic,
-                SPIRV_C_GroupNonUniformClustered,
-                SPIRV_C_GroupNonUniformPartitionedNV]>
-  ];
-}
-
-// -----
-
-def SPIRV_GroupNonUniformLogicalOrOp :
-  SPIRV_GroupNonUniformArithmeticOp<"GroupNonUniformLogicalOr",
-    SPIRV_Bool, []> {
-  let summary = [{
-    A logical `or` group operation of all Value operands contributed by active
-    invocations in the group.
-  }];
-
-  let description = [{
-    Result Type must be a scalar or vector of Boolean type.
-
-    Execution is a Scope. It must be either Workgroup or Subgroup.
-
-    The identity I for Operation is 0. If Operation is ClusteredReduce,
-    ClusterSize must be present.
-
-    The type of Value must be the same as Result Type.
-
-    ClusterSize is the size of cluster to use. ClusterSize must be a scalar
-    of integer type, whose Signedness operand is 0. ClusterSize must come
-    from a constant instruction. ClusterSize must be at least 1, and must be
-    a power of 2. If ClusterSize is greater than the declared SubGroupSize,
-    executing this instruction results in undefined behavior.
-
-    <!-- End of AutoGen section -->
-
-    #### Example:
-
-    ```mlir
-    %four = spirv.Constant 4 : i32
-    %scalar = ... : i1
-    %vector = ... : vector<4xi1>
-    %0 = spirv.GroupNonUniformLogicalOr "Workgroup" "Reduce" %scalar : i1
-    %1 = spirv.GroupNonUniformLogicalOr "Subgroup" "ClusteredReduce"
-           %vector cluster_size(%four) : vector<4xi1>
-    ```
-  }];
-
-  let availability = [
-    MinVersion<SPIRV_V_1_3>,
-    MaxVersion<SPIRV_V_1_6>,
-    Extension<[]>,
-    Capability<[SPIRV_C_GroupNonUniformArithmetic,
-                SPIRV_C_GroupNonUniformClustered,
-                SPIRV_C_GroupNonUniformPartitionedNV]>
-  ];
-}
-
-// -----
-
-def SPIRV_GroupNonUniformLogicalXorOp :
-  SPIRV_GroupNonUniformArithmeticOp<"GroupNonUniformLogicalXor",
-    SPIRV_Bool, []> {
-  let summary = [{
-    A logical `xor` group operation of all Value operands contributed by active
-    invocations in the group.
-  }];
-
-  let description = [{
-    Result Type must be a scalar or vector of Boolean type.
-
-    Execution is a Scope. It must be either Workgroup or Subgroup.
-
-    The identity I for Operation is 0. If Operation is ClusteredReduce,
-    ClusterSize must be present.
-
-    The type of Value must be the same as Result Type.
-
-    ClusterSize is the size of cluster to use. ClusterSize must be a scalar
-    of integer type, whose Signedness operand is 0. ClusterSize must come
-    from a constant instruction. ClusterSize must be at least 1, and must be
-    a power of 2. If ClusterSize is greater than the declared SubGroupSize,
-    executing this instruction results in undefined behavior.
-
-    <!-- End of AutoGen section -->
-
-    #### Example:
-
-    ```mlir
-    %four = spirv.Constant 4 : i32
-    %scalar = ... : i1
-    %vector = ... : vector<4xi1>
-    %0 = spirv.GroupNonUniformLogicalXor "Workgroup" "Reduce" %scalar : i1
-    %1 = spirv.GroupNonUniformLogicalXor "Subgroup" "ClusteredReduce"
-           %vector cluster_size(%four) : vector<4xi>
-    ```
-  }];
-
-  let availability = [
-    MinVersion<SPIRV_V_1_3>,
-    MaxVersion<SPIRV_V_1_6>,
-    Extension<[]>,
-    Capability<[SPIRV_C_GroupNonUniformArithmetic,
-                SPIRV_C_GroupNonUniformClustered,
-                SPIRV_C_GroupNonUniformPartitionedNV]>
+    Capability<[SPV_C_GroupNonUniformArithmetic, SPV_C_GroupNonUniformClustered, SPV_C_GroupNonUniformPartitionedNV]>
   ];
 }
 

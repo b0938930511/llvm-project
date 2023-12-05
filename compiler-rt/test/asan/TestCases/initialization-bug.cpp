@@ -6,7 +6,7 @@
 // Do not test with optimization -- the error may be optimized away.
 
 // FIXME: https://code.google.com/p/address-sanitizer/issues/detail?id=186
-// XFAIL: target={{.*windows-msvc.*}}
+// XFAIL: windows-msvc
 
 #include <cstdio>
 
@@ -14,7 +14,7 @@
 // "x", "y", "z" are dynamically initialized globals.
 // Value of "x" depends on "y", value of "y" depends on "z".
 // "x" and "z" are defined in this TU, "y" is defined in another one.
-// Thus we should stably report initialization order fiasco independently of
+// Thus we shoud stably report initialization order fiasco independently of
 // the translation unit order.
 
 int initZ() {

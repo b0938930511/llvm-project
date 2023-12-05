@@ -8,7 +8,6 @@
 
 #include "llvm/CodeGen/DIE.h"
 #include "TestAsmPrinter.h"
-#include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCExpr.h"
 #include "llvm/Testing/Support/Error.h"
@@ -55,7 +54,7 @@ struct DIEExprFixture : public DIEFixtureBase {
 
 TEST_P(DIEExprFixture, SizeOf) {
   DIEExpr Tst(Val);
-  EXPECT_EQ(Size, Tst.sizeOf(TestPrinter->getAP()->getDwarfFormParams(), Form));
+  EXPECT_EQ(Size, Tst.SizeOf(TestPrinter->getAP(), Form));
 }
 
 TEST_P(DIEExprFixture, EmitValue) {
@@ -88,7 +87,7 @@ struct DIELabelFixture : public DIEFixtureBase {
 
 TEST_P(DIELabelFixture, SizeOf) {
   DIELabel Tst(Val);
-  EXPECT_EQ(Size, Tst.sizeOf(TestPrinter->getAP()->getDwarfFormParams(), Form));
+  EXPECT_EQ(Size, Tst.SizeOf(TestPrinter->getAP(), Form));
 }
 
 TEST_P(DIELabelFixture, EmitValue) {
@@ -134,7 +133,7 @@ struct DIEDeltaFixture : public DIEFixtureBase {
 
 TEST_P(DIEDeltaFixture, SizeOf) {
   DIEDelta Tst(Hi, Lo);
-  EXPECT_EQ(Size, Tst.sizeOf(TestPrinter->getAP()->getDwarfFormParams(), Form));
+  EXPECT_EQ(Size, Tst.SizeOf(TestPrinter->getAP(), Form));
 }
 
 TEST_P(DIEDeltaFixture, EmitValue) {
@@ -159,7 +158,7 @@ struct DIELocListFixture : public DIEFixtureBase {
 
 TEST_P(DIELocListFixture, SizeOf) {
   DIELocList Tst(999);
-  EXPECT_EQ(Size, Tst.sizeOf(TestPrinter->getAP()->getDwarfFormParams(), Form));
+  EXPECT_EQ(Size, Tst.SizeOf(TestPrinter->getAP(), Form));
 }
 
 INSTANTIATE_TEST_SUITE_P(

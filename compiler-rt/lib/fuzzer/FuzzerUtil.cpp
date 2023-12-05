@@ -43,7 +43,7 @@ void PrintASCIIByte(uint8_t Byte) {
   else if (Byte >= 32 && Byte < 127)
     Printf("%c", Byte);
   else
-    Printf("\\%03o", Byte);
+    Printf("\\x%02x", Byte);
 }
 
 void PrintASCII(const uint8_t *Data, size_t Size, const char *PrintAfter) {

@@ -9,7 +9,7 @@
 #ifndef LLVM_SUPPORT_CRASHRECOVERYCONTEXT_H
 #define LLVM_SUPPORT_CRASHRECOVERYCONTEXT_H
 
-#include "llvm/ADT/STLFunctionalExtras.h"
+#include "llvm/ADT/STLExtras.h"
 
 namespace llvm {
 class CrashRecoveryContextCleanup;
@@ -100,9 +100,6 @@ public:
   /// Explicitly trigger a crash recovery in the current process, and
   /// return failure from RunSafely(). This function does not return.
   [[noreturn]] void HandleExit(int RetCode);
-
-  /// Return true if RetCode indicates that a signal or an exception occurred.
-  static bool isCrash(int RetCode);
 
   /// Throw again a signal or an exception, after it was catched once by a
   /// CrashRecoveryContext.

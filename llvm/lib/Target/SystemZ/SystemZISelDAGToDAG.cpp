@@ -21,7 +21,6 @@
 using namespace llvm;
 
 #define DEBUG_TYPE "systemz-isel"
-#define PASS_NAME "SystemZ DAG->DAG Pattern Instruction Selection"
 
 namespace {
 // Used to build addressing modes.
@@ -63,7 +62,8 @@ struct SystemZAddressingMode {
   bool IncludesDynAlloc;
 
   SystemZAddressingMode(AddrForm form, DispRange dr)
-      : Form(form), DR(dr), Disp(0), IncludesDynAlloc(false) {}
+    : Form(form), DR(dr), Base(), Disp(0), Index(),
+      IncludesDynAlloc(false) {}
 
   // True if the address can have an index register.
   bool hasIndexField() { return Form != FormBD; }
@@ -346,12 +346,8 @@ class SystemZDAGToDAGISel : public SelectionDAGISel {
   SDValue expandSelectBoolean(SDNode *Node);
 
 public:
-  static char ID;
-
-  SystemZDAGToDAGISel() = delete;
-
-  SystemZDAGToDAGISel(SystemZTargetMachine &TM, CodeGenOptLevel OptLevel)
-      : SelectionDAGISel(ID, TM, OptLevel) {}
+  SystemZDAGToDAGISel(SystemZTargetMachine &TM, CodeGenOpt::Level OptLevel)
+      : SelectionDAGISel(TM, OptLevel) {}
 
   bool runOnMachineFunction(MachineFunction &MF) override {
     const Function &F = MF.getFunction();
@@ -366,10 +362,14 @@ public:
     return SelectionDAGISel::runOnMachineFunction(MF);
   }
 
+  // Override MachineFunctionPass.
+  StringRef getPassName() const override {
+    return "SystemZ DAG->DAG Pattern Instruction Selection";
+  }
+
   // Override SelectionDAGISel.
   void Select(SDNode *Node) override;
-  bool SelectInlineAsmMemoryOperand(const SDValue &Op,
-                                    InlineAsm::ConstraintCode ConstraintID,
+  bool SelectInlineAsmMemoryOperand(const SDValue &Op, unsigned ConstraintID,
                                     std::vector<SDValue> &OutOps) override;
   bool IsProfitableToFold(SDValue N, SDNode *U, SDNode *Root) const override;
   void PreprocessISelDAG() override;
@@ -379,12 +379,8 @@ public:
 };
 } // end anonymous namespace
 
-char SystemZDAGToDAGISel::ID = 0;
-
-INITIALIZE_PASS(SystemZDAGToDAGISel, DEBUG_TYPE, PASS_NAME, false, false)
-
 FunctionPass *llvm::createSystemZISelDag(SystemZTargetMachine &TM,
-                                         CodeGenOptLevel OptLevel) {
+                                         CodeGenOpt::Level OptLevel) {
   return new SystemZDAGToDAGISel(TM, OptLevel);
 }
 
@@ -865,7 +861,7 @@ bool SystemZDAGToDAGISel::expandRxSBG(RxSBGOperands &RxSBG) const {
       RxSBG.Input = N.getOperand(0);
       return true;
     }
-    [[fallthrough]];
+    LLVM_FALLTHROUGH;
 
   case ISD::SIGN_EXTEND: {
     // Check that the extension bits are don't-care (i.e. are masked out
@@ -973,7 +969,7 @@ bool SystemZDAGToDAGISel::tryRISBGZero(SDNode *N) {
     if (RISBG.Input.getOpcode() != ISD::ANY_EXTEND &&
         RISBG.Input.getOpcode() != ISD::TRUNCATE)
       Count += 1;
-  if (Count == 0 || isa<ConstantSDNode>(RISBG.Input))
+  if (Count == 0)
     return false;
 
   // Prefer to use normal shift instructions over RISBG, since they can handle
@@ -1072,13 +1068,10 @@ bool SystemZDAGToDAGISel::tryRxSBG(SDNode *N, unsigned Opcode) {
   };
   unsigned Count[] = { 0, 0 };
   for (unsigned I = 0; I < 2; ++I)
-    while (RxSBG[I].Input->hasOneUse() && expandRxSBG(RxSBG[I]))
-      // In cases of multiple users it seems better to keep the simple
-      // instruction as they are one cycle faster, and it also helps in cases
-      // where both inputs share a common node.
-      // The widening or narrowing is expected to be free.  Counting widening
-      // or narrowing as a saved operation will result in preferring an R*SBG
-      // over a simple shift/logical instruction.
+    while (expandRxSBG(RxSBG[I]))
+      // The widening or narrowing is expected to be free.
+      // Counting widening or narrowing as a saved operation will result in
+      // preferring an R*SBG over a simple shift/logical instruction.
       if (RxSBG[I].Input.getOpcode() != ISD::ANY_EXTEND &&
           RxSBG[I].Input.getOpcode() != ISD::TRUNCATE)
         Count[I] += 1;
@@ -1357,7 +1350,7 @@ bool SystemZDAGToDAGISel::tryFoldLoadStoreIntoMemOperand(SDNode *Node) {
     return false;
   case SystemZISD::SSUBO:
     NegateOperand = true;
-    [[fallthrough]];
+    LLVM_FALLTHROUGH;
   case SystemZISD::SADDO:
     if (MemVT == MVT::i32)
       NewOpc = SystemZ::ASI;
@@ -1368,7 +1361,7 @@ bool SystemZDAGToDAGISel::tryFoldLoadStoreIntoMemOperand(SDNode *Node) {
     break;
   case SystemZISD::USUBO:
     NegateOperand = true;
-    [[fallthrough]];
+    LLVM_FALLTHROUGH;
   case SystemZISD::UADDO:
     if (MemVT == MVT::i32)
       NewOpc = SystemZ::ALSI;
@@ -1392,7 +1385,7 @@ bool SystemZDAGToDAGISel::tryFoldLoadStoreIntoMemOperand(SDNode *Node) {
   auto OperandV = OperandC->getAPIntValue();
   if (NegateOperand)
     OperandV = -OperandV;
-  if (OperandV.getSignificantBits() > 8)
+  if (OperandV.getMinSignedBits() > 8)
     return false;
   Operand = CurDAG->getTargetConstant(OperandV, DL, MemVT);
 
@@ -1480,7 +1473,7 @@ bool SystemZDAGToDAGISel::storeLoadIsAligned(SDNode *N) const {
   assert(MMO && "Expected a memory operand.");
 
   // The memory access must have a proper alignment and no index register.
-  if (MemAccess->getAlign().value() < StoreSize ||
+  if (MemAccess->getAlignment() < StoreSize ||
       !MemAccess->getOffset().isUndef())
     return false;
 
@@ -1570,7 +1563,7 @@ void SystemZDAGToDAGISel::Select(SDNode *Node) {
     if (Node->getOperand(1).getOpcode() != ISD::Constant)
       if (tryRxSBG(Node, SystemZ::RNSBG))
         return;
-    [[fallthrough]];
+    LLVM_FALLTHROUGH;
   case ISD::ROTL:
   case ISD::SHL:
   case ISD::SRL:
@@ -1678,9 +1671,10 @@ void SystemZDAGToDAGISel::Select(SDNode *Node) {
   SelectCode(Node);
 }
 
-bool SystemZDAGToDAGISel::SelectInlineAsmMemoryOperand(
-    const SDValue &Op, InlineAsm::ConstraintCode ConstraintID,
-    std::vector<SDValue> &OutOps) {
+bool SystemZDAGToDAGISel::
+SelectInlineAsmMemoryOperand(const SDValue &Op,
+                             unsigned ConstraintID,
+                             std::vector<SDValue> &OutOps) {
   SystemZAddressingMode::AddrForm Form;
   SystemZAddressingMode::DispRange DispRange;
   SDValue Base, Disp, Index;
@@ -1688,30 +1682,25 @@ bool SystemZDAGToDAGISel::SelectInlineAsmMemoryOperand(
   switch(ConstraintID) {
   default:
     llvm_unreachable("Unexpected asm memory constraint");
-  case InlineAsm::ConstraintCode::i:
-  case InlineAsm::ConstraintCode::Q:
-  case InlineAsm::ConstraintCode::ZQ:
+  case InlineAsm::Constraint_i:
+  case InlineAsm::Constraint_Q:
     // Accept an address with a short displacement, but no index.
     Form = SystemZAddressingMode::FormBD;
     DispRange = SystemZAddressingMode::Disp12Only;
     break;
-  case InlineAsm::ConstraintCode::R:
-  case InlineAsm::ConstraintCode::ZR:
+  case InlineAsm::Constraint_R:
     // Accept an address with a short displacement and an index.
     Form = SystemZAddressingMode::FormBDXNormal;
     DispRange = SystemZAddressingMode::Disp12Only;
     break;
-  case InlineAsm::ConstraintCode::S:
-  case InlineAsm::ConstraintCode::ZS:
+  case InlineAsm::Constraint_S:
     // Accept an address with a long displacement, but no index.
     Form = SystemZAddressingMode::FormBD;
     DispRange = SystemZAddressingMode::Disp20Only;
     break;
-  case InlineAsm::ConstraintCode::T:
-  case InlineAsm::ConstraintCode::m:
-  case InlineAsm::ConstraintCode::o:
-  case InlineAsm::ConstraintCode::p:
-  case InlineAsm::ConstraintCode::ZT:
+  case InlineAsm::Constraint_T:
+  case InlineAsm::Constraint_m:
+  case InlineAsm::Constraint_o:
     // Accept an address with a long displacement and an index.
     // m works the same as T, as this is the most general case.
     // We don't really have any special handling of "offsettable"

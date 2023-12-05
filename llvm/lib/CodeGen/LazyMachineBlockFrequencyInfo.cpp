@@ -14,7 +14,6 @@
 ///===---------------------------------------------------------------------===//
 
 #include "llvm/CodeGen/LazyMachineBlockFrequencyInfo.h"
-#include "llvm/CodeGen/MachineBranchProbabilityInfo.h"
 #include "llvm/InitializePasses.h"
 
 using namespace llvm;
@@ -88,7 +87,7 @@ LazyMachineBlockFrequencyInfoPass::calculateIfNotAvailable() const {
 
   OwnedMBFI = std::make_unique<MachineBlockFrequencyInfo>();
   OwnedMBFI->calculate(*MF, MBPI, *MLI);
-  return *OwnedMBFI;
+  return *OwnedMBFI.get();
 }
 
 bool LazyMachineBlockFrequencyInfoPass::runOnMachineFunction(

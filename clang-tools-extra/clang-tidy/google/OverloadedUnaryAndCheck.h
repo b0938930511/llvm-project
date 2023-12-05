@@ -11,7 +11,10 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::google::runtime {
+namespace clang {
+namespace tidy {
+namespace google {
+namespace runtime {
 
 /// Finds overloads of unary `operator &`.
 ///
@@ -20,7 +23,7 @@ namespace clang::tidy::google::runtime {
 /// Corresponding cpplint.py check name: 'runtime/operator'.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/google/runtime-operator.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/google-runtime-operator.html
 class OverloadedUnaryAndCheck : public ClangTidyCheck {
 public:
   OverloadedUnaryAndCheck(StringRef Name, ClangTidyContext *Context)
@@ -32,6 +35,9 @@ public:
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
 };
 
-} // namespace clang::tidy::google::runtime
+} // namespace runtime
+} // namespace google
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_GOOGLE_OVERLOADEDUNARYANDCHECK_H

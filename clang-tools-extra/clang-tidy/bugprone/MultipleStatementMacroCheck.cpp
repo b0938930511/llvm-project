@@ -12,7 +12,9 @@
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::bugprone {
+namespace clang {
+namespace tidy {
+namespace bugprone {
 
 namespace {
 
@@ -37,7 +39,7 @@ const Stmt *nextStmt(const MatchFinder::MatchResult &Result, const Stmt *S) {
 
 using ExpansionRanges = std::vector<SourceRange>;
 
-/// \brief Get all the macro expansion ranges related to `Loc`.
+/// \bried Get all the macro expansion ranges related to `Loc`.
 ///
 /// The result is ordered from most inner to most outer.
 ExpansionRanges getExpansionRanges(SourceLocation Loc,
@@ -99,4 +101,6 @@ void MultipleStatementMacroCheck::check(
                                       "unconditionally executed");
 }
 
-} // namespace clang::tidy::bugprone
+} // namespace bugprone
+} // namespace tidy
+} // namespace clang

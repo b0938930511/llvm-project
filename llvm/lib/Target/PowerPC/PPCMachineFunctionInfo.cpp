@@ -20,16 +20,8 @@ static cl::opt<bool> PPCDisableNonVolatileCR(
     cl::init(false), cl::Hidden);
 
 void PPCFunctionInfo::anchor() {}
-PPCFunctionInfo::PPCFunctionInfo(const Function &F,
-                                 const TargetSubtargetInfo *STI)
+PPCFunctionInfo::PPCFunctionInfo(const MachineFunction &MF)
     : DisableNonVolatileCR(PPCDisableNonVolatileCR) {}
-
-MachineFunctionInfo *
-PPCFunctionInfo::clone(BumpPtrAllocator &Allocator, MachineFunction &DestMF,
-                       const DenseMap<MachineBasicBlock *, MachineBasicBlock *>
-                           &Src2DstMBB) const {
-  return DestMF.cloneInfo<PPCFunctionInfo>(*this);
-}
 
 MCSymbol *PPCFunctionInfo::getPICOffsetSymbol(MachineFunction &MF) const {
   const DataLayout &DL = MF.getDataLayout();

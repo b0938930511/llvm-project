@@ -935,7 +935,7 @@ define i8 @f20s8(double %x) #0 {
 ; X87-NEXT:    fldcw {{[0-9]+}}(%esp)
 ; X87-NEXT:    fistps {{[0-9]+}}(%esp)
 ; X87-NEXT:    fldcw {{[0-9]+}}(%esp)
-; X87-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
+; X87-NEXT:    movb {{[0-9]+}}(%esp), %al
 ; X87-NEXT:    addl $8, %esp
 ; X87-NEXT:    .cfi_def_cfa_offset 4
 ; X87-NEXT:    retl
@@ -1145,8 +1145,9 @@ define i128 @f20s128(double %x) nounwind strictfp {
 ;
 ; X86-SSE-LABEL: f20s128:
 ; X86-SSE:       # %bb.0: # %entry
+; X86-SSE-NEXT:    pushl %edi
 ; X86-SSE-NEXT:    pushl %esi
-; X86-SSE-NEXT:    subl $40, %esp
+; X86-SSE-NEXT:    subl $36, %esp
 ; X86-SSE-NEXT:    movl {{[0-9]+}}(%esp), %esi
 ; X86-SSE-NEXT:    movsd {{.*#+}} xmm0 = mem[0],zero
 ; X86-SSE-NEXT:    movsd %xmm0, {{[0-9]+}}(%esp)
@@ -1154,11 +1155,18 @@ define i128 @f20s128(double %x) nounwind strictfp {
 ; X86-SSE-NEXT:    movl %eax, (%esp)
 ; X86-SSE-NEXT:    calll __fixdfti
 ; X86-SSE-NEXT:    subl $4, %esp
-; X86-SSE-NEXT:    movaps {{[0-9]+}}(%esp), %xmm0
-; X86-SSE-NEXT:    movaps %xmm0, (%esi)
+; X86-SSE-NEXT:    movl {{[0-9]+}}(%esp), %eax
+; X86-SSE-NEXT:    movl {{[0-9]+}}(%esp), %ecx
+; X86-SSE-NEXT:    movl {{[0-9]+}}(%esp), %edx
+; X86-SSE-NEXT:    movl {{[0-9]+}}(%esp), %edi
+; X86-SSE-NEXT:    movl %edi, 8(%esi)
+; X86-SSE-NEXT:    movl %edx, 12(%esi)
+; X86-SSE-NEXT:    movl %eax, (%esi)
+; X86-SSE-NEXT:    movl %ecx, 4(%esi)
 ; X86-SSE-NEXT:    movl %esi, %eax
-; X86-SSE-NEXT:    addl $40, %esp
+; X86-SSE-NEXT:    addl $36, %esp
 ; X86-SSE-NEXT:    popl %esi
+; X86-SSE-NEXT:    popl %edi
 ; X86-SSE-NEXT:    retl $4
 ;
 ; SSE-LABEL: f20s128:
@@ -1199,7 +1207,7 @@ define i8 @f20u8(double %x) #0 {
 ; X87-NEXT:    fldcw {{[0-9]+}}(%esp)
 ; X87-NEXT:    fistps {{[0-9]+}}(%esp)
 ; X87-NEXT:    fldcw {{[0-9]+}}(%esp)
-; X87-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
+; X87-NEXT:    movb {{[0-9]+}}(%esp), %al
 ; X87-NEXT:    addl $8, %esp
 ; X87-NEXT:    .cfi_def_cfa_offset 4
 ; X87-NEXT:    retl
@@ -1482,8 +1490,9 @@ define i128 @f20u128(double %x) nounwind strictfp {
 ;
 ; X86-SSE-LABEL: f20u128:
 ; X86-SSE:       # %bb.0: # %entry
+; X86-SSE-NEXT:    pushl %edi
 ; X86-SSE-NEXT:    pushl %esi
-; X86-SSE-NEXT:    subl $40, %esp
+; X86-SSE-NEXT:    subl $36, %esp
 ; X86-SSE-NEXT:    movl {{[0-9]+}}(%esp), %esi
 ; X86-SSE-NEXT:    movsd {{.*#+}} xmm0 = mem[0],zero
 ; X86-SSE-NEXT:    movsd %xmm0, {{[0-9]+}}(%esp)
@@ -1491,11 +1500,18 @@ define i128 @f20u128(double %x) nounwind strictfp {
 ; X86-SSE-NEXT:    movl %eax, (%esp)
 ; X86-SSE-NEXT:    calll __fixunsdfti
 ; X86-SSE-NEXT:    subl $4, %esp
-; X86-SSE-NEXT:    movaps {{[0-9]+}}(%esp), %xmm0
-; X86-SSE-NEXT:    movaps %xmm0, (%esi)
+; X86-SSE-NEXT:    movl {{[0-9]+}}(%esp), %eax
+; X86-SSE-NEXT:    movl {{[0-9]+}}(%esp), %ecx
+; X86-SSE-NEXT:    movl {{[0-9]+}}(%esp), %edx
+; X86-SSE-NEXT:    movl {{[0-9]+}}(%esp), %edi
+; X86-SSE-NEXT:    movl %edi, 8(%esi)
+; X86-SSE-NEXT:    movl %edx, 12(%esi)
+; X86-SSE-NEXT:    movl %eax, (%esi)
+; X86-SSE-NEXT:    movl %ecx, 4(%esi)
 ; X86-SSE-NEXT:    movl %esi, %eax
-; X86-SSE-NEXT:    addl $40, %esp
+; X86-SSE-NEXT:    addl $36, %esp
 ; X86-SSE-NEXT:    popl %esi
+; X86-SSE-NEXT:    popl %edi
 ; X86-SSE-NEXT:    retl $4
 ;
 ; SSE-LABEL: f20u128:
@@ -2418,16 +2434,15 @@ define double @uifdi(i32 %x) #0 {
 ;
 ; X86-SSE-LABEL: uifdi:
 ; X86-SSE:       # %bb.0: # %entry
-; X86-SSE-NEXT:    subl $20, %esp
-; X86-SSE-NEXT:    .cfi_def_cfa_offset 24
-; X86-SSE-NEXT:    movl {{[0-9]+}}(%esp), %eax
-; X86-SSE-NEXT:    movl %eax, (%esp)
-; X86-SSE-NEXT:    movl $0, {{[0-9]+}}(%esp)
-; X86-SSE-NEXT:    fildll (%esp)
-; X86-SSE-NEXT:    fstpl {{[0-9]+}}(%esp)
-; X86-SSE-NEXT:    fldl {{[0-9]+}}(%esp)
+; X86-SSE-NEXT:    subl $12, %esp
+; X86-SSE-NEXT:    .cfi_def_cfa_offset 16
+; X86-SSE-NEXT:    movss {{.*#+}} xmm0 = mem[0],zero,zero,zero
+; X86-SSE-NEXT:    orpd {{\.?LCPI[0-9]+_[0-9]+}}, %xmm0
+; X86-SSE-NEXT:    subsd {{\.?LCPI[0-9]+_[0-9]+}}, %xmm0
+; X86-SSE-NEXT:    movsd %xmm0, (%esp)
+; X86-SSE-NEXT:    fldl (%esp)
 ; X86-SSE-NEXT:    wait
-; X86-SSE-NEXT:    addl $20, %esp
+; X86-SSE-NEXT:    addl $12, %esp
 ; X86-SSE-NEXT:    .cfi_def_cfa_offset 4
 ; X86-SSE-NEXT:    retl
 ;
@@ -2640,16 +2655,16 @@ define float @uiffi(i32 %x) #0 {
 ;
 ; X86-SSE-LABEL: uiffi:
 ; X86-SSE:       # %bb.0: # %entry
-; X86-SSE-NEXT:    subl $20, %esp
-; X86-SSE-NEXT:    .cfi_def_cfa_offset 24
-; X86-SSE-NEXT:    movl {{[0-9]+}}(%esp), %eax
-; X86-SSE-NEXT:    movl %eax, {{[0-9]+}}(%esp)
-; X86-SSE-NEXT:    movl $0, {{[0-9]+}}(%esp)
-; X86-SSE-NEXT:    fildll {{[0-9]+}}(%esp)
-; X86-SSE-NEXT:    fstps {{[0-9]+}}(%esp)
-; X86-SSE-NEXT:    flds {{[0-9]+}}(%esp)
+; X86-SSE-NEXT:    pushl %eax
+; X86-SSE-NEXT:    .cfi_def_cfa_offset 8
+; X86-SSE-NEXT:    movss {{.*#+}} xmm0 = mem[0],zero,zero,zero
+; X86-SSE-NEXT:    orpd {{\.?LCPI[0-9]+_[0-9]+}}, %xmm0
+; X86-SSE-NEXT:    subsd {{\.?LCPI[0-9]+_[0-9]+}}, %xmm0
+; X86-SSE-NEXT:    cvtsd2ss %xmm0, %xmm0
+; X86-SSE-NEXT:    movss %xmm0, (%esp)
+; X86-SSE-NEXT:    flds (%esp)
 ; X86-SSE-NEXT:    wait
-; X86-SSE-NEXT:    addl $20, %esp
+; X86-SSE-NEXT:    popl %eax
 ; X86-SSE-NEXT:    .cfi_def_cfa_offset 4
 ; X86-SSE-NEXT:    retl
 ;

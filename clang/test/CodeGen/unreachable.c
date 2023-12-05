@@ -1,10 +1,10 @@
 // RUN: %clang_cc1 -emit-llvm -o - %s | FileCheck %s
 // CHECK-NOT: @unreachable
 
-extern void abort(void) __attribute__((noreturn));
-extern int unreachable(void);
+extern void abort() __attribute__((noreturn));
+extern int unreachable();
 
-int f0(void) {
+int f0() {
   return 0;
   unreachable();
 }

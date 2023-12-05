@@ -11,12 +11,14 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::bugprone {
+namespace clang {
+namespace tidy {
+namespace bugprone {
 
 /// Find suspicious usages of sizeof expression.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/bugprone/sizeof-expression.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/bugprone-sizeof-expression.html
 class SizeofExpressionCheck : public ClangTidyCheck {
 public:
   SizeofExpressionCheck(StringRef Name, ClangTidyContext *Context);
@@ -29,9 +31,10 @@ private:
   const bool WarnOnSizeOfIntegerExpression;
   const bool WarnOnSizeOfThis;
   const bool WarnOnSizeOfCompareToConstant;
-  const bool WarnOnSizeOfPointerToAggregate;
 };
 
-} // namespace clang::tidy::bugprone
+} // namespace bugprone
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_BUGPRONE_SIZEOFEXPRESSIONCHECK_H

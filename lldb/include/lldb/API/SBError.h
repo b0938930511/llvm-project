@@ -13,9 +13,6 @@
 
 namespace lldb_private {
 class ScriptInterpreter;
-namespace python {
-class SWIGBridge;
-}
 } // namespace lldb_private
 
 namespace lldb {
@@ -26,16 +23,10 @@ public:
 
   SBError(const lldb::SBError &rhs);
 
-  SBError(const char *message);
-
   ~SBError();
 
   const SBError &operator=(const lldb::SBError &rhs);
 
-  /// Get the error string as a NULL terminated UTF8 c-string.
-  ///
-  /// This SBError object owns the returned string and this object must be kept
-  /// around long enough to use the returned string.
   const char *GetCString() const;
 
   void Clear();
@@ -56,14 +47,8 @@ public:
 
   void SetErrorString(const char *err_str);
 
-#ifndef SWIG
-  __attribute__((format(printf, 2, 3)))
-#else
-  // clang-format off
-  %varargs(3, char *str = NULL) SetErrorStringWithFormat;
-  // clang-format on
-#endif
-  int SetErrorStringWithFormat(const char *format, ...);
+  int SetErrorStringWithFormat(const char *format, ...)
+      __attribute__((format(printf, 2, 3)));
 
   explicit operator bool() const;
 
@@ -79,8 +64,6 @@ protected:
   friend class SBCommunication;
   friend class SBData;
   friend class SBDebugger;
-  friend class SBFile;
-  friend class SBFormat;
   friend class SBHostOS;
   friend class SBPlatform;
   friend class SBProcess;
@@ -90,13 +73,10 @@ protected:
   friend class SBThread;
   friend class SBTrace;
   friend class SBValue;
-  friend class SBValueList;
   friend class SBWatchpoint;
+  friend class SBFile;
 
   friend class lldb_private::ScriptInterpreter;
-  friend class lldb_private::python::SWIGBridge;
-
-  SBError(const lldb_private::Status &error);
 
   lldb_private::Status *get();
 

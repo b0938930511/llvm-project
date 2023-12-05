@@ -11,7 +11,6 @@
 
 #include <map>
 #include <mutex>
-#include <optional>
 
 #include "lldb/Core/AddressRange.h"
 #include "lldb/Core/dwarf.h"
@@ -107,9 +106,8 @@ private:
     CIE(dw_offset_t offset)
         : cie_offset(offset), version(-1), code_align(0), data_align(0),
           return_addr_reg_num(LLDB_INVALID_REGNUM), inst_offset(0),
-          inst_length(0), ptr_encoding(0),
-          lsda_addr_encoding(llvm::dwarf::DW_EH_PE_omit),
-          personality_loc(LLDB_INVALID_ADDRESS) {}
+          inst_length(0), ptr_encoding(0), lsda_addr_encoding(DW_EH_PE_omit),
+          personality_loc(LLDB_INVALID_ADDRESS), initial_row() {}
   };
 
   typedef std::shared_ptr<CIE> CIESP;
@@ -123,12 +121,12 @@ private:
 
   bool IsEHFrame() const;
 
-  std::optional<FDEEntryMap::Entry>
+  llvm::Optional<FDEEntryMap::Entry>
   GetFirstFDEEntryInRange(const AddressRange &range);
 
   void GetFDEIndex();
 
-  bool FDEToUnwindPlan(dw_offset_t offset, Address startaddr,
+  bool FDEToUnwindPlan(uint32_t offset, Address startaddr,
                        UnwindPlan &unwind_plan);
 
   const CIE *GetCIE(dw_offset_t cie_offset);
@@ -159,7 +157,7 @@ private:
   Type m_type;
 
   CIESP
-  ParseCIE(const dw_offset_t cie_offset);
+  ParseCIE(const uint32_t cie_offset);
 
   lldb::RegisterKind GetRegisterKind() const {
     return m_type == EH ? lldb::eRegisterKindEHFrame : lldb::eRegisterKindDWARF;

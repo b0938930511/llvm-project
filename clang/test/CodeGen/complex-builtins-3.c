@@ -1,4 +1,5 @@
 // RUN: %clang_cc1 %s -O1 -emit-llvm -o - | FileCheck %s
+// rdar://8315199
 
 /* Test for builtin conj, creal, cimag.  */
 /* Origin: Joseph Myers <jsm28@cam.ac.uk> */
@@ -19,7 +20,7 @@ extern void abort (void);
 extern void link_error (void);
 
 int
-main (void)
+main ()
 {
   /* For each type, test both runtime and compile time (constant folding)
      optimization.  */

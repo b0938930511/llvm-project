@@ -17,7 +17,7 @@ class RegisterContextKDP_i386 : public RegisterContextDarwin_i386 {
 public:
   RegisterContextKDP_i386(ThreadKDP &thread, uint32_t concrete_frame_idx);
 
-  ~RegisterContextKDP_i386() override;
+  virtual ~RegisterContextKDP_i386();
 
 protected:
   int DoReadGPR(lldb::tid_t tid, int flavor, GPR &gpr) override;

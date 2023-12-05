@@ -313,9 +313,10 @@ static const CGFunctionInfo &getFunctionInfo(CodeGenModule &CGM,
   for (unsigned I = 0; I < N; ++I)
     Params.push_back(ImplicitParamDecl::Create(
         Ctx, nullptr, SourceLocation(), &Ctx.Idents.get(ValNameStr[I]), ParamTy,
-        ImplicitParamKind::Other));
+        ImplicitParamDecl::Other));
 
-  llvm::append_range(Args, Params);
+  for (auto &P : Params)
+    Args.push_back(P);
 
   return CGM.getTypes().arrangeBuiltinFunctionDeclaration(Ctx.VoidTy, Args);
 }
@@ -323,11 +324,11 @@ static const CGFunctionInfo &getFunctionInfo(CodeGenModule &CGM,
 template <size_t N, size_t... Ints>
 static std::array<Address, N> getParamAddrs(std::index_sequence<Ints...> IntSeq,
                                             std::array<CharUnits, N> Alignments,
-                                            const FunctionArgList &Args,
+                                            FunctionArgList Args,
                                             CodeGenFunction *CGF) {
-  return std::array<Address, N>{
-      {Address(CGF->Builder.CreateLoad(CGF->GetAddrOfLocalVar(Args[Ints])),
-               CGF->VoidPtrTy, Alignments[Ints], KnownNonNull)...}};
+  return std::array<Address, N>{{
+      Address(CGF->Builder.CreateLoad(CGF->GetAddrOfLocalVar(Args[Ints])),
+              Alignments[Ints])...}};
 }
 
 // Template classes that are used as bases for classes that emit special
@@ -365,8 +366,11 @@ template <class Derived> struct GenFuncBase {
         llvm::ConstantInt::get(NumElts->getType(), BaseEltSize);
     llvm::Value *SizeInBytes =
         CGF.Builder.CreateNUWMul(BaseEltSizeVal, NumElts);
-    llvm::Value *DstArrayEnd = CGF.Builder.CreateInBoundsGEP(
-        CGF.Int8Ty, DstAddr.getPointer(), SizeInBytes);
+    Address BC = CGF.Builder.CreateBitCast(DstAddr, CGF.CGM.Int8PtrTy);
+    llvm::Value *DstArrayEnd =
+        CGF.Builder.CreateInBoundsGEP(CGF.Int8Ty, BC.getPointer(), SizeInBytes);
+    DstArrayEnd = CGF.Builder.CreateBitCast(DstArrayEnd, CGF.CGM.Int8PtrPtrTy,
+                                            "dstarray.end");
     llvm::BasicBlock *PreheaderBB = CGF.Builder.GetInsertBlock();
 
     // Create the header block and insert the phi instructions.
@@ -396,9 +400,8 @@ template <class Derived> struct GenFuncBase {
     std::array<Address, N> NewAddrs = Addrs;
 
     for (unsigned I = 0; I < N; ++I)
-      NewAddrs[I] =
-            Address(PHIs[I], CGF.Int8PtrTy,
-                    StartAddrs[I].getAlignment().alignmentAtOffset(EltSize));
+      NewAddrs[I] = Address(
+          PHIs[I], StartAddrs[I].getAlignment().alignmentAtOffset(EltSize));
 
     EltQT = IsVolatile ? EltQT.withVolatile() : EltQT;
     this->asDerived().visitWithKind(FK, EltQT, nullptr, CharUnits::Zero(),
@@ -423,9 +426,9 @@ template <class Derived> struct GenFuncBase {
     assert(Addr.isValid() && "invalid address");
     if (Offset.getQuantity() == 0)
       return Addr;
-    Addr = Addr.withElementType(CGF->CGM.Int8Ty);
+    Addr = CGF->Builder.CreateBitCast(Addr, CGF->CGM.Int8PtrTy);
     Addr = CGF->Builder.CreateConstInBoundsGEP(Addr, Offset.getQuantity());
-    return Addr.withElementType(CGF->CGM.Int8PtrTy);
+    return CGF->Builder.CreateBitCast(Addr, CGF->CGM.Int8PtrPtrTy);
   }
 
   Address getAddrWithOffset(Address Addr, CharUnits StructFieldOffset,
@@ -488,7 +491,9 @@ template <class Derived> struct GenFuncBase {
 
     for (unsigned I = 0; I < N; ++I) {
       Alignments[I] = Addrs[I].getAlignment();
-      Ptrs[I] = Addrs[I].getPointer();
+      Ptrs[I] =
+          CallerCGF.Builder.CreateBitCast(Addrs[I], CallerCGF.CGM.Int8PtrPtrTy)
+              .getPointer();
     }
 
     if (llvm::Function *F =
@@ -518,19 +523,20 @@ struct GenBinaryFunc : CopyStructVisitor<Derived, IsMove>,
     Address SrcAddr = this->getAddrWithOffset(Addrs[SrcIdx], this->Start);
 
     // Emit memcpy.
-    if (Size.getQuantity() >= 16 ||
-        !llvm::has_single_bit<uint32_t>(Size.getQuantity())) {
+    if (Size.getQuantity() >= 16 || !llvm::isPowerOf2_32(Size.getQuantity())) {
       llvm::Value *SizeVal =
           llvm::ConstantInt::get(this->CGF->SizeTy, Size.getQuantity());
-      DstAddr = DstAddr.withElementType(this->CGF->Int8Ty);
-      SrcAddr = SrcAddr.withElementType(this->CGF->Int8Ty);
+      DstAddr =
+          this->CGF->Builder.CreateElementBitCast(DstAddr, this->CGF->Int8Ty);
+      SrcAddr =
+          this->CGF->Builder.CreateElementBitCast(SrcAddr, this->CGF->Int8Ty);
       this->CGF->Builder.CreateMemCpy(DstAddr, SrcAddr, SizeVal, false);
     } else {
       llvm::Type *Ty = llvm::Type::getIntNTy(
           this->CGF->getLLVMContext(),
           Size.getQuantity() * this->CGF->getContext().getCharWidth());
-      DstAddr = DstAddr.withElementType(Ty);
-      SrcAddr = SrcAddr.withElementType(Ty);
+      DstAddr = this->CGF->Builder.CreateElementBitCast(DstAddr, Ty);
+      SrcAddr = this->CGF->Builder.CreateElementBitCast(SrcAddr, Ty);
       llvm::Value *SrcVal = this->CGF->Builder.CreateLoad(SrcAddr, false);
       this->CGF->Builder.CreateStore(SrcVal, DstAddr, false);
     }
@@ -548,19 +554,19 @@ struct GenBinaryFunc : CopyStructVisitor<Derived, IsMove>,
         return;
 
       QualType RT = QualType(FD->getParent()->getTypeForDecl(), 0);
-      llvm::Type *Ty = this->CGF->ConvertType(RT);
+      llvm::PointerType *PtrTy = this->CGF->ConvertType(RT)->getPointerTo();
       Address DstAddr = this->getAddrWithOffset(Addrs[DstIdx], Offset);
-      LValue DstBase =
-          this->CGF->MakeAddrLValue(DstAddr.withElementType(Ty), FT);
+      LValue DstBase = this->CGF->MakeAddrLValue(
+          this->CGF->Builder.CreateBitCast(DstAddr, PtrTy), FT);
       DstLV = this->CGF->EmitLValueForField(DstBase, FD);
       Address SrcAddr = this->getAddrWithOffset(Addrs[SrcIdx], Offset);
-      LValue SrcBase =
-          this->CGF->MakeAddrLValue(SrcAddr.withElementType(Ty), FT);
+      LValue SrcBase = this->CGF->MakeAddrLValue(
+          this->CGF->Builder.CreateBitCast(SrcAddr, PtrTy), FT);
       SrcLV = this->CGF->EmitLValueForField(SrcBase, FD);
     } else {
-      llvm::Type *Ty = this->CGF->ConvertTypeForMem(FT);
-      Address DstAddr = Addrs[DstIdx].withElementType(Ty);
-      Address SrcAddr = Addrs[SrcIdx].withElementType(Ty);
+      llvm::PointerType *Ty = this->CGF->ConvertTypeForMem(FT)->getPointerTo();
+      Address DstAddr = this->CGF->Builder.CreateBitCast(Addrs[DstIdx], Ty);
+      Address SrcAddr = this->CGF->Builder.CreateBitCast(Addrs[SrcIdx], Ty);
       DstLV = this->CGF->MakeAddrLValue(DstAddr, FT);
       SrcLV = this->CGF->MakeAddrLValue(SrcAddr, FT);
     }
@@ -658,7 +664,7 @@ struct GenDefaultInitialize
 
     llvm::Constant *SizeVal = CGF->Builder.getInt64(Size.getQuantity());
     Address DstAddr = getAddrWithOffset(Addrs[DstIdx], CurStructOffset, FD);
-    Address Loc = DstAddr.withElementType(CGF->Int8Ty);
+    Address Loc = CGF->Builder.CreateElementBitCast(DstAddr, CGF->Int8Ty);
     CGF->Builder.CreateMemSet(Loc, CGF->Builder.getInt8(0), SizeVal,
                               IsVolatile);
   }
@@ -810,7 +816,8 @@ void CodeGenFunction::destroyNonTrivialCStruct(CodeGenFunction &CGF,
 // such structure.
 void CodeGenFunction::defaultInitNonTrivialCStructVar(LValue Dst) {
   GenDefaultInitialize Gen(getContext());
-  Address DstPtr = Dst.getAddress(*this).withElementType(CGM.Int8PtrTy);
+  Address DstPtr =
+      Builder.CreateBitCast(Dst.getAddress(*this), CGM.Int8PtrPtrTy);
   Gen.setCGF(this);
   QualType QT = Dst.getType();
   QT = Dst.isVolatile() ? QT.withVolatile() : QT;
@@ -823,7 +830,7 @@ static void callSpecialFunction(G &&Gen, StringRef FuncName, QualType QT,
                                 std::array<Address, N> Addrs) {
   auto SetArtificialLoc = ApplyDebugLocation::CreateArtificial(CGF);
   for (unsigned I = 0; I < N; ++I)
-    Addrs[I] = Addrs[I].withElementType(CGF.CGM.Int8PtrTy);
+    Addrs[I] = CGF.Builder.CreateBitCast(Addrs[I], CGF.CGM.Int8PtrPtrTy);
   QT = IsVolatile ? QT.withVolatile() : QT;
   Gen.callFunc(FuncName, QT, Addrs, CGF);
 }

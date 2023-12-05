@@ -1,4 +1,4 @@
-//===-- runtime/copy.h ------------------------------------------*- C++ -*-===//
+//===-- runtime/copy.h -----------------------------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -12,18 +12,17 @@
 #ifndef FORTRAN_RUNTIME_COPY_H_
 #define FORTRAN_RUNTIME_COPY_H_
 
-#include "flang/Runtime/descriptor.h"
+#include "descriptor.h"
 
 namespace Fortran::runtime {
 
 // Assigns to uninitialized storage.
 // Duplicates allocatable & automatic components.
-RT_API_ATTRS void CopyElement(const Descriptor &to, const SubscriptValue toAt[],
+void CopyElement(const Descriptor &to, const SubscriptValue toAt[],
     const Descriptor &from, const SubscriptValue fromAt[], Terminator &);
 
 // Copies data from one allocated descriptor's array to another.
-RT_API_ATTRS void CopyArray(
-    const Descriptor &to, const Descriptor &from, Terminator &);
+void CopyArray(const Descriptor &to, const Descriptor &from, Terminator &);
 
 } // namespace Fortran::runtime
 #endif // FORTRAN_RUNTIME_COPY_H_

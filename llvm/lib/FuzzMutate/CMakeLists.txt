@@ -1,19 +1,5 @@
-# Generic helper for fuzzer binaries.
-# This should not depend on LLVM IR etc.
-add_llvm_component_library(LLVMFuzzerCLI
-  FuzzerCLI.cpp
-  PARTIAL_SOURCES_INTENDED
-
-  ADDITIONAL_HEADER_DIRS
-  ${LLVM_MAIN_INCLUDE_DIR}/llvm/FuzzMutate
-
-  LINK_COMPONENTS
-  Support
-  TargetParser
-  )
-
-# Library for using LLVM IR together with fuzzers.
 add_llvm_component_library(LLVMFuzzMutate
+  FuzzerCLI.cpp
   IRMutator.cpp
   OpDescriptor.cpp
   Operations.cpp
@@ -32,6 +18,5 @@ add_llvm_component_library(LLVMFuzzMutate
   Core
   Scalar
   Support
-  TargetParser
-  TransformUtils
+  Target
   )

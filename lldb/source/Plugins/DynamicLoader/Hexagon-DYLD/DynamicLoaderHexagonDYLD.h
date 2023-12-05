@@ -24,9 +24,9 @@ public:
 
   static void Terminate();
 
-  static llvm::StringRef GetPluginNameStatic() { return "hexagon-dyld"; }
+  static lldb_private::ConstString GetPluginNameStatic();
 
-  static llvm::StringRef GetPluginDescriptionStatic();
+  static const char *GetPluginDescriptionStatic();
 
   static lldb_private::DynamicLoader *
   CreateInstance(lldb_private::Process *process, bool force);
@@ -47,7 +47,9 @@ public:
                                   lldb::addr_t tls_file_addr) override;
 
   // PluginInterface protocol
-  llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
+  lldb_private::ConstString GetPluginName() override;
+
+  uint32_t GetPluginVersion() override;
 
 protected:
   /// Runtime linker rendezvous structure.

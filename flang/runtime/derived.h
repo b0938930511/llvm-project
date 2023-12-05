@@ -8,10 +8,8 @@
 
 // Internal runtime utilities for derived type operations.
 
-#ifndef FORTRAN_RUNTIME_DERIVED_H_
-#define FORTRAN_RUNTIME_DERIVED_H_
-
-#include "flang/Runtime/api-attrs.h"
+#ifndef FLANG_RUNTIME_DERIVED_H_
+#define FLANG_RUNTIME_DERIVED_H_
 
 namespace Fortran::runtime::typeInfo {
 class DerivedType;
@@ -23,21 +21,19 @@ class Terminator;
 
 // Perform default component initialization, allocate automatic components.
 // Returns a STAT= code (0 when all's well).
-RT_API_ATTRS int Initialize(const Descriptor &, const typeInfo::DerivedType &,
-    Terminator &, bool hasStat = false, const Descriptor *errMsg = nullptr);
-
-// Call FINAL subroutines, if any
-RT_API_ATTRS void Finalize(
-    const Descriptor &, const typeInfo::DerivedType &derived, Terminator *);
+int Initialize(const Descriptor &, const typeInfo::DerivedType &, Terminator &,
+    bool hasStat = false, const Descriptor *errMsg = nullptr);
 
 // Call FINAL subroutines, deallocate allocatable & automatic components.
 // Does not deallocate the original descriptor.
-RT_API_ATTRS void Destroy(const Descriptor &, bool finalize,
-    const typeInfo::DerivedType &, Terminator *);
+void Destroy(const Descriptor &, bool finalize, const typeInfo::DerivedType &);
 
-// Return true if the passed descriptor is for a derived type
-// entity that has a dynamic (allocatable, automatic) component.
-RT_API_ATTRS bool HasDynamicComponent(const Descriptor &);
+// Assigns one object to another via intrinsic assignment (F'2018 10.2.1.3) or
+// defined assignment (10.2.1.4), as appropriate.  Performs scalar expansion
+// or allocatable reallocation as needed.  Does not perform intrinsic
+// assignment implicit type conversion.
+void Assign(Descriptor &, const Descriptor &, const typeInfo::DerivedType &,
+    Terminator &);
 
 } // namespace Fortran::runtime
-#endif // FORTRAN_RUNTIME_DERIVED_H_
+#endif // FLANG_RUNTIME_DERIVED_H_

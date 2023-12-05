@@ -20,32 +20,35 @@ struct NontrivialDtor {
 
 // CHECK-LABEL: define{{.*}} void @_Z33cleanupsAreEmittedWithoutTryCatchv
 void cleanupsAreEmittedWithoutTryCatch() {
-// CHECK: call void @llvm.lifetime.start.p0({{[^,]+}}, ptr nonnull %[[CLEAN:.*]])
-// CHECK: call void @llvm.lifetime.start.p0({{[^,]+}}, ptr nonnull %[[T1:.*]])
+// CHECK: %[[CLEAN:[^ ]+]] = bitcast %struct.NontrivialDtor* %{{[^ ]+}} to i8*
+// CHECK: call void @llvm.lifetime.start.p0i8({{[^,]+}}, i8* nonnull %[[CLEAN]])
+// CHECK: %[[T1:[^ ]+]] = bitcast %struct.Large* %{{[^ ]+}} to i8*
+// CHECK: call void @llvm.lifetime.start.p0i8({{[^,]+}}, i8* nonnull %[[T1]])
 // CHECK-NEXT: invoke void @_Z8getLargev
 // CHECK-NEXT:     to label %[[CONT:[^ ]+]] unwind label %[[LPAD:[^ ]+]]
 //
 // CHECK: [[CONT]]:
-// CHECK: call void @llvm.lifetime.end.p0({{[^,]+}}, ptr nonnull %[[T1]])
-// CHECK: call void @llvm.lifetime.start.p0({{[^,]+}}, ptr nonnull %[[T2:.*]])
+// CHECK: call void @llvm.lifetime.end.p0i8({{[^,]+}}, i8* nonnull %[[T1]])
+// CHECK: %[[T2:[^ ]+]] = bitcast %struct.Large* %{{[^ ]+}} to i8*
+// CHECK: call void @llvm.lifetime.start.p0i8({{[^,]+}}, i8* nonnull %[[T2]])
 // CHECK-NEXT: invoke void @_Z8getLargev
 // CHECK-NEXT:     to label %[[CONT2:[^ ]+]] unwind label %[[LPAD2:.+]]
 //
 // CHECK: [[CONT2]]:
-// CHECK: call void @llvm.lifetime.end.p0({{[^,]+}}, ptr nonnull %[[T2]])
-// CHECK: call void @llvm.lifetime.end.p0({{[^,]+}}, ptr nonnull %[[CLEAN]])
+// CHECK: call void @llvm.lifetime.end.p0i8({{[^,]+}}, i8* nonnull %[[T2]])
+// CHECK: call void @llvm.lifetime.end.p0i8({{[^,]+}}, i8* nonnull %[[CLEAN]])
 // CHECK: ret void
 //
 // CHECK: [[LPAD]]:
-// CHECK: call void @llvm.lifetime.end.p0({{[^,]+}}, ptr nonnull %[[T1]])
+// CHECK: call void @llvm.lifetime.end.p0i8({{[^,]+}}, i8* nonnull %[[T1]])
 // CHECK: br label %[[EHCLEANUP:.+]]
 //
 // CHECK: [[LPAD2]]:
-// CHECK: call void @llvm.lifetime.end.p0({{[^,]+}}, ptr nonnull %[[T2]])
+// CHECK: call void @llvm.lifetime.end.p0i8({{[^,]+}}, i8* nonnull %[[T2]])
 // CHECK: br label %[[EHCLEANUP]]
 //
 // CHECK: [[EHCLEANUP]]:
-// CHECK: call void @llvm.lifetime.end.p0({{[^,]+}}, ptr nonnull %[[CLEAN]])
+// CHECK: call void @llvm.lifetime.end.p0i8({{[^,]+}}, i8* nonnull %[[CLEAN]])
 
   NontrivialDtor clean;
 
@@ -55,27 +58,30 @@ void cleanupsAreEmittedWithoutTryCatch() {
 
 // CHECK-LABEL: define{{.*}} void @_Z30cleanupsAreEmittedWithTryCatchv
 void cleanupsAreEmittedWithTryCatch() {
-// CHECK: call void @llvm.lifetime.start.p0({{[^,]+}}, ptr nonnull %[[CLEAN:.*]])
-// CHECK: call void @llvm.lifetime.start.p0({{[^,]+}}, ptr nonnull %[[T1:.*]])
+// CHECK: %[[CLEAN:[^ ]+]] = bitcast %struct.NontrivialDtor* %{{[^ ]+}} to i8*
+// CHECK: call void @llvm.lifetime.start.p0i8({{[^,]+}}, i8* nonnull %[[CLEAN]])
+// CHECK: %[[T1:[^ ]+]] = bitcast %struct.Large* %{{[^ ]+}} to i8*
+// CHECK: call void @llvm.lifetime.start.p0i8({{[^,]+}}, i8* nonnull %[[T1]])
 // CHECK-NEXT: invoke void @_Z8getLargev
 // CHECK-NEXT:     to label %[[CONT:[^ ]+]] unwind label %[[LPAD:[^ ]+]]
 //
 // CHECK: [[CONT]]:
-// CHECK: call void @llvm.lifetime.end.p0({{[^,]+}}, ptr nonnull %[[T1]])
-// CHECK: call void @llvm.lifetime.start.p0({{[^,]+}}, ptr nonnull %[[T2:.*]])
+// CHECK: call void @llvm.lifetime.end.p0i8({{[^,]+}}, i8* nonnull %[[T1]])
+// CHECK: %[[T2:[^ ]+]] = bitcast %struct.Large* %{{[^ ]+}} to i8*
+// CHECK: call void @llvm.lifetime.start.p0i8({{[^,]+}}, i8* nonnull %[[T2]])
 // CHECK-NEXT: invoke void @_Z8getLargev
 // CHECK-NEXT:     to label %[[CONT2:[^ ]+]] unwind label %[[LPAD2:.+]]
 //
 // CHECK: [[CONT2]]:
-// CHECK: call void @llvm.lifetime.end.p0({{[^,]+}}, ptr nonnull %[[T2]])
+// CHECK: call void @llvm.lifetime.end.p0i8({{[^,]+}}, i8* nonnull %[[T2]])
 // CHECK: br label %[[TRY_CONT:.+]]
 //
 // CHECK: [[LPAD]]:
-// CHECK: call void @llvm.lifetime.end.p0({{[^,]+}}, ptr nonnull %[[T1]])
+// CHECK: call void @llvm.lifetime.end.p0i8({{[^,]+}}, i8* nonnull %[[T1]])
 // CHECK: br label %[[CATCH:.+]]
 //
 // CHECK: [[LPAD2]]:
-// CHECK: call void @llvm.lifetime.end.p0({{[^,]+}}, ptr nonnull %[[T2]])
+// CHECK: call void @llvm.lifetime.end.p0i8({{[^,]+}}, i8* nonnull %[[T2]])
 // CHECK: br label %[[CATCH]]
 //
 // CHECK: [[CATCH]]:
@@ -84,13 +90,14 @@ void cleanupsAreEmittedWithTryCatch() {
 // CHECK-NEXT: to label %[[TRY_CONT]] unwind label %[[OUTER_LPAD:.+]]
 //
 // CHECK: [[TRY_CONT]]:
-// CHECK: call void @llvm.lifetime.start.p0({{[^,]+}}, ptr nonnull %[[T_OUTER:.*]])
+// CHECK: %[[T_OUTER:[^ ]+]] = bitcast %struct.Large* %{{[^ ]+}} to i8*
+// CHECK: call void @llvm.lifetime.start.p0i8({{[^,]+}}, i8* nonnull %[[T_OUTER]])
 // CHECK-NEXT: invoke void @_Z8getLargev
 // CHECK-NEXT:     to label %[[OUTER_CONT:[^ ]+]] unwind label %[[OUTER_LPAD2:.+]]
 //
 // CHECK: [[OUTER_CONT]]:
-// CHECK: call void @llvm.lifetime.end.p0({{[^,]+}}, ptr nonnull %[[T_OUTER]])
-// CHECK: call void @llvm.lifetime.end.p0({{[^,]+}}, ptr nonnull %[[CLEAN]])
+// CHECK: call void @llvm.lifetime.end.p0i8({{[^,]+}}, i8* nonnull %[[T_OUTER]])
+// CHECK: call void @llvm.lifetime.end.p0i8({{[^,]+}}, i8* nonnull %[[CLEAN]])
 // CHECK: ret void
 //
 // CHECK: [[OUTER_LPAD]]:
@@ -98,11 +105,11 @@ void cleanupsAreEmittedWithTryCatch() {
 // CHECK: br label %[[EHCLEANUP:.+]]
 //
 // CHECK: [[OUTER_LPAD2]]:
-// CHECK: call void @llvm.lifetime.end.p0({{[^,]+}}, ptr nonnull %[[T_OUTER]])
+// CHECK: call void @llvm.lifetime.end.p0i8({{[^,]+}}, i8* nonnull %[[T_OUTER]])
 // CHECK: br label %[[EHCLEANUP]]
 //
 // CHECK: [[EHCLEANUP]]:
-// CHECK: call void @llvm.lifetime.end.p0({{[^,]+}}, ptr nonnull %[[CLEAN]])
+// CHECK: call void @llvm.lifetime.end.p0i8({{[^,]+}}, i8* nonnull %[[CLEAN]])
 
   NontrivialDtor clean;
 
@@ -116,44 +123,47 @@ void cleanupsAreEmittedWithTryCatch() {
 
 // CHECK-LABEL: define{{.*}} void @_Z39cleanupInTryHappensBeforeCleanupInCatchv
 void cleanupInTryHappensBeforeCleanupInCatch() {
-// CHECK: call void @llvm.lifetime.start.p0({{[^,]+}}, ptr nonnull %[[T1:.*]])
+// CHECK: %[[T1:[^ ]+]] = bitcast %struct.Large* %{{[^ ]+}} to i8*
+// CHECK: call void @llvm.lifetime.start.p0i8({{[^,]+}}, i8* nonnull %[[T1]])
 // CHECK-NEXT: invoke void @_Z8getLargev
 // CHECK-NEXT:     to label %[[CONT:[^ ]+]] unwind label %[[LPAD:[^ ]+]]
 //
 // CHECK: [[CONT]]:
-// CHECK: call void @llvm.lifetime.end.p0({{[^,]+}}, ptr nonnull %[[T1]])
+// CHECK: call void @llvm.lifetime.end.p0i8({{[^,]+}}, i8* nonnull %[[T1]])
 // CHECK: br label %[[TRY_CONT]]
 //
 // CHECK: [[LPAD]]:
-// CHECK: call void @llvm.lifetime.end.p0({{[^,]+}}, ptr nonnull %[[T1]])
+// CHECK: call void @llvm.lifetime.end.p0i8({{[^,]+}}, i8* nonnull %[[T1]])
 // CHECK: br i1 {{[^,]+}}, label %[[CATCH_INT_MATCH:[^,]+]], label %[[CATCH_ALL:.+]]
 //
 // CHECK: [[CATCH_INT_MATCH]]:
-// CHECK: call void @llvm.lifetime.start.p0({{[^,]+}}, ptr nonnull %[[T2:.*]])
+// CHECK: %[[T2:[^ ]+]] = bitcast %struct.Large* %{{[^ ]+}} to i8*
+// CHECK: call void @llvm.lifetime.start.p0i8({{[^,]+}}, i8* nonnull %[[T2]])
 // CHECK-NEXT: invoke void @_Z8getLargev
 // CHECK-NEXT:     to label %[[CATCH_INT_CONT:[^ ]+]] unwind label %[[CATCH_INT_LPAD:[^ ]+]]
 //
 // CHECK: [[CATCH_INT_CONT]]:
-// CHECK: call void @llvm.lifetime.end.p0({{[^,]+}}, ptr nonnull %[[T2]])
+// CHECK: call void @llvm.lifetime.end.p0i8({{[^,]+}}, i8* nonnull %[[T2]])
 // CHECK: br label %[[TRY_CONT]]
 //
 // CHECK: [[TRY_CONT]]:
 // CHECK: ret void
 //
 // CHECK: [[CATCH_ALL]]:
-// CHECK: call void @llvm.lifetime.start.p0({{[^,]+}}, ptr nonnull %[[T3:.*]])
+// CHECK: %[[T3:[^ ]+]] = bitcast %struct.Large* %{{[^ ]+}} to i8*
+// CHECK: call void @llvm.lifetime.start.p0i8({{[^,]+}}, i8* nonnull %[[T3]])
 // CHECK-NEXT: invoke void @_Z8getLargev
 // CHECK-NEXT:     to label %[[CATCH_ALL_CONT:[^ ]+]] unwind label %[[CATCH_ALL_LPAD:[^ ]+]]
 //
 // CHECK: [[CATCH_ALL_CONT]]:
-// CHECK: call void @llvm.lifetime.end.p0({{[^,]+}}, ptr nonnull %[[T3]])
+// CHECK: call void @llvm.lifetime.end.p0i8({{[^,]+}}, i8* nonnull %[[T3]])
 // CHECK: br label %[[TRY_CONT]]
 //
 // CHECK: [[CATCH_ALL_LPAD]]:
-// CHECK: call void @llvm.lifetime.end.p0({{[^,]+}}, ptr nonnull %[[T3]])
+// CHECK: call void @llvm.lifetime.end.p0i8({{[^,]+}}, i8* nonnull %[[T3]])
 //
 // CHECK: [[CATCH_INT_LPAD]]:
-// CHECK: call void @llvm.lifetime.end.p0({{[^,]+}}, ptr nonnull %[[T2]])
+// CHECK: call void @llvm.lifetime.end.p0i8({{[^,]+}}, i8* nonnull %[[T2]])
 // CHECK-NOT: call void @llvm.lifetime
 
   try {

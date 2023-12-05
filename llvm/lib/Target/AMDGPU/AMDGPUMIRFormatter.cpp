@@ -21,10 +21,17 @@ bool AMDGPUMIRFormatter::parseCustomPseudoSourceValue(
     StringRef Src, MachineFunction &MF, PerFunctionMIParsingState &PFS,
     const PseudoSourceValue *&PSV, ErrorCallbackType ErrorCallback) const {
   SIMachineFunctionInfo *MFI = MF.getInfo<SIMachineFunctionInfo>();
-  const AMDGPUTargetMachine &TM =
-      static_cast<const AMDGPUTargetMachine &>(MF.getTarget());
+  const SIInstrInfo &TII = *MF.getSubtarget<GCNSubtarget>().getInstrInfo();
+  if (Src == "BufferResource") {
+    PSV = MFI->getBufferPSV(TII);
+    return false;
+  }
+  if (Src == "ImageResource") {
+    PSV = MFI->getImagePSV(TII);
+    return false;
+  }
   if (Src == "GWSResource") {
-    PSV = MFI->getGWSPSV(TM);
+    PSV = MFI->getGWSPSV(TII);
     return false;
   }
   llvm_unreachable("unknown MIR custom pseudo source value");

@@ -26,7 +26,7 @@ struct S {};
 void make_move_iterator(S*) {}
 }
 
-TEST_CONSTEXPR_CXX20 bool tests()
+int main(int, char**)
 {
     {
         typedef std::vector<int> V;
@@ -68,7 +68,7 @@ TEST_CONSTEXPR_CXX20 bool tests()
         typedef std::vector<int> V;
         V v(100);
         while(v.size() < v.capacity()) v.push_back(0); // force reallocation
-        std::size_t sz = v.size();
+        size_t sz = v.size();
         int a[] = {1, 2, 3, 4, 5};
         const unsigned N = sizeof(a)/sizeof(a[0]);
         V::iterator i = v.insert(v.cbegin() + 10, forward_iterator<const int*>(a),
@@ -87,7 +87,7 @@ TEST_CONSTEXPR_CXX20 bool tests()
         typedef std::vector<int> V;
         V v(100);
         v.reserve(128); // force no reallocation
-        std::size_t sz = v.size();
+        size_t sz = v.size();
         int a[] = {1, 2, 3, 4, 5};
         const unsigned N = sizeof(a)/sizeof(a[0]);
         V::iterator i = v.insert(v.cbegin() + 10, forward_iterator<const int*>(a),
@@ -179,17 +179,8 @@ TEST_CONSTEXPR_CXX20 bool tests()
 
     {
         std::vector<adl::S> s;
-        s.insert(s.end(), cpp17_input_iterator<adl::S*>(nullptr), cpp17_input_iterator<adl::S*>(nullptr));
+        s.insert(s.end(), cpp17_input_iterator<adl::S*>(), cpp17_input_iterator<adl::S*>());
     }
 
-    return true;
-}
-
-int main(int, char**)
-{
-    tests();
-#if TEST_STD_VER > 17
-    static_assert(tests());
-#endif
-    return 0;
+  return 0;
 }

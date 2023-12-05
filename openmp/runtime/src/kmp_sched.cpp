@@ -61,13 +61,11 @@ char const *traits_t<long>::spec = "ld";
 #define KMP_STATS_LOOP_END(stat) /* Nothing */
 #endif
 
-#if USE_ITT_BUILD || defined KMP_DEBUG
 static ident_t loc_stub = {0, KMP_IDENT_KMPC, 0, 0, ";unknown;unknown;0;0;;"};
 static inline void check_loc(ident_t *&loc) {
   if (loc == NULL)
     loc = &loc_stub; // may need to report location info to ittnotify
 }
-#endif
 
 template <typename T>
 static void __kmp_for_static_init(ident_t *loc, kmp_int32 global_tid,
@@ -84,9 +82,6 @@ static void __kmp_for_static_init(ident_t *loc, kmp_int32 global_tid,
   KMP_COUNT_BLOCK(OMP_LOOP_STATIC);
   KMP_PUSH_PARTITIONED_TIMER(OMP_loop_static);
   KMP_PUSH_PARTITIONED_TIMER(OMP_loop_static_scheduling);
-
-  // Clear monotonic/nonmonotonic bits (ignore it)
-  schedtype = SCHEDULE_WITHOUT_MODIFIERS(schedtype);
 
   typedef typename traits_t<T>::unsigned_t UT;
   typedef typename traits_t<T>::signed_t ST;
@@ -106,7 +101,7 @@ static void __kmp_for_static_init(ident_t *loc, kmp_int32 global_tid,
 
   static kmp_int8 warn = 0;
 
-  if (ompt_enabled.ompt_callback_work || ompt_enabled.ompt_callback_dispatch) {
+  if (ompt_enabled.ompt_callback_work) {
     // Only fully initialize variables needed by OMPT if OMPT is enabled.
     team_info = __ompt_get_teaminfo(0, NULL);
     task_info = __ompt_get_task_info_object(0);
@@ -199,13 +194,8 @@ static void __kmp_for_static_init(ident_t *loc, kmp_int32 global_tid,
     // we are in DISTRIBUTE construct
     schedtype += kmp_sch_static -
                  kmp_distribute_static; // AC: convert to usual schedule type
-    if (th->th.th_team->t.t_serialized > 1) {
-      tid = 0;
-      team = th->th.th_team;
-    } else {
-      tid = th->th.th_team->t.t_master_tid;
-      team = th->th.th_team->t.t_parent;
-    }
+    tid = th->th.th_team->t.t_master_tid;
+    team = th->th.th_team->t.t_parent;
   } else {
     tid = __kmp_tid_from_gtid(global_tid);
     team = th->th.th_team;
@@ -443,24 +433,6 @@ static void __kmp_for_static_init(ident_t *loc, kmp_int32 global_tid,
         ompt_work_type, ompt_scope_begin, &(team_info->parallel_data),
         &(task_info->task_data), trip_count, codeptr);
   }
-  if (ompt_enabled.ompt_callback_dispatch) {
-    ompt_dispatch_t dispatch_type;
-    ompt_data_t instance = ompt_data_none;
-    ompt_dispatch_chunk_t dispatch_chunk;
-    if (ompt_work_type == ompt_work_sections) {
-      dispatch_type = ompt_dispatch_section;
-      instance.ptr = codeptr;
-    } else {
-      OMPT_GET_DISPATCH_CHUNK(dispatch_chunk, *plower, *pupper, incr);
-      dispatch_type = (ompt_work_type == ompt_work_distribute)
-                          ? ompt_dispatch_distribute_chunk
-                          : ompt_dispatch_ws_loop_chunk;
-      instance.ptr = &dispatch_chunk;
-    }
-    ompt_callbacks.ompt_callback(ompt_callback_dispatch)(
-        &(team_info->parallel_data), &(task_info->task_data), dispatch_type,
-        instance);
-  }
 #endif
 
   KMP_STATS_LOOP_END(OMP_loop_static_iterations);
@@ -473,12 +445,7 @@ static void __kmp_dist_for_static_init(ident_t *loc, kmp_int32 gtid,
                                        T *plower, T *pupper, T *pupperDist,
                                        typename traits_t<T>::signed_t *pstride,
                                        typename traits_t<T>::signed_t incr,
-                                       typename traits_t<T>::signed_t chunk
-#if OMPT_SUPPORT && OMPT_OPTIONAL
-                                       ,
-                                       void *codeptr
-#endif
-) {
+                                       typename traits_t<T>::signed_t chunk) {
   KMP_COUNT_BLOCK(OMP_DISTRIBUTE);
   KMP_PUSH_PARTITIONED_TIMER(OMP_distribute);
   KMP_PUSH_PARTITIONED_TIMER(OMP_distribute_scheduling);
@@ -710,26 +677,6 @@ end:;
   }
 #endif
   KE_TRACE(10, ("__kmpc_dist_for_static_init: T#%d return\n", gtid));
-#if OMPT_SUPPORT && OMPT_OPTIONAL
-  if (ompt_enabled.ompt_callback_work || ompt_enabled.ompt_callback_dispatch) {
-    ompt_team_info_t *team_info = __ompt_get_teaminfo(0, NULL);
-    ompt_task_info_t *task_info = __ompt_get_task_info_object(0);
-    if (ompt_enabled.ompt_callback_work) {
-      ompt_callbacks.ompt_callback(ompt_callback_work)(
-          ompt_work_distribute, ompt_scope_begin, &(team_info->parallel_data),
-          &(task_info->task_data), 0, codeptr);
-    }
-    if (ompt_enabled.ompt_callback_dispatch) {
-      ompt_data_t instance = ompt_data_none;
-      ompt_dispatch_chunk_t dispatch_chunk;
-      OMPT_GET_DISPATCH_CHUNK(dispatch_chunk, *plower, *pupperDist, incr);
-      instance.ptr = &dispatch_chunk;
-      ompt_callbacks.ompt_callback(ompt_callback_dispatch)(
-          &(team_info->parallel_data), &(task_info->task_data),
-          ompt_dispatch_distribute_chunk, instance);
-    }
-  }
-#endif // OMPT_SUPPORT && OMPT_OPTIONAL
   KMP_STATS_LOOP_END(OMP_distribute_iterations);
   return;
 }
@@ -935,12 +882,6 @@ void __kmpc_for_static_init_8u(ident_t *loc, kmp_int32 gtid,
 @}
 */
 
-#if OMPT_SUPPORT && OMPT_OPTIONAL
-#define OMPT_CODEPTR_ARG , OMPT_GET_RETURN_ADDRESS(0)
-#else
-#define OMPT_CODEPTR_ARG
-#endif
-
 /*!
 @ingroup WORK_SHARING
 @param    loc       Source code location
@@ -969,8 +910,7 @@ void __kmpc_dist_for_static_init_4(ident_t *loc, kmp_int32 gtid,
                                    kmp_int32 *pupperD, kmp_int32 *pstride,
                                    kmp_int32 incr, kmp_int32 chunk) {
   __kmp_dist_for_static_init<kmp_int32>(loc, gtid, schedule, plastiter, plower,
-                                        pupper, pupperD, pstride, incr,
-                                        chunk OMPT_CODEPTR_ARG);
+                                        pupper, pupperD, pstride, incr, chunk);
 }
 
 /*!
@@ -982,8 +922,7 @@ void __kmpc_dist_for_static_init_4u(ident_t *loc, kmp_int32 gtid,
                                     kmp_uint32 *pupperD, kmp_int32 *pstride,
                                     kmp_int32 incr, kmp_int32 chunk) {
   __kmp_dist_for_static_init<kmp_uint32>(loc, gtid, schedule, plastiter, plower,
-                                         pupper, pupperD, pstride, incr,
-                                         chunk OMPT_CODEPTR_ARG);
+                                         pupper, pupperD, pstride, incr, chunk);
 }
 
 /*!
@@ -995,8 +934,7 @@ void __kmpc_dist_for_static_init_8(ident_t *loc, kmp_int32 gtid,
                                    kmp_int64 *pupperD, kmp_int64 *pstride,
                                    kmp_int64 incr, kmp_int64 chunk) {
   __kmp_dist_for_static_init<kmp_int64>(loc, gtid, schedule, plastiter, plower,
-                                        pupper, pupperD, pstride, incr,
-                                        chunk OMPT_CODEPTR_ARG);
+                                        pupper, pupperD, pstride, incr, chunk);
 }
 
 /*!
@@ -1008,8 +946,7 @@ void __kmpc_dist_for_static_init_8u(ident_t *loc, kmp_int32 gtid,
                                     kmp_uint64 *pupperD, kmp_int64 *pstride,
                                     kmp_int64 incr, kmp_int64 chunk) {
   __kmp_dist_for_static_init<kmp_uint64>(loc, gtid, schedule, plastiter, plower,
-                                         pupper, pupperD, pstride, incr,
-                                         chunk OMPT_CODEPTR_ARG);
+                                         pupper, pupperD, pstride, incr, chunk);
 }
 /*!
 @}

@@ -44,23 +44,22 @@ public:
     None,
     Custom,  // For custom placeholders
     Builder, // For the $_builder placeholder
+    Op,      // For the $_op placeholder
     Self,    // For the $_self placeholder
   };
 
   FmtContext() = default;
 
-  // Create a format context with a list of substitutions.
-  FmtContext(ArrayRef<std::pair<StringRef, StringRef>> subs);
-
   // Setter for custom placeholders
-  FmtContext &addSubst(StringRef placeholder, const Twine &subst);
+  FmtContext &addSubst(StringRef placeholder, Twine subst);
 
   // Setters for builtin placeholders
   FmtContext &withBuilder(Twine subst);
+  FmtContext &withOp(Twine subst);
   FmtContext &withSelf(Twine subst);
 
-  std::optional<StringRef> getSubstFor(PHKind placeholder) const;
-  std::optional<StringRef> getSubstFor(StringRef placeholder) const;
+  Optional<StringRef> getSubstFor(PHKind placeholder) const;
+  Optional<StringRef> getSubstFor(StringRef placeholder) const;
 
   static PHKind getPlaceHolderKind(StringRef str);
 
@@ -150,7 +149,7 @@ public:
   FmtObjectBase(const FmtObjectBase &that) = delete;
 
   FmtObjectBase(FmtObjectBase &&that)
-      : fmt(that.fmt), context(that.context),
+      : fmt(std::move(that.fmt)), context(that.context),
         adapters(), // adapters are initialized by FmtObject
         replacements(std::move(that.replacements)) {}
 
@@ -163,24 +162,19 @@ public:
     return s.str();
   }
 
-  template <unsigned N>
-  SmallString<N> sstr() const {
+  template <unsigned N> SmallString<N> sstr() const {
     SmallString<N> result;
     llvm::raw_svector_ostream s(result);
     format(s);
     return result;
   }
 
-  template <unsigned N>
-  operator SmallString<N>() const {
-    return sstr<N>();
-  }
+  template <unsigned N> operator SmallString<N>() const { return sstr<N>(); }
 
   operator std::string() const { return str(); }
 };
 
-template <typename Tuple>
-class FmtObject : public FmtObjectBase {
+template <typename Tuple> class FmtObject : public FmtObjectBase {
   // Storage for the parameter adapters.  Since the base class erases the type
   // of the parameters, we have to own the storage for the parameters here, and
   // have the base class store type-erased pointers into this tuple.
@@ -191,7 +185,7 @@ public:
       : FmtObjectBase(fmt, ctx, std::tuple_size<Tuple>::value),
         parameters(std::move(params)) {
     adapters.reserve(std::tuple_size<Tuple>::value);
-    adapters = std::apply(CreateAdapters(), parameters);
+    adapters = llvm::apply_tuple(CreateAdapters(), parameters);
   }
 
   FmtObject(FmtObject const &that) = delete;
@@ -199,7 +193,7 @@ public:
   FmtObject(FmtObject &&that)
       : FmtObjectBase(std::move(that)), parameters(std::move(that.parameters)) {
     adapters.reserve(that.adapters.size());
-    adapters = std::apply(CreateAdapters(), parameters);
+    adapters = llvm::apply_tuple(CreateAdapters(), parameters);
   }
 };
 
@@ -274,7 +268,7 @@ inline FmtStrVecObject tgfmt(StringRef fmt, const FmtContext *ctx,
   return FmtStrVecObject(fmt, ctx, params);
 }
 
-} // namespace tblgen
-} // namespace mlir
+} // end namespace tblgen
+} // end namespace mlir
 
 #endif // MLIR_TABLEGEN_FORMAT_H_

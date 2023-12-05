@@ -13,7 +13,6 @@
 // template <class... Args> reference emplace_front(Args&&... args);
 // return type is 'reference' in C++17; 'void' before
 
-#include "asan_testing.h"
 #include <deque>
 #include <cstddef>
 #include <cassert>
@@ -58,11 +57,10 @@ test(C& c1)
                   c1.emplace_front(Emplaceable(1, 2.5));
 #endif
     assert(c1.size() == c1_osize + 1);
-    assert(std::distance(c1.begin(), c1.end())
+    assert(distance(c1.begin(), c1.end())
                == static_cast<std::ptrdiff_t>(c1.size()));
     I i = c1.begin();
     assert(*i == Emplaceable(1, 2.5));
-    LIBCPP_ASSERT(is_double_ended_contiguous_container_asan_correct(c1));
 #if TEST_STD_VER > 14
     assert(&res_ref == &(*i));
 #endif
@@ -97,16 +95,12 @@ int main(int, char**)
         std::deque<Tag_X, TaggingAllocator<Tag_X>> c;
         c.emplace_front();
         assert(c.size() == 1);
-        LIBCPP_ASSERT(is_double_ended_contiguous_container_asan_correct(c));
         c.emplace_front(1, 2, 3);
         assert(c.size() == 2);
-        LIBCPP_ASSERT(is_double_ended_contiguous_container_asan_correct(c));
         c.emplace_front();
         assert(c.size() == 3);
-        LIBCPP_ASSERT(is_double_ended_contiguous_container_asan_correct(c));
         c.emplace_front(1, 2, 3);
         assert(c.size() == 4);
-        LIBCPP_ASSERT(is_double_ended_contiguous_container_asan_correct(c));
     }
 
   return 0;

@@ -17,11 +17,11 @@
 #include "clang/StaticAnalyzer/Core/Checker.h"
 #include "clang/StaticAnalyzer/Core/CheckerManager.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CheckerContext.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/raw_ostream.h"
-#include <optional>
 
 using namespace clang;
 using namespace ento;
@@ -40,9 +40,11 @@ namespace {
 
 class UnixAPIMisuseChecker : public Checker< check::PreStmt<CallExpr> > {
   mutable std::unique_ptr<BugType> BT_open, BT_pthreadOnce;
-  mutable std::optional<uint64_t> Val_O_CREAT;
+  mutable Optional<uint64_t> Val_O_CREAT;
 
 public:
+  DefaultBool CheckMisuse, CheckPortability;
+
   void checkPreStmt(const CallExpr *CE, CheckerContext &C) const;
 
   void CheckOpen(CheckerContext &C, const CallExpr *CE) const;
@@ -108,7 +110,7 @@ void UnixAPIMisuseChecker::checkPreStmt(const CallExpr *CE,
   // Don't treat functions in namespaces with the same name a Unix function
   // as a call to the Unix function.
   const DeclContext *NamespaceCtx = FD->getEnclosingNamespaceContext();
-  if (isa_and_nonnull<NamespaceDecl>(NamespaceCtx))
+  if (NamespaceCtx && isa<NamespaceDecl>(NamespaceCtx))
     return;
 
   StringRef FName = C.getCalleeName(FD);
@@ -180,7 +182,8 @@ void UnixAPIMisuseChecker::CheckOpenVariant(CheckerContext &C,
   ProgramStateRef state = C.getState();
 
   if (CE->getNumArgs() < MinArgCount) {
-    // The frontend should issue a warning for this case. Just return.
+    // The frontend should issue a warning for this case, so this is a sanity
+    // check.
     return;
   } else if (CE->getNumArgs() == MaxArgCount) {
     const Expr *Arg = CE->getArg(CreateModeArgIndex);
@@ -211,7 +214,7 @@ void UnixAPIMisuseChecker::CheckOpenVariant(CheckerContext &C,
 
   // The definition of O_CREAT is platform specific.  We need a better way
   // of querying this information from the checking environment.
-  if (!Val_O_CREAT) {
+  if (!Val_O_CREAT.hasValue()) {
     if (C.getASTContext().getTargetInfo().getTriple().getVendor()
                                                       == llvm::Triple::Apple)
       Val_O_CREAT = 0x0200;
@@ -227,15 +230,14 @@ void UnixAPIMisuseChecker::CheckOpenVariant(CheckerContext &C,
   // Now check if oflags has O_CREAT set.
   const Expr *oflagsEx = CE->getArg(FlagsArgIndex);
   const SVal V = C.getSVal(oflagsEx);
-  if (!isa<NonLoc>(V)) {
+  if (!V.getAs<NonLoc>()) {
     // The case where 'V' can be a location can only be due to a bad header,
     // so in this case bail out.
     return;
   }
   NonLoc oflags = V.castAs<NonLoc>();
   NonLoc ocreateFlag = C.getSValBuilder()
-                           .makeIntVal(*Val_O_CREAT, oflagsEx->getType())
-                           .castAs<NonLoc>();
+      .makeIntVal(Val_O_CREAT.getValue(), oflagsEx->getType()).castAs<NonLoc>();
   SVal maskedFlagsUC = C.getSValBuilder().evalBinOpNN(state, BO_And,
                                                       oflags, ocreateFlag,
                                                       oflagsEx->getType());
@@ -364,7 +366,7 @@ void UnixAPIPortabilityChecker::BasicAllocationCheck(CheckerContext &C,
                                                      const unsigned numArgs,
                                                      const unsigned sizeArg,
                                                      const char *fn) const {
-  // Check for the correct number of arguments.
+  // Sanity check for the correct number of arguments
   if (CE->getNumArgs() != numArgs)
     return;
 
@@ -464,7 +466,7 @@ void UnixAPIPortabilityChecker::checkPreStmt(const CallExpr *CE,
   // Don't treat functions in namespaces with the same name a Unix function
   // as a call to the Unix function.
   const DeclContext *NamespaceCtx = FD->getEnclosingNamespaceContext();
-  if (isa_and_nonnull<NamespaceDecl>(NamespaceCtx))
+  if (NamespaceCtx && isa<NamespaceDecl>(NamespaceCtx))
     return;
 
   StringRef FName = C.getCalleeName(FD);
@@ -502,7 +504,7 @@ void UnixAPIPortabilityChecker::checkPreStmt(const CallExpr *CE,
     mgr.registerChecker<CHECKERNAME>();                                        \
   }                                                                            \
                                                                                \
-  bool ento::shouldRegister##CHECKERNAME(const CheckerManager &mgr) {          \
+  bool ento::shouldRegister##CHECKERNAME(const CheckerManager &mgr) {              \
     return true;                                                               \
   }
 

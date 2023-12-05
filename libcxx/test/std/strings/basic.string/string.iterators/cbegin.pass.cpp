@@ -8,7 +8,7 @@
 
 // <string>
 
-// const_iterator cbegin() const; // constexpr since C++20
+// const_iterator cbegin() const;
 
 #include <string>
 #include <cassert>
@@ -17,33 +17,30 @@
 #include "min_allocator.h"
 
 template <class S>
-TEST_CONSTEXPR_CXX20 void test(const S& s) {
-  typename S::const_iterator cb = s.cbegin();
-  if (!s.empty()) {
-    assert(*cb == s[0]);
-  }
-  assert(cb == s.begin());
+void
+test(const S& s)
+{
+    typename S::const_iterator cb = s.cbegin();
+    if (!s.empty())
+    {
+        assert(*cb == s[0]);
+    }
+    assert(cb == s.begin());
 }
 
-template <class S>
-TEST_CONSTEXPR_CXX20 void test_string() {
-  test(S());
-  test(S("123"));
-}
-
-TEST_CONSTEXPR_CXX20 bool test() {
-  test_string<std::string>();
+int main(int, char**)
+{
+    {
+    typedef std::string S;
+    test(S());
+    test(S("123"));
+    }
 #if TEST_STD_VER >= 11
-  test_string<std::basic_string<char, std::char_traits<char>, min_allocator<char> > >();
-#endif
-
-  return true;
-}
-
-int main(int, char**) {
-  test();
-#if TEST_STD_VER > 17
-  static_assert(test());
+    {
+    typedef std::basic_string<char, std::char_traits<char>, min_allocator<char>> S;
+    test(S());
+    test(S("123"));
+    }
 #endif
 
   return 0;

@@ -1,4 +1,5 @@
-! RUN: %python %S/test_modfile.py %s %flang_fc1
+! RUN: %S/test_modfile.sh %s %t %flang_fc1
+! REQUIRES: shell
 ! Check that implicitly typed entities get a type in the module file.
 
 module m

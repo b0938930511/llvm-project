@@ -6,10 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// UNSUPPORTED: no-threads
+// UNSUPPORTED: libcpp-has-no-threads
 // UNSUPPORTED: c++03, c++11
 
-// XFAIL: availability-synchronization_library-missing
+// This test requires the dylib support introduced in D68480, which shipped in
+// macOS 11.0.
+// XFAIL: use_system_cxx_lib && target={{.+}}-apple-macosx10.{{9|10|11|12|13|14|15}}
 
 // <semaphore>
 
@@ -25,17 +27,14 @@ int main(int, char**)
   std::counting_semaphore<> s(1);
 
   assert(s.try_acquire());
-  assert(!s.try_acquire());
   s.release();
   assert(s.try_acquire());
-  assert(!s.try_acquire());
   s.release(2);
   std::thread t = support::make_test_thread([&](){
     assert(s.try_acquire());
   });
   t.join();
   assert(s.try_acquire());
-  assert(!s.try_acquire());
 
   return 0;
 }

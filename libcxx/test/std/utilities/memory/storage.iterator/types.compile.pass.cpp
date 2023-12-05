@@ -12,7 +12,6 @@
 // raw_storage_iterator associated types
 
 #include <cstddef>
-#include <iterator>
 #include <memory>
 #include <type_traits>
 

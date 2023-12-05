@@ -6,7 +6,7 @@
 // Intel inline assembly parser should rewrite to the appropriate form depending
 // on the platform.
 
-void align_test(void) {
+void align_test() {
   __asm align 8
   __asm align 16;
   __asm align 128;

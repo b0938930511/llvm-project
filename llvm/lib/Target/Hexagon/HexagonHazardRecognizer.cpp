@@ -44,7 +44,12 @@ HexagonHazardRecognizer::getHazardType(SUnit *SU, int stalls) {
   if (!Resources->canReserveResources(*MI)) {
     LLVM_DEBUG(dbgs() << "*** Hazard in cycle " << PacketNum << ", " << *MI);
     HazardType RetVal = Hazard;
-    if (isNewStore(*MI)) {
+    if (TII->mayBeNewStore(*MI)) {
+      // Make sure the register to be stored is defined by an instruction in the
+      // packet.
+      MachineOperand &MO = MI->getOperand(MI->getNumOperands() - 1);
+      if (!MO.isReg() || RegDefs.count(MO.getReg()) == 0)
+        return Hazard;
       // The .new store version uses different resources so check if it
       // causes a hazard.
       MachineFunction *MF = MI->getParent()->getParent();
@@ -55,7 +60,7 @@ HexagonHazardRecognizer::getHazardType(SUnit *SU, int stalls) {
         RetVal = NoHazard;
       LLVM_DEBUG(dbgs() << "*** Try .new version? " << (RetVal == NoHazard)
                         << "\n");
-      MF->deleteMachineInstr(NewMI);
+      MF->DeleteMachineInstr(NewMI);
     }
     return RetVal;
   }
@@ -100,15 +105,6 @@ bool HexagonHazardRecognizer::ShouldPreferAnother(SUnit *SU) {
   return UsesDotCur && ((SU == UsesDotCur) ^ (DotCurPNum == (int)PacketNum));
 }
 
-/// Return true if the instruction would be converted to a new value store when
-/// packetized.
-bool HexagonHazardRecognizer::isNewStore(MachineInstr &MI) {
-  if (!TII->mayBeNewStore(MI))
-    return false;
-  MachineOperand &MO = MI.getOperand(MI.getNumOperands() - 1);
-  return MO.isReg() && RegDefs.contains(MO.getReg());
-}
-
 void HexagonHazardRecognizer::EmitInstruction(SUnit *SU) {
   MachineInstr *MI = SU->getInstr();
   if (!MI)
@@ -123,7 +119,7 @@ void HexagonHazardRecognizer::EmitInstruction(SUnit *SU) {
   if (TII->isZeroCost(MI->getOpcode()))
     return;
 
-  if (!Resources->canReserveResources(*MI) || isNewStore(*MI)) {
+  if (!Resources->canReserveResources(*MI)) {
     // It must be a .new store since other instructions must be able to be
     // reserved at this point.
     assert(TII->mayBeNewStore(*MI) && "Expecting .new store");
@@ -131,12 +127,11 @@ void HexagonHazardRecognizer::EmitInstruction(SUnit *SU) {
     MachineInstr *NewMI =
         MF->CreateMachineInstr(TII->get(TII->getDotNewOp(*MI)),
                                MI->getDebugLoc());
-    if (Resources->canReserveResources(*NewMI))
-      Resources->reserveResources(*NewMI);
-    else
-      Resources->reserveResources(*MI);
-    MF->deleteMachineInstr(NewMI);
-  } else
+    assert(Resources->canReserveResources(*NewMI));
+    Resources->reserveResources(*NewMI);
+    MF->DeleteMachineInstr(NewMI);
+  }
+  else
     Resources->reserveResources(*MI);
   LLVM_DEBUG(dbgs() << " Add instruction " << *MI);
 

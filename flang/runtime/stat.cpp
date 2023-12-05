@@ -1,4 +1,4 @@
-//===-- runtime/stat.cpp --------------------------------------------------===//
+//===-- runtime/stat.cpp ----------------------------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -7,14 +7,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "stat.h"
+#include "descriptor.h"
 #include "terminator.h"
-#include "tools.h"
-#include "flang/Runtime/descriptor.h"
 
 namespace Fortran::runtime {
-RT_OFFLOAD_API_GROUP_BEGIN
-
-RT_API_ATTRS const char *StatErrorString(int stat) {
+const char *StatErrorString(int stat) {
   switch (stat) {
   case StatOk:
     return "No error";
@@ -53,32 +50,19 @@ RT_API_ATTRS const char *StatErrorString(int stat) {
   case StatUnlockedFailedImage:
     return "Failed image unlocked";
 
-  case StatInvalidArgumentNumber:
-    return "Invalid argument number";
-  case StatMissingArgument:
-    return "Missing argument";
-  case StatValueTooShort:
-    return "Value too short";
-
-  case StatMissingEnvVariable:
-    return "Missing environment variable";
-
-  case StatMoveAllocSameAllocatable:
-    return "MOVE_ALLOC passed the same address as to and from";
-
   default:
     return nullptr;
   }
 }
 
-RT_API_ATTRS int ToErrmsg(const Descriptor *errmsg, int stat) {
+int ToErrmsg(const Descriptor *errmsg, int stat) {
   if (stat != StatOk && errmsg && errmsg->raw().base_addr &&
       errmsg->type() == TypeCode(TypeCategory::Character, 1) &&
       errmsg->rank() == 0) {
     if (const char *msg{StatErrorString(stat)}) {
       char *buffer{errmsg->OffsetElement()};
       std::size_t bufferLength{errmsg->ElementBytes()};
-      std::size_t msgLength{Fortran::runtime::strlen(msg)};
+      std::size_t msgLength{std::strlen(msg)};
       if (msgLength >= bufferLength) {
         std::memcpy(buffer, msg, bufferLength);
       } else {
@@ -90,7 +74,7 @@ RT_API_ATTRS int ToErrmsg(const Descriptor *errmsg, int stat) {
   return stat;
 }
 
-RT_API_ATTRS int ReturnError(
+int ReturnError(
     Terminator &terminator, int stat, const Descriptor *errmsg, bool hasStat) {
   if (stat == StatOk || hasStat) {
     return ToErrmsg(errmsg, stat);
@@ -101,6 +85,4 @@ RT_API_ATTRS int ReturnError(
   }
   return stat;
 }
-
-RT_OFFLOAD_API_GROUP_END
 } // namespace Fortran::runtime

@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-
 #ifndef MAP_ALLOCATOR_REQUIREMENT_TEST_TEMPLATES_H
 #define MAP_ALLOCATOR_REQUIREMENT_TEST_TEMPLATES_H
 
@@ -22,7 +21,6 @@
 // UNSUPPORTED: c++03
 
 #include <cassert>
-#include <iterator>
 
 #include "test_macros.h"
 #include "count_new.h"

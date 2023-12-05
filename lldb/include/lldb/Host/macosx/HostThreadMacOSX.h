@@ -17,7 +17,8 @@ class HostThreadMacOSX : public HostThreadPosix {
   friend class ThreadLauncher;
 
 public:
-  using HostThreadPosix::HostThreadPosix;
+  HostThreadMacOSX();
+  HostThreadMacOSX(lldb::thread_t thread);
 
 protected:
   static lldb::thread_result_t ThreadCreateTrampoline(lldb::thread_arg_t arg);

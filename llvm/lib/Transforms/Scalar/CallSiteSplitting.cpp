@@ -57,13 +57,15 @@
 
 #include "llvm/Transforms/Scalar/CallSiteSplitting.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Analysis/DomTreeUpdater.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/PatternMatch.h"
+#include "llvm/InitializePasses.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/Local.h"
 
@@ -121,8 +123,8 @@ static bool isCondRelevantToAnyCallArgument(ICmpInst *Cmp, CallBase &CB) {
   return false;
 }
 
-using ConditionTy = std::pair<ICmpInst *, unsigned>;
-using ConditionsTy = SmallVector<ConditionTy, 2>;
+typedef std::pair<ICmpInst *, unsigned> ConditionTy;
+typedef SmallVector<ConditionTy, 2> ConditionsTy;
 
 /// If From has a conditional jump to To, add the condition to Conditions,
 /// if it is relevant to any argument at CB.
@@ -163,7 +165,7 @@ static void recordConditions(CallBase &CB, BasicBlock *Pred,
 }
 
 static void addConditions(CallBase &CB, const ConditionsTy &Conditions) {
-  for (const auto &Cond : Conditions) {
+  for (auto &Cond : Conditions) {
     Value *Arg = Cond.first->getOperand(0);
     Constant *ConstVal = cast<Constant>(Cond.first->getOperand(1));
     if (Cond.second == ICmpInst::ICMP_EQ)
@@ -299,9 +301,10 @@ static void copyMustTailReturn(BasicBlock *SplitBB, Instruction *CI,
 /// Note that in case any arguments at the call-site are constrained by its
 /// predecessors, new call-sites with more constrained arguments will be
 /// created in createCallSitesOnPredicatedArgument().
-static void splitCallSite(CallBase &CB,
-                          ArrayRef<std::pair<BasicBlock *, ConditionsTy>> Preds,
-                          DomTreeUpdater &DTU) {
+static void splitCallSite(
+    CallBase &CB,
+    const SmallVectorImpl<std::pair<BasicBlock *, ConditionsTy>> &Preds,
+    DomTreeUpdater &DTU) {
   BasicBlock *TailBB = CB.getParent();
   bool IsMustTailCall = CB.isMustTailCall();
 
@@ -362,9 +365,9 @@ static void splitCallSite(CallBase &CB,
     // attempting removal.
     SmallVector<BasicBlock *, 2> Splits(predecessors((TailBB)));
     assert(Splits.size() == 2 && "Expected exactly 2 splits!");
-    for (BasicBlock *BB : Splits) {
-      BB->getTerminator()->eraseFromParent();
-      DTU.applyUpdatesPermissive({{DominatorTree::Delete, BB, TailBB}});
+    for (unsigned i = 0; i < Splits.size(); i++) {
+      Splits[i]->getTerminator()->eraseFromParent();
+      DTU.applyUpdatesPermissive({{DominatorTree::Delete, Splits[i], TailBB}});
     }
 
     // Erase the tail block once done with musttail patching
@@ -402,7 +405,6 @@ static void splitCallSite(CallBase &CB,
       NewPN->insertBefore(&*TailBB->begin());
       CurrentI->replaceAllUsesWith(NewPN);
     }
-    CurrentI->dropDbgValues();
     CurrentI->eraseFromParent();
     // We are done once we handled the first original instruction in TailBB.
     if (CurrentI == OriginalBegin)
@@ -465,7 +467,7 @@ static PredsWithCondsTy shouldSplitOnPredicatedArgument(CallBase &CB,
   BasicBlock *StopAt = CSDTNode ? CSDTNode->getIDom()->getBlock() : nullptr;
 
   SmallVector<std::pair<BasicBlock *, ConditionsTy>, 2> PredsCS;
-  for (auto *Pred : llvm::reverse(Preds)) {
+  for (auto *Pred : make_range(Preds.rbegin(), Preds.rend())) {
     ConditionsTy Conditions;
     // Record condition on edge BB(CS) <- Pred
     recordCondition(CB, Pred, CB.getParent(), Conditions);
@@ -503,7 +505,8 @@ static bool doCallSiteSplitting(Function &F, TargetLibraryInfo &TLI,
 
   DomTreeUpdater DTU(&DT, DomTreeUpdater::UpdateStrategy::Lazy);
   bool Changed = false;
-  for (BasicBlock &BB : llvm::make_early_inc_range(F)) {
+  for (Function::iterator BI = F.begin(), BE = F.end(); BI != BE;) {
+    BasicBlock &BB = *BI++;
     auto II = BB.getFirstNonPHIOrDbg()->getIterator();
     auto IE = BB.getTerminator()->getIterator();
     // Iterate until we reach the terminator instruction. tryToSplitCallSite
@@ -532,6 +535,45 @@ static bool doCallSiteSplitting(Function &F, TargetLibraryInfo &TLI,
     }
   }
   return Changed;
+}
+
+namespace {
+struct CallSiteSplittingLegacyPass : public FunctionPass {
+  static char ID;
+  CallSiteSplittingLegacyPass() : FunctionPass(ID) {
+    initializeCallSiteSplittingLegacyPassPass(*PassRegistry::getPassRegistry());
+  }
+
+  void getAnalysisUsage(AnalysisUsage &AU) const override {
+    AU.addRequired<TargetLibraryInfoWrapperPass>();
+    AU.addRequired<TargetTransformInfoWrapperPass>();
+    AU.addRequired<DominatorTreeWrapperPass>();
+    AU.addPreserved<DominatorTreeWrapperPass>();
+    FunctionPass::getAnalysisUsage(AU);
+  }
+
+  bool runOnFunction(Function &F) override {
+    if (skipFunction(F))
+      return false;
+
+    auto &TLI = getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(F);
+    auto &TTI = getAnalysis<TargetTransformInfoWrapperPass>().getTTI(F);
+    auto &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
+    return doCallSiteSplitting(F, TLI, TTI, DT);
+  }
+};
+} // namespace
+
+char CallSiteSplittingLegacyPass::ID = 0;
+INITIALIZE_PASS_BEGIN(CallSiteSplittingLegacyPass, "callsite-splitting",
+                      "Call-site splitting", false, false)
+INITIALIZE_PASS_DEPENDENCY(TargetLibraryInfoWrapperPass)
+INITIALIZE_PASS_DEPENDENCY(TargetTransformInfoWrapperPass)
+INITIALIZE_PASS_DEPENDENCY(DominatorTreeWrapperPass)
+INITIALIZE_PASS_END(CallSiteSplittingLegacyPass, "callsite-splitting",
+                    "Call-site splitting", false, false)
+FunctionPass *llvm::createCallSiteSplittingPass() {
+  return new CallSiteSplittingLegacyPass();
 }
 
 PreservedAnalyses CallSiteSplittingPass::run(Function &F,

@@ -17,18 +17,19 @@
 
 #include "llvm-c/lto.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/IR/ModuleSummaryIndex.h"
 #include "llvm/LTO/LTO.h"
 #include "llvm/Support/CachePruning.h"
 #include "llvm/Support/CodeGen.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Target/TargetOptions.h"
-#include "llvm/TargetParser/Triple.h"
 
 #include <string>
 
 namespace llvm {
 class StringRef;
+class LLVMContext;
 class TargetMachine;
 
 /// Helper to gather options relevant to the target machine creation
@@ -37,8 +38,8 @@ struct TargetMachineBuilder {
   std::string MCpu;
   std::string MAttr;
   TargetOptions Options;
-  std::optional<Reloc::Model> RelocModel;
-  CodeGenOptLevel CGOptLevel = CodeGenOptLevel::Aggressive;
+  Optional<Reloc::Model> RelocModel;
+  CodeGenOpt::Level CGOptLevel = CodeGenOpt::Aggressive;
 
   std::unique_ptr<TargetMachine> create() const;
 };
@@ -211,12 +212,12 @@ public:
   void setFreestanding(bool Enabled) { Freestanding = Enabled; }
 
   /// CodeModel
-  void setCodePICModel(std::optional<Reloc::Model> Model) {
+  void setCodePICModel(Optional<Reloc::Model> Model) {
     TMBuilder.RelocModel = Model;
   }
 
   /// CodeGen optimization level
-  void setCodeGenOptLevel(CodeGenOptLevel CGOptLevel) {
+  void setCodeGenOptLevel(CodeGenOpt::Level CGOptLevel) {
     TMBuilder.CGOptLevel = CGOptLevel;
   }
 
@@ -224,6 +225,9 @@ public:
   void setOptLevel(unsigned NewOptLevel) {
     OptLevel = (NewOptLevel > 3) ? 3 : NewOptLevel;
   }
+
+  /// Enable or disable the new pass manager.
+  void setUseNewPM(unsigned Enabled) { UseNewPM = Enabled; }
 
   /// Enable or disable debug output for the new pass manager.
   void setDebugPassManager(unsigned Enabled) { DebugPassManager = Enabled; }
@@ -343,6 +347,10 @@ private:
 
   /// IR Optimization Level [0-3].
   unsigned OptLevel = 3;
+
+  /// Flag to indicate whether the new pass manager should be used for IR
+  /// optimizations.
+  bool UseNewPM = LLVM_ENABLE_NEW_PASS_MANAGER;
 
   /// Flag to indicate whether debug output should be enabled for the new pass
   /// manager.

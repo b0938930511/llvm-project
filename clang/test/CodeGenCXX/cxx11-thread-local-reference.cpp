@@ -4,32 +4,30 @@
 
 int &f();
 
-// LINUX_AIX: @r ={{.*}} thread_local global ptr null
-// DARWIN: @r = internal thread_local global ptr null
+// LINUX_AIX: @r ={{.*}} thread_local global i32* null
+// DARWIN: @r = internal thread_local global i32* null
 thread_local int &r = f();
 
-// LINUX_AIX: @_ZTH1r ={{.*}} alias void (), ptr @__tls_init
-// DARWIN: @_ZTH1r = internal alias void (), ptr @__tls_init
+// LINUX_AIX: @_ZTH1r ={{.*}} alias void (), void ()* @__tls_init
+// DARWIN: @_ZTH1r = internal alias void (), void ()* @__tls_init
 
 int &g() { return r; }
 
 // CHECK: define {{.*}} @[[R_INIT:.*]]()
-// CHECK: call noundef nonnull align {{[0-9]+}} dereferenceable({{[0-9]+}}) ptr @_Z1fv()
-// CHECK: %[[R_ADDR:.+]] = call align 8 ptr @llvm.threadlocal.address.p0(ptr align 8 @r)
-// CHECK: store ptr %{{.*}}, ptr %[[R_ADDR]], align 8
+// CHECK: call nonnull align {{[0-9]+}} dereferenceable({{[0-9]+}}) i32* @_Z1fv()
+// CHECK: store i32* %{{.*}}, i32** @r, align 8
 
-// CHECK-LABEL: define{{.*}} nonnull align {{[0-9]+}} dereferenceable({{[0-9]+}}) ptr @_Z1gv()
-// LINUX_AIX: call ptr @_ZTW1r()
-// DARWIN: call cxx_fast_tlscc ptr @_ZTW1r()
-// CHECK: ret ptr %{{.*}}
+// CHECK-LABEL: define{{.*}} nonnull align {{[0-9]+}} dereferenceable({{[0-9]+}}) i32* @_Z1gv()
+// LINUX_AIX: call i32* @_ZTW1r()
+// DARWIN: call cxx_fast_tlscc i32* @_ZTW1r()
+// CHECK: ret i32* %{{.*}}
 
-// LINUX_AIX: define weak_odr hidden noundef ptr @_ZTW1r() [[ATTR0:#[0-9]+]]{{( comdat)?}} {
-// DARWIN: define cxx_fast_tlscc noundef ptr @_ZTW1r() [[ATTR1:#[0-9]+]] {
+// LINUX_AIX: define weak_odr hidden i32* @_ZTW1r() [[ATTR0:#[0-9]+]]{{( comdat)?}} {
+// DARWIN: define cxx_fast_tlscc i32* @_ZTW1r() [[ATTR1:#[0-9]+]] {
 // LINUX_AIX: call void @_ZTH1r()
 // DARWIN: call cxx_fast_tlscc void @_ZTH1r()
-// CHECK: %[[R_ADDR2:.+]] = call align 8 ptr @llvm.threadlocal.address.p0(ptr align 8 @r)
-// CHECK: load ptr, ptr %[[R_ADDR2]], align 8
-// CHECK: ret ptr %{{.*}}
+// CHECK: load i32*, i32** @r, align 8
+// CHECK: ret i32* %{{.*}}
 
 // LINUX_AIX-LABEL: define internal void @__tls_init()
 // DARWIN-LABEL: define internal cxx_fast_tlscc void @__tls_init()

@@ -18,14 +18,17 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/ADT/DepthFirstIterator.h"
+#include "llvm/ADT/Optional.h"
+#include "llvm/ADT/SetOperations.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
+#include "llvm/CodeGen/MachineModuleInfo.h"
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/CodeGen/TargetFrameLowering.h"
 #include "llvm/CodeGen/TargetInstrInfo.h"
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
 #include "llvm/InitializePasses.h"
-#include "llvm/MC/MCDwarf.h"
+#include "llvm/Target/TargetMachine.h"
 using namespace llvm;
 
 static cl::opt<bool> VerifyCFI("verify-cfiinstrs",
@@ -88,10 +91,10 @@ class CFIInstrInserter : public MachineFunctionPass {
 #define INVALID_OFFSET INT_MAX
   /// contains the location where CSR register is saved.
   struct CSRSavedLocation {
-    CSRSavedLocation(std::optional<unsigned> R, std::optional<int> O)
+    CSRSavedLocation(Optional<unsigned> R, Optional<int> O)
         : Reg(R), Offset(O) {}
-    std::optional<unsigned> Reg;
-    std::optional<int> Offset;
+    Optional<unsigned> Reg;
+    Optional<int> Offset;
   };
 
   /// Contains cfa offset and register values valid at entry and exit of basic
@@ -141,17 +144,16 @@ INITIALIZE_PASS(CFIInstrInserter, "cfi-instr-inserter",
 FunctionPass *llvm::createCFIInstrInserter() { return new CFIInstrInserter(); }
 
 void CFIInstrInserter::calculateCFAInfo(MachineFunction &MF) {
-  const TargetRegisterInfo &TRI = *MF.getSubtarget().getRegisterInfo();
   // Initial CFA offset value i.e. the one valid at the beginning of the
   // function.
   int InitialOffset =
       MF.getSubtarget().getFrameLowering()->getInitialCFAOffset(MF);
   // Initial CFA register value i.e. the one valid at the beginning of the
   // function.
-  Register InitialRegister =
+  unsigned InitialRegister =
       MF.getSubtarget().getFrameLowering()->getInitialCFARegister(MF);
-  InitialRegister = TRI.getDwarfRegNum(InitialRegister, true);
-  unsigned NumRegs = TRI.getNumSupportedRegs(MF);
+  const TargetRegisterInfo &TRI = *MF.getSubtarget().getRegisterInfo();
+  unsigned NumRegs = TRI.getNumRegs();
 
   // Initialize MBBMap.
   for (MachineBasicBlock &MBB : MF) {
@@ -181,14 +183,14 @@ void CFIInstrInserter::calculateOutgoingCFAInfo(MBBCFAInfo &MBBInfo) {
   MachineFunction *MF = MBBInfo.MBB->getParent();
   const std::vector<MCCFIInstruction> &Instrs = MF->getFrameInstructions();
   const TargetRegisterInfo &TRI = *MF->getSubtarget().getRegisterInfo();
-  unsigned NumRegs = TRI.getNumSupportedRegs(*MF);
+  unsigned NumRegs = TRI.getNumRegs();
   BitVector CSRSaved(NumRegs), CSRRestored(NumRegs);
 
   // Determine cfa offset and register set by the block.
   for (MachineInstr &MI : *MBBInfo.MBB) {
     if (MI.isCFIInstruction()) {
-      std::optional<unsigned> CSRReg;
-      std::optional<int> CSROffset;
+      Optional<unsigned> CSRReg;
+      Optional<int> CSROffset;
       unsigned CFIIndex = MI.getOperand(0).getCFIIndex();
       const MCCFIInstruction &CFI = Instrs[CFIIndex];
       switch (CFI.getOperation()) {
@@ -345,7 +347,7 @@ bool CFIInstrInserter::insertCFIInstrs(MachineFunction &MF) {
     }
 
     if (ForceFullCFA) {
-      MF.getSubtarget().getFrameLowering()->emitCalleeSavedFrameMovesFullCFA(
+      MF.getSubtarget().getFrameLowering()->emitCalleeSavedFrameMoves(
           *MBBInfo.MBB, MBBI);
       InsertedCFIInstr = true;
       PrevMBBInfo = &MBBInfo;

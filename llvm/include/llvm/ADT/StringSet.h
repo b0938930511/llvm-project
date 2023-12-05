@@ -5,10 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-///
-/// \file
-///  StringSet - A set-like wrapper for the StringMap.
-///
+//
+//  StringSet - A set-like wrapper for the StringMap.
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef LLVM_ADT_STRINGSET_H
@@ -20,8 +19,8 @@ namespace llvm {
 
 /// StringSet - A wrapper for StringMap that provides set-like functionality.
 template <class AllocatorTy = MallocAllocator>
-class StringSet : public StringMap<std::nullopt_t, AllocatorTy> {
-  using Base = StringMap<std::nullopt_t, AllocatorTy>;
+class StringSet : public StringMap<NoneType, AllocatorTy> {
+  using Base = StringMap<NoneType, AllocatorTy>;
 
 public:
   StringSet() = default;
@@ -36,7 +35,7 @@ public:
   }
 
   template <typename InputIt>
-  void insert(InputIt begin, InputIt end) {
+  void insert(const InputIt &begin, const InputIt &end) {
     for (auto it = begin; it != end; ++it)
       insert(*it);
   }

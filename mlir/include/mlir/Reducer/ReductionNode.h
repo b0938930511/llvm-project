@@ -48,7 +48,7 @@ public:
 
   using Range = std::pair<int, int>;
 
-  ReductionNode(ReductionNode *parent, const std::vector<Range> &range,
+  ReductionNode(ReductionNode *parent, std::vector<Range> range,
                 llvm::SpecificBumpPtrAllocator<ReductionNode> &allocator);
 
   ReductionNode *getParent() const { return parent; }
@@ -145,22 +145,22 @@ private:
   OwningOpRef<ModuleOp> module;
 
   /// The region of certain operation we're reducing in the module
-  Region *region = nullptr;
+  Region *region;
 
   /// The node we are reduced from. It means we will be in variants of parent
   /// node.
-  ReductionNode *parent = nullptr;
+  ReductionNode *parent;
 
   /// The size of module after applying the reducer patterns with range
   /// constraints. This is only valid while the interestingness has been tested.
-  size_t size = 0;
+  size_t size;
 
   /// This is true if the module has been evaluated and it exhibits the
   /// interesting behavior.
-  Tester::Interestingness interesting = Tester::Interestingness::Untested;
+  Tester::Interestingness interesting;
 
   /// `ranges` represents the selected subset of operations in the region. We
-  /// implicitly number each operation in the region and ReductionTreePass will
+  /// implictly number each operation in the region and ReductionTreePass will
   /// apply reducer patterns on the operation falls into the `ranges`. We will
   /// generate new ReductionNode with subset of `ranges` to see if we can do
   /// further reduction. we may split the element in the `ranges` so that we can
@@ -192,6 +192,6 @@ class ReductionNode::iterator<SinglePath>
   ArrayRef<ReductionNode *> getNeighbors(ReductionNode *node);
 };
 
-} // namespace mlir
+} // end namespace mlir
 
 #endif // MLIR_REDUCER_REDUCTIONNODE_H

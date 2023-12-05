@@ -16,13 +16,16 @@
 #include "lldb/Target/SectionLoadList.h"
 #include "lldb/Target/Target.h"
 #include "lldb/Utility/ArchSpec.h"
-#include "lldb/Utility/LLDBLog.h"
 #include "lldb/Utility/Log.h"
 
 using namespace lldb_private;
 using namespace lldb;
 
 LLDB_PLUGIN_DEFINE(ArchitectureMips)
+
+ConstString ArchitectureMips::GetPluginNameStatic() {
+  return ConstString("mips");
+}
 
 void ArchitectureMips::Initialize() {
   PluginManager::RegisterPlugin(GetPluginNameStatic(),
@@ -38,6 +41,9 @@ std::unique_ptr<Architecture> ArchitectureMips::Create(const ArchSpec &arch) {
   return arch.IsMIPS() ?
       std::unique_ptr<Architecture>(new ArchitectureMips(arch)) : nullptr;
 }
+
+ConstString ArchitectureMips::GetPluginName() { return GetPluginNameStatic(); }
+uint32_t ArchitectureMips::GetPluginVersion() { return 1; }
 
 addr_t ArchitectureMips::GetCallableLoadAddress(addr_t code_addr,
                                                 AddressClass addr_class) const {
@@ -72,7 +78,7 @@ addr_t ArchitectureMips::GetOpcodeLoadAddress(addr_t opcode_addr,
 lldb::addr_t ArchitectureMips::GetBreakableLoadAddress(lldb::addr_t addr,
                                                        Target &target) const {
 
-  Log *log = GetLog(LLDBLog::Breakpoints);
+  Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_BREAKPOINTS));
 
   Address resolved_addr;
 

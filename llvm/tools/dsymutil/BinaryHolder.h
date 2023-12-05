@@ -15,6 +15,7 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/Object/Archive.h"
 #include "llvm/Object/Error.h"
 #include "llvm/Object/MachOUniversal.h"
@@ -23,7 +24,6 @@
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/VirtualFileSystem.h"
-#include "llvm/TargetParser/Triple.h"
 
 #include <mutex>
 
@@ -103,7 +103,7 @@ public:
       std::string Filename;
       TimestampTy Timestamp;
 
-      KeyTy() {}
+      KeyTy() : Filename(), Timestamp() {}
       KeyTy(StringRef Filename, TimestampTy Timestamp)
           : Filename(Filename.str()), Timestamp(Timestamp) {}
     };
@@ -118,7 +118,7 @@ public:
 
   private:
     std::vector<std::unique_ptr<object::Archive>> Archives;
-    DenseMap<KeyTy, std::unique_ptr<ObjectEntry>> MemberCache;
+    DenseMap<KeyTy, ObjectEntry> MemberCache;
     std::mutex MemberCacheMutex;
   };
 
@@ -126,18 +126,15 @@ public:
   getObjectEntry(StringRef Filename, TimestampTy Timestamp = TimestampTy());
 
   void clear();
-  void eraseObjectEntry(StringRef Filename);
 
 private:
   /// Cache of static archives. Objects that are part of a static archive are
   /// stored under this object, rather than in the map below.
-  StringMap<std::unique_ptr<ArchiveEntry>> ArchiveCache;
-  StringMap<uint32_t> ArchiveRefCounter;
+  StringMap<ArchiveEntry> ArchiveCache;
   std::mutex ArchiveCacheMutex;
 
   /// Object entries for objects that are not in a static archive.
-  StringMap<std::unique_ptr<ObjectEntry>> ObjectCache;
-  StringMap<uint32_t> ObjectRefCounter;
+  StringMap<ObjectEntry> ObjectCache;
   std::mutex ObjectCacheMutex;
 
   /// Virtual File System instance.

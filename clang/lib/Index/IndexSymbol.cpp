@@ -66,17 +66,16 @@ bool index::isFunctionLocalSymbol(const Decl *D) {
 
   if (const NamedDecl *ND = dyn_cast<NamedDecl>(D)) {
     switch (ND->getFormalLinkage()) {
-    case Linkage::Invalid:
-      llvm_unreachable("Linkage hasn't been computed!");
-    case Linkage::None:
-    case Linkage::Internal:
-      return true;
-    case Linkage::VisibleNone:
-    case Linkage::UniqueExternal:
-      llvm_unreachable("Not a sema linkage");
-    case Linkage::Module:
-    case Linkage::External:
-      return false;
+      case NoLinkage:
+      case InternalLinkage:
+        return true;
+      case VisibleNoLinkage:
+      case UniqueExternalLinkage:
+      case ModuleInternalLinkage:
+        llvm_unreachable("Not a sema linkage");
+      case ModuleLinkage:
+      case ExternalLinkage:
+        return false;
     }
   }
 
@@ -107,19 +106,19 @@ SymbolInfo index::getSymbolInfo(const Decl *D) {
 
   if (const TagDecl *TD = dyn_cast<TagDecl>(D)) {
     switch (TD->getTagKind()) {
-    case TagTypeKind::Struct:
+    case TTK_Struct:
       Info.Kind = SymbolKind::Struct; break;
-    case TagTypeKind::Union:
+    case TTK_Union:
       Info.Kind = SymbolKind::Union; break;
-    case TagTypeKind::Class:
+    case TTK_Class:
       Info.Kind = SymbolKind::Class;
       Info.Lang = SymbolLanguage::CXX;
       break;
-    case TagTypeKind::Interface:
+    case TTK_Interface:
       Info.Kind = SymbolKind::Protocol;
       Info.Lang = SymbolLanguage::CXX;
       break;
-    case TagTypeKind::Enum:
+    case TTK_Enum:
       Info.Kind = SymbolKind::Enum; break;
     }
 
@@ -348,6 +347,7 @@ SymbolInfo index::getSymbolInfo(const Decl *D) {
       }
       break;
     case Decl::ClassTemplatePartialSpecialization:
+    case Decl::ClassScopeFunctionSpecialization:
     case Decl::ClassTemplateSpecialization:
     case Decl::CXXRecord:
     case Decl::Enum:
@@ -370,9 +370,6 @@ SymbolInfo index::getSymbolInfo(const Decl *D) {
       break;
     case Decl::NonTypeTemplateParm:
       Info.Kind = SymbolKind::NonTypeTemplateParm;
-      break;
-    case Decl::Concept:
-      Info.Kind = SymbolKind::Concept;
       break;
     // Other decls get the 'unknown' kind.
     default:
@@ -537,8 +534,6 @@ StringRef index::getSymbolKindString(SymbolKind K) {
   case SymbolKind::TemplateTypeParm: return "template-type-param";
   case SymbolKind::TemplateTemplateParm: return "template-template-param";
   case SymbolKind::NonTypeTemplateParm: return "non-type-template-param";
-  case SymbolKind::Concept:
-    return "concept";
   }
   llvm_unreachable("invalid symbol kind");
 }

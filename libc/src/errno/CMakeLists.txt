@@ -1,10 +1,18 @@
+if (LLVM_LIBC_FULL_BUILD)
 add_entrypoint_object(
-  errno
+  __errno_location
   SRCS
-    libc_errno.cpp
+    __errno_location.cpp
   HDRS
-    libc_errno.h     # Include this
-  DEPENDS
-    libc.include.errno
-    libc.src.__support.common
+    __errno_location.h
+    llvmlibc_errno.h
 )
+else()
+add_entrypoint_object(
+  __errno_location
+  SRCS
+    dummy_errno.cpp
+  HDRS
+    dummy_errno.h
+)
+endif()

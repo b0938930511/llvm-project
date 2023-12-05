@@ -5,10 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-///
-/// \file
-/// This file implements the BitVector class.
-///
+//
+// This file implements the BitVector class.
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef LLVM_ADT_BITVECTOR_H
@@ -24,7 +23,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <iterator>
 #include <utility>
 
 namespace llvm {
@@ -41,12 +39,6 @@ template <typename BitVectorT> class const_set_bits_iterator_impl {
   }
 
 public:
-  using iterator_category = std::forward_iterator_tag;
-  using difference_type   = void;
-  using value_type        = int;
-  using pointer           = value_type*;
-  using reference         = value_type&;
-
   const_set_bits_iterator_impl(const BitVectorT &Parent, int Current)
       : Parent(Parent), Current(Current) {}
   explicit const_set_bits_iterator_impl(const BitVectorT &Parent)
@@ -90,10 +82,10 @@ class BitVector {
   using Storage = SmallVector<BitWord>;
 
   Storage Bits;  // Actual bits.
-  unsigned Size = 0; // Size of bitvector in bits.
+  unsigned Size; // Size of bitvector in bits.
 
 public:
-  using size_type = unsigned;
+  typedef unsigned size_type;
 
   // Encapsulation of a single bit.
   class reference {
@@ -142,7 +134,7 @@ public:
   }
 
   /// BitVector default ctor - Creates an empty bitvector.
-  BitVector() = default;
+  BitVector() : Size(0) {}
 
   /// BitVector ctor - Creates a bitvector of specified number of bits. All
   /// bits are initialized to the specified value.
@@ -162,7 +154,7 @@ public:
   size_type count() const {
     unsigned NumBits = 0;
     for (auto Bit : Bits)
-      NumBits += llvm::popcount(Bit);
+      NumBits += countPopulation(Bit);
     return NumBits;
   }
 
@@ -220,7 +212,7 @@ public:
         Copy &= maskTrailingOnes<BitWord>(LastBit + 1);
       }
       if (Copy != 0)
-        return i * BITWORD_SIZE + llvm::countr_zero(Copy);
+        return i * BITWORD_SIZE + countTrailingZeros(Copy);
     }
     return -1;
   }
@@ -250,7 +242,7 @@ public:
       }
 
       if (Copy != 0)
-        return (CurrentWord + 1) * BITWORD_SIZE - llvm::countl_zero(Copy) - 1;
+        return (CurrentWord + 1) * BITWORD_SIZE - countLeadingZeros(Copy) - 1;
     }
 
     return -1;
@@ -288,7 +280,7 @@ public:
 
       if (Copy != ~BitWord(0)) {
         unsigned Result =
-            (CurrentWord + 1) * BITWORD_SIZE - llvm::countl_one(Copy) - 1;
+            (CurrentWord + 1) * BITWORD_SIZE - countLeadingOnes(Copy) - 1;
         return Result < Size ? Result : -1;
       }
     }
@@ -452,12 +444,6 @@ public:
     return (Bits[Idx / BITWORD_SIZE] & Mask) != 0;
   }
 
-  /// Return the last element in the vector.
-  bool back() const {
-    assert(!empty() && "Getting last element of empty vector.");
-    return (*this)[size() - 1];
-  }
-
   bool test(unsigned Idx) const {
     return (*this)[Idx];
   }
@@ -477,12 +463,6 @@ public:
     // If true, set single bit.
     if (Val)
       set(OldSize);
-  }
-
-  /// Pop one bit from the end of the vector.
-  void pop_back() {
-    assert(!empty() && "Empty vector has no element to pop.");
-    resize(size() - 1);
   }
 
   /// Test if any common bits are set.
@@ -556,8 +536,8 @@ public:
                [&Arg](auto const &BV) { return Arg.size() == BV; }) &&
            "consistent sizes");
     Out.resize(Arg.size());
-    for (size_type I = 0, E = Arg.Bits.size(); I != E; ++I)
-      Out.Bits[I] = f(Arg.Bits[I], Args.Bits[I]...);
+    for (size_t i = 0, e = Arg.Bits.size(); i != e; ++i)
+      Out.Bits[i] = f(Arg.Bits[i], Args.Bits[i]...);
     Out.clear_unused_bits();
     return Out;
   }
@@ -565,16 +545,16 @@ public:
   BitVector &operator|=(const BitVector &RHS) {
     if (size() < RHS.size())
       resize(RHS.size());
-    for (size_type I = 0, E = RHS.Bits.size(); I != E; ++I)
-      Bits[I] |= RHS.Bits[I];
+    for (size_t i = 0, e = RHS.Bits.size(); i != e; ++i)
+      Bits[i] |= RHS.Bits[i];
     return *this;
   }
 
   BitVector &operator^=(const BitVector &RHS) {
     if (size() < RHS.size())
       resize(RHS.size());
-    for (size_type I = 0, E = RHS.Bits.size(); I != E; ++I)
-      Bits[I] ^= RHS.Bits[I];
+    for (size_t i = 0, e = RHS.Bits.size(); i != e; ++i)
+      Bits[i] ^= RHS.Bits[i];
     return *this;
   }
 
@@ -688,7 +668,7 @@ public:
   }
   bool isInvalid() const { return Size == (unsigned)-1; }
 
-  ArrayRef<BitWord> getData() const { return {Bits.data(), Bits.size()}; }
+  ArrayRef<BitWord> getData() const { return {&Bits[0], Bits.size()}; }
 
   //===--------------------------------------------------------------------===//
   // Portable bit mask operations.
@@ -770,7 +750,7 @@ private:
   }
 
   int next_unset_in_word(int WordIndex, BitWord Word) const {
-    unsigned Result = WordIndex * BITWORD_SIZE + llvm::countr_one(Word);
+    unsigned Result = WordIndex * BITWORD_SIZE + countTrailingOnes(Word);
     return Result < size() ? Result : -1;
   }
 
@@ -828,11 +808,11 @@ private:
 
 public:
   /// Return the size (in bytes) of the bit vector.
-  size_type getMemorySize() const { return Bits.size() * sizeof(BitWord); }
-  size_type getBitCapacity() const { return Bits.size() * BITWORD_SIZE; }
+  size_t getMemorySize() const { return Bits.size() * sizeof(BitWord); }
+  size_t getBitCapacity() const { return Bits.size() * BITWORD_SIZE; }
 };
 
-inline BitVector::size_type capacity_in_bytes(const BitVector &X) {
+inline size_t capacity_in_bytes(const BitVector &X) {
   return X.getMemorySize();
 }
 
@@ -844,8 +824,8 @@ template <> struct DenseMapInfo<BitVector> {
     return V;
   }
   static unsigned getHashValue(const BitVector &V) {
-    return DenseMapInfo<std::pair<BitVector::size_type, ArrayRef<uintptr_t>>>::
-        getHashValue(std::make_pair(V.size(), V.getData()));
+    return DenseMapInfo<std::pair<unsigned, ArrayRef<uintptr_t>>>::getHashValue(
+        std::make_pair(V.size(), V.getData()));
   }
   static bool isEqual(const BitVector &LHS, const BitVector &RHS) {
     if (LHS.isInvalid() || RHS.isInvalid())

@@ -308,7 +308,7 @@ ExtractLoops(BugDriver &BD,
                                       std::unique_ptr<Module>),
              std::vector<Function *> &MiscompiledFunctions) {
   bool MadeChange = false;
-  while (true) {
+  while (1) {
     if (BugpointIsInterrupted)
       return MadeChange;
 
@@ -830,8 +830,8 @@ CleanupAndPrepareModules(BugDriver &BD, std::unique_ptr<Module> Test,
   // Add the resolver to the Safe module.
   // Prototype: void *getPointerToNamedFunction(const char* Name)
   FunctionCallee resolverFunc = Safe->getOrInsertFunction(
-      "getPointerToNamedFunction", PointerType::getUnqual(Safe->getContext()),
-      PointerType::getUnqual(Safe->getContext()));
+      "getPointerToNamedFunction", Type::getInt8PtrTy(Safe->getContext()),
+      Type::getInt8PtrTy(Safe->getContext()));
 
   // Use the function we just added to get addresses of functions we need.
   for (Module::iterator F = Safe->begin(), E = Safe->end(); F != E; ++F) {

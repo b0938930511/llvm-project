@@ -1,7 +1,6 @@
 # REQUIRES: hexagon
 # RUN: llvm-mc -filetype=obj -triple=hexagon-unknown-elf %s -o %t.o
-## Use --threads=1 to keep emitted warnings across sections sequential.
-# RUN: not ld.lld %t.o -o /dev/null --threads=1 2>&1 | FileCheck --implicit-check-not "out of range" %s
+# RUN: not ld.lld %t.o -o /dev/null 2>&1 | FileCheck --implicit-check-not "out of range" %s
 
 	.globl	_start
 	.type	_start, @function

@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 // <algorithm>
+// REQUIRES: c++03 || c++11 || c++14
 
 // template<RandomAccessIterator Iter, Callable<auto, Iter::difference_type> Rand>
 //   requires ShuffleIterator<Iter>
@@ -14,8 +15,7 @@
 //   void
 //   random_shuffle(Iter first, Iter last, Rand&& rand);
 
-// REQUIRES: c++03 || c++11 || c++14
-// ADDITIONAL_COMPILE_FLAGS: -D_LIBCPP_DISABLE_DEPRECATION_WARNINGS
+#define _LIBCPP_DISABLE_DEPRECATION_WARNINGS
 
 #include <algorithm>
 #include <cassert>

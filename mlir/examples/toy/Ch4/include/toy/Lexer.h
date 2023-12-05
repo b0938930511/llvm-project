@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef TOY_LEXER_H
-#define TOY_LEXER_H
+#ifndef MLIR_TUTORIAL_TOY_LEXER_H_
+#define MLIR_TUTORIAL_TOY_LEXER_H_
 
 #include "llvm/ADT/StringRef.h"
 
@@ -229,4 +229,4 @@ private:
 };
 } // namespace toy
 
-#endif // TOY_LEXER_H
+#endif // MLIR_TUTORIAL_TOY_LEXER_H_

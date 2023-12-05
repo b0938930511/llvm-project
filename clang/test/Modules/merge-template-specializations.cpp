@@ -3,7 +3,3 @@
 // expected-no-diagnostics
 #include "c.h"
 X x;
-
-void test_var_template() {
-  use_var_template<int>(0);
-}

@@ -1,23 +1,5 @@
 include "llvm/Option/OptParser.td"
 
-// Convenience classes for long options which only accept two dashes. For lld
-// specific or newer long options, we prefer two dashes to avoid collision with
-// short options. For many others, we have to accept both forms to be compatible
-// with GNU ld.
-class FF<string name> : Flag<["--"], name>;
-class JJ<string name>: Joined<["--"], name>;
-
-multiclass EEq<string name, string help> {
-  def NAME: Separate<["--"], name>;
-  def NAME # _eq: Joined<["--"], name # "=">, Alias<!cast<Separate>(NAME)>,
-    HelpText<help>;
-}
-
-multiclass BB<string name, string help1, string help2> {
-  def NAME: Flag<["--"], name>, HelpText<help1>;
-  def no_ # NAME: Flag<["--"], "no-" # name>, HelpText<help2>;
-}
-
 // For options whose names are multiple letters, either one dash or
 // two can precede the option name except those that start with 'o'.
 class F<string name>: Flag<["--", "-"], name>;
@@ -35,17 +17,13 @@ multiclass B<string name, string help1, string help2> {
   def no_ # NAME: Flag<["--", "-"], "no-" # name>, HelpText<help2>;
 }
 
+multiclass BB<string name, string help1, string help2> {
+  def NAME: Flag<["--"], name>, HelpText<help1>;
+  def no_ # NAME: Flag<["--"], "no-" # name>, HelpText<help2>;
+}
+
 // The following flags are shared with the ELF linker
 def Bsymbolic: F<"Bsymbolic">, HelpText<"Bind defined symbols locally">;
-
-def Bdynamic: F<"Bdynamic">, HelpText<"Link against shared libraries (default)">;
-
-def Bstatic: F<"Bstatic">, HelpText<"Do not link against shared libraries">;
-
-def build_id: F<"build-id">, HelpText<"Alias for --build-id=fast">;
-
-def build_id_eq: J<"build-id=">, HelpText<"Generate build ID note">,
-  MetaVarName<"[fast,sha1,uuid,0x<hexstring>]">;
 
 defm color_diagnostics: B<"color-diagnostics",
   "Alias for --color-diagnostics=always",
@@ -73,8 +51,8 @@ defm export_dynamic: B<"export-dynamic",
 def entry: S<"entry">, MetaVarName<"<entry>">,
   HelpText<"Name of entry point symbol">;
 
-defm error_limit:
-  EEq<"error-limit", "Maximum number of errors to emit before stopping (0 = no limit)">;
+def error_limit: J<"error-limit=">,
+  HelpText<"Maximum number of errors to emit before stopping (0 = no limit)">;
 
 def fatal_warnings: F<"fatal-warnings">,
   HelpText<"Treat warnings as errors">;
@@ -83,21 +61,21 @@ defm gc_sections: B<"gc-sections",
     "Enable garbage collection of unused sections",
     "Disable garbage collection of unused sections">;
 
-defm merge_data_segments: BB<"merge-data-segments",
+defm merge_data_segments: B<"merge-data-segments",
     "Enable merging data segments",
     "Disable merging data segments">;
 
 def help: F<"help">, HelpText<"Print option help">;
 
-def library: JoinedOrSeparate<["-"], "l">, MetaVarName<"<libName>">,
+def l: JoinedOrSeparate<["-"], "l">, MetaVarName<"<libName>">,
   HelpText<"Root name of library to use">;
 
-def library_path: JoinedOrSeparate<["-"], "L">, MetaVarName<"<dir>">,
+def L: JoinedOrSeparate<["-"], "L">, MetaVarName<"<dir>">,
   HelpText<"Add a directory to the library search path">;
 
 def m: JoinedOrSeparate<["-"], "m">, HelpText<"Set target emulation">;
 
-defm mllvm: Eq<"mllvm", "Additional arguments to forward to LLVM's option processing">;
+def mllvm: S<"mllvm">, HelpText<"Options to pass to LLVM">;
 
 defm Map: Eq<"Map", "Print a link map to the specified file">;
 
@@ -121,7 +99,7 @@ def print_map: F<"print-map">,
 
 def relocatable: F<"relocatable">, HelpText<"Create relocatable object file">;
 
-defm reproduce: EEq<"reproduce", "Dump linker invocation and input files for debugging">;
+defm reproduce: Eq<"reproduce", "Dump linker invocation and input files for debugging">;
 
 defm rsp_quoting: Eq<"rsp-quoting", "Quoting style for response files">,
   MetaVarName<"[posix,windows]">;
@@ -163,9 +141,8 @@ def z: JoinedOrSeparate<["-"], "z">, MetaVarName<"<option>">,
 // The follow flags are unique to wasm
 
 def allow_undefined: F<"allow-undefined">,
-  HelpText<"Allow undefined symbols in linked binary. "
-           "This options is equivalent to --import-undefined "
-           "and --unresolved-symbols=ignore-all">;
+  HelpText<"Allow undefined symbols in linked binary. This options is equivelant "
+           "to --import-undefined and --unresolved-symbols=ignore-all">;
 
 def import_undefined: F<"import-undefined">,
   HelpText<"Turn undefined symbols into imports where possible">;
@@ -181,85 +158,55 @@ defm export: Eq<"export", "Force a symbol to be exported">;
 defm export_if_defined: Eq<"export-if-defined",
      "Force a symbol to be exported, if it is defined in the input">;
 
-def export_all: FF<"export-all">,
+def export_all: F<"export-all">,
   HelpText<"Export all symbols (normally combined with --no-gc-sections)">;
 
-def export_table: FF<"export-table">,
+def export_table: F<"export-table">,
   HelpText<"Export function table to the environment">;
 
-def growable_table: FF<"growable-table">,
+def growable_table: F<"growable-table">,
   HelpText<"Remove maximum size from function table, allowing table to grow">;
 
-def global_base: JJ<"global-base=">,
-  HelpText<"Memory offset at which to place global data (Defaults to 1024)">;
+def global_base: J<"global-base=">,
+  HelpText<"Where to start to place global data">;
 
-defm keep_section: Eq<"keep-section",
-     "Preserve a section even when --strip-all is given. This is useful for compiler drivers such as clang or emcc that, for example, depend on the features section for post-link processing. Can be specified multiple times to keep multiple sections">;
+def import_memory: F<"import-memory">,
+  HelpText<"Import memory from the environment">;
 
-def import_memory: FF<"import-memory">,
-  HelpText<"Import the module's memory from the default module of \"env\" with the name \"memory\".">;
-def import_memory_with_name: JJ<"import-memory=">,
-  HelpText<"Import the module's memory from the passed module with the passed name.">,
-  MetaVarName<"<module>,<name>">;
-
-def export_memory: FF<"export-memory">,
-  HelpText<"Export the module's memory with the default name of \"memory\"">;
-def export_memory_with_name: JJ<"export-memory=">,
-  HelpText<"Export the module's memory with the passed name">;
-
-def shared_memory: FF<"shared-memory">,
+def shared_memory: F<"shared-memory">,
   HelpText<"Use shared linear memory">;
 
-defm soname: Eq<"soname", "Set the module name in the generated name section">;
-
-def import_table: FF<"import-table">,
+def import_table: F<"import-table">,
   HelpText<"Import function table from the environment">;
 
-def initial_memory: JJ<"initial-memory=">,
+def initial_memory: J<"initial-memory=">,
   HelpText<"Initial size of the linear memory">;
 
-def max_memory: JJ<"max-memory=">,
+def max_memory: J<"max-memory=">,
   HelpText<"Maximum size of the linear memory">;
 
-def no_entry: FF<"no-entry">,
+def no_entry: F<"no-entry">,
   HelpText<"Do not output any entry point">;
 
-def stack_first: FF<"stack-first">,
+def stack_first: F<"stack-first">,
   HelpText<"Place stack at start of linear memory rather than after data">;
-
-def table_base: JJ<"table-base=">,
-  HelpText<"Table offset at which to place address taken functions (Defaults to 1)">;
 
 defm whole_archive: B<"whole-archive",
     "Force load of all members in a static library",
     "Do not force load of all members in a static library (default)">;
 
-def why_extract: JJ<"why-extract=">, HelpText<"Print to a file about why archive members are extracted">;
-
-defm check_features: BB<"check-features",
+defm check_features: B<"check-features",
     "Check feature compatibility of linked objects (default)",
     "Ignore feature compatibility of linked objects">;
 
 def features: CommaJoined<["--", "-"], "features=">,
   HelpText<"Comma-separated used features, inferred from input objects by default.">;
 
-def extra_features: CommaJoined<["--", "-"], "extra-features=">,
-  HelpText<"Comma-separated list of features to add to the default set of features inferred from input objects.">;
-
 // Aliases
 def: JoinedOrSeparate<["-"], "e">, Alias<entry>;
 def: J<"entry=">, Alias<entry>;
-def: F<"call_shared">, Alias<Bdynamic>, HelpText<"Alias for --Bdynamic">;
-def: F<"dy">, Alias<Bdynamic>, HelpText<"Alias for --Bdynamic">;
-def: F<"dn">, Alias<Bstatic>, HelpText<"Alias for --Bstatic">;
-def: F<"non_shared">, Alias<Bstatic>, HelpText<"Alias for --Bstatic">;
-def: F<"static">, Alias<Bstatic>, HelpText<"Alias for --Bstatic">;
 def: Flag<["-"], "E">, Alias<export_dynamic>, HelpText<"Alias for --export-dynamic">;
 def: Flag<["-"], "i">, Alias<initial_memory>;
-def: Separate<["--", "-"], "library">, Alias<library>;
-def: Joined<["--", "-"], "library=">, Alias<library>;
-def: Separate<["--", "-"], "library-path">, Alias<library_path>;
-def: Joined<["--", "-"], "library-path=">, Alias<library_path>;
 def: Flag<["-"], "M">, Alias<print_map>, HelpText<"Alias for --print-map">;
 def: Flag<["-"], "r">, Alias<relocatable>;
 def: Flag<["-"], "s">, Alias<strip_all>, HelpText<"Alias for --strip-all">;
@@ -269,22 +216,21 @@ def: JoinedOrSeparate<["-"], "y">, Alias<trace_symbol>, HelpText<"Alias for --tr
 def: JoinedOrSeparate<["-"], "u">, Alias<undefined>;
 
 // LTO-related options.
-def lto_O: JJ<"lto-O">, MetaVarName<"<opt-level>">,
+def lto_O: J<"lto-O">, MetaVarName<"<opt-level>">,
   HelpText<"Optimization level for LTO">;
-def lto_CGO: JJ<"lto-CGO">, MetaVarName<"<cgopt-level>">,
-  HelpText<"Codegen optimization level for LTO">;
-def lto_partitions: JJ<"lto-partitions=">,
+def lto_partitions: J<"lto-partitions=">,
   HelpText<"Number of LTO codegen partitions">;
 def disable_verify: F<"disable-verify">;
 def save_temps: F<"save-temps">, HelpText<"Save intermediate LTO compilation results">;
-def thinlto_cache_dir: JJ<"thinlto-cache-dir=">,
+def thinlto_cache_dir: J<"thinlto-cache-dir=">,
   HelpText<"Path to ThinLTO cached object file directory">;
-defm thinlto_cache_policy: EEq<"thinlto-cache-policy", "Pruning policy for the ThinLTO cache">;
-def thinlto_jobs: JJ<"thinlto-jobs=">,
+defm thinlto_cache_policy: Eq<"thinlto-cache-policy", "Pruning policy for the ThinLTO cache">;
+def thinlto_jobs: J<"thinlto-jobs=">,
   HelpText<"Number of ThinLTO jobs. Default to --threads=">;
-def lto_debug_pass_manager: FF<"lto-debug-pass-manager">,
+defm lto_legacy_pass_manager: BB<"lto-legacy-pass-manager", "Use legacy pass manager", "Use new pass manager">;
+def lto_debug_pass_manager: F<"lto-debug-pass-manager">,
   HelpText<"Debug new pass manager">;
 
 // Experimental PIC mode.
-def experimental_pic: FF<"experimental-pic">,
+def experimental_pic: F<"experimental-pic">,
   HelpText<"Enable Experimental PIC">;

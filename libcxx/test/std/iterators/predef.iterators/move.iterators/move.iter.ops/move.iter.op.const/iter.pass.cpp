@@ -16,73 +16,33 @@
 
 #include <iterator>
 #include <cassert>
-#include <utility>
 
 #include "test_macros.h"
 #include "test_iterators.h"
 
 template <class It>
-TEST_CONSTEXPR_CXX17 bool test()
+void
+test(It i)
 {
-  static_assert( std::is_constructible<std::move_iterator<It>, const It&>::value, "");
-  static_assert( std::is_constructible<std::move_iterator<It>, It&&>::value, "");
-  static_assert(!std::is_convertible<const It&, std::move_iterator<It> >::value, "");
-  static_assert(!std::is_convertible<It&&, std::move_iterator<It> >::value, "");
-
-  char s[] = "123";
-  {
-    It it = It(s);
-    std::move_iterator<It> r(it);
-    assert(base(r.base()) == s);
-  }
-  {
-    It it = It(s);
-    std::move_iterator<It> r(std::move(it));
-    assert(base(r.base()) == s);
-  }
-  return true;
-}
-
-template <class It>
-TEST_CONSTEXPR_CXX17 bool test_moveonly()
-{
-  static_assert(!std::is_constructible<std::move_iterator<It>, const It&>::value, "");
-  static_assert( std::is_constructible<std::move_iterator<It>, It&&>::value, "");
-  static_assert(!std::is_convertible<const It&, std::move_iterator<It> >::value, "");
-  static_assert(!std::is_convertible<It&&, std::move_iterator<It> >::value, "");
-
-  char s[] = "123";
-  {
-    It it = It(s);
-    std::move_iterator<It> r(std::move(it));
-    assert(base(r.base()) == s);
-  }
-  return true;
+    std::move_iterator<It> r(i);
+    assert(r.base() == i);
 }
 
 int main(int, char**)
 {
-  test<cpp17_input_iterator<char*> >();
-  test<forward_iterator<char*> >();
-  test<bidirectional_iterator<char*> >();
-  test<random_access_iterator<char*> >();
-  test<char*>();
-  test<const char*>();
+    char s[] = "123";
+    test(cpp17_input_iterator<char*>(s));
+    test(forward_iterator<char*>(s));
+    test(bidirectional_iterator<char*>(s));
+    test(random_access_iterator<char*>(s));
+    test(s);
 
 #if TEST_STD_VER > 14
-  static_assert(test<cpp17_input_iterator<char*>>());
-  static_assert(test<forward_iterator<char*>>());
-  static_assert(test<bidirectional_iterator<char*>>());
-  static_assert(test<random_access_iterator<char*>>());
-  static_assert(test<char*>());
-  static_assert(test<const char*>());
-#endif
-
-#if TEST_STD_VER > 17
-  test<contiguous_iterator<char*>>();
-  test_moveonly<cpp20_input_iterator<char*>>();
-  static_assert(test<contiguous_iterator<char*>>());
-  static_assert(test_moveonly<cpp20_input_iterator<char*>>());
+    {
+    constexpr const char *p = "123456789";
+    constexpr std::move_iterator<const char *> it(p);
+    static_assert(it.base() == p);
+    }
 #endif
 
   return 0;

@@ -27,10 +27,10 @@ struct some_alloc
 {
     typedef T value_type;
     some_alloc(const some_alloc&);
-    void allocate(std::size_t);
 };
 
-TEST_CONSTEXPR_CXX20 bool tests() {
+int main(int, char**)
+{
     {
         typedef std::vector<MoveOnly> C;
         static_assert(std::is_nothrow_default_constructible<C>::value, "");
@@ -48,14 +48,5 @@ TEST_CONSTEXPR_CXX20 bool tests() {
         static_assert(!std::is_nothrow_default_constructible<C>::value, "");
     }
 
-    return true;
-}
-
-int main(int, char**)
-{
-    tests();
-#if TEST_STD_VER > 17
-    static_assert(tests());
-#endif
-    return 0;
+  return 0;
 }

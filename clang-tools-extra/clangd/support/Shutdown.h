@@ -45,8 +45,6 @@
 
 #include <cerrno>
 #include <chrono>
-#include <type_traits>
-#include <utility>
 
 namespace clang {
 namespace clangd {

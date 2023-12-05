@@ -23,7 +23,7 @@
 #endif
 
 
-TEST_CONSTEXPR_CXX20 bool test() {
+void test_emplaceable_concept() {
 #if TEST_STD_VER >= 11
   int arr1[] = {42};
   int arr2[] = {1, 101, 42};
@@ -64,27 +64,13 @@ TEST_CONSTEXPR_CXX20 bool test() {
     }
   }
 #endif
-
-  // Test with a number of elements in the source range that is greater than capacity
-  {
-    typedef forward_iterator<int*> It;
-
-    std::vector<int> dst(10);
-
-    std::size_t n = dst.capacity() * 2;
-    std::vector<int> src(n);
-
-    dst.assign(It(src.data()), It(src.data() + src.size()));
-    assert(dst == src);
-  }
-
-  return true;
 }
 
-int main(int, char**) {
-  test();
-#if TEST_STD_VER > 17
-  static_assert(test());
-#endif
+
+
+int main(int, char**)
+{
+    test_emplaceable_concept();
+
   return 0;
 }

@@ -9,7 +9,7 @@
 
 int i = Red;
 
-int return_enum_constant(void) {
+int return_enum_constant() {
   int result = aRoundShape;
   return result;
 }

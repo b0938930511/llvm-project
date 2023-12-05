@@ -1,5 +1,5 @@
 // RUN: %clang_cc1 -triple %itanium_abi_triple %s -fsyntax-only -verify -pedantic
-enum e {A,
+enum e {A, 
         B = 42LL << 32,        // expected-warning {{ISO C restricts enumerator values to range of 'int'}}
       C = -4, D = 12456 };
 
@@ -11,14 +11,14 @@ enum g {  // too negative
 enum h { e = -2147483648, // too pos
    f = 2147483648,           // expected-warning {{ISO C restricts enumerator values to range of 'int'}}
   i = 0xFFFF0000 // expected-warning {{too large}}
-};
+}; 
 
 // minll maxull
 enum x                      // expected-warning {{enumeration values exceed range of largest integer}}
 { y = -9223372036854775807LL-1,  // expected-warning {{ISO C restricts enumerator values to range of 'int'}}
 z = 9223372036854775808ULL };    // expected-warning {{ISO C restricts enumerator values to range of 'int'}}
 
-int test(void) {
+int test() {
   return sizeof(enum e) ;
 }
 
@@ -35,9 +35,11 @@ int test2(int i)
 union u0;    // expected-note {{previous use is here}}
 enum u0 { U0A }; // expected-error {{use of 'u0' with tag type that does not match previous declaration}}
 
+
+// rdar://6095136
 extern enum some_undefined_enum ve2; // expected-warning {{ISO C forbids forward references to 'enum' types}}
 
-void test4(void) {
+void test4() {
   for (; ve2;) // expected-error {{statement requires expression of scalar type}}
     ;
   (_Bool)ve2;  // expected-error {{arithmetic or pointer type is required}}
@@ -51,6 +53,7 @@ void test4(void) {
 // PR2416
 enum someenum {};  // expected-error {{use of empty enum}}
 
+// <rdar://problem/6093889>
 enum e0 { // expected-note {{previous definition is here}}
   E0 = sizeof(enum e0 { E1 }), // expected-error {{nested redefinition}}
 };
@@ -59,11 +62,12 @@ enum e0 { // expected-note {{previous definition is here}}
 enum { PR3173A, PR3173B = PR3173A+50 };
 
 // PR2753
-void foo(void) {
+void foo() {
   enum xpto; // expected-warning{{ISO C forbids forward references to 'enum' types}}
   enum xpto; // expected-warning{{ISO C forbids forward references to 'enum' types}}
 }
 
+// <rdar://problem/6503878>
 typedef enum { X = 0 }; // expected-warning{{typedef requires a name}}
 
 
@@ -87,7 +91,7 @@ static enum e1 badfunc(struct s1 *q) {
 typedef enum {
   an_enumerator = 20
 } an_enum;
-char * s = (an_enum) an_enumerator; // expected-error {{incompatible integer to pointer conversion initializing 'char *' with an expression of type 'an_enum'}}
+char * s = (an_enum) an_enumerator; // expected-warning {{incompatible integer to pointer conversion initializing 'char *' with an expression of type 'an_enum'}}
 
 // PR4515
 enum PR4515 {PR4515a=1u,PR4515b=(PR4515a-2)/2};
@@ -95,7 +99,7 @@ int CheckPR4515[PR4515b==0?1:-1];
 
 // PR7911
 extern enum PR7911T PR7911V; // expected-warning{{ISO C forbids forward references to 'enum' types}}
-void PR7911F(void) {
+void PR7911F() {
   switch (PR7911V) // expected-error {{statement requires expression of integer type}}
     ;
 }
@@ -103,6 +107,7 @@ void PR7911F(void) {
 char test5[__has_feature(enumerator_attributes) ? 1 : -1];
 
 // PR8694
+// rdar://8707031
 void PR8694(int* e) // expected-note {{passing argument to parameter 'e' here}}
 {
 }
@@ -153,17 +158,4 @@ struct EnumRedeclStruct {
   enum {
     PR15071_One // expected-error {{redefinition of enumerator 'PR15071_One'}}
   } e;
-};
-
-enum struct GH42372_1 { // expected-error {{expected identifier or '{'}}
-  One
-};
-
-// Because class is not a keyword in C, this looks like a forward declaration.
-// expected-error@+4 {{expected ';' after top level declarator}}
-// expected-error@+3 {{tentative definition has type 'enum class' that is never completed}}
-// expected-warning@+2 {{ISO C forbids forward references to 'enum' types}}
-// expected-note@+1 {{forward declaration of 'enum class'}}
-enum class GH42372_2 {
-  One
 };

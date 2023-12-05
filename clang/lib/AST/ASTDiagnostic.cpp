@@ -25,10 +25,8 @@
 using namespace clang;
 
 // Returns a desugared version of the QualType, and marks ShouldAKA as true
-// whenever we remove significant sugar from the type. Make sure ShouldAKA
-// is initialized before passing it in.
-QualType clang::desugarForDiagnostic(ASTContext &Context, QualType QT,
-                                     bool &ShouldAKA) {
+// whenever we remove significant sugar from the type.
+static QualType Desugar(ASTContext &Context, QualType QT, bool &ShouldAKA) {
   QualifierCollector QC;
 
   while (true) {
@@ -37,11 +35,6 @@ QualType clang::desugarForDiagnostic(ASTContext &Context, QualType QT,
     // Don't aka just because we saw an elaborated type...
     if (const ElaboratedType *ET = dyn_cast<ElaboratedType>(Ty)) {
       QT = ET->desugar();
-      continue;
-    }
-    // ... or a using type ...
-    if (const UsingType *UT = dyn_cast<UsingType>(Ty)) {
-      QT = UT->desugar();
       continue;
     }
     // ... or a paren type ...
@@ -83,7 +76,7 @@ QualType clang::desugarForDiagnostic(ASTContext &Context, QualType QT,
     if (const FunctionType *FT = dyn_cast<FunctionType>(Ty)) {
       bool DesugarReturn = false;
       QualType SugarRT = FT->getReturnType();
-      QualType RT = desugarForDiagnostic(Context, SugarRT, DesugarReturn);
+      QualType RT = Desugar(Context, SugarRT, DesugarReturn);
       if (auto nullability = AttributedType::stripOuterNullability(SugarRT)) {
         RT = Context.getAttributedType(
             AttributedType::getNullabilityAttrKind(*nullability), RT, RT);
@@ -94,7 +87,7 @@ QualType clang::desugarForDiagnostic(ASTContext &Context, QualType QT,
       const FunctionProtoType *FPT = dyn_cast<FunctionProtoType>(FT);
       if (FPT) {
         for (QualType SugarPT : FPT->param_types()) {
-          QualType PT = desugarForDiagnostic(Context, SugarPT, DesugarArgument);
+          QualType PT = Desugar(Context, SugarPT, DesugarArgument);
           if (auto nullability =
                   AttributedType::stripOuterNullability(SugarPT)) {
             PT = Context.getAttributedType(
@@ -119,10 +112,10 @@ QualType clang::desugarForDiagnostic(ASTContext &Context, QualType QT,
       if (!TST->isTypeAlias()) {
         bool DesugarArgument = false;
         SmallVector<TemplateArgument, 4> Args;
-        for (const TemplateArgument &Arg : TST->template_arguments()) {
+        for (unsigned I = 0, N = TST->getNumArgs(); I != N; ++I) {
+          const TemplateArgument &Arg = TST->getArg(I);
           if (Arg.getKind() == TemplateArgument::Type)
-            Args.push_back(desugarForDiagnostic(Context, Arg.getAsType(),
-                                                DesugarArgument));
+            Args.push_back(Desugar(Context, Arg.getAsType(), DesugarArgument));
           else
             Args.push_back(Arg);
         }
@@ -134,29 +127,6 @@ QualType clang::desugarForDiagnostic(ASTContext &Context, QualType QT,
         }
         break;
       }
-    }
-
-    if (const auto *AT = dyn_cast<ArrayType>(Ty)) {
-      QualType ElementTy =
-          desugarForDiagnostic(Context, AT->getElementType(), ShouldAKA);
-      if (const auto *CAT = dyn_cast<ConstantArrayType>(AT))
-        QT = Context.getConstantArrayType(
-            ElementTy, CAT->getSize(), CAT->getSizeExpr(),
-            CAT->getSizeModifier(), CAT->getIndexTypeCVRQualifiers());
-      else if (const auto *VAT = dyn_cast<VariableArrayType>(AT))
-        QT = Context.getVariableArrayType(
-            ElementTy, VAT->getSizeExpr(), VAT->getSizeModifier(),
-            VAT->getIndexTypeCVRQualifiers(), VAT->getBracketsRange());
-      else if (const auto *DSAT = dyn_cast<DependentSizedArrayType>(AT))
-        QT = Context.getDependentSizedArrayType(
-            ElementTy, DSAT->getSizeExpr(), DSAT->getSizeModifier(),
-            DSAT->getIndexTypeCVRQualifiers(), DSAT->getBracketsRange());
-      else if (const auto *IAT = dyn_cast<IncompleteArrayType>(AT))
-        QT = Context.getIncompleteArrayType(ElementTy, IAT->getSizeModifier(),
-                                            IAT->getIndexTypeCVRQualifiers());
-      else
-        llvm_unreachable("Unhandled array type");
-      break;
     }
 
     // Don't desugar magic Objective-C types.
@@ -211,25 +181,24 @@ break; \
   // If we have a pointer-like type, desugar the pointee as well.
   // FIXME: Handle other pointer-like types.
   if (const PointerType *Ty = QT->getAs<PointerType>()) {
-    QT = Context.getPointerType(
-        desugarForDiagnostic(Context, Ty->getPointeeType(), ShouldAKA));
+    QT = Context.getPointerType(Desugar(Context, Ty->getPointeeType(),
+                                        ShouldAKA));
   } else if (const auto *Ty = QT->getAs<ObjCObjectPointerType>()) {
-    QT = Context.getObjCObjectPointerType(
-        desugarForDiagnostic(Context, Ty->getPointeeType(), ShouldAKA));
+    QT = Context.getObjCObjectPointerType(Desugar(Context, Ty->getPointeeType(),
+                                                  ShouldAKA));
   } else if (const LValueReferenceType *Ty = QT->getAs<LValueReferenceType>()) {
-    QT = Context.getLValueReferenceType(
-        desugarForDiagnostic(Context, Ty->getPointeeType(), ShouldAKA));
+    QT = Context.getLValueReferenceType(Desugar(Context, Ty->getPointeeType(),
+                                                ShouldAKA));
   } else if (const RValueReferenceType *Ty = QT->getAs<RValueReferenceType>()) {
-    QT = Context.getRValueReferenceType(
-        desugarForDiagnostic(Context, Ty->getPointeeType(), ShouldAKA));
+    QT = Context.getRValueReferenceType(Desugar(Context, Ty->getPointeeType(),
+                                                ShouldAKA));
   } else if (const auto *Ty = QT->getAs<ObjCObjectType>()) {
     if (Ty->getBaseType().getTypePtr() != Ty && !ShouldAKA) {
-      QualType BaseType =
-          desugarForDiagnostic(Context, Ty->getBaseType(), ShouldAKA);
-      QT = Context.getObjCObjectType(
-          BaseType, Ty->getTypeArgsAsWritten(),
-          llvm::ArrayRef(Ty->qual_begin(), Ty->getNumProtocols()),
-          Ty->isKindOfTypeAsWritten());
+      QualType BaseType = Desugar(Context, Ty->getBaseType(), ShouldAKA);
+      QT = Context.getObjCObjectType(BaseType, Ty->getTypeArgsAsWritten(),
+                                     llvm::makeArrayRef(Ty->qual_begin(),
+                                                        Ty->getNumProtocols()),
+                                     Ty->isKindOfTypeAsWritten());
     }
   }
 
@@ -270,9 +239,9 @@ ConvertTypeToDiagnosticString(ASTContext &Context, QualType Ty,
   std::string S = Ty.getAsString(Context.getPrintingPolicy());
   std::string CanS = CanTy.getAsString(Context.getPrintingPolicy());
 
-  for (const intptr_t &QualTypeVal : QualTypeVals) {
+  for (unsigned I = 0, E = QualTypeVals.size(); I != E; ++I) {
     QualType CompareTy =
-        QualType::getFromOpaquePtr(reinterpret_cast<void *>(QualTypeVal));
+        QualType::getFromOpaquePtr(reinterpret_cast<void*>(QualTypeVals[I]));
     if (CompareTy.isNull())
       continue;
     if (CompareTy == Ty)
@@ -282,8 +251,7 @@ ConvertTypeToDiagnosticString(ASTContext &Context, QualType Ty,
       continue;  // Same canonical types
     std::string CompareS = CompareTy.getAsString(Context.getPrintingPolicy());
     bool ShouldAKA = false;
-    QualType CompareDesugar =
-        desugarForDiagnostic(Context, CompareTy, ShouldAKA);
+    QualType CompareDesugar = Desugar(Context, CompareTy, ShouldAKA);
     std::string CompareDesugarStr =
         CompareDesugar.getAsString(Context.getPrintingPolicy());
     if (CompareS != S && CompareDesugarStr != S)
@@ -302,11 +270,11 @@ ConvertTypeToDiagnosticString(ASTContext &Context, QualType Ty,
   // Check to see if we already desugared this type in this
   // diagnostic.  If so, don't do it again.
   bool Repeated = false;
-  for (const auto &PrevArg : PrevArgs) {
+  for (unsigned i = 0, e = PrevArgs.size(); i != e; ++i) {
     // TODO: Handle ak_declcontext case.
-    if (PrevArg.first == DiagnosticsEngine::ak_qualtype) {
-      QualType PrevTy(
-          QualType::getFromOpaquePtr(reinterpret_cast<void *>(PrevArg.second)));
+    if (PrevArgs[i].first == DiagnosticsEngine::ak_qualtype) {
+      void *Ptr = (void*)PrevArgs[i].second;
+      QualType PrevTy(QualType::getFromOpaquePtr(Ptr));
       if (PrevTy == Ty) {
         Repeated = true;
         break;
@@ -318,7 +286,7 @@ ConvertTypeToDiagnosticString(ASTContext &Context, QualType Ty,
   // sugar gives us something "significantly different".
   if (!Repeated) {
     bool ShouldAKA = false;
-    QualType DesugaredTy = desugarForDiagnostic(Context, Ty, ShouldAKA);
+    QualType DesugaredTy = Desugar(Context, Ty, ShouldAKA);
     if (ShouldAKA || ForceAKA) {
       if (DesugaredTy == Ty) {
         DesugaredTy = Ty.getCanonicalType();
@@ -340,7 +308,7 @@ ConvertTypeToDiagnosticString(ASTContext &Context, QualType Ty,
       OS << "'" << S << "' (vector of " << VTy->getNumElements() << " '"
          << VTy->getElementType().getAsString(Context.getPrintingPolicy())
          << "' " << Values << ")";
-      return DecoratedString;
+      return OS.str();
     }
   }
 
@@ -372,7 +340,7 @@ void clang::FormatASTNodeDiagnosticArgument(
     default: llvm_unreachable("unknown ArgumentKind");
     case DiagnosticsEngine::ak_addrspace: {
       assert(Modifier.empty() && Argument.empty() &&
-             "Invalid modifier for Qualifiers argument");
+             "Invalid modifier for Qualfiers argument");
 
       auto S = Qualifiers::getAddrSpaceAsString(static_cast<LangAS>(Val));
       if (S.empty()) {
@@ -387,7 +355,7 @@ void clang::FormatASTNodeDiagnosticArgument(
     }
     case DiagnosticsEngine::ak_qual: {
       assert(Modifier.empty() && Argument.empty() &&
-             "Invalid modifier for Qualifiers argument");
+             "Invalid modifier for Qualfiers argument");
 
       Qualifiers Q(Qualifiers::fromOpaqueValue(Val));
       auto S = Q.getAsString();
@@ -425,7 +393,7 @@ void clang::FormatASTNodeDiagnosticArgument(
       Modifier = StringRef();
       Argument = StringRef();
       // Fall through
-      [[fallthrough]];
+      LLVM_FALLTHROUGH;
     }
     case DiagnosticsEngine::ak_qualtype: {
       assert(Modifier.empty() && Argument.empty() &&
@@ -539,7 +507,7 @@ class TemplateDiff {
   bool ShowColor;
 
   /// FromTemplateType - When single type printing is selected, this is the
-  /// type to be printed.  When tree printing is selected, this type will
+  /// type to be be printed.  When tree printing is selected, this type will
   /// show up first in the tree.
   QualType FromTemplateType;
 
@@ -986,7 +954,7 @@ class TemplateDiff {
         if (isEnd()) return;
 
         // Set to first template argument.  If not a parameter pack, done.
-        TemplateArgument TA = TST->template_arguments()[0];
+        TemplateArgument TA = TST->getArg(0);
         if (TA.getKind() != TemplateArgument::Pack) return;
 
         // Start looking into the parameter pack.
@@ -1007,7 +975,7 @@ class TemplateDiff {
       /// isEnd - Returns true if the iterator is one past the end.
       bool isEnd() const {
         assert(TST && "InternalIterator is invalid with a null TST.");
-        return Index >= TST->template_arguments().size();
+        return Index >= TST->getNumArgs();
       }
 
       /// &operator++ - Increment the iterator to the next template argument.
@@ -1027,11 +995,11 @@ class TemplateDiff {
         // Loop until a template argument is found, or the end is reached.
         while (true) {
           // Advance to the next template argument.  Break if reached the end.
-          if (++Index == TST->template_arguments().size())
+          if (++Index == TST->getNumArgs())
             break;
 
           // If the TemplateArgument is not a parameter pack, done.
-          TemplateArgument TA = TST->template_arguments()[Index];
+          TemplateArgument TA = TST->getArg(Index);
           if (TA.getKind() != TemplateArgument::Pack)
             break;
 
@@ -1051,7 +1019,7 @@ class TemplateDiff {
         assert(TST && "InternalIterator is invalid with a null TST.");
         assert(!isEnd() && "Index exceeds number of arguments.");
         if (CurrentTA == EndTA)
-          return TST->template_arguments()[Index];
+          return TST->getArg(Index);
         else
           return *CurrentTA;
       }
@@ -1119,9 +1087,6 @@ class TemplateDiff {
     if (const TemplateSpecializationType *TST =
             Ty->getAs<TemplateSpecializationType>())
       return TST;
-
-    if (const auto* SubstType = Ty->getAs<SubstTemplateTypeParmType>())
-      Ty = SubstType->getReplacementType();
 
     const RecordType *RT = Ty->getAs<RecordType>();
 
@@ -1684,24 +1649,9 @@ class TemplateDiff {
                                                 : FromType.getAsString(Policy);
     std::string ToTypeStr = ToType.isNull() ? "(no argument)"
                                             : ToType.getAsString(Policy);
-    // Print without ElaboratedType sugar if it is better.
+    // Switch to canonical typename if it is better.
     // TODO: merge this with other aka printing above.
     if (FromTypeStr == ToTypeStr) {
-      const auto *FromElTy = dyn_cast<ElaboratedType>(FromType),
-                 *ToElTy = dyn_cast<ElaboratedType>(ToType);
-      if (FromElTy || ToElTy) {
-        std::string FromNamedTypeStr =
-            FromElTy ? FromElTy->getNamedType().getAsString(Policy)
-                     : FromTypeStr;
-        std::string ToNamedTypeStr =
-            ToElTy ? ToElTy->getNamedType().getAsString(Policy) : ToTypeStr;
-        if (FromNamedTypeStr != ToNamedTypeStr) {
-          FromTypeStr = FromNamedTypeStr;
-          ToTypeStr = ToNamedTypeStr;
-          goto PrintTypes;
-        }
-      }
-      // Switch to canonical typename if it is better.
       std::string FromCanTypeStr =
           FromType.getCanonicalType().getAsString(Policy);
       std::string ToCanTypeStr = ToType.getCanonicalType().getAsString(Policy);
@@ -1711,7 +1661,6 @@ class TemplateDiff {
       }
     }
 
-  PrintTypes:
     if (PrintTree) OS << '[';
     OS << (FromDefault ? "(default) " : "");
     Bold();
@@ -1890,11 +1839,10 @@ class TemplateDiff {
         // FIXME: Diffing the APValue would be neat.
         // FIXME: Suppress this and use the full name of the declaration if the
         // parameter is a pointer or reference.
-        TPO->getType().getUnqualifiedType().print(OS, Policy);
-        TPO->printAsInit(OS, Policy);
+        TPO->printAsInit(OS);
         return;
       }
-      VD->printName(OS, Policy);
+      VD->printName(OS);
       return;
     }
 

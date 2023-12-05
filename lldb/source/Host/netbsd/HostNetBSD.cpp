@@ -25,7 +25,6 @@
 #include "lldb/Utility/DataBufferHeap.h"
 #include "lldb/Utility/DataExtractor.h"
 #include "lldb/Utility/Endian.h"
-#include "lldb/Utility/LLDBLog.h"
 #include "lldb/Utility/Log.h"
 #include "lldb/Utility/NameMatches.h"
 #include "lldb/Utility/ProcessInfo.h"
@@ -33,7 +32,7 @@
 #include "lldb/Utility/StreamString.h"
 
 #include "llvm/Object/ELF.h"
-#include "llvm/TargetParser/Host.h"
+#include "llvm/Support/Host.h"
 
 extern "C" {
 extern char **environ;
@@ -102,7 +101,7 @@ static bool GetNetBSDProcessArgs(const ProcessInstanceInfoMatch *match_info_ptr,
 }
 
 static bool GetNetBSDProcessCPUType(ProcessInstanceInfo &process_info) {
-  Log *log = GetLog(LLDBLog::Host);
+  Log *log = GetLogIfAllCategoriesSet(LIBLLDB_LOG_HOST);
 
   if (process_info.ProcessIDIsValid()) {
     auto buffer_sp = FileSystem::Instance().CreateDataBuffer(
@@ -110,8 +109,7 @@ static bool GetNetBSDProcessCPUType(ProcessInstanceInfo &process_info) {
     if (buffer_sp) {
       uint8_t exe_class =
           llvm::object::getElfArchType(
-              {reinterpret_cast<const char *>(buffer_sp->GetBytes()),
-               size_t(buffer_sp->GetByteSize())})
+              {buffer_sp->GetChars(), size_t(buffer_sp->GetByteSize())})
               .first;
 
       switch (exe_class) {

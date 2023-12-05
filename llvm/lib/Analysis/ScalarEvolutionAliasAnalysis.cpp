@@ -20,22 +20,11 @@
 
 #include "llvm/Analysis/ScalarEvolutionAliasAnalysis.h"
 #include "llvm/Analysis/ScalarEvolution.h"
-#include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/InitializePasses.h"
 using namespace llvm;
 
-static bool canComputePointerDiff(ScalarEvolution &SE,
-                                  const SCEV *A, const SCEV *B) {
-  if (SE.getEffectiveSCEVType(A->getType()) !=
-      SE.getEffectiveSCEVType(B->getType()))
-    return false;
-
-  return SE.instructionCouldExistWithOperands(A, B);
-}
-
 AliasResult SCEVAAResult::alias(const MemoryLocation &LocA,
-                                const MemoryLocation &LocB, AAQueryInfo &AAQI,
-                                const Instruction *) {
+                                const MemoryLocation &LocB, AAQueryInfo &AAQI) {
   // If either of the memory references is empty, it doesn't matter what the
   // pointer values are. This allows the code below to ignore this special
   // case.
@@ -52,13 +41,14 @@ AliasResult SCEVAAResult::alias(const MemoryLocation &LocA,
 
   // If something is known about the difference between the two addresses,
   // see if it's enough to prove a NoAlias.
-  if (canComputePointerDiff(SE, AS, BS)) {
+  if (SE.getEffectiveSCEVType(AS->getType()) ==
+      SE.getEffectiveSCEVType(BS->getType())) {
     unsigned BitWidth = SE.getTypeSizeInBits(AS->getType());
     APInt ASizeInt(BitWidth, LocA.Size.hasValue()
-                                 ? static_cast<uint64_t>(LocA.Size.getValue())
+                                 ? LocA.Size.getValue()
                                  : MemoryLocation::UnknownSize);
     APInt BSizeInt(BitWidth, LocB.Size.hasValue()
-                                 ? static_cast<uint64_t>(LocB.Size.getValue())
+                                 ? LocB.Size.getValue()
                                  : MemoryLocation::UnknownSize);
 
     // Compute the difference between the two pointers.
@@ -102,10 +92,11 @@ AliasResult SCEVAAResult::alias(const MemoryLocation &LocA,
                              BO ? LocationSize::beforeOrAfterPointer()
                                 : LocB.Size,
                              BO ? AAMDNodes() : LocB.AATags),
-              AAQI, nullptr) == AliasResult::NoAlias)
+              AAQI) == AliasResult::NoAlias)
       return AliasResult::NoAlias;
 
-  return AliasResult::MayAlias;
+  // Forward the query to the next analysis.
+  return AAResultBase::alias(LocA, LocB, AAQI);
 }
 
 /// Given an expression, try to find a base value.

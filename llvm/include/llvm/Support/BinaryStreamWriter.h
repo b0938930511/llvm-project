@@ -10,6 +10,7 @@
 #define LLVM_SUPPORT_BINARYSTREAMWRITER_H
 
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/BinaryStreamArray.h"
 #include "llvm/Support/BinaryStreamError.h"
@@ -33,13 +34,18 @@ public:
   explicit BinaryStreamWriter(WritableBinaryStreamRef Ref);
   explicit BinaryStreamWriter(WritableBinaryStream &Stream);
   explicit BinaryStreamWriter(MutableArrayRef<uint8_t> Data,
-                              llvm::endianness Endian);
+                              llvm::support::endianness Endian);
 
-  BinaryStreamWriter(const BinaryStreamWriter &Other) = default;
+  BinaryStreamWriter(const BinaryStreamWriter &Other)
+      : Stream(Other.Stream), Offset(Other.Offset) {}
 
-  BinaryStreamWriter &operator=(const BinaryStreamWriter &Other) = default;
+  BinaryStreamWriter &operator=(const BinaryStreamWriter &Other) {
+    Stream = Other.Stream;
+    Offset = Other.Offset;
+    return *this;
+  }
 
-  virtual ~BinaryStreamWriter() = default;
+  virtual ~BinaryStreamWriter() {}
 
   /// Write the bytes specified in \p Buffer to the underlying stream.
   /// On success, updates the offset so that subsequent writes will occur
@@ -56,10 +62,11 @@ public:
   /// \returns a success error code if the data was successfully written,
   /// otherwise returns an appropriate error code.
   template <typename T> Error writeInteger(T Value) {
-    static_assert(std::is_integral_v<T>,
+    static_assert(std::is_integral<T>::value,
                   "Cannot call writeInteger with non-integral value!");
     uint8_t Buffer[sizeof(T)];
-    llvm::support::endian::write<T>(Buffer, Value, Stream.getEndian());
+    llvm::support::endian::write<T, llvm::support::unaligned>(
+        Buffer, Value, Stream.getEndian());
     return writeBytes(Buffer);
   }
 
@@ -117,7 +124,7 @@ public:
   ///
   /// \returns a success error code if the data was successfully written,
   /// otherwise returns an appropriate error code.
-  Error writeStreamRef(BinaryStreamRef Ref, uint64_t Size);
+  Error writeStreamRef(BinaryStreamRef Ref, uint32_t Size);
 
   /// Writes the object \p Obj to the underlying stream, as if by using memcpy.
   /// It is up to the caller to ensure that type of \p Obj can be safely copied
@@ -171,17 +178,17 @@ public:
   }
 
   /// Splits the Writer into two Writers at a given offset.
-  std::pair<BinaryStreamWriter, BinaryStreamWriter> split(uint64_t Off) const;
+  std::pair<BinaryStreamWriter, BinaryStreamWriter> split(uint32_t Off) const;
 
-  void setOffset(uint64_t Off) { Offset = Off; }
-  uint64_t getOffset() const { return Offset; }
-  uint64_t getLength() const { return Stream.getLength(); }
-  uint64_t bytesRemaining() const { return getLength() - getOffset(); }
+  void setOffset(uint32_t Off) { Offset = Off; }
+  uint32_t getOffset() const { return Offset; }
+  uint32_t getLength() const { return Stream.getLength(); }
+  uint32_t bytesRemaining() const { return getLength() - getOffset(); }
   Error padToAlignment(uint32_t Align);
 
 protected:
   WritableBinaryStreamRef Stream;
-  uint64_t Offset = 0;
+  uint32_t Offset = 0;
 };
 
 } // end namespace llvm

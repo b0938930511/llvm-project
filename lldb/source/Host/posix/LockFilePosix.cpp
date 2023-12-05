@@ -16,8 +16,10 @@
 using namespace lldb;
 using namespace lldb_private;
 
-static Status fileLock(int fd, int cmd, int lock_type, const uint64_t start,
-                       const uint64_t len) {
+namespace {
+
+Status fileLock(int fd, int cmd, int lock_type, const uint64_t start,
+                const uint64_t len) {
   struct flock fl;
 
   fl.l_type = lock_type;
@@ -32,6 +34,8 @@ static Status fileLock(int fd, int cmd, int lock_type, const uint64_t start,
 
   return error;
 }
+
+} // namespace
 
 LockFilePosix::LockFilePosix(int fd) : LockFileBase(fd) {}
 

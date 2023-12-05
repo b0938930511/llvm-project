@@ -5,11 +5,11 @@
 // RUN: not %clang_cc1 %s -emit-llvm-bc -o %t1.bc
 // RUN: not opt %t1.bc -disable-output
 
-void f(void) {
+void f() {
 }
 
 #ifndef PASS
-void g(void) {
+void g() {
   *10;
 }
 #endif

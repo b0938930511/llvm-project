@@ -8,8 +8,7 @@
     if (self) {
         _bar = [[Bar alloc] init];
     }
-    NSLog(@"waiting");; // Set breakpoint where Bar is an interface
-    return self;
+    return self; // Set breakpoint where Bar is an interface
 }
 
 - (void)dealloc

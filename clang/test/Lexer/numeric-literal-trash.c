@@ -7,7 +7,7 @@
 int ec(int, int);
 
 
- void x(void) {
+ void x() {
 
 XRECORD (XRECORD (1, 1), 1);
     }

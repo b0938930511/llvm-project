@@ -12,7 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "R600RegisterInfo.h"
-#include "MCTargetDesc/R600MCTargetDesc.h"
+#include "MCTargetDesc/AMDGPUMCTargetDesc.h"
 #include "R600Defines.h"
 #include "R600Subtarget.h"
 
@@ -29,7 +29,7 @@ unsigned R600RegisterInfo::getSubRegFromChannel(unsigned Channel) {
     R600::sub12, R600::sub13, R600::sub14, R600::sub15
   };
 
-  assert(Channel < std::size(SubRegFromChannelTable));
+  assert(Channel < array_lengthof(SubRegFromChannelTable));
   return SubRegFromChannelTable[Channel];
 }
 
@@ -54,8 +54,10 @@ BitVector R600RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   reserveRegisterTuples(Reserved, R600::PRED_SEL_ONE);
   reserveRegisterTuples(Reserved, R600::INDIRECT_BASE_ADDR);
 
-  for (MCPhysReg R : R600::R600_AddrRegClass)
-    reserveRegisterTuples(Reserved, R);
+  for (TargetRegisterClass::iterator I = R600::R600_AddrRegClass.begin(),
+                        E = R600::R600_AddrRegClass.end(); I != E; ++I) {
+    reserveRegisterTuples(Reserved, *I);
+  }
 
   TII->reserveIndirectRegisters(Reserved, MF, *this);
 
@@ -103,7 +105,7 @@ bool R600RegisterInfo::isPhysRegLiveAcrossClauses(Register Reg) const {
   }
 }
 
-bool R600RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator MI,
+void R600RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator MI,
                                            int SPAdj,
                                            unsigned FIOperandNum,
                                            RegScavenger *RS) const {

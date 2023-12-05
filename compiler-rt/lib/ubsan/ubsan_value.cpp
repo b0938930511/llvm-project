@@ -18,7 +18,9 @@
 #include "sanitizer_common/sanitizer_libc.h"
 #include "sanitizer_common/sanitizer_mutex.h"
 
-#if SANITIZER_APPLE
+// TODO(dliew): Prefer '__APPLE__' here over 'SANITIZER_MAC', as the latter is
+// unclear. rdar://58124919 tracks using a more obviously portable guard.
+#if defined(__APPLE__)
 #include <dlfcn.h>
 #endif
 
@@ -27,7 +29,7 @@ using namespace __ubsan;
 typedef const char *(*ObjCGetClassNameTy)(void *);
 
 const char *__ubsan::getObjCClassName(ValueHandle Pointer) {
-#if SANITIZER_APPLE
+#if defined(__APPLE__)
   // We need to query the ObjC runtime for some information, but do not want
   // to introduce a static dependency from the ubsan runtime onto ObjC. Try to
   // grab a handle to the ObjC runtime used by the process.

@@ -3,7 +3,7 @@ typedef long Integer;
 typedef enum : Integer { Red, Green, Blue} Color;
 typedef enum { Cyan, Magenta, Yellow, Key } PrintColor;
 
-int a(void) {
+int a() {
   return @encode(int) == @encode(int) &&
     @encode(Color) == @encode(long) &&
     @encode(PrintColor) == @encode(int);

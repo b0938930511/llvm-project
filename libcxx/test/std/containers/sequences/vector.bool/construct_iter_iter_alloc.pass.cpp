@@ -21,7 +21,8 @@
 #include "min_allocator.h"
 
 template <class C, class Iterator>
-TEST_CONSTEXPR_CXX20 void test(Iterator first, Iterator last, const typename C::allocator_type& a)
+void
+test(Iterator first, Iterator last, const typename C::allocator_type& a)
 {
     C c(first, last, a);
     LIBCPP_ASSERT(c.__invariants());
@@ -30,7 +31,7 @@ TEST_CONSTEXPR_CXX20 void test(Iterator first, Iterator last, const typename C::
         assert(*i == *first);
 }
 
-TEST_CONSTEXPR_CXX20 bool tests()
+int main(int, char**)
 {
     bool a[] = {0, 1, 0, 0, 1, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 0};
     bool* an = a + sizeof(a)/sizeof(a[0]);
@@ -53,14 +54,5 @@ TEST_CONSTEXPR_CXX20 bool tests()
     }
 #endif
 
-    return true;
-}
-
-int main(int, char**)
-{
-    tests();
-#if TEST_STD_VER > 17
-    static_assert(tests());
-#endif
-    return 0;
+  return 0;
 }

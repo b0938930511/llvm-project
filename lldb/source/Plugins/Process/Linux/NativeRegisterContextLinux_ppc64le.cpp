@@ -13,7 +13,6 @@
 
 #include "NativeRegisterContextLinux_ppc64le.h"
 
-#include "lldb/Host/HostInfo.h"
 #include "lldb/Host/common/NativeProcessProtocol.h"
 #include "lldb/Utility/DataBufferHeap.h"
 #include "lldb/Utility/Log.h"
@@ -98,8 +97,10 @@ static const uint32_t g_vsx_regnums_ppc64le[] = {
     LLDB_INVALID_REGNUM // register sets need to end with this flag
 };
 
+namespace {
 // Number of register sets provided by this context.
-static constexpr int k_num_register_sets = 4;
+enum { k_num_register_sets = 4 };
+}
 
 static const RegisterSet g_reg_sets_ppc64le[k_num_register_sets] = {
     {"General Purpose Registers", "gpr", k_num_gpr_registers_ppc64le,
@@ -122,11 +123,6 @@ NativeRegisterContextLinux::CreateHostNativeRegisterContextLinux(
   default:
     llvm_unreachable("have no register context for architecture");
   }
-}
-
-llvm::Expected<ArchSpec>
-NativeRegisterContextLinux::DetermineArchitecture(lldb::tid_t tid) {
-  return HostInfo::GetArchitecture();
 }
 
 NativeRegisterContextLinux_ppc64le::NativeRegisterContextLinux_ppc64le(
@@ -184,7 +180,7 @@ Status NativeRegisterContextLinux_ppc64le::ReadRegister(
     uint32_t fpr_offset = CalculateFprOffset(reg_info);
     assert(fpr_offset < sizeof m_fpr_ppc64le);
     uint8_t *src = (uint8_t *)&m_fpr_ppc64le + fpr_offset;
-    reg_value.SetFromMemoryData(*reg_info, src, reg_info->byte_size,
+    reg_value.SetFromMemoryData(reg_info, src, reg_info->byte_size,
                                 eByteOrderLittle, error);
   } else if (IsVSX(reg)) {
     uint32_t vsx_offset = CalculateVsxOffset(reg_info);
@@ -207,7 +203,7 @@ Status NativeRegisterContextLinux_ppc64le::ReadRegister(
       dst += 8;
       src = (uint8_t *)&m_fpr_ppc64le + vsx_offset / 2;
       ::memcpy(dst, src, 8);
-      reg_value.SetFromMemoryData(*reg_info, &value, reg_info->byte_size,
+      reg_value.SetFromMemoryData(reg_info, &value, reg_info->byte_size,
                                   eByteOrderLittle, error);
     } else {
       error = ReadVMX();
@@ -217,7 +213,7 @@ Status NativeRegisterContextLinux_ppc64le::ReadRegister(
       // Get pointer to m_vmx_ppc64le variable and set the data from it.
       uint32_t vmx_offset = vsx_offset - sizeof(m_vsx_ppc64le) / 2;
       uint8_t *src = (uint8_t *)&m_vmx_ppc64le + vmx_offset;
-      reg_value.SetFromMemoryData(*reg_info, src, reg_info->byte_size,
+      reg_value.SetFromMemoryData(reg_info, src, reg_info->byte_size,
                                   eByteOrderLittle, error);
     }
   } else if (IsVMX(reg)) {
@@ -229,7 +225,7 @@ Status NativeRegisterContextLinux_ppc64le::ReadRegister(
     uint32_t vmx_offset = CalculateVmxOffset(reg_info);
     assert(vmx_offset < sizeof m_vmx_ppc64le);
     uint8_t *src = (uint8_t *)&m_vmx_ppc64le + vmx_offset;
-    reg_value.SetFromMemoryData(*reg_info, src, reg_info->byte_size,
+    reg_value.SetFromMemoryData(reg_info, src, reg_info->byte_size,
                                 eByteOrderLittle, error);
   } else if (IsGPR(reg)) {
     error = ReadGPR();
@@ -237,7 +233,7 @@ Status NativeRegisterContextLinux_ppc64le::ReadRegister(
       return error;
 
     uint8_t *src = (uint8_t *) &m_gpr_ppc64le + reg_info->byte_offset;
-    reg_value.SetFromMemoryData(*reg_info, src, reg_info->byte_size,
+    reg_value.SetFromMemoryData(reg_info, src, reg_info->byte_size,
                                 eByteOrderLittle, error);
   } else {
     return Status("failed - register wasn't recognized to be a GPR, FPR, VSX "
@@ -355,7 +351,7 @@ Status NativeRegisterContextLinux_ppc64le::WriteRegister(
 }
 
 Status NativeRegisterContextLinux_ppc64le::ReadAllRegisterValues(
-    lldb::WritableDataBufferSP &data_sp) {
+    lldb::DataBufferSP &data_sp) {
   Status error;
 
   data_sp.reset(new DataBufferHeap(REG_CONTEXT_SIZE, 0));
@@ -406,7 +402,7 @@ Status NativeRegisterContextLinux_ppc64le::WriteAllRegisterValues(
     return error;
   }
 
-  const uint8_t *src = data_sp->GetBytes();
+  uint8_t *src = data_sp->GetBytes();
   if (src == nullptr) {
     error.SetErrorStringWithFormat("NativeRegisterContextLinux_ppc64le::%s "
                                    "DataBuffer::GetBytes() returned a null "
@@ -505,7 +501,7 @@ bool NativeRegisterContextLinux_ppc64le::IsVSX(unsigned reg) {
 }
 
 uint32_t NativeRegisterContextLinux_ppc64le::NumSupportedHardwareWatchpoints() {
-  Log *log = GetLog(POSIXLog::Watchpoints);
+  Log *log(ProcessPOSIXLog::GetLogIfAllCategoriesSet(POSIX_LOG_WATCHPOINTS));
 
   // Read hardware breakpoint and watchpoint information.
   Status error = ReadHardwareDebugInfo();
@@ -519,7 +515,7 @@ uint32_t NativeRegisterContextLinux_ppc64le::NumSupportedHardwareWatchpoints() {
 
 uint32_t NativeRegisterContextLinux_ppc64le::SetHardwareWatchpoint(
     lldb::addr_t addr, size_t size, uint32_t watch_flags) {
-  Log *log = GetLog(POSIXLog::Watchpoints);
+  Log *log(ProcessPOSIXLog::GetLogIfAllCategoriesSet(POSIX_LOG_WATCHPOINTS));
   LLDB_LOG(log, "addr: {0:x}, size: {1:x} watch_flags: {2:x}", addr, size,
            watch_flags);
 
@@ -606,7 +602,7 @@ uint32_t NativeRegisterContextLinux_ppc64le::SetHardwareWatchpoint(
 
 bool NativeRegisterContextLinux_ppc64le::ClearHardwareWatchpoint(
     uint32_t wp_index) {
-  Log *log = GetLog(POSIXLog::Watchpoints);
+  Log *log(ProcessPOSIXLog::GetLogIfAllCategoriesSet(POSIX_LOG_WATCHPOINTS));
   LLDB_LOG(log, "wp_index: {0}", wp_index);
 
   // Read hardware breakpoint and watchpoint information.
@@ -646,12 +642,12 @@ bool NativeRegisterContextLinux_ppc64le::ClearHardwareWatchpoint(
 
 uint32_t
 NativeRegisterContextLinux_ppc64le::GetWatchpointSize(uint32_t wp_index) {
-  Log *log = GetLog(POSIXLog::Watchpoints);
+  Log *log(ProcessPOSIXLog::GetLogIfAllCategoriesSet(POSIX_LOG_WATCHPOINTS));
   LLDB_LOG(log, "wp_index: {0}", wp_index);
 
   unsigned control = (m_hwp_regs[wp_index].control >> 5) & 0xff;
   if (llvm::isPowerOf2_32(control + 1)) {
-    return llvm::popcount(control);
+    return llvm::countPopulation(control);
   }
 
   return 0;
@@ -659,7 +655,7 @@ NativeRegisterContextLinux_ppc64le::GetWatchpointSize(uint32_t wp_index) {
 
 bool NativeRegisterContextLinux_ppc64le::WatchpointIsEnabled(
     uint32_t wp_index) {
-  Log *log = GetLog(POSIXLog::Watchpoints);
+  Log *log(ProcessPOSIXLog::GetLogIfAllCategoriesSet(POSIX_LOG_WATCHPOINTS));
   LLDB_LOG(log, "wp_index: {0}", wp_index);
 
   return !!((m_hwp_regs[wp_index].control & 0x1) == 0x1);
@@ -667,7 +663,7 @@ bool NativeRegisterContextLinux_ppc64le::WatchpointIsEnabled(
 
 Status NativeRegisterContextLinux_ppc64le::GetWatchpointHitIndex(
     uint32_t &wp_index, lldb::addr_t trap_addr) {
-  Log *log = GetLog(POSIXLog::Watchpoints);
+  Log *log(ProcessPOSIXLog::GetLogIfAllCategoriesSet(POSIX_LOG_WATCHPOINTS));
   LLDB_LOG(log, "wp_index: {0}, trap_addr: {1:x}", wp_index, trap_addr);
 
   uint32_t watch_size;
@@ -690,7 +686,7 @@ Status NativeRegisterContextLinux_ppc64le::GetWatchpointHitIndex(
 
 lldb::addr_t
 NativeRegisterContextLinux_ppc64le::GetWatchpointAddress(uint32_t wp_index) {
-  Log *log = GetLog(POSIXLog::Watchpoints);
+  Log *log(ProcessPOSIXLog::GetLogIfAllCategoriesSet(POSIX_LOG_WATCHPOINTS));
   LLDB_LOG(log, "wp_index: {0}", wp_index);
 
   if (wp_index >= m_max_hwp_supported)
@@ -704,7 +700,7 @@ NativeRegisterContextLinux_ppc64le::GetWatchpointAddress(uint32_t wp_index) {
 
 lldb::addr_t
 NativeRegisterContextLinux_ppc64le::GetWatchpointHitAddress(uint32_t wp_index) {
-  Log *log = GetLog(POSIXLog::Watchpoints);
+  Log *log(ProcessPOSIXLog::GetLogIfAllCategoriesSet(POSIX_LOG_WATCHPOINTS));
   LLDB_LOG(log, "wp_index: {0}", wp_index);
 
   if (wp_index >= m_max_hwp_supported)

@@ -11,12 +11,14 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::readability {
+namespace clang {
+namespace tidy {
+namespace readability {
 
 /// Finds non-static member functions that can be made 'const'.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/readability/make-member-function-const.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/readability-make-member-function-const.html
 class MakeMemberFunctionConstCheck : public ClangTidyCheck {
 public:
   MakeMemberFunctionConstCheck(StringRef Name, ClangTidyContext *Context)
@@ -28,6 +30,8 @@ public:
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
 };
 
-} // namespace clang::tidy::readability
+} // namespace readability
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_READABILITY_MAKEMEMBERFUNCTIONCONSTCHECK_H

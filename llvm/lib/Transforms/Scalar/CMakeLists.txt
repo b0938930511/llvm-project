@@ -22,7 +22,6 @@ add_llvm_component_library(LLVMScalarOpts
   InductiveRangeCheckElimination.cpp
   IndVarSimplify.cpp
   InferAddressSpaces.cpp
-  InferAlignment.cpp
   InstSimplifyPass.cpp
   JumpThreading.cpp
   LICM.cpp
@@ -46,8 +45,9 @@ add_llvm_component_library(LLVMScalarOpts
   LoopStrengthReduce.cpp
   LoopUnrollPass.cpp
   LoopUnrollAndJamPass.cpp
+  LoopUnswitch.cpp
   LoopVersioningLICM.cpp
-  LowerAtomicPass.cpp
+  LowerAtomic.cpp
   LowerConstantIntrinsics.cpp
   LowerExpectIntrinsic.cpp
   LowerGuardIntrinsic.cpp
@@ -77,7 +77,6 @@ add_llvm_component_library(LLVMScalarOpts
   StraightLineStrengthReduce.cpp
   StructurizeCFG.cpp
   TailRecursionElimination.cpp
-  TLSVariableHoist.cpp
   WarnMissedTransforms.cpp
 
   ADDITIONAL_HEADER_DIRS

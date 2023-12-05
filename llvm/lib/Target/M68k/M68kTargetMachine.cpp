@@ -1,4 +1,4 @@
-//===-- M68kTargetMachine.cpp - M68k Target Machine -------------*- C++ -*-===//
+//===-- M68kTargetMachine.cpp - M68k target machine ---------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -13,7 +13,6 @@
 
 #include "M68kTargetMachine.h"
 #include "M68k.h"
-#include "M68kMachineFunction.h"
 #include "M68kSubtarget.h"
 #include "M68kTargetObjectFile.h"
 #include "TargetInfo/M68kTargetInfo.h"
@@ -23,11 +22,11 @@
 #include "llvm/CodeGen/GlobalISel/RegBankSelect.h"
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/CodeGen/TargetPassConfig.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/InitializePasses.h"
-#include "llvm/MC/TargetRegistry.h"
 #include "llvm/PassRegistry.h"
+#include "llvm/Support/TargetRegistry.h"
 #include <memory>
-#include <optional>
 
 using namespace llvm;
 
@@ -37,10 +36,6 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeM68kTarget() {
   RegisterTargetMachine<M68kTargetMachine> X(getTheM68kTarget());
   auto *PR = PassRegistry::getPassRegistry();
   initializeGlobalISel(*PR);
-  initializeM68kDAGToDAGISelPass(*PR);
-  initializeM68kExpandPseudoPass(*PR);
-  initializeM68kGlobalBaseRegPass(*PR);
-  initializeM68kCollapseMOVEMPass(*PR);
 }
 
 namespace {
@@ -54,14 +49,10 @@ std::string computeDataLayout(const Triple &TT, StringRef CPU,
   // FIXME how to wire it with the used object format?
   Ret += "-m:e";
 
-  // M68k pointers are always 32 bit wide even for 16-bit CPUs.
-  // The ABI only specifies 16-bit alignment.
-  // On at least the 68020+ with a 32-bit bus, there is a performance benefit
-  // to having 32-bit alignment.
-  Ret += "-p:32:16:32";
+  // M68k pointers are always 32 bit wide even for 16 bit cpus
+  Ret += "-p:32:32";
 
-  // Bytes do not require special alignment, words are word aligned and
-  // long words are word aligned at minimum.
+  // M68k requires i8 to align on 2 byte boundry
   Ret += "-i8:8:8-i16:16:16-i32:16:32";
 
   // FIXME no floats at the moment
@@ -75,15 +66,16 @@ std::string computeDataLayout(const Triple &TT, StringRef CPU,
 }
 
 Reloc::Model getEffectiveRelocModel(const Triple &TT,
-                                    std::optional<Reloc::Model> RM) {
+                                    Optional<Reloc::Model> RM) {
   // If not defined we default to static
-  if (!RM.has_value())
+  if (!RM.hasValue()) {
     return Reloc::Static;
+  }
 
   return *RM;
 }
 
-CodeModel::Model getEffectiveCodeModel(std::optional<CodeModel::Model> CM,
+CodeModel::Model getEffectiveCodeModel(Optional<CodeModel::Model> CM,
                                        bool JIT) {
   if (!CM) {
     return CodeModel::Small;
@@ -92,16 +84,16 @@ CodeModel::Model getEffectiveCodeModel(std::optional<CodeModel::Model> CM,
   } else if (CM == CodeModel::Kernel) {
     llvm_unreachable("Kernel code model is not implemented yet");
   }
-  return CM.value();
+  return CM.getValue();
 }
 } // end anonymous namespace
 
 M68kTargetMachine::M68kTargetMachine(const Target &T, const Triple &TT,
                                      StringRef CPU, StringRef FS,
                                      const TargetOptions &Options,
-                                     std::optional<Reloc::Model> RM,
-                                     std::optional<CodeModel::Model> CM,
-                                     CodeGenOptLevel OL, bool JIT)
+                                     Optional<Reloc::Model> RM,
+                                     Optional<CodeModel::Model> CM,
+                                     CodeGenOpt::Level OL, bool JIT)
     : LLVMTargetMachine(T, computeDataLayout(TT, CPU, Options), TT, CPU, FS,
                         Options, getEffectiveRelocModel(TT, RM),
                         ::getEffectiveCodeModel(CM, JIT), OL),
@@ -131,13 +123,6 @@ M68kTargetMachine::getSubtargetImpl(const Function &F) const {
   return I.get();
 }
 
-MachineFunctionInfo *M68kTargetMachine::createMachineFunctionInfo(
-    BumpPtrAllocator &Allocator, const Function &F,
-    const TargetSubtargetInfo *STI) const {
-  return M68kMachineFunctionInfo::create<M68kMachineFunctionInfo>(Allocator, F,
-                                                                  STI);
-}
-
 //===----------------------------------------------------------------------===//
 // Pass Pipeline Configuration
 //===----------------------------------------------------------------------===//
@@ -155,7 +140,6 @@ public:
   const M68kSubtarget &getM68kSubtarget() const {
     return *getM68kTargetMachine().getSubtargetImpl();
   }
-  void addIRPasses() override;
   bool addIRTranslator() override;
   bool addLegalizeMachineIR() override;
   bool addRegBankSelect() override;
@@ -168,11 +152,6 @@ public:
 
 TargetPassConfig *M68kTargetMachine::createPassConfig(PassManagerBase &PM) {
   return new M68kPassConfig(*this, PM);
-}
-
-void M68kPassConfig::addIRPasses() {
-  addPass(createAtomicExpandPass());
-  TargetPassConfig::addIRPasses();
 }
 
 bool M68kPassConfig::addInstSelector() {

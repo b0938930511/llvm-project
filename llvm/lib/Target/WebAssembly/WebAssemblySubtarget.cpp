@@ -15,7 +15,7 @@
 #include "WebAssemblySubtarget.h"
 #include "MCTargetDesc/WebAssemblyMCTargetDesc.h"
 #include "WebAssemblyInstrInfo.h"
-#include "llvm/MC/TargetRegistry.h"
+#include "llvm/Support/TargetRegistry.h"
 using namespace llvm;
 
 #define DEBUG_TYPE "wasm-subtarget"
@@ -42,7 +42,8 @@ WebAssemblySubtarget::WebAssemblySubtarget(const Triple &TT,
                                            const std::string &FS,
                                            const TargetMachine &TM)
     : WebAssemblyGenSubtargetInfo(TT, CPU, /*TuneCPU*/ CPU, FS),
-      TargetTriple(TT), InstrInfo(initializeSubtargetDependencies(CPU, FS)),
+      TargetTriple(TT), FrameLowering(),
+      InstrInfo(initializeSubtargetDependencies(CPU, FS)), TSInfo(),
       TLInfo(TM, *this) {}
 
 bool WebAssemblySubtarget::enableAtomicExpand() const {

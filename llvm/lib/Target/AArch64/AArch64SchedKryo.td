@@ -29,8 +29,7 @@ def KryoModel : SchedMachineModel {
 
   list<Predicate> UnsupportedFeatures = !listconcat(SVEUnsupported.F,
                                                     PAUnsupported.F,
-                                                    SMEUnsupported.F,
-                                                    [HasMTE]);
+                                                    SMEUnsupported.F);
   // FIXME: Remove when all errors have been fixed.
   let FullInstRWOverlapCheck = 0;
 }
@@ -96,8 +95,7 @@ def : WriteRes<WriteFMul,  [KryoUnitX, KryoUnitX]>
       { let Latency = 6; let NumMicroOps = 2; }
 def : WriteRes<WriteFDiv,  [KryoUnitXA, KryoUnitY]>
       { let Latency = 12; let NumMicroOps = 2; } // Fragent -1 / NoRSV +1
-def : WriteRes<WriteVd,    [KryoUnitXY]> { let Latency = 6; }
-def : WriteRes<WriteVq,    [KryoUnitXY]> { let Latency = 6; }
+def : WriteRes<WriteV,     [KryoUnitXY]> { let Latency = 6; }
 def : WriteRes<WriteVLD,   [KryoUnitLS]> { let Latency = 4; }
 def : WriteRes<WriteVST,   [KryoUnitLS]> { let Latency = 4; }
 
@@ -119,7 +117,6 @@ def : ReadAdvance<ReadID,      0>;
 def : ReadAdvance<ReadExtrHi,  0>;
 def : ReadAdvance<ReadAdrBase, 0>;
 def : ReadAdvance<ReadVLD,     0>;
-def : ReadAdvance<ReadST,      0>;
 
 
 //===----------------------------------------------------------------------===//

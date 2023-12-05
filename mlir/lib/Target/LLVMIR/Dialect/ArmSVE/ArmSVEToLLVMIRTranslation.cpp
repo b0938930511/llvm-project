@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "mlir/Target/LLVMIR/Dialect/ArmSVE/ArmSVEToLLVMIRTranslation.h"
-#include "mlir/Dialect/ArmSVE/IR/ArmSVEDialect.h"
+#include "mlir/Dialect/ArmSVE/ArmSVEDialect.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/Target/LLVMIR/ModuleTranslation.h"
 
@@ -35,18 +35,17 @@ public:
   convertOperation(Operation *op, llvm::IRBuilderBase &builder,
                    LLVM::ModuleTranslation &moduleTranslation) const final {
     Operation &opInst = *op;
-#include "mlir/Dialect/ArmSVE/IR/ArmSVEConversions.inc"
+#include "mlir/Dialect/ArmSVE/ArmSVEConversions.inc"
 
     return failure();
   }
 };
-} // namespace
+} // end namespace
 
 void mlir::registerArmSVEDialectTranslation(DialectRegistry &registry) {
   registry.insert<arm_sve::ArmSVEDialect>();
-  registry.addExtension(+[](MLIRContext *ctx, arm_sve::ArmSVEDialect *dialect) {
-    dialect->addInterfaces<ArmSVEDialectLLVMIRTranslationInterface>();
-  });
+  registry.addDialectInterface<arm_sve::ArmSVEDialect,
+                               ArmSVEDialectLLVMIRTranslationInterface>();
 }
 
 void mlir::registerArmSVEDialectTranslation(MLIRContext &context) {

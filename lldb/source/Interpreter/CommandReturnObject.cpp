@@ -101,21 +101,12 @@ void CommandReturnObject::AppendError(llvm::StringRef in_string) {
   SetStatus(eReturnStatusFailed);
   if (in_string.empty())
     return;
-  // Workaround to deal with already fully formatted compiler diagnostics.
-  llvm::StringRef msg(in_string.rtrim());
-  msg.consume_front("error: ");
-  error(GetErrorStream()) << msg << '\n';
+  error(GetErrorStream()) << in_string.rtrim() << '\n';
 }
 
 void CommandReturnObject::SetError(const Status &error,
                                    const char *fallback_error_cstr) {
-  if (error.Fail())
-    AppendError(error.AsCString(fallback_error_cstr));
-}
-
-void CommandReturnObject::SetError(llvm::Error error) {
-  if (error)
-    AppendError(llvm::toString(std::move(error)));
+  AppendError(error.AsCString(fallback_error_cstr));
 }
 
 // Similar to AppendError, but do not prepend 'Status: ' to message, and don't
@@ -129,13 +120,13 @@ void CommandReturnObject::AppendRawError(llvm::StringRef in_string) {
 
 void CommandReturnObject::SetStatus(ReturnStatus status) { m_status = status; }
 
-ReturnStatus CommandReturnObject::GetStatus() const { return m_status; }
+ReturnStatus CommandReturnObject::GetStatus() { return m_status; }
 
-bool CommandReturnObject::Succeeded() const {
+bool CommandReturnObject::Succeeded() {
   return m_status <= eReturnStatusSuccessContinuingResult;
 }
 
-bool CommandReturnObject::HasResult() const {
+bool CommandReturnObject::HasResult() {
   return (m_status == eReturnStatusSuccessFinishResult ||
           m_status == eReturnStatusSuccessContinuingResult);
 }
@@ -154,7 +145,7 @@ void CommandReturnObject::Clear() {
   m_interactive = true;
 }
 
-bool CommandReturnObject::GetDidChangeProcessState() const {
+bool CommandReturnObject::GetDidChangeProcessState() {
   return m_did_change_process_state;
 }
 

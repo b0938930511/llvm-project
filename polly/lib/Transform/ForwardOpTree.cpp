@@ -197,7 +197,7 @@ struct ForwardingAction {
 /// the MemoryAccess is removed and the all the operand tree instructions are
 /// moved into the statement. All original instructions are left in the source
 /// statements. The simplification pass can clean these up.
-class ForwardOpTreeImpl final : ZoneAlgorithm {
+class ForwardOpTreeImpl : ZoneAlgorithm {
 private:
   using MemoizationTy = DenseMap<ForwardingAction::KeyTy, ForwardingAction>;
 
@@ -682,7 +682,7 @@ public:
     // Instruction::mayHaveSideEffects is not sufficient because it considers
     // malloc to not have side-effects. llvm::isSafeToSpeculativelyExecute is
     // not sufficient because it allows memory accesses.
-    if (mayHaveNonDefUseDependency(*UseInst))
+    if (mayBeMemoryDependent(*UseInst))
       return ForwardingAction::notApplicable();
 
     SmallVector<ForwardingAction::KeyTy, 4> Depends;
@@ -801,7 +801,7 @@ public:
       // reuse the information about UseStmt for DefStmt
       DefStmt = UseStmt;
 
-      [[fallthrough]];
+      LLVM_FALLTHROUGH;
     case VirtualUse::Inter:
       Instruction *Inst = cast<Instruction>(UseVal);
 
@@ -1101,7 +1101,7 @@ runForwardOpTreeUsingNPM(Scop &S, ScopAnalysisManager &SAM,
 /// scalar definition are redirected (We currently do not care about removing
 /// the write in this case).  This is also useful for the main DeLICM pass as
 /// there are less scalars to be mapped.
-class ForwardOpTreeWrapperPass final : public ScopPass {
+class ForwardOpTreeWrapperPass : public ScopPass {
 private:
   /// The pass implementation, also holding per-scop data.
   std::unique_ptr<ForwardOpTreeImpl> Impl;
@@ -1143,47 +1143,17 @@ public:
 }; // class ForwardOpTree
 
 char ForwardOpTreeWrapperPass::ID;
-
-/// Print result from ForwardOpTreeWrapperPass.
-class ForwardOpTreePrinterLegacyPass final : public ScopPass {
-public:
-  static char ID;
-
-  ForwardOpTreePrinterLegacyPass() : ForwardOpTreePrinterLegacyPass(outs()){};
-  explicit ForwardOpTreePrinterLegacyPass(llvm::raw_ostream &OS)
-      : ScopPass(ID), OS(OS) {}
-
-  bool runOnScop(Scop &S) override {
-    ForwardOpTreeWrapperPass &P = getAnalysis<ForwardOpTreeWrapperPass>();
-
-    OS << "Printing analysis '" << P.getPassName() << "' for region: '"
-       << S.getRegion().getNameStr() << "' in function '"
-       << S.getFunction().getName() << "':\n";
-    P.printScop(OS, S);
-
-    return false;
-  }
-
-  void getAnalysisUsage(AnalysisUsage &AU) const override {
-    ScopPass::getAnalysisUsage(AU);
-    AU.addRequired<ForwardOpTreeWrapperPass>();
-    AU.setPreservesAll();
-  }
-
-private:
-  llvm::raw_ostream &OS;
-};
-
-char ForwardOpTreePrinterLegacyPass::ID = 0;
 } // namespace
 
 Pass *polly::createForwardOpTreeWrapperPass() {
   return new ForwardOpTreeWrapperPass();
 }
 
-Pass *polly::createForwardOpTreePrinterLegacyPass(llvm::raw_ostream &OS) {
-  return new ForwardOpTreePrinterLegacyPass(OS);
-}
+INITIALIZE_PASS_BEGIN(ForwardOpTreeWrapperPass, "polly-optree",
+                      "Polly - Forward operand tree", false, false)
+INITIALIZE_PASS_DEPENDENCY(LoopInfoWrapperPass)
+INITIALIZE_PASS_END(ForwardOpTreeWrapperPass, "polly-optree",
+                    "Polly - Forward operand tree", false, false)
 
 llvm::PreservedAnalyses ForwardOpTreePass::run(Scop &S,
                                                ScopAnalysisManager &SAM,
@@ -1197,15 +1167,3 @@ ForwardOpTreePrinterPass::run(Scop &S, ScopAnalysisManager &SAM,
                               ScopStandardAnalysisResults &SAR, SPMUpdater &U) {
   return runForwardOpTreeUsingNPM(S, SAM, SAR, U, &OS);
 }
-
-INITIALIZE_PASS_BEGIN(ForwardOpTreeWrapperPass, "polly-optree",
-                      "Polly - Forward operand tree", false, false)
-INITIALIZE_PASS_DEPENDENCY(LoopInfoWrapperPass)
-INITIALIZE_PASS_END(ForwardOpTreeWrapperPass, "polly-optree",
-                    "Polly - Forward operand tree", false, false)
-
-INITIALIZE_PASS_BEGIN(ForwardOpTreePrinterLegacyPass, "polly-print-optree",
-                      "Polly - Print forward operand tree result", false, false)
-INITIALIZE_PASS_DEPENDENCY(ForwardOpTreeWrapperPass)
-INITIALIZE_PASS_END(ForwardOpTreePrinterLegacyPass, "polly-print-optree",
-                    "Polly - Print forward operand tree result", false, false)

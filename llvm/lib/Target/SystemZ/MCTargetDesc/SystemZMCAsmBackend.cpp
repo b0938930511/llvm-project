@@ -10,8 +10,6 @@
 #include "MCTargetDesc/SystemZMCTargetDesc.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/MC/MCAsmBackend.h"
-#include "llvm/MC/MCAssembler.h"
-#include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCELFObjectWriter.h"
 #include "llvm/MC/MCFixupKindInfo.h"
 #include "llvm/MC/MCInst.h"
@@ -23,82 +21,19 @@ using namespace llvm;
 // Value is a fully-resolved relocation value: Symbol + Addend [- Pivot].
 // Return the bits that should be installed in a relocation field for
 // fixup kind Kind.
-static uint64_t extractBitsForFixup(MCFixupKind Kind, uint64_t Value,
-                                    const MCFixup &Fixup, MCContext &Ctx) {
+static uint64_t extractBitsForFixup(MCFixupKind Kind, uint64_t Value) {
   if (Kind < FirstTargetFixupKind)
     return Value;
 
-  auto checkFixupInRange = [&](int64_t Min, int64_t Max) -> bool {
-    int64_t SVal = int64_t(Value);
-    if (SVal < Min || SVal > Max) {
-      Ctx.reportError(Fixup.getLoc(), "operand out of range (" + Twine(SVal) +
-                                          " not between " + Twine(Min) +
-                                          " and " + Twine(Max) + ")");
-      return false;
-    }
-    return true;
-  };
-
-  auto handlePCRelFixupValue = [&](unsigned W) -> uint64_t {
-    if (Value % 2 != 0)
-      Ctx.reportError(Fixup.getLoc(), "Non-even PC relative offset.");
-    if (!checkFixupInRange(minIntN(W) * 2, maxIntN(W) * 2))
-      return 0;
-    return (int64_t)Value / 2;
-  };
-
-  auto handleImmValue = [&](bool IsSigned, unsigned W) -> uint64_t {
-    if (!(IsSigned ? checkFixupInRange(minIntN(W), maxIntN(W))
-                   : checkFixupInRange(0, maxUIntN(W))))
-      return 0;
-    return Value;
-  };
-
   switch (unsigned(Kind)) {
   case SystemZ::FK_390_PC12DBL:
-    return handlePCRelFixupValue(12);
   case SystemZ::FK_390_PC16DBL:
-    return handlePCRelFixupValue(16);
   case SystemZ::FK_390_PC24DBL:
-    return handlePCRelFixupValue(24);
   case SystemZ::FK_390_PC32DBL:
-    return handlePCRelFixupValue(32);
+    return (int64_t)Value / 2;
 
   case SystemZ::FK_390_TLS_CALL:
     return 0;
-
-  case SystemZ::FK_390_S8Imm:
-    return handleImmValue(true, 8);
-  case SystemZ::FK_390_S16Imm:
-    return handleImmValue(true, 16);
-  case SystemZ::FK_390_S20Imm: {
-    Value = handleImmValue(true, 20);
-    // S20Imm is used only for signed 20-bit displacements.
-    // The high byte of a 20 bit displacement value comes first.
-    uint64_t DLo = Value & 0xfff;
-    uint64_t DHi = (Value >> 12) & 0xff;
-    return (DLo << 8) | DHi;
-  }
-  case SystemZ::FK_390_S32Imm:
-    return handleImmValue(true, 32);
-  case SystemZ::FK_390_U1Imm:
-    return handleImmValue(false, 1);
-  case SystemZ::FK_390_U2Imm:
-    return handleImmValue(false, 2);
-  case SystemZ::FK_390_U3Imm:
-    return handleImmValue(false, 3);
-  case SystemZ::FK_390_U4Imm:
-    return handleImmValue(false, 4);
-  case SystemZ::FK_390_U8Imm:
-    return handleImmValue(false, 8);
-  case SystemZ::FK_390_U12Imm:
-    return handleImmValue(false, 12);
-  case SystemZ::FK_390_U16Imm:
-    return handleImmValue(false, 16);
-  case SystemZ::FK_390_U32Imm:
-    return handleImmValue(false, 32);
-  case SystemZ::FK_390_U48Imm:
-    return handleImmValue(false, 48);
   }
 
   llvm_unreachable("Unknown fixup kind!");
@@ -106,14 +41,16 @@ static uint64_t extractBitsForFixup(MCFixupKind Kind, uint64_t Value,
 
 namespace {
 class SystemZMCAsmBackend : public MCAsmBackend {
+  uint8_t OSABI;
 public:
-  SystemZMCAsmBackend() : MCAsmBackend(llvm::endianness::big) {}
+  SystemZMCAsmBackend(uint8_t osABI)
+      : MCAsmBackend(support::big), OSABI(osABI) {}
 
   // Override MCAsmBackend
   unsigned getNumFixupKinds() const override {
     return SystemZ::NumTargetFixupKinds;
   }
-  std::optional<MCFixupKind> getFixupKind(StringRef Name) const override;
+  Optional<MCFixupKind> getFixupKind(StringRef Name) const override;
   const MCFixupKindInfo &getFixupKindInfo(MCFixupKind Kind) const override;
   bool shouldForceRelocation(const MCAssembler &Asm, const MCFixup &Fixup,
                              const MCValue &Target) override;
@@ -126,13 +63,15 @@ public:
                             const MCAsmLayout &Layout) const override {
     return false;
   }
-  bool writeNopData(raw_ostream &OS, uint64_t Count,
-                    const MCSubtargetInfo *STI) const override;
+  bool writeNopData(raw_ostream &OS, uint64_t Count) const override;
+  std::unique_ptr<MCObjectTargetWriter>
+  createObjectTargetWriter() const override {
+    return createSystemZObjectWriter(OSABI);
+  }
 };
 } // end anonymous namespace
 
-std::optional<MCFixupKind>
-SystemZMCAsmBackend::getFixupKind(StringRef Name) const {
+Optional<MCFixupKind> SystemZMCAsmBackend::getFixupKind(StringRef Name) const {
   unsigned Type = llvm::StringSwitch<unsigned>(Name)
 #define ELF_RELOC(X, Y) .Case(#X, Y)
 #include "llvm/BinaryFormat/ELFRelocs/SystemZ.def"
@@ -145,11 +84,19 @@ SystemZMCAsmBackend::getFixupKind(StringRef Name) const {
 			.Default(-1u);
   if (Type != -1u)
     return static_cast<MCFixupKind>(FirstLiteralRelocationKind + Type);
-  return std::nullopt;
+  return None;
 }
 
 const MCFixupKindInfo &
 SystemZMCAsmBackend::getFixupKindInfo(MCFixupKind Kind) const {
+  const static MCFixupKindInfo Infos[SystemZ::NumTargetFixupKinds] = {
+    { "FK_390_PC12DBL",  4, 12, MCFixupKindInfo::FKF_IsPCRel },
+    { "FK_390_PC16DBL",  0, 16, MCFixupKindInfo::FKF_IsPCRel },
+    { "FK_390_PC24DBL",  0, 24, MCFixupKindInfo::FKF_IsPCRel },
+    { "FK_390_PC32DBL",  0, 32, MCFixupKindInfo::FKF_IsPCRel },
+    { "FK_390_TLS_CALL", 0, 0, 0 }
+  };
+
   // Fixup kinds from .reloc directive are like R_390_NONE. They
   // do not require any extra processing.
   if (Kind >= FirstLiteralRelocationKind)
@@ -160,7 +107,7 @@ SystemZMCAsmBackend::getFixupKindInfo(MCFixupKind Kind) const {
 
   assert(unsigned(Kind - FirstTargetFixupKind) < getNumFixupKinds() &&
          "Invalid kind!");
-  return SystemZ::MCFixupKindInfos[Kind - FirstTargetFixupKind];
+  return Infos[Kind - FirstTargetFixupKind];
 }
 
 bool SystemZMCAsmBackend::shouldForceRelocation(const MCAssembler &,
@@ -185,7 +132,7 @@ void SystemZMCAsmBackend::applyFixup(const MCAssembler &Asm,
   assert(Offset + Size <= Data.size() && "Invalid fixup offset!");
 
   // Big-endian insertion of Size bytes.
-  Value = extractBitsForFixup(Kind, Value, Fixup, Asm.getContext());
+  Value = extractBitsForFixup(Kind, Value);
   if (BitSize < 64)
     Value &= ((uint64_t)1 << BitSize) - 1;
   unsigned ShiftValue = (Size * 8) - 8;
@@ -195,46 +142,17 @@ void SystemZMCAsmBackend::applyFixup(const MCAssembler &Asm,
   }
 }
 
-bool SystemZMCAsmBackend::writeNopData(raw_ostream &OS, uint64_t Count,
-                                       const MCSubtargetInfo *STI) const {
+bool SystemZMCAsmBackend::writeNopData(raw_ostream &OS, uint64_t Count) const {
   for (uint64_t I = 0; I != Count; ++I)
     OS << '\x7';
   return true;
 }
 
-namespace {
-class ELFSystemZAsmBackend : public SystemZMCAsmBackend {
-  uint8_t OSABI;
-
-public:
-  ELFSystemZAsmBackend(uint8_t OsABI) : SystemZMCAsmBackend(), OSABI(OsABI){};
-
-  std::unique_ptr<MCObjectTargetWriter>
-  createObjectTargetWriter() const override {
-    return createSystemZELFObjectWriter(OSABI);
-  }
-};
-
-class GOFFSystemZAsmBackend : public SystemZMCAsmBackend {
-public:
-  GOFFSystemZAsmBackend() : SystemZMCAsmBackend(){};
-
-  std::unique_ptr<MCObjectTargetWriter>
-  createObjectTargetWriter() const override {
-    return createSystemZGOFFObjectWriter();
-  }
-};
-} // namespace
-
 MCAsmBackend *llvm::createSystemZMCAsmBackend(const Target &T,
                                               const MCSubtargetInfo &STI,
                                               const MCRegisterInfo &MRI,
                                               const MCTargetOptions &Options) {
-  if (STI.getTargetTriple().isOSzOS()) {
-    return new GOFFSystemZAsmBackend();
-  }
-
   uint8_t OSABI =
       MCELFObjectTargetWriter::getOSABI(STI.getTargetTriple().getOS());
-  return new ELFSystemZAsmBackend(OSABI);
+  return new SystemZMCAsmBackend(OSABI);
 }

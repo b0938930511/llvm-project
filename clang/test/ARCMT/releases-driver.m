@@ -6,7 +6,7 @@
 
 typedef int BOOL;
 
-id IhaveSideEffect(void);
+id IhaveSideEffect();
 
 @protocol NSObject
 - (BOOL)isEqual:(id)object;

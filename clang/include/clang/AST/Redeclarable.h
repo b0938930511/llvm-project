@@ -240,7 +240,7 @@ public:
   class redecl_iterator {
     /// Current - The current declaration.
     decl_type *Current = nullptr;
-    decl_type *Starter = nullptr;
+    decl_type *Starter;
     bool PassedFirst = false;
 
   public:
@@ -258,8 +258,7 @@ public:
 
     redecl_iterator& operator++() {
       assert(Current && "Advancing while iterator has reached end");
-      // Make sure we don't infinitely loop on an invalid redecl chain. This
-      // should never happen.
+      // Sanity check to avoid infinite loop on invalid redecl chain.
       if (Current->isFirstDecl()) {
         if (PassedFirst) {
           assert(0 && "Passed first decl twice, invalid redecl chain!");

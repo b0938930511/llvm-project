@@ -8,10 +8,10 @@
 
 #include "llvm/DebugInfo/PDB/PDBSymbolExe.h"
 
-#include "llvm/DebugInfo/PDB/ConcreteSymbolEnumerator.h"
 #include "llvm/DebugInfo/PDB/PDBSymDumper.h"
 #include "llvm/DebugInfo/PDB/PDBSymbolTypePointer.h"
-#include "llvm/DebugInfo/PDB/PDBTypes.h"
+
+#include <utility>
 
 using namespace llvm;
 using namespace llvm::pdb;

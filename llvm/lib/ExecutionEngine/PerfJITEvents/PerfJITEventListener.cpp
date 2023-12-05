@@ -24,6 +24,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errno.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/Path.h"
@@ -205,7 +206,7 @@ PerfJITEventListener::PerfJITEventListener()
 
   Dumpstream = std::make_unique<raw_fd_ostream>(DumpFd, true);
 
-  LLVMPerfJitHeader Header = {0, 0, 0, 0, 0, 0, 0, 0};
+  LLVMPerfJitHeader Header = {0};
   if (!FillMachine(Header))
     return;
 
@@ -275,7 +276,7 @@ void PerfJITEventListener::notifyObjectLoaded(
             SectionIndex = SectOrErr.get()->getIndex();
 
     // According to spec debugging info has to come before loading the
-    // corresponding code load.
+    // corresonding code load.
     DILineInfoTable Lines = Context->getLineInfoForAddressRange(
         {*AddrOrErr, SectionIndex}, Size, FileLineInfoKind::AbsoluteFilePath);
 
@@ -417,7 +418,7 @@ void PerfJITEventListener::NotifyCode(Expected<llvm::StringRef> &Symbol,
   rec.Prefix.Timestamp = perf_get_timestamp();
 
   rec.CodeSize = CodeSize;
-  rec.Vma = CodeAddr;
+  rec.Vma = 0;
   rec.CodeAddr = CodeAddr;
   rec.Pid = Pid;
   rec.Tid = get_threadid();
@@ -447,7 +448,7 @@ void PerfJITEventListener::NotifyDebug(uint64_t CodeAddr,
   rec.CodeAddr = CodeAddr;
   rec.NrEntry = Lines.size();
 
-  // compute total size of record (variable due to filenames)
+  // compute total size size of record (variable due to filenames)
   DILineInfoTable::iterator Begin = Lines.begin();
   DILineInfoTable::iterator End = Lines.end();
   for (DILineInfoTable::iterator It = Begin; It != End; ++It) {
@@ -487,14 +488,15 @@ void PerfJITEventListener::NotifyDebug(uint64_t CodeAddr,
   }
 }
 
+// There should be only a single event listener per process, otherwise perf gets
+// confused.
+llvm::ManagedStatic<PerfJITEventListener> PerfListener;
+
 } // end anonymous namespace
 
 namespace llvm {
 JITEventListener *JITEventListener::createPerfJITEventListener() {
-  // There should be only a single event listener per process, otherwise perf
-  // gets confused.
-  static PerfJITEventListener PerfListener;
-  return &PerfListener;
+  return &*PerfListener;
 }
 
 } // namespace llvm

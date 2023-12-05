@@ -1,28 +1,40 @@
-! Check that if there is a label or a name on an label-do-stmt,
-! then it is not lost when rewriting it to an non-label-do-stmt.
+! RUN: %flang_fc1 -fdebug-unparse-with-symbols %s 2>&1 | FileCheck %s
+! RUN: %flang_fc1 -fopenmp -fdebug-unparse-with-symbols %s 2>&1 | FileCheck %s
+! CHECK-NOT: do *[1-9]
 
-! RUN: %flang_fc1 -fdebug-unparse-with-symbols -pedantic %s 2>&1 | FileCheck %s
+program P
+implicit none
+integer OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
+integer NUMTHRDS, TID
+integer N, CSZ, CNUM, I
+parameter (N=100)
+parameter (CSZ=10) 
+real A(N), B(N), C(N)
 
-! CHECK: end do
-! CHECK: 2 do
-! CHECK: mainloop: do
-! CHECK: end do mainloop
+do 10 I = 1, N
+   A(I) = I * 1.0
+10 continue
 
-! CHECK-NOT: do [1-9]
+B = A
+CNUM = CSZ
 
-subroutine foo()
-  do 1 i=1,2
-    goto 2
-1 continue
-2 do 3 i=1,2
-3 continue
+!$OMP PARALLEL SHARED(A,B,C,NUMTHRDS,CNUM) PRIVATE(I,TID)
+TID = OMP_GET_THREAD_NUM()
+if (TID .EQ. 0) then
+   NUMTHRDS = OMP_GET_NUM_THREADS()
+   print *, "Number of threads =", NUMTHRDS
+end if
+print *, "Thread", TID, " is starting..."
 
-  mainloop : do 4 i=1,100
-    do j=1,20
-      if (j==i) then
-        ! cycle mainloop: TODO: fix invalid complaints that mainloop construct
-        ! is not in scope.
-      end if
-    end do
-4 end do mainloop
-end subroutine
+!$OMP DO SCHEDULE(DYNAMIC,CNUM)
+do 20 I = 1, N
+   C(I) = A(I) + B(I)
+   write (*,100) TID, I, C(I)
+20 continue
+!$OMP END DO NOWAIT
+
+print *, "Thread", TID, " done."
+
+!$OMP END PARALLEL
+100 format(" Thread", I2, ": C(", I3, ")=", F8.2)
+end program P

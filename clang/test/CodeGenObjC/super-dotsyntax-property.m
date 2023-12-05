@@ -35,7 +35,7 @@
 }
 @end
 
-void f0(void) {
+void f0() {
   int l1 = A.classGetter;
   int l2 = [A classGetter2];
 }

@@ -28,13 +28,14 @@ typedef struct objc_object {
 }
 @end
 
-void selfStaysLive(void) {
+void selfStaysLive() {
     SelfStaysLive *foo = [[SelfStaysLive alloc] init]; 
     [foo release];
 }
 
 // Test that retain release checker warns on leaks and use-after-frees when 
 // self init is not enabled.  
+// radar://12115830
 @interface ParentOfCell : NSObject
 - (id)initWithInt: (int)inInt;
 @end

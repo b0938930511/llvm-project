@@ -6,9 +6,9 @@
 typedef __SIZE_TYPE__ size_t;
 // The last parameter is normally size_t but the test is about the abnormal
 // situation when it's not a size_t.
-size_t strlcpy(char *, const char *, void (*)(void));
+size_t strlcpy(char *, const char *, void (*)());
 
-void foo(void);
+void foo();
 
 void testWeirdDecls(const char *src) {
   char dst[10];

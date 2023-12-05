@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// Implements a combinatorial exploration of all the different
+/// Implements a combinartorial exploration of all the different
 /// linebreaks unwrapped lines can be formatted in.
 ///
 //===----------------------------------------------------------------------===//

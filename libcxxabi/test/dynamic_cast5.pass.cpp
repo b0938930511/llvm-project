@@ -1,10 +1,12 @@
-//===----------------------------------------------------------------------===//
+//===------------------------- dynamic_cast5.cpp --------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+
+// XFAIL: gcc-7, gcc-8, gcc-9
 
 #include <cassert>
 #include "support/timer.h"
@@ -13,7 +15,7 @@
 // bases.
 #if defined(__clang__)
 #   pragma clang diagnostic ignored "-Winaccessible-base"
-#elif defined(__GNUC__)
+#elif defined(__GNUC__) && (__GNUC__ >= 10)
 #   pragma GCC diagnostic ignored "-Winaccessible-base"
 #endif
 

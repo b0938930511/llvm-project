@@ -7,13 +7,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "src/math/hypot.h"
-#include "src/__support/FPUtil/Hypot.h"
 #include "src/__support/common.h"
+#include "utils/FPUtil/Hypot.h"
 
-namespace LIBC_NAMESPACE {
+namespace __llvm_libc {
 
 LLVM_LIBC_FUNCTION(double, hypot, (double x, double y)) {
-  return LIBC_NAMESPACE::fputil::hypot(x, y);
+  return __llvm_libc::fputil::hypot(x, y);
 }
 
-} // namespace LIBC_NAMESPACE
+} // namespace __llvm_libc

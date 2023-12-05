@@ -31,14 +31,14 @@ extern int setjmp(long); // OK, right type.
 typedef int *jmp_buf;
 #endif
 
-void use(void) {
+void use() {
   setjmp(0);
   #if NO_SETJMP
   // cxx-error@-2 {{undeclared identifier 'setjmp'}}
-  // c-error@-3 {{call to undeclared function 'setjmp'; ISO C99 and later do not support implicit function declarations}}
+  // c-warning@-3 {{implicit declaration of function 'setjmp' is invalid in C99}}
   #elif ONLY_JMP_BUF
   // cxx-error@-5 {{undeclared identifier 'setjmp'}}
-  // c-error@-6 {{call to undeclared library function 'setjmp' with type 'int (jmp_buf)' (aka 'int (int *)'); ISO C99 and later do not support implicit function declarations}}
+  // c-warning@-6 {{implicitly declaring library function 'setjmp' with type 'int (jmp_buf)' (aka 'int (int *)')}}
   // c-note@-7 {{include the header <setjmp.h> or explicitly provide a declaration for 'setjmp'}}
   #else
   // cxx-no-diagnostics
@@ -60,7 +60,7 @@ int _setjmp(void *, void *);
 // c-warning@-2 {{incompatible redeclaration of library function '_setjmp'}}
 // c-note@-3 {{'_setjmp' is a builtin with type 'int (jmp_buf)'}}
 #endif
-void use_mingw(void) {
+void use_mingw() {
   _setjmp(0, 0);
 }
 

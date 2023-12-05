@@ -3,9 +3,7 @@
 # RUN: llvm-mc -filetype=obj -triple=x86_64-apple-darwin %t/foo1.s -o %t/foo1.o
 # RUN: llvm-mc -filetype=obj -triple=x86_64-apple-darwin %t/foo2.s -o %t/foo2.o
 # RUN: %lld -dylib --icf=all -framework CoreFoundation %t/foo1.o %t/foo2.o -o %t/foo
-# RUN: llvm-objdump --no-print-imm-hex --macho --rebase --bind --syms -d %t/foo | FileCheck %s --check-prefixes=CHECK,LITERALS
-# RUN: %lld -dylib -framework CoreFoundation %t/foo1.o %t/foo2.o -o %t/foo
-# RUN: llvm-objdump --no-print-imm-hex --macho --rebase --bind --syms -d %t/foo | FileCheck %s --check-prefix=LITERALS
+# RUN: llvm-objdump --macho --rebase --bind --syms -d %t/foo | FileCheck %s
 
 # CHECK:       (__TEXT,__text) section
 # CHECK-NEXT:  _foo1:
@@ -24,25 +22,21 @@
 # CHECK-DAG:   [[#FOO]]        g     F __TEXT,__text _foo2
 
 ## Make sure we don't emit redundant bind / rebase opcodes for folded sections.
-# LITERALS:       Rebase table:
-# LITERALS-NEXT:  segment  section          address  type
-# LITERALS-NEXT:  __DATA_CONST __cfstring   {{.*}}   pointer
-# LITERALS-NEXT:  __DATA_CONST __cfstring   {{.*}}   pointer
-# LITERALS-NEXT:  __DATA_CONST __cfstring   {{.*}}   pointer
-# LITERALS-EMPTY:
-# LITERALS-NEXT:  Bind table:
-# LITERALS-NEXT:  segment      section      address  type       addend dylib            symbol
-# LITERALS-NEXT:  __DATA_CONST __cfstring   {{.*}}   pointer         0 CoreFoundation   ___CFConstantStringClassReference
-# LITERALS-NEXT:  __DATA_CONST __cfstring   {{.*}}   pointer         0 CoreFoundation   ___CFConstantStringClassReference
-# LITERALS-NEXT:  __DATA_CONST __cfstring   {{.*}}   pointer         0 CoreFoundation   ___CFConstantStringClassReference
-# LITERALS-EMPTY:
+# CHECK:       Rebase table:
+# CHECK-NEXT:  segment  section          address  type
+# CHECK-NEXT:  __DATA_CONST __cfstring   {{.*}}   pointer
+# CHECK-NEXT:  __DATA_CONST __cfstring   {{.*}}   pointer
+# CHECK-NEXT:  __DATA_CONST __cfstring   {{.*}}   pointer
+# CHECK-EMPTY:
+# CHECK-NEXT:  Bind table:
+# CHECK-NEXT:  segment      section      address  type       addend dylib            symbol
+# CHECK-NEXT:  __DATA_CONST __cfstring   {{.*}}   pointer         0 CoreFoundation   ___CFConstantStringClassReference
+# CHECK-NEXT:  __DATA_CONST __cfstring   {{.*}}   pointer         0 CoreFoundation   ___CFConstantStringClassReference
+# CHECK-NEXT:  __DATA_CONST __cfstring   {{.*}}   pointer         0 CoreFoundation   ___CFConstantStringClassReference
+# CHECK-EMPTY:
 
 #--- foo1.s
 .cstring
-L_.str.0:
-  .asciz  "bar"
-## This string is at a different offset than the corresponding "foo" string in
-## foo2.s. Make sure that we treat references to either string as equivalent.
 L_.str:
   .asciz  "foo"
 
@@ -63,7 +57,7 @@ _named_cfstring:
   .quad  3 ## strlen
 
 .section  __TEXT,__ustring
-l_.ustr:
+l_.str.2:
   .short  102 ## f
   .short  111 ## o
   .short  0   ## \0
@@ -83,7 +77,7 @@ L__unnamed_cfstring_.2:
   .quad  ___CFConstantStringClassReference
   .long  2000 ## utf-16
   .space  4
-  .quad  l_.ustr
+  .quad  l_.str.2
   .quad  4 ## strlen
 
 .text
@@ -122,7 +116,7 @@ _named_cfstring:
 
 .section  __TEXT,__ustring
   .p2align  1
-l_.ustr:
+l_.str.2:
   .short  102 ## f
   .short  111 ## o
   .short  0   ## \0
@@ -135,7 +129,7 @@ L__unnamed_cfstring_.2:
   .quad  ___CFConstantStringClassReference
   .long  2000 ## utf-16
   .space  4
-  .quad  l_.ustr
+  .quad  l_.str.2
   .quad  4 ## strlen
 
 .text

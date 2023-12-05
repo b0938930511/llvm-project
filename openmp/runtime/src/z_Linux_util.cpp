@@ -60,8 +60,6 @@
 #elif KMP_OS_NETBSD || KMP_OS_OPENBSD
 #include <sys/types.h>
 #include <sys/sysctl.h>
-#elif KMP_OS_SOLARIS
-#include <sys/loadavg.h>
 #endif
 
 #include <ctype.h>
@@ -71,15 +69,6 @@
 struct kmp_sys_timer {
   struct timespec start;
 };
-
-#if KMP_OS_SOLARIS
-// Convert timeval to timespec.
-#define TIMEVAL_TO_TIMESPEC(tv, ts)                                            \
-  do {                                                                         \
-    (ts)->tv_sec = (tv)->tv_sec;                                               \
-    (ts)->tv_nsec = (tv)->tv_usec * 1000;                                      \
-  } while (0)
-#endif
 
 // Convert timespec to nanoseconds.
 #define TS2NS(timespec)                                                        \
@@ -104,7 +93,6 @@ static kmp_cond_align_t __kmp_wait_cv;
 static kmp_mutex_align_t __kmp_wait_mx;
 
 kmp_uint64 __kmp_ticks_per_msec = 1000000;
-kmp_uint64 __kmp_ticks_per_usec = 1000;
 
 #ifdef DEBUG_SUSPEND
 static void __kmp_print_cond(char *buffer, kmp_cond_align_t *cond) {
@@ -143,10 +131,6 @@ void __kmp_affinity_determine_capable(const char *env_var) {
 #define KMP_CPU_SET_SIZE_LIMIT (sizeof(cpuset_t))
 #endif
 
-  int verbose = __kmp_affinity.flags.verbose;
-  int warnings = __kmp_affinity.flags.warnings;
-  enum affinity_type type = __kmp_affinity.type;
-
 #if KMP_OS_LINUX
   long gCode;
   unsigned char *buf;
@@ -161,9 +145,10 @@ void __kmp_affinity_determine_capable(const char *env_var) {
 
   if (gCode < 0 && errno != EINVAL) {
     // System call not supported
-    if (verbose ||
-        (warnings && (type != affinity_none) && (type != affinity_default) &&
-         (type != affinity_disabled))) {
+    if (__kmp_affinity_verbose ||
+        (__kmp_affinity_warnings && (__kmp_affinity_type != affinity_none) &&
+         (__kmp_affinity_type != affinity_default) &&
+         (__kmp_affinity_type != affinity_disabled))) {
       int error = errno;
       kmp_msg_t err_code = KMP_ERR(error);
       __kmp_msg(kmp_ms_warning, KMP_MSG(GetAffSysCallNotSupported, env_var),
@@ -203,9 +188,11 @@ void __kmp_affinity_determine_capable(const char *env_var) {
                       "inconsistent OS call behavior: errno == ENOSYS for mask "
                       "size %d\n",
                       size));
-        if (verbose ||
-            (warnings && (type != affinity_none) &&
-             (type != affinity_default) && (type != affinity_disabled))) {
+        if (__kmp_affinity_verbose ||
+            (__kmp_affinity_warnings &&
+             (__kmp_affinity_type != affinity_none) &&
+             (__kmp_affinity_type != affinity_default) &&
+             (__kmp_affinity_type != affinity_disabled))) {
           int error = errno;
           kmp_msg_t err_code = KMP_ERR(error);
           __kmp_msg(kmp_ms_warning, KMP_MSG(GetAffSysCallNotSupported, env_var),
@@ -252,8 +239,10 @@ void __kmp_affinity_determine_capable(const char *env_var) {
   KMP_AFFINITY_DISABLE();
   KA_TRACE(10, ("__kmp_affinity_determine_capable: "
                 "cannot determine mask size - affinity not supported\n"));
-  if (verbose || (warnings && (type != affinity_none) &&
-                  (type != affinity_default) && (type != affinity_disabled))) {
+  if (__kmp_affinity_verbose ||
+      (__kmp_affinity_warnings && (__kmp_affinity_type != affinity_none) &&
+       (__kmp_affinity_type != affinity_default) &&
+       (__kmp_affinity_type != affinity_disabled))) {
     KMP_WARNING(AffCantGetMaskSize, env_var);
   }
 }
@@ -420,7 +409,7 @@ void __kmp_terminate_thread(int gtid) {
 static kmp_int32 __kmp_set_stack_info(int gtid, kmp_info_t *th) {
   int stack_data;
 #if KMP_OS_LINUX || KMP_OS_DRAGONFLY || KMP_OS_FREEBSD || KMP_OS_NETBSD ||     \
-    KMP_OS_HURD || KMP_OS_SOLARIS
+    KMP_OS_HURD
   pthread_attr_t attr;
   int status;
   size_t size = 0;
@@ -459,7 +448,7 @@ static kmp_int32 __kmp_set_stack_info(int gtid, kmp_info_t *th) {
     return TRUE;
   }
 #endif /* KMP_OS_LINUX || KMP_OS_DRAGONFLY || KMP_OS_FREEBSD || KMP_OS_NETBSD  \
-          || KMP_OS_HURD || KMP_OS_SOLARIS */
+          || KMP_OS_HURD */
   /* Use incremental refinement starting from initial conservative estimate */
   TCW_PTR(th->th.th_info.ds.ds_stacksize, 0);
   TCW_PTR(th->th.th_info.ds.ds_stackbase, &stack_data);
@@ -474,7 +463,7 @@ static void *__kmp_launch_worker(void *thr) {
 #endif /* KMP_BLOCK_SIGNALS */
   void *exit_val;
 #if KMP_OS_LINUX || KMP_OS_DRAGONFLY || KMP_OS_FREEBSD || KMP_OS_NETBSD ||     \
-    KMP_OS_OPENBSD || KMP_OS_HURD || KMP_OS_SOLARIS
+    KMP_OS_OPENBSD || KMP_OS_HURD
   void *volatile padding = 0;
 #endif
   int gtid;
@@ -497,7 +486,7 @@ static void *__kmp_launch_worker(void *thr) {
 #endif /* USE_ITT_BUILD */
 
 #if KMP_AFFINITY_SUPPORTED
-  __kmp_affinity_bind_init_mask(gtid);
+  __kmp_affinity_set_init_mask(gtid, FALSE);
 #endif
 
 #ifdef KMP_CANCEL_THREADS
@@ -523,7 +512,7 @@ static void *__kmp_launch_worker(void *thr) {
 #endif /* KMP_BLOCK_SIGNALS */
 
 #if KMP_OS_LINUX || KMP_OS_DRAGONFLY || KMP_OS_FREEBSD || KMP_OS_NETBSD ||     \
-    KMP_OS_OPENBSD || KMP_OS_HURD || KMP_OS_SOLARIS
+    KMP_OS_OPENBSD
   if (__kmp_stkoffset > 0 && gtid > 0) {
     padding = KMP_ALLOCA(gtid * __kmp_stkoffset);
     (void)padding;
@@ -776,6 +765,13 @@ void __kmp_create_worker(int gtid, kmp_info_t *th, size_t stack_size) {
      and also gives the user the stack space they requested for all threads */
   stack_size += gtid * __kmp_stkoffset * 2;
 
+#if defined(__ANDROID__) && __ANDROID_API__ < 19
+  // Round the stack size to a multiple of the page size. Older versions of
+  // Android (until KitKat) would fail pthread_attr_setstacksize with EINVAL
+  // if the stack size was not a multiple of the page size.
+  stack_size = (stack_size + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+#endif
+
   KA_TRACE(10, ("__kmp_create_worker: T#%d, default stacksize = %lu bytes, "
                 "__kmp_stksize = %lu bytes, final stacksize = %lu bytes\n",
                 gtid, KMP_DEFAULT_STKSIZE, __kmp_stksize, stack_size));
@@ -991,7 +987,7 @@ void __kmp_exit_thread(int exit_status) {
 #if KMP_USE_MONITOR
 void __kmp_resume_monitor();
 
-extern "C" void __kmp_reap_monitor(kmp_info_t *th) {
+void __kmp_reap_monitor(kmp_info_t *th) {
   int status;
   void *exit_val;
 
@@ -1032,12 +1028,6 @@ extern "C" void __kmp_reap_monitor(kmp_info_t *th) {
                 th->th.th_info.ds.ds_thread));
 
   KMP_MB(); /* Flush all pending memory write invalidates.  */
-}
-#else
-// Empty symbol to export (see exports_so.txt) when
-// monitor thread feature is disabled
-extern "C" void __kmp_reap_monitor(kmp_info_t *th) {
-  (void)th;
 }
 #endif // KMP_USE_MONITOR
 
@@ -1244,17 +1234,15 @@ static void __kmp_atfork_child(void) {
   // affinity in the parent
   kmp_set_thread_affinity_mask_initial();
 #endif
-  // Set default not to bind threads tightly in the child (we're expecting
+  // Set default not to bind threads tightly in the child (we’re expecting
   // over-subscription after the fork and this can improve things for
   // scripting languages that use OpenMP inside process-parallel code).
+  __kmp_affinity_type = affinity_none;
   if (__kmp_nested_proc_bind.bind_types != NULL) {
     __kmp_nested_proc_bind.bind_types[0] = proc_bind_false;
   }
-  for (kmp_affinity_t *affinity : __kmp_affinities)
-    *affinity = KMP_AFFINITY_INIT(affinity->env_var);
-  __kmp_affin_fullMask = nullptr;
-  __kmp_affin_origMask = nullptr;
-  __kmp_topology = nullptr;
+  __kmp_affinity_masks = NULL;
+  __kmp_affinity_num_masks = 0;
 #endif // KMP_AFFINITY_SUPPORTED
 
 #if KMP_USE_MONITOR
@@ -1309,13 +1297,7 @@ static void __kmp_atfork_child(void) {
   __kmp_itt_reset(); // reset ITT's global state
 #endif /* USE_ITT_BUILD */
 
-  {
-    // Child process often get terminated without any use of OpenMP. That might
-    // cause mapped shared memory file to be left unattended. Thus we postpone
-    // library registration till middle initialization in the child process.
-    __kmp_need_register_serial = FALSE;
-    __kmp_serial_initialize();
-  }
+  __kmp_serial_initialize();
 
   /* This is necessary to make sure no stale data is left around */
   /* AC: customers complain that we use unsafe routines in the atfork
@@ -1819,12 +1801,8 @@ static int __kmp_get_xproc(void) {
 
   int r = 0;
 
-#if KMP_OS_LINUX
-
-  __kmp_type_convert(sysconf(_SC_NPROCESSORS_CONF), &(r));
-
-#elif KMP_OS_DRAGONFLY || KMP_OS_FREEBSD || KMP_OS_NETBSD || KMP_OS_OPENBSD || \
-    KMP_OS_HURD || KMP_OS_SOLARIS
+#if KMP_OS_LINUX || KMP_OS_DRAGONFLY || KMP_OS_FREEBSD || KMP_OS_NETBSD ||     \
+    KMP_OS_OPENBSD || KMP_OS_HURD
 
   __kmp_type_convert(sysconf(_SC_NPROCESSORS_ONLN), &(r));
 
@@ -1862,13 +1840,10 @@ int __kmp_read_from_file(char const *path, char const *format, ...) {
 
   va_start(args, format);
   FILE *f = fopen(path, "rb");
-  if (f == NULL) {
-    va_end(args);
+  if (f == NULL)
     return 0;
-  }
   result = vfscanf(f, format, args);
   fclose(f);
-  va_end(args);
 
   return result;
 }
@@ -1905,13 +1880,6 @@ void __kmp_runtime_initialize(void) {
 
     /* Query the maximum number of threads */
     __kmp_type_convert(sysconf(_SC_THREAD_THREADS_MAX), &(__kmp_sys_max_nth));
-#ifdef __ve__
-    if (__kmp_sys_max_nth == -1) {
-      // VE's pthread supports only up to 64 threads per a VE process.
-      // So we use that KMP_MAX_NTH (predefined as 64) here.
-      __kmp_sys_max_nth = KMP_MAX_NTH;
-    }
-#else
     if (__kmp_sys_max_nth == -1) {
       /* Unlimited threads for NPTL */
       __kmp_sys_max_nth = INT_MAX;
@@ -1919,7 +1887,6 @@ void __kmp_runtime_initialize(void) {
       /* Can't tell, just use PTHREAD_THREADS_MAX */
       __kmp_sys_max_nth = KMP_MAX_NTH;
     }
-#endif
 
     /* Query the minimum stack size */
     __kmp_sys_min_stksize = sysconf(_SC_THREAD_STACK_MIN);
@@ -2022,7 +1989,7 @@ kmp_uint64 __kmp_now_nsec() {
 /* Measure clock ticks per millisecond */
 void __kmp_initialize_system_tick() {
   kmp_uint64 now, nsec2, diff;
-  kmp_uint64 delay = 1000000; // ~450 usec on most machines.
+  kmp_uint64 delay = 100000; // 50~100 usec on most machines.
   kmp_uint64 nsec = __kmp_now_nsec();
   kmp_uint64 goal = __kmp_hardware_timestamp() + delay;
   while ((now = __kmp_hardware_timestamp()) < goal)
@@ -2030,11 +1997,9 @@ void __kmp_initialize_system_tick() {
   nsec2 = __kmp_now_nsec();
   diff = nsec2 - nsec;
   if (diff > 0) {
-    double tpus = 1000.0 * (double)(delay + (now - goal)) / (double)diff;
-    if (tpus > 0.0) {
-      __kmp_ticks_per_msec = (kmp_uint64)(tpus * 1000.0);
-      __kmp_ticks_per_usec = (kmp_uint64)tpus;
-    }
+    kmp_uint64 tpms = ((kmp_uint64)1e6 * (delay + (now - goal)) / diff);
+    if (tpms > 0)
+      __kmp_ticks_per_msec = tpms;
   }
 }
 #endif
@@ -2200,9 +2165,9 @@ int __kmp_is_address_mapped(void *addr) {
     }
     kiv.kve_start += 1;
   }
-#elif KMP_OS_DRAGONFLY || KMP_OS_SOLARIS
+#elif KMP_OS_DRAGONFLY
 
-  // FIXME(DragonFly, Solaris): Implement this
+  // FIXME(DragonFly): Implement this
   found = 1;
 
 #else
@@ -2217,8 +2182,7 @@ int __kmp_is_address_mapped(void *addr) {
 
 #ifdef USE_LOAD_BALANCE
 
-#if KMP_OS_DARWIN || KMP_OS_DRAGONFLY || KMP_OS_FREEBSD || KMP_OS_NETBSD ||    \
-    KMP_OS_OPENBSD || KMP_OS_SOLARIS
+#if KMP_OS_DARWIN || KMP_OS_NETBSD
 
 // The function returns the rounded value of the system load average
 // during given time interval which depends on the value of
@@ -2275,9 +2239,8 @@ int __kmp_get_load_balance(int max) {
   int stat_file = -1;
   int stat_path_fixed_len;
 
-#ifdef KMP_DEBUG
   int total_processes = 0; // Total number of processes in system.
-#endif
+  int total_threads = 0; // Total number of threads in system.
 
   double call_time = 0.0;
 
@@ -2324,9 +2287,7 @@ int __kmp_get_load_balance(int max) {
     // process' directory.
     if (proc_entry->d_type == DT_DIR && isdigit(proc_entry->d_name[0])) {
 
-#ifdef KMP_DEBUG
       ++total_processes;
-#endif
       // Make sure init process is the very first in "/proc", so we can replace
       // strcmp( proc_entry->d_name, "1" ) == 0 with simpler total_processes ==
       // 1. We are going to check that total_processes == 1 => d_name == "1" is
@@ -2367,6 +2328,7 @@ int __kmp_get_load_balance(int max) {
         while (task_entry != NULL) {
           // It is a directory and name starts with a digit.
           if (proc_entry->d_type == DT_DIR && isdigit(task_entry->d_name[0])) {
+            ++total_threads;
 
             // Construct complete stat file path. Easiest way would be:
             //  __kmp_str_buf_print( & stat_path, "%s/%s/stat", task_path.str,
@@ -2475,8 +2437,7 @@ finish: // Clean up and exit.
 
 #if !(KMP_ARCH_X86 || KMP_ARCH_X86_64 || KMP_MIC ||                            \
       ((KMP_OS_LINUX || KMP_OS_DARWIN) && KMP_ARCH_AARCH64) ||                 \
-      KMP_ARCH_PPC64 || KMP_ARCH_RISCV64 || KMP_ARCH_LOONGARCH64 ||            \
-      KMP_ARCH_ARM || KMP_ARCH_VE || KMP_ARCH_S390X)
+      KMP_ARCH_PPC64 || KMP_ARCH_RISCV64)
 
 // we really only need the case with 1 argument, because CLANG always build
 // a struct of pointers to shared variables referenced in the outlined function
@@ -2763,29 +2724,5 @@ void __kmp_hidden_helper_threads_deinitz_release() {
   KMP_ASSERT(0 && "Hidden helper task is not supported on this OS");
 }
 #endif // KMP_OS_LINUX
-
-bool __kmp_detect_shm() {
-  DIR *dir = opendir("/dev/shm");
-  if (dir) { // /dev/shm exists
-    closedir(dir);
-    return true;
-  } else if (ENOENT == errno) { // /dev/shm does not exist
-    return false;
-  } else { // opendir() failed
-    return false;
-  }
-}
-
-bool __kmp_detect_tmp() {
-  DIR *dir = opendir("/tmp");
-  if (dir) { // /tmp exists
-    closedir(dir);
-    return true;
-  } else if (ENOENT == errno) { // /tmp does not exist
-    return false;
-  } else { // opendir() failed
-    return false;
-  }
-}
 
 // end of file //

@@ -69,7 +69,7 @@ Since the initial implementation, the design has evolved with, and partially
 driven the evolution of the core MLIR infrastructure to use
 [Regions](../LangRef.md/#regions),
 [OpInterfaces](../Interfaces.md),
-[ODS](../DefiningDialects/Operations.md) and
+[ODS](../OpDefinitions.md) and
 [Declarative Rewrite Rules](../DeclarativeRewrites.md)
 among others. The approach adopted by Linalg was extended to become
 [StructuredOps abstractions](
@@ -384,7 +384,7 @@ Affine dialects in particular, Linalg takes the following decisions.
   multi-for loops with induction variables independent of each other (referred
   to as hyper-rectangular iteration domains in the literature) such as the
   proposed
-  [affine.parallel](https://llvm.discourse.group/t/rfc-add-affine-parallel/350)
+  [affine.parallel]((https://llvm.discourse.group/t/rfc-add-affine-parallel/350)
   are sufficient in the majority of cases.
 - **Declarative Tiling**: the *tiling* transformation is ubiquitous in HPC code
   generation. It can be seen as a decomposition of either the iteration space or
@@ -547,7 +547,7 @@ data types. We choose to take advantage of these properties for the
 reasons described above.
 In particular, the `MemRefType` represents dense non-contiguous memory regions.
 This structure should extend beyond simple dense data types and generalize to
-ragged, sparse and mixed dense/sparse tensors as well as to trees, hash tables,
+ragged, sparse and mixed dens/sparse tensors as well as to trees, hash tables,
 tables of records and maybe even graphs.
 
 For such more advanced data types, the control-flow required to traverse the

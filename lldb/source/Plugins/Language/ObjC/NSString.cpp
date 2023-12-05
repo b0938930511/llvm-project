@@ -8,13 +8,14 @@
 
 #include "NSString.h"
 
+#include "Plugins/TypeSystem/Clang/TypeSystemClang.h"
 #include "lldb/Core/ValueObject.h"
 #include "lldb/Core/ValueObjectConstResult.h"
 #include "lldb/DataFormatters/FormattersHelpers.h"
 #include "lldb/DataFormatters/StringPrinter.h"
 #include "lldb/Target/Language.h"
+#include "lldb/Target/ProcessStructReader.h"
 #include "lldb/Target/Target.h"
-#include "lldb/Utility/ConstString.h"
 #include "lldb/Utility/DataBufferHeap.h"
 #include "lldb/Utility/Endian.h"
 #include "lldb/Utility/Status.h"
@@ -30,10 +31,28 @@ NSString_Additionals::GetAdditionalSummaries() {
   return g_map;
 }
 
+static CompilerType GetNSPathStore2Type(Target &target) {
+  static ConstString g_type_name("__lldb_autogen_nspathstore2");
+
+  TypeSystemClang *ast_ctx = ScratchTypeSystemClang::GetForTarget(target);
+
+  if (!ast_ctx)
+    return CompilerType();
+
+  CompilerType voidstar =
+      ast_ctx->GetBasicType(lldb::eBasicTypeVoid).GetPointerType();
+  CompilerType uint32 =
+      ast_ctx->GetBuiltinTypeForEncodingAndBitSize(eEncodingUint, 32);
+
+  return ast_ctx->GetOrCreateStructForIdentifier(
+      g_type_name,
+      {{"isa", voidstar}, {"lengthAndRef", uint32}, {"buffer", voidstar}});
+}
+
 bool lldb_private::formatters::NSStringSummaryProvider(
     ValueObject &valobj, Stream &stream,
     const TypeSummaryOptions &summary_options) {
-  static constexpr llvm::StringLiteral g_TypeHint("NSString");
+  static ConstString g_TypeHint("NSString");
 
   ProcessSP process_sp = valobj.GetProcessSP();
   if (!process_sp)
@@ -126,13 +145,19 @@ bool lldb_private::formatters::NSStringSummaryProvider(
     return true;
   }
 
-  llvm::StringRef prefix, suffix;
-  if (Language *language = Language::FindPlugin(summary_options.GetLanguage()))
-    std::tie(prefix, suffix) = language->GetFormatterPrefixSuffix(g_TypeHint);
+  std::string prefix, suffix;
+  if (Language *language =
+          Language::FindPlugin(summary_options.GetLanguage())) {
+    if (!language->GetFormatterPrefixSuffix(valobj, g_TypeHint, prefix,
+                                            suffix)) {
+      prefix.clear();
+      suffix.clear();
+    }
+  }
 
   StringPrinter::ReadStringAndDumpToStreamOptions options(valobj);
-  options.SetPrefixToken(prefix.str());
-  options.SetSuffixToken(suffix.str());
+  options.SetPrefixToken(prefix);
+  options.SetSuffixToken(suffix);
 
   if (is_mutable) {
     uint64_t location = 2 * ptr_size + valobj_addr;
@@ -141,7 +166,7 @@ bool lldb_private::formatters::NSStringSummaryProvider(
       return false;
     if (has_explicit_length && is_unicode) {
       options.SetLocation(location);
-      options.SetTargetSP(valobj.GetTargetSP());
+      options.SetProcessSP(process_sp);
       options.SetStream(&stream);
       options.SetQuote('"');
       options.SetSourceSize(explicit_length);
@@ -154,7 +179,7 @@ bool lldb_private::formatters::NSStringSummaryProvider(
           StringPrinter::StringElementType::UTF16>(options);
     } else {
       options.SetLocation(location + 1);
-      options.SetTargetSP(valobj.GetTargetSP());
+      options.SetProcessSP(process_sp);
       options.SetStream(&stream);
       options.SetSourceSize(explicit_length);
       options.SetHasSourceSize(has_explicit_length);
@@ -170,7 +195,7 @@ bool lldb_private::formatters::NSStringSummaryProvider(
     uint64_t location = 3 * ptr_size + valobj_addr;
 
     options.SetLocation(location);
-    options.SetTargetSP(valobj.GetTargetSP());
+    options.SetProcessSP(process_sp);
     options.SetStream(&stream);
     options.SetQuote('"');
     options.SetSourceSize(explicit_length);
@@ -192,7 +217,7 @@ bool lldb_private::formatters::NSStringSummaryProvider(
         return false;
     }
     options.SetLocation(location);
-    options.SetTargetSP(valobj.GetTargetSP());
+    options.SetProcessSP(process_sp);
     options.SetStream(&stream);
     options.SetQuote('"');
     options.SetSourceSize(explicit_length);
@@ -204,21 +229,15 @@ bool lldb_private::formatters::NSStringSummaryProvider(
     return StringPrinter::ReadStringAndDumpToStream<
         StringPrinter::StringElementType::UTF16>(options);
   } else if (is_path_store) {
-    // _lengthAndRefCount is the first ivar of NSPathStore2 (after the isa).
-    uint64_t length_ivar_offset = 1 * ptr_size;
-    CompilerType length_type = valobj.GetCompilerType().GetBasicTypeFromAST(
-        lldb::eBasicTypeUnsignedInt);
-    ValueObjectSP length_valobj_sp =
-        valobj.GetSyntheticChildAtOffset(length_ivar_offset, length_type, true,
-                                         ConstString("_lengthAndRefCount"));
-    if (!length_valobj_sp)
-      return false;
-    // Get the length out of _lengthAndRefCount.
-    explicit_length = length_valobj_sp->GetValueAsUnsigned(0) >> 20;
+    ProcessStructReader reader(valobj.GetProcessSP().get(),
+                               valobj.GetValueAsUnsigned(0),
+                               GetNSPathStore2Type(*valobj.GetTargetSP()));
+    explicit_length =
+        reader.GetField<uint32_t>(ConstString("lengthAndRef")) >> 20;
     lldb::addr_t location = valobj.GetValueAsUnsigned(0) + ptr_size + 4;
 
     options.SetLocation(location);
-    options.SetTargetSP(valobj.GetTargetSP());
+    options.SetProcessSP(process_sp);
     options.SetStream(&stream);
     options.SetQuote('"');
     options.SetSourceSize(explicit_length);
@@ -241,7 +260,7 @@ bool lldb_private::formatters::NSStringSummaryProvider(
       location++;
     }
     options.SetLocation(location);
-    options.SetTargetSP(valobj.GetTargetSP());
+    options.SetProcessSP(process_sp);
     options.SetStream(&stream);
     options.SetSourceSize(explicit_length);
     options.SetHasSourceSize(has_explicit_length);
@@ -264,7 +283,7 @@ bool lldb_private::formatters::NSStringSummaryProvider(
       explicit_length++; // account for the fact that there is no NULL and we
                          // need to have one added
     options.SetLocation(location);
-    options.SetTargetSP(valobj.GetTargetSP());
+    options.SetProcessSP(process_sp);
     options.SetStream(&stream);
     options.SetSourceSize(explicit_length);
     options.SetHasSourceSize(has_explicit_length);
@@ -312,7 +331,7 @@ bool lldb_private::formatters::NSMutableAttributedStringSummaryProvider(
 bool lldb_private::formatters::NSTaggedString_SummaryProvider(
     ValueObject &valobj, ObjCLanguageRuntime::ClassDescriptorSP descriptor,
     Stream &stream, const TypeSummaryOptions &summary_options) {
-  static constexpr llvm::StringLiteral g_TypeHint("NSString");
+  static ConstString g_TypeHint("NSString");
 
   if (!descriptor)
     return false;
@@ -330,17 +349,23 @@ bool lldb_private::formatters::NSTaggedString_SummaryProvider(
   if (len_bits > g_fiveBitMaxLen)
     return false;
 
-  llvm::StringRef prefix, suffix;
-  if (Language *language = Language::FindPlugin(summary_options.GetLanguage()))
-    std::tie(prefix, suffix) = language->GetFormatterPrefixSuffix(g_TypeHint);
+  std::string prefix, suffix;
+  if (Language *language =
+          Language::FindPlugin(summary_options.GetLanguage())) {
+    if (!language->GetFormatterPrefixSuffix(valobj, g_TypeHint, prefix,
+                                            suffix)) {
+      prefix.clear();
+      suffix.clear();
+    }
+  }
 
   // this is a fairly ugly trick - pretend that the numeric value is actually a
   // char* this works under a few assumptions: little endian architecture
   // sizeof(uint64_t) > g_MaxNonBitmaskedLen
   if (len_bits <= g_MaxNonBitmaskedLen) {
-    stream << prefix;
+    stream.Printf("%s", prefix.c_str());
     stream.Printf("\"%s\"", (const char *)&data_bits);
-    stream << suffix;
+    stream.Printf("%s", suffix.c_str());
     return true;
   }
 
@@ -363,8 +388,8 @@ bool lldb_private::formatters::NSTaggedString_SummaryProvider(
     bytes.insert(bytes.begin(), sixBitToCharLookup[packed]);
   }
 
-  stream << prefix;
+  stream.Printf("%s", prefix.c_str());
   stream.Printf("\"%s\"", &bytes[0]);
-  stream << suffix;
+  stream.Printf("%s", suffix.c_str());
   return true;
 }

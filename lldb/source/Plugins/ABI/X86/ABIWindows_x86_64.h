@@ -40,15 +40,10 @@ public:
 
   bool RegisterIsVolatile(const lldb_private::RegisterInfo *reg_info) override;
 
-  // In Windows_x86_64 ABI requires that the stack will be maintained 16-byte
-  // aligned.
-  // When ntdll invokes callbacks such as KiUserExceptionDispatcher or
-  // KiUserCallbackDispatcher, those functions won't have a properly 16-byte
-  // aligned stack - but tolerate unwinding through them by relaxing the
-  // requirement to 8 bytes.
+  // In Windows_x86_64 ABI, stack will always be maintained 16-byte aligned
   bool CallFrameAddressIsValid(lldb::addr_t cfa) override {
-    if (cfa & (8ull - 1ull))
-      return false; // Not 8 byte aligned
+	  if (cfa & (16ull - 1ull))
+      return false; // Not 16 byte aligned
     if (cfa == 0)
       return false; // Zero is not a valid stack address
     return true;
@@ -72,13 +67,15 @@ public:
 
   static lldb::ABISP CreateInstance(lldb::ProcessSP process_sp, const lldb_private::ArchSpec &arch);
 
-  static llvm::StringRef GetPluginNameStatic() { return "windows-x86_64"; }
+  static lldb_private::ConstString GetPluginNameStatic();
 
   //------------------------------------------------------------------
   // PluginInterface protocol
   //------------------------------------------------------------------
 
-  llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
+  lldb_private::ConstString GetPluginName() override;
+
+  uint32_t GetPluginVersion() override;
 
 protected:
   void CreateRegisterMapIfNeeded();

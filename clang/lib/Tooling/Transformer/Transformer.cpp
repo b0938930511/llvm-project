@@ -16,29 +16,35 @@
 #include <utility>
 #include <vector>
 
-namespace clang {
-namespace tooling {
+using namespace clang;
+using namespace tooling;
 
-using ::clang::ast_matchers::MatchFinder;
+using ast_matchers::MatchFinder;
 
-namespace detail {
+void Transformer::registerMatchers(MatchFinder *MatchFinder) {
+  for (auto &Matcher : transformer::detail::buildMatchers(Rule))
+    MatchFinder->addDynamicMatcher(Matcher, this);
+}
 
-void TransformerImpl::onMatch(
-    const ast_matchers::MatchFinder::MatchResult &Result) {
+void Transformer::run(const MatchFinder::MatchResult &Result) {
   if (Result.Context->getDiagnostics().hasErrorOccurred())
     return;
 
-  onMatchImpl(Result);
-}
+  transformer::RewriteRule::Case Case =
+      transformer::detail::findSelectedCase(Result, Rule);
+  auto Transformations = Case.Edits(Result);
+  if (!Transformations) {
+    Consumer(Transformations.takeError());
+    return;
+  }
 
-llvm::Expected<llvm::SmallVector<AtomicChange, 1>>
-TransformerImpl::convertToAtomicChanges(
-    const llvm::SmallVectorImpl<transformer::Edit> &Edits,
-    const MatchFinder::MatchResult &Result) {
+  if (Transformations->empty())
+    return;
+
   // Group the transformations, by file, into AtomicChanges, each anchored by
   // the location of the first change in that file.
   std::map<FileID, AtomicChange> ChangesByFileID;
-  for (const auto &T : Edits) {
+  for (const auto &T : *Transformations) {
     auto ID = Result.SourceManager->getFileID(T.Range.getBegin());
     auto Iter = ChangesByFileID
                     .emplace(ID, AtomicChange(*Result.SourceManager,
@@ -49,7 +55,8 @@ TransformerImpl::convertToAtomicChanges(
     case transformer::EditKind::Range:
       if (auto Err =
               AC.replace(*Result.SourceManager, T.Range, T.Replacement)) {
-        return std::move(Err);
+        Consumer(std::move(Err));
+        return;
       }
       break;
     case transformer::EditKind::AddInclude:
@@ -58,27 +65,6 @@ TransformerImpl::convertToAtomicChanges(
     }
   }
 
-  llvm::SmallVector<AtomicChange, 1> Changes;
-  Changes.reserve(ChangesByFileID.size());
   for (auto &IDChangePair : ChangesByFileID)
-    Changes.push_back(std::move(IDChangePair.second));
-
-  return Changes;
+    Consumer(std::move(IDChangePair.second));
 }
-
-} // namespace detail
-
-void Transformer::registerMatchers(MatchFinder *MatchFinder) {
-  for (auto &Matcher : Impl->buildMatchers())
-    MatchFinder->addDynamicMatcher(Matcher, this);
-}
-
-void Transformer::run(const MatchFinder::MatchResult &Result) {
-  if (Result.Context->getDiagnostics().hasErrorOccurred())
-    return;
-
-  Impl->onMatch(Result);
-}
-
-} // namespace tooling
-} // namespace clang

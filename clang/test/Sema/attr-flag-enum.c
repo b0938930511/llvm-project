@@ -7,7 +7,7 @@ enum __attribute__((flag_enum)) flag {
 };
 
 enum __attribute__((flag_enum)) {
-  g = 0x7,  // expected-warning {{enumeration value 'g' is out of range of flags in enumeration type 'enum (unnamed at}}
+  g = 0x7,  // expected-warning {{enumeration value 'g' is out of range of flags in enumeration type ''}}
 };
 
 enum __attribute__((flag_enum)) flag2 {

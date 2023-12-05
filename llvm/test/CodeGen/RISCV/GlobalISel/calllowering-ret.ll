@@ -5,14 +5,13 @@
 ; RUN:   | FileCheck -check-prefix=RV64I %s
 
 define void @foo() {
-; RV32I-LABEL: foo:
-; RV32I:       # %bb.0: # %entry
-; RV32I-NEXT:    ret
-;
-; RV64I-LABEL: foo:
-; RV64I:       # %bb.0: # %entry
-; RV64I-NEXT:    ret
+  ; RV32I-LABEL: foo
+  ; RV32I:       # %bb.0: # %entry
+  ; RV32I:         ret
 
+  ; RV64I-LABEL: foo
+  ; RV64I:       # %bb.0: # %entry
+  ; RV64I:         ret
 entry:
   ret void
 }

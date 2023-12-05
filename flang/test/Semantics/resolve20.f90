@@ -1,9 +1,8 @@
-! RUN: %python %S/test_errors.py %s %flang_fc1 -pedantic
+! RUN: %S/test_errors.sh %s %t %flang_fc1
+! REQUIRES: shell
 module m
   abstract interface
     subroutine foo
-    end subroutine
-    subroutine foo2
     end subroutine
   end interface
 
@@ -21,7 +20,6 @@ module m
   procedure(h) :: i
   procedure(forward) :: j
   !ERROR: 'bad1' must be an abstract interface or a procedure with an explicit interface
-  !ERROR: Procedure 'k1' may not be an array without an explicit interface
   procedure(bad1) :: k1
   !ERROR: 'bad2' must be an abstract interface or a procedure with an explicit interface
   procedure(bad2) :: k2
@@ -38,25 +36,16 @@ module m
   type :: bad3
   end type
 
-  !PORTABILITY: Name 'm' declared in a module should not have the same name as the module
-  type :: m
+  type :: m ! the name of a module can be used as a local identifier
   end type m
 
-  !ERROR: EXTERNAL attribute was already specified on 'a'
-  !ERROR: EXTERNAL attribute was already specified on 'b'
-  !ERROR: EXTERNAL attribute was already specified on 'c'
-  !ERROR: EXTERNAL attribute was already specified on 'd'
   external :: a, b, c, d
   !ERROR: EXTERNAL attribute not allowed on 'm'
   external :: m
-  !WARNING: EXTERNAL attribute was already specified on 'foo'
+  !ERROR: EXTERNAL attribute not allowed on 'foo'
   external :: foo
   !ERROR: EXTERNAL attribute not allowed on 'bar'
   external :: bar
-
-  !ERROR: An entity may not have the ASYNCHRONOUS attribute unless it is a variable
-  asynchronous :: async
-  external :: async
 
   !ERROR: PARAMETER attribute not allowed on 'm'
   parameter(m=2)
@@ -69,7 +58,7 @@ module m
     integer :: i
   contains
     !ERROR: 'proc' must be an abstract interface or a procedure with an explicit interface
-    !ERROR: Procedure component 'p1' must have NOPASS attribute or explicit interface
+    !ERROR: Procedure component 'p1' has invalid interface 'proc'
     procedure(proc), deferred :: p1
   end type t1
 
@@ -81,12 +70,10 @@ module m
 contains
   subroutine bar
   end subroutine
-  !ERROR: An entity may not have the ASYNCHRONOUS attribute unless it is a variable
   subroutine test
-    asynchronous test
-    !ERROR: Abstract procedure interface 'foo2' may not be referenced
-    call foo2()
-    !ERROR: Abstract procedure interface 'f' may not be referenced
+    !ERROR: Abstract interface 'foo' may not be called
+    call foo()
+    !ERROR: Abstract interface 'f' may not be called
     x = f()
   end subroutine
 end module

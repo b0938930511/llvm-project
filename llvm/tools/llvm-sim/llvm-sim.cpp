@@ -41,13 +41,13 @@ static cl::opt<std::string> InputSourceFile(cl::Positional,
 /// \param LLVMInstNum - The mapping of Instructions to their location in the
 /// module represented by an unsigned integer.
 /// \returns The instruction number for \p I if it exists.
-std::optional<unsigned>
+Optional<unsigned>
 getPositionInModule(const Instruction *I,
                     const DenseMap<Instruction *, unsigned> &LLVMInstNum) {
   assert(I && "Instruction is nullptr!");
   DenseMap<Instruction *, unsigned>::const_iterator It = LLVMInstNum.find(I);
   if (It == LLVMInstNum.end())
-    return std::nullopt;
+    return None;
   return It->second;
 }
 
@@ -80,18 +80,19 @@ exportToFile(const StringRef FilePath,
     // For each file there is a list of the range where the similarity
     // exists.
     for (const IRSimilarityCandidate &C : G) {
-      std::optional<unsigned> Start =
+      Optional<unsigned> Start =
           getPositionInModule((*C.front()).Inst, LLVMInstNum);
-      std::optional<unsigned> End =
+      Optional<unsigned> End =
           getPositionInModule((*C.back()).Inst, LLVMInstNum);
 
-      assert(Start &&
+      assert(Start.hasValue() &&
              "Could not find instruction number for first instruction");
-      assert(End && "Could not find instruction number for last instruction");
+      assert(End.hasValue() &&
+             "Could not find instruction number for last instruction");
 
       J.object([&] {
-        J.attribute("start", *Start);
-        J.attribute("end", *End);
+        J.attribute("start", Start.getValue());
+        J.attribute("end", End.getValue());
       });
     }
     J.arrayEnd();

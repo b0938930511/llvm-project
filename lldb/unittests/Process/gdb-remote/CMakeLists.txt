@@ -1,7 +1,6 @@
 add_lldb_unittest(ProcessGdbRemoteTests
   GDBRemoteClientBaseTest.cpp
   GDBRemoteCommunicationClientTest.cpp
-  GDBRemoteCommunicationServerLLGSTest.cpp
   GDBRemoteCommunicationServerTest.cpp
   GDBRemoteCommunicationTest.cpp
   GDBRemoteTestUtils.cpp

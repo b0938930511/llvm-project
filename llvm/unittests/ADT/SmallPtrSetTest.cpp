@@ -12,7 +12,6 @@
 
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/PointerIntPair.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/PointerLikeTypeTraits.h"
 #include "gtest/gtest.h"
 
@@ -299,7 +298,7 @@ TEST(SmallPtrSetTest, dereferenceAndIterate) {
 
   // Sort.  We should hit the first element just once and the final element N
   // times.
-  llvm::sort(Found);
+  llvm::sort(std::begin(Found), std::end(Found));
   for (auto F = std::begin(Found), E = std::end(Found); F != E; ++F)
     EXPECT_EQ(F - Found + 1, *F);
 }

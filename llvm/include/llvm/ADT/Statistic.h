@@ -5,22 +5,21 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-///
-/// \file
-/// This file defines the 'Statistic' class, which is designed to be an easy way
-/// to expose various metrics from passes.  These statistics are printed at the
-/// end of a run (from llvm_shutdown), when the -stats command line option is
-/// passed on the command line.
-///
-/// This is useful for reporting information like the number of instructions
-/// simplified, optimized or removed by various transformations, like this:
-///
-/// static Statistic NumInstsKilled("gcse", "Number of instructions killed");
-///
-/// Later, in the code: ++NumInstsKilled;
-///
-/// NOTE: Statistics *must* be declared as global variables.
-///
+//
+// This file defines the 'Statistic' class, which is designed to be an easy way
+// to expose various metrics from passes.  These statistics are printed at the
+// end of a run (from llvm_shutdown), when the -stats command line option is
+// passed on the command line.
+//
+// This is useful for reporting information like the number of instructions
+// simplified, optimized or removed by various transformations, like this:
+//
+// static Statistic NumInstsKilled("gcse", "Number of instructions killed");
+//
+// Later, in the code: ++NumInstsKilled;
+//
+// NOTE: Statistics *must* be declared as global variables.
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef LLVM_ADT_STATISTIC_H
@@ -53,7 +52,7 @@ public:
   const char *const Name;
   const char *const Desc;
 
-  std::atomic<uint64_t> Value;
+  std::atomic<unsigned> Value;
   std::atomic<bool> Initialized;
 
   constexpr TrackingStatistic(const char *DebugType, const char *Name,
@@ -65,12 +64,12 @@ public:
   const char *getName() const { return Name; }
   const char *getDesc() const { return Desc; }
 
-  uint64_t getValue() const { return Value.load(std::memory_order_relaxed); }
+  unsigned getValue() const { return Value.load(std::memory_order_relaxed); }
 
   // Allow use of this class as the value itself.
-  operator uint64_t() const { return getValue(); }
+  operator unsigned() const { return getValue(); }
 
-  const TrackingStatistic &operator=(uint64_t Val) {
+  const TrackingStatistic &operator=(unsigned Val) {
     Value.store(Val, std::memory_order_relaxed);
     return init();
   }
@@ -80,7 +79,7 @@ public:
     return init();
   }
 
-  uint64_t operator++(int) {
+  unsigned operator++(int) {
     init();
     return Value.fetch_add(1, std::memory_order_relaxed);
   }
@@ -90,27 +89,27 @@ public:
     return init();
   }
 
-  uint64_t operator--(int) {
+  unsigned operator--(int) {
     init();
     return Value.fetch_sub(1, std::memory_order_relaxed);
   }
 
-  const TrackingStatistic &operator+=(uint64_t V) {
+  const TrackingStatistic &operator+=(unsigned V) {
     if (V == 0)
       return *this;
     Value.fetch_add(V, std::memory_order_relaxed);
     return init();
   }
 
-  const TrackingStatistic &operator-=(uint64_t V) {
+  const TrackingStatistic &operator-=(unsigned V) {
     if (V == 0)
       return *this;
     Value.fetch_sub(V, std::memory_order_relaxed);
     return init();
   }
 
-  void updateMax(uint64_t V) {
-    uint64_t PrevMax = Value.load(std::memory_order_relaxed);
+  void updateMax(unsigned V) {
+    unsigned PrevMax = Value.load(std::memory_order_relaxed);
     // Keep trying to update max until we succeed or another thread produces
     // a bigger max than us.
     while (V > PrevMax && !Value.compare_exchange_weak(
@@ -134,26 +133,26 @@ public:
   NoopStatistic(const char * /*DebugType*/, const char * /*Name*/,
                 const char * /*Desc*/) {}
 
-  uint64_t getValue() const { return 0; }
+  unsigned getValue() const { return 0; }
 
   // Allow use of this class as the value itself.
-  operator uint64_t() const { return 0; }
+  operator unsigned() const { return 0; }
 
-  const NoopStatistic &operator=(uint64_t Val) { return *this; }
+  const NoopStatistic &operator=(unsigned Val) { return *this; }
 
   const NoopStatistic &operator++() { return *this; }
 
-  uint64_t operator++(int) { return 0; }
+  unsigned operator++(int) { return 0; }
 
   const NoopStatistic &operator--() { return *this; }
 
-  uint64_t operator--(int) { return 0; }
+  unsigned operator--(int) { return 0; }
 
-  const NoopStatistic &operator+=(const uint64_t &V) { return *this; }
+  const NoopStatistic &operator+=(const unsigned &V) { return *this; }
 
-  const NoopStatistic &operator-=(const uint64_t &V) { return *this; }
+  const NoopStatistic &operator-=(const unsigned &V) { return *this; }
 
-  void updateMax(uint64_t V) {}
+  void updateMax(unsigned V) {}
 };
 
 #if LLVM_ENABLE_STATS
@@ -200,7 +199,7 @@ void PrintStatisticsJSON(raw_ostream &OS);
 /// during it's execution. It will return the value at the point that it is
 /// read. However, it will prevent new statistics from registering until it
 /// completes.
-std::vector<std::pair<StringRef, uint64_t>> GetStatistics();
+const std::vector<std::pair<StringRef, unsigned>> GetStatistics();
 
 /// Reset the statistics. This can be used to zero and de-register the
 /// statistics in order to measure a compilation.

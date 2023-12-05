@@ -11,10 +11,12 @@
 
 #include "lld/Common/LLVM.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/MemoryBufferRef.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include <utility>
 #include <vector>
 
-namespace lld::elf {
+namespace lld {
+namespace elf {
 
 class ScriptLexer {
 public:
@@ -51,6 +53,7 @@ private:
   size_t getColumnNumber();
 };
 
-} // namespace lld::elf
+} // namespace elf
+} // namespace lld
 
 #endif

@@ -27,18 +27,15 @@
 #include "lldb/Target/Target.h"
 #include "lldb/Target/UnixSignals.h"
 #include "lldb/Utility/LLDBAssert.h"
-#include "lldb/Utility/LLDBLog.h"
 #include "lldb/Utility/Log.h"
 #include "lldb/Utility/State.h"
 #include "llvm/BinaryFormat/Magic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Threading.h"
 
-#include "Plugins/ObjectFile/Placeholder/ObjectFilePlaceholder.h"
 #include "Plugins/Process/Utility/StopInfoMachException.h"
 
 #include <memory>
-#include <optional>
 
 using namespace lldb;
 using namespace lldb_private;
@@ -47,6 +44,83 @@ using namespace minidump;
 LLDB_PLUGIN_DEFINE(ProcessMinidump)
 
 namespace {
+
+/// A minimal ObjectFile implementation providing a dummy object file for the
+/// cases when the real module binary is not available. This allows the module
+/// to show up in "image list" and symbols to be added to it.
+class PlaceholderObjectFile : public ObjectFile {
+public:
+  PlaceholderObjectFile(const lldb::ModuleSP &module_sp,
+                        const ModuleSpec &module_spec, lldb::addr_t base,
+                        lldb::addr_t size)
+      : ObjectFile(module_sp, &module_spec.GetFileSpec(), /*file_offset*/ 0,
+                   /*length*/ 0, /*data_sp*/ nullptr, /*data_offset*/ 0),
+        m_arch(module_spec.GetArchitecture()), m_uuid(module_spec.GetUUID()),
+        m_base(base), m_size(size) {
+    m_symtab_up = std::make_unique<Symtab>(this);
+  }
+
+  static ConstString GetStaticPluginName() {
+    return ConstString("placeholder");
+  }
+  ConstString GetPluginName() override { return GetStaticPluginName(); }
+  uint32_t GetPluginVersion() override { return 1; }
+  bool ParseHeader() override { return true; }
+  Type CalculateType() override { return eTypeUnknown; }
+  Strata CalculateStrata() override { return eStrataUnknown; }
+  uint32_t GetDependentModules(FileSpecList &file_list) override { return 0; }
+  bool IsExecutable() const override { return false; }
+  ArchSpec GetArchitecture() override { return m_arch; }
+  UUID GetUUID() override { return m_uuid; }
+  Symtab *GetSymtab() override { return m_symtab_up.get(); }
+  bool IsStripped() override { return true; }
+  ByteOrder GetByteOrder() const override { return m_arch.GetByteOrder(); }
+
+  uint32_t GetAddressByteSize() const override {
+    return m_arch.GetAddressByteSize();
+  }
+
+  Address GetBaseAddress() override {
+    return Address(m_sections_up->GetSectionAtIndex(0), 0);
+  }
+
+  void CreateSections(SectionList &unified_section_list) override {
+    m_sections_up = std::make_unique<SectionList>();
+    auto section_sp = std::make_shared<Section>(
+        GetModule(), this, /*sect_id*/ 0, ConstString(".module_image"),
+        eSectionTypeOther, m_base, m_size, /*file_offset*/ 0, /*file_size*/ 0,
+        /*log2align*/ 0, /*flags*/ 0);
+    section_sp->SetPermissions(ePermissionsReadable | ePermissionsExecutable);
+    m_sections_up->AddSection(section_sp);
+    unified_section_list.AddSection(std::move(section_sp));
+  }
+
+  bool SetLoadAddress(Target &target, addr_t value,
+                      bool value_is_offset) override {
+    assert(!value_is_offset);
+    assert(value == m_base);
+
+    // Create sections if they haven't been created already.
+    GetModule()->GetSectionList();
+    assert(m_sections_up->GetNumSections(0) == 1);
+
+    target.GetSectionLoadList().SetSectionLoadAddress(
+        m_sections_up->GetSectionAtIndex(0), m_base);
+    return true;
+  }
+
+  void Dump(Stream *s) override {
+    s->Format("Placeholder object file for {0} loaded at [{1:x}-{2:x})\n",
+              GetFileSpec(), m_base, m_base + m_size);
+  }
+
+  lldb::addr_t GetBaseImageAddress() const { return m_base; }
+private:
+  ArchSpec m_arch;
+  UUID m_uuid;
+  lldb::addr_t m_base;
+  lldb::addr_t m_size;
+};
 
 /// Duplicate the HashElfTextSection() from the breakpad sources.
 ///
@@ -115,7 +189,12 @@ void HashElfTextSection(ModuleSP module_sp, std::vector<uint8_t> &breakpad_uuid,
 
 } // namespace
 
-llvm::StringRef ProcessMinidump::GetPluginDescriptionStatic() {
+ConstString ProcessMinidump::GetPluginNameStatic() {
+  static ConstString g_name("minidump");
+  return g_name;
+}
+
+const char *ProcessMinidump::GetPluginDescriptionStatic() {
   return "Minidump plug-in.";
 }
 
@@ -157,8 +236,7 @@ ProcessMinidump::ProcessMinidump(lldb::TargetSP target_sp,
                                  const FileSpec &core_file,
                                  DataBufferSP core_data)
     : PostMortemProcess(target_sp, listener_sp), m_core_file(core_file),
-      m_core_data(std::move(core_data)), m_active_exception(nullptr),
-      m_is_wow64(false) {}
+      m_core_data(std::move(core_data)), m_is_wow64(false) {}
 
 ProcessMinidump::~ProcessMinidump() {
   Clear();
@@ -214,19 +292,22 @@ Status ProcessMinidump::DoLoadCore() {
   SetUnixSignals(UnixSignals::Create(GetArchitecture()));
 
   ReadModuleList();
-  if (ModuleSP module = GetTarget().GetExecutableModule())
-    GetTarget().MergeArchitecture(module->GetArchitecture());
-  std::optional<lldb::pid_t> pid = m_minidump_parser->GetPid();
+
+  llvm::Optional<lldb::pid_t> pid = m_minidump_parser->GetPid();
   if (!pid) {
-    Debugger::ReportWarning("unable to retrieve process ID from minidump file, "
-                            "setting process ID to 1",
-                            GetTarget().GetDebugger().GetID());
+    GetTarget().GetDebugger().GetAsyncErrorStream()->PutCString(
+        "Unable to retrieve process ID from minidump file, setting process ID "
+        "to 1.\n");
     pid = 1;
   }
-  SetID(*pid);
+  SetID(pid.getValue());
 
   return error;
 }
+
+ConstString ProcessMinidump::GetPluginName() { return GetPluginNameStatic(); }
+
+uint32_t ProcessMinidump::GetPluginVersion() { return 1; }
 
 Status ProcessMinidump::DoDestroy() { return Status(); }
 
@@ -366,8 +447,8 @@ void ProcessMinidump::BuildMemoryRegions() {
   llvm::sort(*m_memory_regions);
 }
 
-Status ProcessMinidump::DoGetMemoryRegionInfo(lldb::addr_t load_addr,
-                                              MemoryRegionInfo &region) {
+Status ProcessMinidump::GetMemoryRegionInfo(lldb::addr_t load_addr,
+                                            MemoryRegionInfo &region) {
   BuildMemoryRegions();
   region = MinidumpParser::GetMemoryRegionInfo(*m_memory_regions, load_addr);
   return Status();
@@ -407,7 +488,7 @@ bool ProcessMinidump::DoUpdateThreadList(ThreadList &old_thread_list,
 ModuleSP ProcessMinidump::GetOrCreateModule(UUID minidump_uuid,
                                             llvm::StringRef name,
                                             ModuleSpec module_spec) {
-  Log *log = GetLog(LLDBLog::DynamicLoader);
+  Log *log(GetLogIfAllCategoriesSet(LIBLLDB_LOG_DYNAMIC_LOADER));
   Status error;
 
   ModuleSP module_sp =
@@ -455,7 +536,7 @@ void ProcessMinidump::ReadModuleList() {
   std::vector<const minidump::Module *> filtered_modules =
       m_minidump_parser->GetFilteredModuleList();
 
-  Log *log = GetLog(LLDBLog::DynamicLoader);
+  Log *log(GetLogIfAllCategoriesSet(LIBLLDB_LOG_DYNAMIC_LOADER));
 
   for (auto module : filtered_modules) {
     std::string name = cantFail(m_minidump_parser->GetMinidumpFile().getString(
@@ -467,7 +548,7 @@ void ProcessMinidump::ReadModuleList() {
 
     // check if the process is wow64 - a 32 bit windows process running on a
     // 64 bit windows
-    if (llvm::StringRef(name).ends_with_insensitive("wow64.dll")) {
+    if (llvm::StringRef(name).endswith_insensitive("wow64.dll")) {
       m_is_wow64 = true;
     }
 
@@ -493,7 +574,7 @@ void ProcessMinidump::ReadModuleList() {
       partial_module_spec.GetUUID().Clear();
       module_sp = GetOrCreateModule(uuid, name, partial_module_spec);
       if (!module_sp) {
-        partial_module_spec.GetFileSpec().ClearDirectory();
+        partial_module_spec.GetFileSpec().GetDirectory().Clear();
         module_sp = GetOrCreateModule(uuid, name, partial_module_spec);
       }
     }
@@ -501,12 +582,11 @@ void ProcessMinidump::ReadModuleList() {
       // Watch out for place holder modules that have different paths, but the
       // same UUID. If the base address is different, create a new module. If
       // we don't then we will end up setting the load address of a different
-      // ObjectFilePlaceholder and an assertion will fire.
+      // PlaceholderObjectFile and an assertion will fire.
       auto *objfile = module_sp->GetObjectFile();
-      if (objfile &&
-          objfile->GetPluginName() ==
-              ObjectFilePlaceholder::GetPluginNameStatic()) {
-        if (((ObjectFilePlaceholder *)objfile)->GetBaseImageAddress() !=
+      if (objfile && objfile->GetPluginName() ==
+          PlaceholderObjectFile::GetStaticPluginName()) {
+        if (((PlaceholderObjectFile *)objfile)->GetBaseImageAddress() !=
             load_addr)
           module_sp.reset();
       }
@@ -524,7 +604,7 @@ void ProcessMinidump::ReadModuleList() {
                "placeholder module for: {0}",
                name);
 
-      module_sp = Module::CreateModuleFromObjectFile<ObjectFilePlaceholder>(
+      module_sp = Module::CreateModuleFromObjectFile<PlaceholderObjectFile>(
           module_spec, load_addr, load_size);
       GetTarget().GetImages().Append(module_sp, true /* notify */);
     }
@@ -795,12 +875,12 @@ public:
 
   Options *GetOptions() override { return &m_option_group; }
 
-  void DoExecute(Args &command, CommandReturnObject &result) override {
+  bool DoExecute(Args &command, CommandReturnObject &result) override {
     const size_t argc = command.GetArgumentCount();
     if (argc > 0) {
       result.AppendErrorWithFormat("'%s' take no arguments, only options",
                                    m_cmd_name.c_str());
-      return;
+      return false;
     }
     SetDefaultOptionsIfNoneAreSet();
 
@@ -904,7 +984,9 @@ public:
       DumpTextStream(StreamType::FacebookThreadName,
                      "Facebook Thread Name");
     if (DumpFacebookLogcat())
-      DumpTextStream(StreamType::FacebookLogcat, "Facebook Logcat");
+      DumpTextStream(StreamType::FacebookLogcat,
+                     "Facebook Logcat");
+    return true;
   }
 };
 

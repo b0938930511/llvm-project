@@ -16,33 +16,12 @@
 
 #include "mlir/Rewrite/FrozenRewritePatternSet.h"
 
-#include "mlir/IR/Action.h"
-
 namespace mlir {
 class PatternRewriter;
 
 namespace detail {
 class PDLByteCodeMutableState;
-} // namespace detail
-
-/// This is the type of Action that is dispatched when a pattern is applied.
-/// It captures the pattern to apply on top of the usual context.
-class ApplyPatternAction : public tracing::ActionImpl<ApplyPatternAction> {
-public:
-  using Base = tracing::ActionImpl<ApplyPatternAction>;
-  ApplyPatternAction(ArrayRef<IRUnit> irUnits, const Pattern &pattern)
-      : Base(irUnits), pattern(pattern) {}
-  static constexpr StringLiteral tag = "apply-pattern";
-  static constexpr StringLiteral desc =
-      "Encapsulate the application of rewrite patterns";
-
-  void print(raw_ostream &os) const override {
-    os << "`" << tag << " pattern: " << pattern.getDebugName();
-  }
-
-private:
-  const Pattern &pattern;
-};
+} // end namespace detail
 
 /// This class manages the application of a group of rewrite patterns, with a
 /// user-provided cost model.
@@ -96,6 +75,6 @@ private:
   std::unique_ptr<detail::PDLByteCodeMutableState> mutableByteCodeState;
 };
 
-} // namespace mlir
+} // end namespace mlir
 
 #endif // MLIR_REWRITE_PATTERNAPPLICATOR_H

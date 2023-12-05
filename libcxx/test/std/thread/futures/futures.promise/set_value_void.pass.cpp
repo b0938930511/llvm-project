@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 //
 // UNSUPPORTED: no-exceptions
-// UNSUPPORTED: no-threads
+// UNSUPPORTED: libcpp-has-no-threads
 // UNSUPPORTED: c++03
 
 // <future>

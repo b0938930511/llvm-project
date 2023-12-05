@@ -218,9 +218,8 @@ void SparcFrameLowering::emitEpilogue(MachineFunction &MF,
   const SparcInstrInfo &TII =
       *static_cast<const SparcInstrInfo *>(MF.getSubtarget().getInstrInfo());
   DebugLoc dl = MBBI->getDebugLoc();
-  assert((MBBI->getOpcode() == SP::RETL || MBBI->getOpcode() == SP::TAIL_CALL ||
-          MBBI->getOpcode() == SP::TAIL_CALLri) &&
-         "Can only put epilog before 'retl' or 'tail_call' instruction!");
+  assert(MBBI->getOpcode() == SP::RETL &&
+         "Can only put epilog before 'retl' instruction!");
   if (!FuncInfo->isLeafProc()) {
     BuildMI(MBB, MBBI, dl, TII.get(SP::RESTORErr), SP::G0).addReg(SP::G0)
       .addReg(SP::G0);
@@ -229,19 +228,10 @@ void SparcFrameLowering::emitEpilogue(MachineFunction &MF,
   MachineFrameInfo &MFI = MF.getFrameInfo();
 
   int NumBytes = (int) MFI.getStackSize();
-  if (NumBytes != 0)
-    emitSPAdjustment(MF, MBB, MBBI, NumBytes, SP::ADDrr, SP::ADDri);
+  if (NumBytes == 0)
+    return;
 
-  // Preserve return address in %o7
-  if (MBBI->getOpcode() == SP::TAIL_CALL) {
-    MBB.addLiveIn(SP::O7);
-    BuildMI(MBB, MBBI, dl, TII.get(SP::ORrr), SP::G1)
-        .addReg(SP::G0)
-        .addReg(SP::O7);
-    BuildMI(MBB, MBBI, dl, TII.get(SP::ORrr), SP::O7)
-        .addReg(SP::G0)
-        .addReg(SP::G1);
-  }
+  emitSPAdjustment(MF, MBB, MBBI, NumBytes, SP::ADDrr, SP::ADDri);
 }
 
 bool SparcFrameLowering::hasReservedCallFrame(const MachineFunction &MF) const {
@@ -326,11 +316,10 @@ bool SparcFrameLowering::isLeafProc(MachineFunction &MF) const
   MachineRegisterInfo &MRI = MF.getRegInfo();
   MachineFrameInfo    &MFI = MF.getFrameInfo();
 
-  return !(MFI.hasCalls()               // has calls
-           || MRI.isPhysRegUsed(SP::L0) // Too many registers needed
-           || MRI.isPhysRegUsed(SP::O6) // %sp is used
-           || hasFP(MF)                 // need %fp
-           || MF.hasInlineAsm());       // has inline assembly
+  return !(MFI.hasCalls()                  // has calls
+           || MRI.isPhysRegUsed(SP::L0)    // Too many registers needed
+           || MRI.isPhysRegUsed(SP::O6)    // %sp is used
+           || hasFP(MF));                  // need %fp
 }
 
 void SparcFrameLowering::remapRegsForLeafProc(MachineFunction &MF) const {
@@ -354,18 +343,19 @@ void SparcFrameLowering::remapRegsForLeafProc(MachineFunction &MF) const {
   }
 
   // Rewrite MBB's Live-ins.
-  for (MachineBasicBlock &MBB : MF) {
+  for (MachineFunction::iterator MBB = MF.begin(), E = MF.end();
+       MBB != E; ++MBB) {
     for (unsigned reg = SP::I0_I1; reg <= SP::I6_I7; ++reg) {
-      if (!MBB.isLiveIn(reg))
+      if (!MBB->isLiveIn(reg))
         continue;
-      MBB.removeLiveIn(reg);
-      MBB.addLiveIn(reg - SP::I0_I1 + SP::O0_O1);
+      MBB->removeLiveIn(reg);
+      MBB->addLiveIn(reg - SP::I0_I1 + SP::O0_O1);
     }
     for (unsigned reg = SP::I0; reg <= SP::I7; ++reg) {
-      if (!MBB.isLiveIn(reg))
+      if (!MBB->isLiveIn(reg))
         continue;
-      MBB.removeLiveIn(reg);
-      MBB.addLiveIn(reg - SP::I0 + SP::O0);
+      MBB->removeLiveIn(reg);
+      MBB->addLiveIn(reg - SP::I0 + SP::O0);
     }
   }
 

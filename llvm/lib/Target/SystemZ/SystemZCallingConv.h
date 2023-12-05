@@ -124,9 +124,7 @@ inline bool CC_SystemZ_I128Indirect(unsigned &ValNo, MVT &ValVT,
   else
     llvm_unreachable("Unknown Calling Convention!");
 
-  unsigned Offset = Reg && !Subtarget.isTargetXPLINK64()
-                        ? 0
-                        : State.AllocateStack(8, Align(8));
+  unsigned Offset = Reg ? 0 : State.AllocateStack(8, Align(8));
 
   // Use that same location for all the pending parts.
   for (auto &It : PendingMembers) {
@@ -169,6 +167,12 @@ inline bool CC_XPLINK64_Allocate128BitVararg(unsigned &ValNo, MVT &ValVT,
                                              CCValAssign::LocInfo &LocInfo,
                                              ISD::ArgFlagsTy &ArgFlags,
                                              CCState &State) {
+  if (LocVT.getSizeInBits() < 128)
+    return false;
+
+  if (static_cast<SystemZCCState *>(&State)->IsFixed(ValNo))
+    return false;
+
   // For any C or C++ program, this should always be
   // false, since it is illegal to have a function
   // where the first argument is variadic. Therefore
@@ -181,21 +185,18 @@ inline bool CC_XPLINK64_Allocate128BitVararg(unsigned &ValNo, MVT &ValVT,
   bool AllocGPR3 = State.AllocateReg(SystemZ::R3D);
 
   // If GPR2 and GPR3 are available, then we may pass vararg in R2Q.
-  // If only GPR3 is available, we need to set custom handling to copy
-  // hi bits into GPR3.
-  // Either way, we allocate on the stack.
-  if (AllocGPR3) {
-    // For f128 and vector var arg case, set the bitcast flag to bitcast to
-    // i128.
-    LocVT = MVT::i128;
-    LocInfo = CCValAssign::BCvt;
+  if (AllocGPR2 && AllocGPR3) {
+    State.addLoc(
+        CCValAssign::getReg(ValNo, ValVT, SystemZ::R2Q, LocVT, LocInfo));
+    return true;
+  }
+
+  // If only GPR3 is available, we allocate on stack but need to
+  // set custom handling to copy hi bits into GPR3.
+  if (!AllocGPR2 && AllocGPR3) {
     auto Offset = State.AllocateStack(16, Align(8));
-    if (AllocGPR2)
-      State.addLoc(
-          CCValAssign::getReg(ValNo, ValVT, SystemZ::R2Q, LocVT, LocInfo));
-    else
-      State.addLoc(
-          CCValAssign::getCustomMem(ValNo, ValVT, Offset, LocVT, LocInfo));
+    State.addLoc(
+        CCValAssign::getCustomMem(ValNo, ValVT, Offset, LocVT, LocInfo));
     return true;
   }
 

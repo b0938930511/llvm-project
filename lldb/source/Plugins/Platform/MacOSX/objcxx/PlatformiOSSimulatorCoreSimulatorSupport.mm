@@ -110,10 +110,12 @@ CoreSimulatorSupport::Device::State CoreSimulatorSupport::Device::GetState() {
 
 CoreSimulatorSupport::ModelIdentifier::ModelIdentifier(const std::string &mi)
     : m_family(), m_versions() {
+  bool any = false;
   bool first_digit = false;
   unsigned int val = 0;
 
   for (char c : mi) {
+    any = true;
     if (::isdigit(c)) {
       if (!first_digit)
         first_digit = true;
@@ -167,21 +169,21 @@ CoreSimulatorSupport::OSVersion::OSVersion() : OSVersion("", "") {}
 
 CoreSimulatorSupport::ModelIdentifier
 CoreSimulatorSupport::DeviceType::GetModelIdentifier() {
-  if (!m_model_identifier.has_value()) {
+  if (!m_model_identifier.hasValue()) {
     auto utf8_model_id = [[m_dev modelIdentifier] UTF8String];
     if (utf8_model_id && *utf8_model_id)
       m_model_identifier = ModelIdentifier(utf8_model_id);
   }
 
-  if (m_model_identifier.has_value())
-    return m_model_identifier.value();
+  if (m_model_identifier.hasValue())
+    return m_model_identifier.getValue();
   else
     return ModelIdentifier();
 }
 
 CoreSimulatorSupport::OSVersion
 CoreSimulatorSupport::DeviceRuntime::GetVersion() {
-  if (!m_os_version.has_value()) {
+  if (!m_os_version.hasValue()) {
     auto utf8_ver_string = [[m_dev versionString] UTF8String];
     auto utf8_build_ver = [[m_dev buildVersionString] UTF8String];
     if (utf8_ver_string && *utf8_ver_string && utf8_build_ver &&
@@ -190,8 +192,8 @@ CoreSimulatorSupport::DeviceRuntime::GetVersion() {
     }
   }
 
-  if (m_os_version.has_value())
-    return m_os_version.value();
+  if (m_os_version.hasValue())
+    return m_os_version.getValue();
   return OSVersion();
 }
 
@@ -218,18 +220,18 @@ std::string CoreSimulatorSupport::Device::GetUDID() const {
 }
 
 CoreSimulatorSupport::DeviceType CoreSimulatorSupport::Device::GetDeviceType() {
-  if (!m_dev_type.has_value())
+  if (!m_dev_type.hasValue())
     m_dev_type = DeviceType([m_dev deviceType]);
 
-  return m_dev_type.value();
+  return m_dev_type.getValue();
 }
 
 CoreSimulatorSupport::DeviceRuntime
 CoreSimulatorSupport::Device::GetDeviceRuntime() {
-  if (!m_dev_runtime.has_value())
+  if (!m_dev_runtime.hasValue())
     m_dev_runtime = DeviceRuntime([m_dev runtime]);
 
-  return m_dev_runtime.value();
+  return m_dev_runtime.getValue();
 }
 
 bool CoreSimulatorSupport::
@@ -399,8 +401,8 @@ static Status HandleFileAction(ProcessLaunchInfo &launch_info,
     case FileAction::eFileActionOpen: {
       FileSpec file_spec = file_action->GetFileSpec();
       if (file_spec) {
-        const int primary_fd = launch_info.GetPTY().GetPrimaryFileDescriptor();
-        if (primary_fd != PseudoTerminal::invalid_fd) {
+        const int master_fd = launch_info.GetPTY().GetPrimaryFileDescriptor();
+        if (master_fd != PseudoTerminal::invalid_fd) {
           // Check in case our file action open wants to open the secondary
           FileSpec secondary_spec(launch_info.GetPTY().GetSecondaryName());
           if (file_spec == secondary_spec) {
@@ -423,12 +425,10 @@ static Status HandleFileAction(ProcessLaunchInfo &launch_info,
             open(file_spec.GetPath().c_str(), oflag, S_IRUSR | S_IWUSR);
         if (created_fd >= 0) {
           auto file_options = File::OpenOptions(0);
-          if (oflag & O_RDWR)
-            file_options |= File::eOpenOptionReadWrite;
-          else if (oflag & O_WRONLY)
-            file_options |= File::eOpenOptionWriteOnly;
-          else if (oflag & O_RDONLY)
-            file_options |= File::eOpenOptionReadOnly;
+          if ((oflag & O_RDWR) || (oflag & O_RDONLY))
+            file_options |= File::eOpenOptionRead;
+          if ((oflag & O_RDWR) || (oflag & O_RDONLY))
+            file_options |= File::eOpenOptionWrite;
           file = std::make_shared<NativeFile>(created_fd, file_options, true);
           [options setValue:[NSNumber numberWithInteger:created_fd] forKey:key];
           return error; // Success

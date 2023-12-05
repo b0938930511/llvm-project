@@ -1,9 +1,8 @@
-// RUN: %clang_analyze_cc1 -analyzer-checker=core,unix.Malloc,debug.ExprInspection -std=c++11 -verify -analyzer-config eagerly-assume=false %s
-// RUN: %clang_analyze_cc1 -analyzer-checker=core,unix.Malloc,debug.ExprInspection -std=c++11 -DTEST_INLINABLE_ALLOCATORS -verify -analyzer-config eagerly-assume=false %s
+// RUN: %clang_analyze_cc1 -analyzer-checker=core,unix.Malloc,debug.ExprInspection -analyzer-store region -std=c++11 -verify -analyzer-config eagerly-assume=false %s
+// RUN: %clang_analyze_cc1 -analyzer-checker=core,unix.Malloc,debug.ExprInspection -analyzer-store region -std=c++11 -DTEST_INLINABLE_ALLOCATORS -verify -analyzer-config eagerly-assume=false %s
 #include "Inputs/system-header-simulator-cxx.h"
 
 void clang_analyzer_eval(bool);
-void clang_analyzer_warnIfReached();
 
 typedef __typeof__(sizeof(int)) size_t;
 extern "C" void *malloc(size_t);
@@ -177,20 +176,21 @@ void testAggregateNew() {
   clang_analyzer_eval(p.y == 2); // expected-warning{{TRUE}}
 }
 
+//--------------------------------
+// Incorrectly-modelled behavior
+//--------------------------------
+
 int testNoInitialization() {
   int *n = new int;
 
-  if (*n) { // expected-warning{{Branch condition evaluates to a garbage value [core.uninitialized.Branch]}}
+  // Should warn that *n is uninitialized.
+  if (*n) { // no-warning
     delete n;
     return 0;
   }
   delete n;
   return 1;
 }
-
-//===----------------------------------------------------------------------===//
-// Incorrectly-modelled behavior.
-//===----------------------------------------------------------------------===//
 
 int testNoInitializationPlacement() {
   int n;
@@ -323,8 +323,9 @@ void testArrayNull() {
 
 void testArrayDestr() {
   NoReturnDtor *p = new NoReturnDtor[2];
-  delete[] p;
-  clang_analyzer_warnIfReached(); // no-warning
+  delete[] p; // Calls the base destructor which aborts, checked below
+   //TODO: clang_analyzer_eval should not be called
+  clang_analyzer_eval(true); // expected-warning{{TRUE}}
 }
 
 // Invalidate Region even in case of default destructor

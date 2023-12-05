@@ -73,7 +73,7 @@ struct TestClangConfig {
     std::string Result;
     llvm::raw_string_ostream OS(Result);
     OS << "{ Language=" << Language << ", Target=" << Target << " }";
-    return Result;
+    return OS.str();
   }
 
   friend std::ostream &operator<<(std::ostream &OS,

@@ -1,4 +1,4 @@
-; RUN: opt -passes=ipsccp -S %s | FileCheck %s
+; RUN: opt -ipsccp -S %s | FileCheck %s
 
 %struct.S = type { i32 }
 

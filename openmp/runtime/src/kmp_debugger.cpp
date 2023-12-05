@@ -226,16 +226,16 @@ kmp_omp_struct_info_t __kmp_omp_debug_struct_info = {
   when 64-bit value is assigned to 32-bit pointer. Use this function
   to suppress the warning. */
 static inline void *__kmp_convert_to_ptr(kmp_uint64 addr) {
-#if KMP_COMPILER_ICC || KMP_COMPILER_ICX
+#if KMP_COMPILER_ICC
 #pragma warning(push)
 #pragma warning(disable : 810) // conversion from "unsigned long long" to "char
 // *" may lose significant bits
 #pragma warning(disable : 1195) // conversion from integer to smaller pointer
-#endif // KMP_COMPILER_ICC || KMP_COMPILER_ICX
+#endif // KMP_COMPILER_ICC
   return (void *)addr;
-#if KMP_COMPILER_ICC || KMP_COMPILER_ICX
+#if KMP_COMPILER_ICC
 #pragma warning(pop)
-#endif // KMP_COMPILER_ICC || KMP_COMPILER_ICX
+#endif // KMP_COMPILER_ICC
 } // __kmp_convert_to_ptr
 
 static int kmp_location_match(kmp_str_loc_t *loc, kmp_omp_nthr_item_t *item) {

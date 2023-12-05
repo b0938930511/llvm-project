@@ -69,3 +69,11 @@ void SymbolVendor::AddSymbolFileRepresentation(const ObjectFileSP &objfile_sp) {
       m_sym_file_up.reset(SymbolFile::FindPlugin(objfile_sp));
   }
 }
+
+// PluginInterface protocol
+lldb_private::ConstString SymbolVendor::GetPluginName() {
+  static ConstString g_name("vendor-default");
+  return g_name;
+}
+
+uint32_t SymbolVendor::GetPluginVersion() { return 1; }

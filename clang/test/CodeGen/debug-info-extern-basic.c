@@ -1,17 +1,17 @@
 // RUN: %clang_cc1 -x c -debug-info-kind=limited -triple bpf-linux-gnu -emit-llvm %s -o - | FileCheck %s
 
 extern char ch;
-int test(void) {
+int test() {
   return ch;
 }
 
-int test2(void) {
+int test2() {
   extern char ch2;
   return ch2;
 }
 
 extern int (*foo)(int);
-int test3(void) {
+int test3() {
   return foo(0);
 }
 

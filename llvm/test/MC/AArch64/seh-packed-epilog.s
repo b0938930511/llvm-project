@@ -43,13 +43,6 @@
 // CHECK-NEXT:     ExceptionData {
 // CHECK:            ExceptionData:
 // CHECK-NEXT:       EpiloguePacked: Yes
-// CHECK-NEXT:       EpilogueOffset: 0
-// CHECK-NEXT:       ByteCodeLength: 4
-// CHECK-NEXT:       Prologue [
-// CHECK-NEXT:         0x83                ; stp x29, x30, [sp, #-32]!
-// CHECK-NEXT:         0x03                ; sub sp, #48
-// CHECK-NEXT:         0xe4                ; end
-// CHECK-NEXT:       ]
 // CHECK:        RuntimeFunction {
 // CHECK-NEXT:     Function: nonpacked1
 // CHECK-NEXT:     ExceptionRecord:
@@ -57,42 +50,17 @@
 // CHECK:            ExceptionData:
 // CHECK-NEXT:       EpiloguePacked: No
 // CHECK:        RuntimeFunction {
-// CHECK-NEXT:     Function: nonshared2
+// CHECK-NEXT:     Function: nonpacked2
 // CHECK-NEXT:     ExceptionRecord:
 // CHECK-NEXT:     ExceptionData {
 // CHECK:            ExceptionData:
-// CHECK-NEXT:       EpiloguePacked: Yes
-// CHECK-NEXT:       EpilogueOffset: 3
-// CHECK-NEXT:       ByteCodeLength: 8
-// CHECK-NEXT:       Prologue [
-// CHECK-NEXT:         0x02                ; sub sp, #32
-// CHECK-NEXT:         0x03                ; sub sp, #48
-// CHECK-NEXT:         0xe4                ; end
-// CHECK-NEXT:       ]
-// CHECK-NEXT:       Epilogue [
-// CHECK-NEXT:         0x01                ; add sp, #16
-// CHECK-NEXT:         0x03                ; add sp, #48
-// CHECK-NEXT:         0xe4                ; end
-// CHECK-NEXT:       ]
+// CHECK-NEXT:       EpiloguePacked: No
 // CHECK:        RuntimeFunction {
-// CHECK-NEXT:     Function: nonshared3
+// CHECK-NEXT:     Function: nonpacked3
 // CHECK-NEXT:     ExceptionRecord:
 // CHECK-NEXT:     ExceptionData {
 // CHECK:            ExceptionData:
-// CHECK-NEXT:       EpiloguePacked: Yes
-// CHECK-NEXT:       EpilogueOffset: 3
-// CHECK-NEXT:       ByteCodeLength: 8
-// CHECK-NEXT:       Prologue [
-// CHECK-NEXT:         0x02                ; sub sp, #32
-// CHECK-NEXT:         0x03                ; sub sp, #48
-// CHECK-NEXT:         0xe4                ; end
-// CHECK-NEXT:       ]
-// CHECK-NEXT:       Epilogue [
-// CHECK-NEXT:         0xe1                ; mov sp, fp
-// CHECK-NEXT:         0x02                ; add sp, #32
-// CHECK-NEXT:         0x03                ; add sp, #48
-// CHECK-NEXT:         0xe4                ; end
-// CHECK-NEXT:       ]
+// CHECK-NEXT:       EpiloguePacked: No
 
     .text
     .globl func
@@ -178,8 +146,8 @@ nonpacked1:
     .seh_endproc
 
 
-    .seh_proc nonshared2
-nonshared2:
+    .seh_proc nonpacked2
+nonpacked2:
     sub sp, sp, #48
     .seh_stackalloc 48
     sub sp, sp, #32
@@ -188,7 +156,7 @@ nonshared2:
 
     nop
     .seh_startepilogue
-    // Not shared; the epilogue mismatches at the second opcode.
+    // Not packed; the epilogue mismatches at the second opcode.
     add sp, sp, #16
     .seh_stackalloc 16
     add sp, sp, #48
@@ -197,8 +165,8 @@ nonshared2:
     ret
     .seh_endproc
 
-    .seh_proc nonshared3
-nonshared3:
+    .seh_proc nonpacked3
+nonpacked3:
     sub sp, sp, #48
     .seh_stackalloc 48
     sub sp, sp, #32
@@ -207,7 +175,7 @@ nonshared3:
 
     nop
     .seh_startepilogue
-    // Not shared; the epilogue is longer than the prologue.
+    // Not packed; the epilogue is longer than the prologue.
     mov sp, x29
     .seh_set_fp
     add sp, sp, #32

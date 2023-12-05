@@ -18,12 +18,25 @@
 #include <future>
 #include <memory>
 #include <mutex>
-#include <optional>
 #include <thread>
 #include <vector>
 
 namespace clang {
 namespace clangd {
+
+/// A threadsafe flag that is initially clear.
+class Notification {
+public:
+  // Sets the flag. No-op if already set.
+  void notify();
+  // Blocks until flag is set.
+  void wait() const;
+
+private:
+  bool Notified = false;
+  mutable std::condition_variable CV;
+  mutable std::mutex Mu;
+};
 
 /// Limits the number of threads that can acquire the lock at the same time.
 class Semaphore {
@@ -70,15 +83,15 @@ private:
   std::chrono::steady_clock::time_point Time;
 };
 
-/// Makes a deadline from a timeout in seconds. std::nullopt means wait forever.
-Deadline timeoutSeconds(std::optional<double> Seconds);
+/// Makes a deadline from a timeout in seconds. None means wait forever.
+Deadline timeoutSeconds(llvm::Optional<double> Seconds);
 /// Wait once on CV for the specified duration.
 void wait(std::unique_lock<std::mutex> &Lock, std::condition_variable &CV,
           Deadline D);
 /// Waits on a condition variable until F() is true or D expires.
 template <typename Func>
-[[nodiscard]] bool wait(std::unique_lock<std::mutex> &Lock,
-                        std::condition_variable &CV, Deadline D, Func F) {
+LLVM_NODISCARD bool wait(std::unique_lock<std::mutex> &Lock,
+                         std::condition_variable &CV, Deadline D, Func F) {
   while (!F()) {
     if (D.expired())
       return false;
@@ -86,21 +99,6 @@ template <typename Func>
   }
   return true;
 }
-
-/// A threadsafe flag that is initially clear.
-class Notification {
-public:
-  // Sets the flag. No-op if already set.
-  void notify();
-  // Blocks until flag is set.
-  void wait() const { (void)wait(Deadline::infinity()); }
-  [[nodiscard]] bool wait(Deadline D) const;
-
-private:
-  bool Notified = false;
-  mutable std::condition_variable CV;
-  mutable std::mutex Mu;
-};
 
 /// Runs tasks on separate (detached) threads and wait for all tasks to finish.
 /// Objects that need to spawn threads can own an AsyncTaskRunner to ensure they
@@ -111,7 +109,7 @@ public:
   ~AsyncTaskRunner();
 
   void wait() const { (void)wait(Deadline::infinity()); }
-  [[nodiscard]] bool wait(Deadline D) const;
+  LLVM_NODISCARD bool wait(Deadline D) const;
   // The name is used for tracing and debugging (e.g. to name a spawned thread).
   void runAsync(const llvm::Twine &Name, llvm::unique_function<void()> Action);
 

@@ -1,1 +1,2 @@
-DisableFormat: true
+BasedOnStyle: LLVM
+ColumnLimit: 0

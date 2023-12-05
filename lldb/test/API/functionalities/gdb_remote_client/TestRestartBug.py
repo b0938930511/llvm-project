@@ -1,12 +1,14 @@
+from __future__ import print_function
 import lldb
 from lldbsuite.test.lldbtest import *
 from lldbsuite.test.decorators import *
-from lldbsuite.test.gdbclientutils import *
-from lldbsuite.test.lldbgdbclient import GDBRemoteTestBase
+from gdbclientutils import *
 
 
 class TestRestartBug(GDBRemoteTestBase):
+
     @expectedFailureAll(bugnumber="llvm.org/pr24530")
+    @skipIfReproducer # FIXME: Unexpected packet during (passive) replay
     def test(self):
         """
         Test auto-continue behavior when a process is interrupted to deliver
@@ -15,7 +17,6 @@ class TestRestartBug(GDBRemoteTestBase):
         client should not auto-continue in this case, unless the user has
         explicitly requested that we ignore signals of this type.
         """
-
         class MyResponder(MockGDBServerResponder):
             continueCount = 0
 
@@ -32,7 +33,7 @@ class TestRestartBug(GDBRemoteTestBase):
                 if self.continueCount == 1:
                     # No response, wait for the client to interrupt us.
                     return None
-                return "W00"  # Exit
+                return "W00" # Exit
 
         self.server.responder = MyResponder()
         target = self.createTarget("a.yaml")
@@ -50,10 +51,8 @@ class TestRestartBug(GDBRemoteTestBase):
         event = lldb.SBEvent()
         while self.dbg.GetListener().WaitForEvent(2, event):
             if self.TraceOn():
-                print(
-                    "Process changing state to:",
-                    self.dbg.StateAsCString(process.GetStateFromEvent(event)),
-                )
+                print("Process changing state to:",
+                    self.dbg.StateAsCString(process.GetStateFromEvent(event)))
             if process.GetStateFromEvent(event) == lldb.eStateExited:
                 break
 
@@ -61,4 +60,4 @@ class TestRestartBug(GDBRemoteTestBase):
         # auto-continue after setting the breakpoint.
         self.assertEqual(self.server.responder.continueCount, 1)
         # And the process should end up in the stopped state.
-        self.assertState(process.GetState(), lldb.eStateStopped)
+        self.assertEqual(process.GetState(), lldb.eStateStopped)

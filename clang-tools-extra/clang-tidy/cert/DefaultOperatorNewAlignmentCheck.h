@@ -11,13 +11,15 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::cert {
+namespace clang {
+namespace tidy {
+namespace cert {
 
 /// Checks if an object of type with extended alignment is allocated by using
 /// the default operator new.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/cert/mem57-cpp.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/cert-mem57-cpp.html
 class DefaultOperatorNewAlignmentCheck : public ClangTidyCheck {
 public:
   DefaultOperatorNewAlignmentCheck(StringRef Name, ClangTidyContext *Context)
@@ -29,6 +31,8 @@ public:
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
 };
 
-} // namespace clang::tidy::cert
+} // namespace cert
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_CERT_DEFAULTOPERATORNEWALIGNMENTCHECK_H

@@ -1,11 +1,12 @@
-// RUN: %clang_cc1 -fsyntax-only -verify -pedantic %s -std=c99
+// RUN: %clang_cc1 -fsyntax-only -verify -pedantic %s
+// expected-no-diagnostics
 // PR4287
 
 #include <stdarg.h>
 char *foo = "test";
 int test(char*,...);
 
-int test(fmt) // expected-warning {{a function definition without a prototype is deprecated in all versions of C and is not supported in C23}}
+int test(fmt)
         char*fmt;
 {
         va_list ap;
@@ -19,9 +20,9 @@ int test(fmt) // expected-warning {{a function definition without a prototype is
         return x;
 }
 
-void exit(); // expected-warning {{a function declaration without a prototype is deprecated in all versions of C}}
+void exit();
 
-int main(argc,argv) // expected-warning {{a function definition without a prototype is deprecated in all versions of C and is not supported in C23}}
+int main(argc,argv)
         int argc;char**argv;
 {
         exit(test("",foo));

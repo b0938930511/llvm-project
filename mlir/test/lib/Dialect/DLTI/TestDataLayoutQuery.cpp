@@ -20,19 +20,17 @@ namespace {
 /// attributes containing the results of data layout queries for operation
 /// result types.
 struct TestDataLayoutQuery
-    : public PassWrapper<TestDataLayoutQuery, OperationPass<func::FuncOp>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TestDataLayoutQuery)
-
+    : public PassWrapper<TestDataLayoutQuery, FunctionPass> {
   StringRef getArgument() const final { return "test-data-layout-query"; }
   StringRef getDescription() const final { return "Test data layout queries"; }
-  void runOnOperation() override {
-    func::FuncOp func = getOperation();
+  void runOnFunction() override {
+    FuncOp func = getFunction();
     Builder builder(func.getContext());
     const DataLayoutAnalysis &layouts = getAnalysis<DataLayoutAnalysis>();
 
     func.walk([&](test::DataLayoutQueryOp op) {
       // Skip the ops with already processed in a deeper call.
-      if (op->getDiscardableAttr("size"))
+      if (op->getAttr("size"))
         return;
 
       const DataLayout &layout = layouts.getAbove(op);
@@ -40,19 +38,11 @@ struct TestDataLayoutQuery
       unsigned bitsize = layout.getTypeSizeInBits(op.getType());
       unsigned alignment = layout.getTypeABIAlignment(op.getType());
       unsigned preferred = layout.getTypePreferredAlignment(op.getType());
-      Attribute allocaMemorySpace = layout.getAllocaMemorySpace();
-      unsigned stackAlignment = layout.getStackAlignment();
       op->setAttrs(
           {builder.getNamedAttr("size", builder.getIndexAttr(size)),
            builder.getNamedAttr("bitsize", builder.getIndexAttr(bitsize)),
            builder.getNamedAttr("alignment", builder.getIndexAttr(alignment)),
-           builder.getNamedAttr("preferred", builder.getIndexAttr(preferred)),
-           builder.getNamedAttr("alloca_memory_space",
-                                allocaMemorySpace == Attribute()
-                                    ? builder.getUI32IntegerAttr(0)
-                                    : allocaMemorySpace),
-           builder.getNamedAttr("stack_alignment",
-                                builder.getIndexAttr(stackAlignment))});
+           builder.getNamedAttr("preferred", builder.getIndexAttr(preferred))});
     });
   }
 };

@@ -13,8 +13,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef FP_MODE_H
-#define FP_MODE_H
+#ifndef FP_MODE
+#define FP_MODE
 
 typedef enum {
   CRT_FE_TONEAREST,

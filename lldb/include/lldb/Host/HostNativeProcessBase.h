@@ -30,6 +30,7 @@ public:
   virtual ~HostNativeProcessBase() = default;
 
   virtual Status Terminate() = 0;
+  virtual Status GetMainModule(FileSpec &file_spec) const = 0;
 
   virtual lldb::pid_t GetProcessId() const = 0;
   virtual bool IsRunning() const = 0;
@@ -37,7 +38,8 @@ public:
   lldb::process_t GetSystemHandle() const { return m_process; }
 
   virtual llvm::Expected<HostThread>
-  StartMonitoring(const Host::MonitorChildProcessCallback &callback) = 0;
+  StartMonitoring(const Host::MonitorChildProcessCallback &callback,
+                  bool monitor_signals) = 0;
 
 protected:
   lldb::process_t m_process;

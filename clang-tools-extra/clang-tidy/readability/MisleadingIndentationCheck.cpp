@@ -12,7 +12,9 @@
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::readability {
+namespace clang {
+namespace tidy {
+namespace readability {
 
 static const IfStmt *getPrecedingIf(const SourceManager &SM,
                                     ASTContext *Context, const IfStmt *If) {
@@ -104,8 +106,7 @@ void MisleadingIndentationCheck::missingBracesCheck(const SourceManager &SM,
 }
 
 void MisleadingIndentationCheck::registerMatchers(MatchFinder *Finder) {
-  Finder->addMatcher(
-      ifStmt(unless(hasThen(nullStmt())), hasElse(stmt())).bind("if"), this);
+  Finder->addMatcher(ifStmt(hasElse(stmt())).bind("if"), this);
   Finder->addMatcher(
       compoundStmt(has(stmt(anyOf(ifStmt(), forStmt(), whileStmt()))))
           .bind("compound"),
@@ -120,4 +121,6 @@ void MisleadingIndentationCheck::check(const MatchFinder::MatchResult &Result) {
     missingBracesCheck(*Result.SourceManager, CStmt);
 }
 
-} // namespace clang::tidy::readability
+} // namespace readability
+} // namespace tidy
+} // namespace clang

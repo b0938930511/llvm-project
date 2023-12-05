@@ -4,27 +4,30 @@
 #include "omp_testsuite.h"
 #include "omp_my_sleep.h"
 
-#define NTIMES 100
+int test_omp_get_wtime()
+{
+  double start;
+  double end;
+  double measured_time;
+  double wait_time = 5.0;
+  start = 0;
+  end = 0;
+  start = omp_get_wtime();
+  my_sleep (wait_time);
+  end = omp_get_wtime();
+  measured_time = end-start;
+  return ((measured_time > 0.97 * wait_time) && (measured_time < 1.03 * wait_time)) ;
+}
 
-#define ASSERT_CMP(lhs, cmp, rhs)                                              \
-  if (!((lhs)cmp(rhs))) {                                                      \
-    printf("Expected: (" #lhs ") " #cmp " (" #rhs "), actual: %e vs. %e", lhs, \
-           rhs);                                                               \
-    return EXIT_FAILURE;                                                       \
-  }
-
-int main() {
+int main()
+{
   int i;
+  int num_failed=0;
 
-  for (i = 0; i < NTIMES; i++) {
-    double start = omp_get_wtime(), end;
-    ASSERT_CMP(start, >=, 0.0);
-    for (end = omp_get_wtime(); end == start; end = omp_get_wtime()) {
-      ASSERT_CMP(end, >=, 0.0);
+  for(i = 0; i < REPETITIONS; i++) {
+    if(!test_omp_get_wtime()) {
+      num_failed++;
     }
-    ASSERT_CMP(end, >=, 0.0);
-    ASSERT_CMP(end, >, start);
   }
-
-  return EXIT_SUCCESS;
+  return num_failed;
 }

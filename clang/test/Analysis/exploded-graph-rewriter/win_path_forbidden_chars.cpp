@@ -3,7 +3,8 @@
 // RUN:                     -analyzer-checker=core \
 // RUN:                     -analyzer-dump-egraph=%t.dot %s
 // RUN: %exploded_graph_rewriter --verbose %t.dot 2>&1 | FileCheck %s
-// REQUIRES: system-windows
+// REQUIRES: asserts
+// UNSUPPORTED: !windows
 
 // Angle brackets shall not be presented in the field `file`,
 // because exploded_graph_rewriter handles it as a file path

@@ -9,7 +9,6 @@
 #include "MCTargetDesc/ARMBaseInfo.h"
 #include "MCTargetDesc/ARMFixupKinds.h"
 #include "MCTargetDesc/ARMMCTargetDesc.h"
-#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/BinaryFormat/MachO.h"
 #include "llvm/MC/MCAsmLayout.h"
@@ -22,6 +21,7 @@
 #include "llvm/MC/MCSection.h"
 #include "llvm/MC/MCValue.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/ScopedPrinter.h"
 
 using namespace llvm;
 
@@ -79,7 +79,7 @@ static bool getARMFixupKindMachOInfo(unsigned Kind, unsigned &RelocType,
     return true;
   case FK_Data_8:
     Log2Size = llvm::Log2_32(8);
-    return false;
+    return true;
 
     // These fixups are expected to always be resolvable at assembly time and
     // have no relocations supported.
@@ -149,7 +149,7 @@ RecordARMScatteredHalfRelocation(MachObjectWriter *Writer,
   if (FixupOffset & 0xff000000) {
     Asm.getContext().reportError(Fixup.getLoc(),
                                  "can not encode offset '0x" +
-                                     utohexstr(FixupOffset) +
+                                     to_hexString(FixupOffset) +
                                      "' in resulting scattered relocation.");
     return;
   }
@@ -218,7 +218,7 @@ RecordARMScatteredHalfRelocation(MachObjectWriter *Writer,
     if (Asm.isThumbFunc(A))
       FixedValue &= 0xfffffffe;
     MovtBit = 1;
-    [[fallthrough]];
+    LLVM_FALLTHROUGH;
   case ARM::fixup_t2_movw_lo16:
     ThumbBit = 1;
     break;
@@ -264,7 +264,7 @@ void ARMMachObjectWriter::RecordARMScatteredRelocation(MachObjectWriter *Writer,
   if (FixupOffset & 0xff000000) {
     Asm.getContext().reportError(Fixup.getLoc(),
                                  "can not encode offset '0x" +
-                                     utohexstr(FixupOffset) +
+                                     to_hexString(FixupOffset) +
                                      "' in resulting scattered relocation.");
     return;
   }
@@ -386,7 +386,8 @@ void ARMMachObjectWriter::recordRelocation(MachObjectWriter *Writer,
     // relocation type for the fixup kind. This happens when it's a fixup that's
     // expected to always be resolvable at assembly time and not have any
     // relocations needed.
-    Asm.getContext().reportError(Fixup.getLoc(), "unsupported relocation type");
+    Asm.getContext().reportError(Fixup.getLoc(),
+                                 "unsupported relocation on symbol");
     return;
   }
 
@@ -427,10 +428,8 @@ void ARMMachObjectWriter::recordRelocation(MachObjectWriter *Writer,
   unsigned Type = 0;
   const MCSymbol *RelSymbol = nullptr;
 
-  if (!A) { // constant
-    // FIXME! This is Target.isAbsolute() case as we check SymB above. We check
-    // !A to ensure that null pointer isn't dereferenced and suppress static
-    // analyzer warnings.
+  if (Target.isAbsolute()) { // constant
+    // FIXME!
     report_fatal_error("FIXME: relocations to absolute targets "
                        "not yet implemented");
   } else {

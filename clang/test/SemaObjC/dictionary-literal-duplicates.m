@@ -23,7 +23,7 @@
                                 count:(unsigned long)cnt;
 @end
 
-void test(void) {
+void test() {
   NSDictionary *t1 = @{
     @"foo" : @0, // expected-note 2 {{previous equal key is here}}
     @"foo" : @0, // expected-warning{{duplicate key in dictionary literal}}

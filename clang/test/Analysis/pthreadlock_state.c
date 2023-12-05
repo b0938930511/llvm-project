@@ -4,11 +4,11 @@
 
 #define NULL 0
 
-void clang_analyzer_printState(void);
+void clang_analyzer_printState();
 
 pthread_mutex_t mtx;
 
-void test(void) {
+void test() {
   clang_analyzer_printState();
   // CHECK:    "checker_messages": null
 

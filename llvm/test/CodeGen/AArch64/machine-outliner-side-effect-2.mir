@@ -1,7 +1,6 @@
 # RUN: llc -mtriple=aarch64 -run-pass=machine-outliner -verify-machineinstrs %s -o - | FileCheck %s
 
-# The test checks whether the compiler updates the side effect of function @OUTLINED_FUNCTION_0
-# when implict-def and implict use of $x0 in the same instruction.
+# The test checks whether the compiler updates the side effect of function @OUTLINED_FUNCTION_0 by adding the use of register x0.
 
 --- |
   declare void @spam() local_unnamed_addr
@@ -17,8 +16,7 @@ body:             |
     liveins: $x0, $lr
 
     $x1 = ADDXri $sp, 16, 0
-    BL @spam, csr_darwin_aarch64_aapcs, implicit-def dead $lr, implicit $sp, implicit $x0, implicit killed $x1, implicit-def $sp, implicit-def $x0
-    renamable $x1 = COPY $x0
+    BL @spam, csr_darwin_aarch64_aapcs, implicit-def dead $lr, implicit $sp, implicit $x0, implicit killed $x1, implicit-def $sp, implicit-def dead $x0
 
     RET_ReallyLR
 
@@ -31,8 +29,7 @@ body:             |
     liveins: $x0, $lr
 
     $x1 = ADDXri $sp, 16, 0
-    BL @spam, csr_darwin_aarch64_aapcs, implicit-def dead $lr, implicit $sp, implicit $x0, implicit killed $x1, implicit-def $sp, implicit-def $x0
-    renamable $x2 = COPY $x0
+    BL @spam, csr_darwin_aarch64_aapcs, implicit-def dead $lr, implicit $sp, implicit $x0, implicit killed $x1, implicit-def $sp, implicit-def dead $x0
 
     RET_ReallyLR
 
@@ -45,11 +42,10 @@ body:             |
     liveins: $x0, $lr
 
     $x1 = ADDXri $sp, 16, 0
-    BL @spam, csr_darwin_aarch64_aapcs, implicit-def dead $lr, implicit $sp, implicit $x0, implicit killed $x1, implicit-def $sp, implicit-def $x0
-    renamable $x3 = COPY $x0
+    BL @spam, csr_darwin_aarch64_aapcs, implicit-def dead $lr, implicit $sp, implicit $x0, implicit killed $x1, implicit-def $sp, implicit-def dead $x0
 
     RET_ReallyLR
 
 ...
 
-# CHECK: BL @OUTLINED_FUNCTION_0, {{.*}}, implicit $x0{{.*}}
+# CHECK: BL @OUTLINED_FUNCTION_0, {{.*}}, implicit $x0

@@ -1,4 +1,4 @@
-; RUN: opt -passes=simple-loop-unswitch -enable-nontrivial-unswitch -verify-memoryssa -S < %s | FileCheck %s
+; RUN: opt -simple-loop-unswitch -enable-nontrivial-unswitch -enable-mssa-loop-dependency -verify-memoryssa -S < %s | FileCheck %s
 ; REQUIRES: asserts
 
 ; CHECK-LABEL: @c
@@ -11,7 +11,7 @@ while.body.lr.ph:                                 ; preds = %entry
   br label %while.body
 
 while.body:                                       ; preds = %while.body, %while.body.lr.ph
-  %call = tail call signext i32 @e()
+  %call = tail call signext i32 bitcast (i32 (...)* @e to i32 ()*)()
   %0 = and i1 %tobool1, undef
   br i1 %0, label %while.body, label %while.end
 

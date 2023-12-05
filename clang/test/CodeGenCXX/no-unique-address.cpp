@@ -62,18 +62,21 @@ static_assert(sizeof(FieldOverlap) == 4);
 // CHECK-DAG: @fo ={{.*}} global %{{[^ ]*}} { i32 1234 }
 FieldOverlap fo = {{}, {}, {}, {}, 1234};
 
-// CHECK-DAG: @e1 ={{.*}} constant ptr @fo
+// CHECK-DAG: @e1 ={{.*}} constant %[[E1:[^ ]*]]* bitcast (%[[FO:[^ ]*]]* @fo to %[[E1]]*)
 Empty1 &e1 = fo.e1;
-// CHECK-DAG: @e2 ={{.*}} constant ptr getelementptr (i8, ptr @fo, i64 1)
+// CHECK-DAG: @e2 ={{.*}} constant %[[E1]]* bitcast (i8* getelementptr (i8, i8* bitcast (%[[FO]]* @fo to i8*), i64 1) to %[[E1]]*)
 Empty1 &e2 = fo.e2;
 
 // CHECK-LABEL: accessE1
-// CHECK: ret ptr %{{.*}}
+// CHECK: %[[RET:.*]] = bitcast %[[FO]]* %{{.*}} to %[[E1]]*
+// CHECK: ret %[[E1]]* %[[RET]]
 Empty1 &accessE1(FieldOverlap &fo) { return fo.e1; }
 
 // CHECK-LABEL: accessE2
-// CHECK: %[[ADJUSTED:.*]] = getelementptr inbounds i8, ptr %{{.*}}, i64 1
-// CHECK: ret ptr %[[ADJUSTED]]
+// CHECK: %[[AS_I8:.*]] = bitcast %[[FO]]* %{{.*}} to i8*
+// CHECK: %[[ADJUSTED:.*]] = getelementptr inbounds i8, i8* %[[AS_I8]], i64 1
+// CHECK: %[[RET:.*]] = bitcast i8* %[[ADJUSTED]] to %[[E1]]*
+// CHECK: ret %[[E1]]* %[[RET]]
 Empty1 &accessE2(FieldOverlap &fo) { return fo.e2; }
 
 struct LaterDeclaredFieldHasLowerOffset {
@@ -90,14 +93,3 @@ int loadWhereLaterDeclaredFieldHasLowerOffset(LaterDeclaredFieldHasLowerOffset &
 // Note, never emit TBAA for zero-size fields.
 // CHECK-OPT: ![[TBAA_AB]] = !{![[TBAA_A:[0-9]*]], ![[TBAA_INT:[0-9]*]], i64 4}
 // CHECK-OPT: ![[TBAA_A]] = !{!"_ZTS32LaterDeclaredFieldHasLowerOffset", ![[TBAA_INT]], i64 0, ![[TBAA_INT]], i64 4}
-
-struct NonTrivialInit {
-  NonTrivialInit();
-};
-struct HasZeroSizedFieldWithNonTrivialInit {
-  int a;
-  [[no_unique_address]] NonTrivialInit b;
-};
-HasZeroSizedFieldWithNonTrivialInit testHasZeroSizedFieldWithNonTrivialInit = {.a = 1};
-// CHECK-LABEL: define {{.*}}cxx_global_var_init
-// CHECK: call {{.*}}@_ZN14NonTrivialInitC1Ev({{.*}}@testHasZeroSizedFieldWithNonTrivialInit

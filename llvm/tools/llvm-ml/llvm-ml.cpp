@@ -24,9 +24,7 @@
 #include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSubtargetInfo.h"
-#include "llvm/MC/MCSymbol.h"
 #include "llvm/MC/MCTargetOptionsCommandFlags.h"
-#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
@@ -34,18 +32,17 @@
 #include "llvm/Support/FileUtilities.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/FormattedStream.h"
+#include "llvm/Support/Host.h"
 #include "llvm/Support/InitLLVM.h"
-#include "llvm/Support/LLVMDriver.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/WithColor.h"
-#include "llvm/TargetParser/Host.h"
 #include <ctime>
-#include <optional>
 
 using namespace llvm;
 using namespace llvm::opt;
@@ -54,27 +51,32 @@ namespace {
 
 enum ID {
   OPT_INVALID = 0, // This is not an option ID.
-#define OPTION(...) LLVM_MAKE_OPT_ID(__VA_ARGS__),
+#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
+               HELPTEXT, METAVAR, VALUES)                                      \
+  OPT_##ID,
 #include "Opts.inc"
 #undef OPTION
 };
 
-#define PREFIX(NAME, VALUE)                                                    \
-  static constexpr StringLiteral NAME##_init[] = VALUE;                        \
-  static constexpr ArrayRef<StringLiteral> NAME(NAME##_init,                   \
-                                                std::size(NAME##_init) - 1);
+#define PREFIX(NAME, VALUE) const char *const NAME[] = VALUE;
 #include "Opts.inc"
 #undef PREFIX
 
-static constexpr opt::OptTable::Info InfoTable[] = {
-#define OPTION(...) LLVM_CONSTRUCT_OPT_INFO(__VA_ARGS__),
+static const opt::OptTable::Info InfoTable[] = {
+#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
+               HELPTEXT, METAVAR, VALUES)                                      \
+  {                                                                            \
+      PREFIX,      NAME,      HELPTEXT,                                        \
+      METAVAR,     OPT_##ID,  opt::Option::KIND##Class,                        \
+      PARAM,       FLAGS,     OPT_##GROUP,                                     \
+      OPT_##ALIAS, ALIASARGS, VALUES},
 #include "Opts.inc"
 #undef OPTION
 };
 
-class MLOptTable : public opt::GenericOptTable {
+class MLOptTable : public opt::OptTable {
 public:
-  MLOptTable() : opt::GenericOptTable(InfoTable, /*IgnoreCase=*/false) {}
+  MLOptTable() : OptTable(InfoTable, /*IgnoreCase=*/false) {}
 };
 } // namespace
 
@@ -186,7 +188,7 @@ static int AssembleInput(StringRef ProgName, const Target *TheTarget,
   return Res;
 }
 
-int llvm_ml_main(int Argc, char **Argv, const llvm::ToolContext &) {
+int main(int Argc, char **Argv) {
   InitLLVM X(Argc, Argv);
   StringRef ProgName = sys::path::filename(Argv[0]);
 
@@ -198,17 +200,14 @@ int llvm_ml_main(int Argc, char **Argv, const llvm::ToolContext &) {
 
   MLOptTable T;
   unsigned MissingArgIndex, MissingArgCount;
-  ArrayRef<const char *> ArgsArr = ArrayRef(Argv + 1, Argc - 1);
+  ArrayRef<const char *> ArgsArr = makeArrayRef(Argv + 1, Argc - 1);
   opt::InputArgList InputArgs =
       T.ParseArgs(ArgsArr, MissingArgIndex, MissingArgCount);
 
   std::string InputFilename;
   for (auto *Arg : InputArgs.filtered(OPT_INPUT)) {
     std::string ArgString = Arg->getAsString(InputArgs);
-    bool IsFile = false;
-    std::error_code IsFileEC =
-        llvm::sys::fs::is_regular_file(ArgString, IsFile);
-    if (ArgString == "-" || IsFile) {
+    if (ArgString == "-" || StringRef(ArgString).endswith(".asm")) {
       if (!InputFilename.empty()) {
         WithColor::warning(errs(), ProgName)
             << "does not support multiple assembly files in one command; "
@@ -218,7 +217,7 @@ int llvm_ml_main(int Argc, char **Argv, const llvm::ToolContext &) {
     } else {
       std::string Diag;
       raw_string_ostream OS(Diag);
-      OS << ArgString << ": " << IsFileEC.message();
+      OS << "invalid option '" << ArgString << "'";
 
       std::string Nearest;
       if (T.findNearest(ArgString, Nearest) < 2)
@@ -234,20 +233,13 @@ int llvm_ml_main(int Argc, char **Argv, const llvm::ToolContext &) {
           << "does not support multiple assembly files in one command; "
           << "ignoring '" << InputFilename << "'\n";
     }
-    InputFilename = Arg->getValue();
+    InputFilename = Arg->getAsString(InputArgs);
   }
 
   for (auto *Arg : InputArgs.filtered(OPT_unsupported_Group)) {
     WithColor::warning(errs(), ProgName)
         << "ignoring unsupported '" << Arg->getOption().getName()
         << "' option\n";
-  }
-
-  if (InputArgs.hasArg(OPT_debug)) {
-    DebugFlag = true;
-  }
-  for (auto *Arg : InputArgs.filtered(OPT_debug_only)) {
-    setCurrentDebugTypes(Arg->getValues().data(), Arg->getNumValues());
   }
 
   if (InputArgs.hasArg(OPT_help)) {
@@ -300,7 +292,7 @@ int llvm_ml_main(int Argc, char **Argv, const llvm::ToolContext &) {
   std::vector<std::string> IncludeDirs =
       InputArgs.getAllArgValues(OPT_include_path);
   if (!InputArgs.hasArg(OPT_ignore_include_envvar)) {
-    if (std::optional<std::string> IncludeEnvVar =
+    if (llvm::Optional<std::string> IncludeEnvVar =
             llvm::sys::Process::GetEnv("INCLUDE")) {
       SmallVector<StringRef, 8> Dirs;
       StringRef(*IncludeEnvVar)
@@ -384,7 +376,7 @@ int llvm_ml_main(int Argc, char **Argv, const llvm::ToolContext &) {
     // Set up the AsmStreamer.
     std::unique_ptr<MCCodeEmitter> CE;
     if (InputArgs.hasArg(OPT_show_encoding))
-      CE.reset(TheTarget->createMCCodeEmitter(*MCII, Ctx));
+      CE.reset(TheTarget->createMCCodeEmitter(*MCII, *MRI, Ctx));
 
     std::unique_ptr<MCAsmBackend> MAB(
         TheTarget->createMCAsmBackend(*STI, *MRI, MCOptions));
@@ -402,7 +394,7 @@ int llvm_ml_main(int Argc, char **Argv, const llvm::ToolContext &) {
       OS = BOS.get();
     }
 
-    MCCodeEmitter *CE = TheTarget->createMCCodeEmitter(*MCII, Ctx);
+    MCCodeEmitter *CE = TheTarget->createMCCodeEmitter(*MCII, *MRI, Ctx);
     MCAsmBackend *MAB = TheTarget->createMCAsmBackend(*STI, *MRI, MCOptions);
     Str.reset(TheTarget->createMCObjectStreamer(
         TheTriple, Ctx, std::unique_ptr<MCAsmBackend>(MAB),

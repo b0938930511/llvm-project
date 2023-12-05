@@ -7,6 +7,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/CodeGen/DbgEntityHistoryCalculator.h"
+#include "llvm/ADT/BitVector.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -25,7 +27,6 @@
 #include "llvm/Support/raw_ostream.h"
 #include <cassert>
 #include <map>
-#include <optional>
 #include <utility>
 
 using namespace llvm;
@@ -76,7 +77,7 @@ bool DbgValueHistoryMap::startDbgValue(InlinedEntity Var,
   auto &Entries = VarEntries[Var];
   if (!Entries.empty() && Entries.back().isDbgValue() &&
       !Entries.back().isClosed() &&
-      Entries.back().getInstr()->isEquivalentDbgInstr(MI)) {
+      Entries.back().getInstr()->isIdenticalTo(MI)) {
     LLVM_DEBUG(dbgs() << "Coalescing identical DBG_VALUE entries:\n"
                       << "\t" << Entries.back().getInstr() << "\t" << MI
                       << "\n");
@@ -110,20 +111,20 @@ void DbgValueHistoryMap::Entry::endEntry(EntryIndex Index) {
 /// range in Ranges. EndMI can be nullptr to indicate that the range is
 /// unbounded. Assumes Ranges is ordered and disjoint. Returns true and points
 /// to the first intersecting scope range if one exists.
-static std::optional<ArrayRef<InsnRange>::iterator>
+static Optional<ArrayRef<InsnRange>::iterator>
 intersects(const MachineInstr *StartMI, const MachineInstr *EndMI,
            const ArrayRef<InsnRange> &Ranges,
            const InstructionOrdering &Ordering) {
   for (auto RangesI = Ranges.begin(), RangesE = Ranges.end();
        RangesI != RangesE; ++RangesI) {
     if (EndMI && Ordering.isBefore(EndMI, RangesI->first))
-      return std::nullopt;
+      return None;
     if (EndMI && !Ordering.isBefore(RangesI->second, EndMI))
       return RangesI;
     if (Ordering.isBefore(StartMI, RangesI->second))
       return RangesI;
   }
-  return std::nullopt;
+  return None;
 }
 
 void DbgValueHistoryMap::trimLocationRanges(
@@ -137,9 +138,6 @@ void DbgValueHistoryMap::trimLocationRanges(
   // Entries reference other entries by index. Offsets is used to remap these
   // references if any entries are removed.
   SmallVector<size_t, 4> Offsets;
-
-  LLVM_DEBUG(dbgs() << "Trimming location ranges for function '" << MF.getName()
-                    << "'\n");
 
   for (auto &Record : VarEntries) {
     auto &HistoryMapEntries = Record.second;
@@ -206,7 +204,7 @@ void DbgValueHistoryMap::trimLocationRanges(
       if (auto R = intersects(StartMI, EndMI, ScopeRanges, Ordering)) {
         // Adjust ScopeRanges to exclude ranges which subsequent location ranges
         // cannot possibly intersect.
-        ScopeRanges = ArrayRef<InsnRange>(*R, ScopeRanges.end());
+        ScopeRanges = ArrayRef<InsnRange>(R.getValue(), ScopeRanges.end());
       } else {
         // If the location range does not intersect any scope range then the
         // DBG_VALUE which opened this location range is usless, mark it for
@@ -216,8 +214,6 @@ void DbgValueHistoryMap::trimLocationRanges(
         // count of the closing entry, if one exists.
         if (EndIndex != NoEntry)
           ReferenceCount[EndIndex] -= 1;
-        LLVM_DEBUG(dbgs() << "Dropping value outside scope range of variable: ";
-                   StartMI->print(llvm::dbgs()););
       }
     }
 
@@ -256,10 +252,8 @@ void DbgValueHistoryMap::trimLocationRanges(
 
     // Now actually remove the entries. Iterate backwards so that our remaining
     // ToRemove indices are valid after each erase.
-    for (EntryIndex Idx : llvm::reverse(ToRemove))
-      HistoryMapEntries.erase(HistoryMapEntries.begin() + Idx);
-    LLVM_DEBUG(llvm::dbgs() << "New HistoryMap('" << LocalVar->getName()
-                            << "') size: " << HistoryMapEntries.size() << "\n");
+    for (auto Itr = ToRemove.rbegin(), End = ToRemove.rend(); Itr != End; ++Itr)
+      HistoryMapEntries.erase(HistoryMapEntries.begin() + *Itr);
   }
 }
 
@@ -271,7 +265,7 @@ bool DbgValueHistoryMap::hasNonEmptyLocation(const Entries &Entries) const {
     const MachineInstr *MI = Entry.getInstr();
     assert(MI->isDebugValue());
     // A DBG_VALUE $noreg is an empty variable location
-    if (MI->isUndefDebugValue())
+    if (MI->getOperand(0).isReg() && MI->getOperand(0).getReg() == 0)
       continue;
 
     return true;
@@ -347,11 +341,11 @@ static void clobberRegEntries(InlinedEntity Var, unsigned RegNo,
     if (Entry.getInstr()->hasDebugOperandForReg(RegNo)) {
       IndicesToErase.push_back(Index);
       Entry.endEntry(ClobberIndex);
-      for (const auto &MO : Entry.getInstr()->debug_operands())
+      for (auto &MO : Entry.getInstr()->debug_operands())
         if (MO.isReg() && MO.getReg() && MO.getReg() != RegNo)
           MaybeRemovedRegisters.insert(MO.getReg());
     } else {
-      for (const auto &MO : Entry.getInstr()->debug_operands())
+      for (auto &MO : Entry.getInstr()->debug_operands())
         if (MO.isReg() && MO.getReg())
           KeepRegisters.insert(MO.getReg());
     }
@@ -502,7 +496,7 @@ void llvm::calculateDbgEntityHistory(const MachineFunction *MF,
             continue;
           // If this is a virtual register, only clobber it since it doesn't
           // have aliases.
-          if (MO.getReg().isVirtual())
+          if (Register::isVirtualRegister(MO.getReg()))
             clobberRegisterUses(RegVars, MO.getReg(), DbgValues, LiveEntries,
                                 MI);
           // If this is a register def operand, it may end a debug value
@@ -562,8 +556,8 @@ void llvm::calculateDbgEntityHistory(const MachineFunction *MF,
 }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
-LLVM_DUMP_METHOD void DbgValueHistoryMap::dump(StringRef FuncName) const {
-  dbgs() << "DbgValueHistoryMap('" << FuncName << "'):\n";
+LLVM_DUMP_METHOD void DbgValueHistoryMap::dump() const {
+  dbgs() << "DbgValueHistoryMap:\n";
   for (const auto &VarRangePair : *this) {
     const InlinedEntity &Var = VarRangePair.first;
     const Entries &Entries = VarRangePair.second;

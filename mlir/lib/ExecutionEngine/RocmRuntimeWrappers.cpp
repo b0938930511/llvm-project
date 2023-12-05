@@ -30,17 +30,32 @@
     fprintf(stderr, "'%s' failed with '%s'\n", #expr, name);                   \
   }(expr)
 
-thread_local static int32_t defaultDevice = 0;
+// Sets the `Context` for the duration of the instance and restores the previous
+// context on destruction.
+class ScopedContext {
+public:
+  ScopedContext() {
+    // Static reference to HIP primary context for device ordinal 0.
+    static hipCtx_t context = [] {
+      HIP_REPORT_IF_ERROR(hipInit(/*flags=*/0));
+      hipDevice_t device;
+      HIP_REPORT_IF_ERROR(hipDeviceGet(&device, /*ordinal=*/0));
+      hipCtx_t ctx;
+      HIP_REPORT_IF_ERROR(hipDevicePrimaryCtxRetain(&ctx, device));
+      return ctx;
+    }();
 
-extern "C" hipModule_t mgpuModuleLoad(void *data, size_t /*gpuBlobSize*/) {
+    HIP_REPORT_IF_ERROR(hipCtxPushCurrent(context));
+  }
+
+  ~ScopedContext() { HIP_REPORT_IF_ERROR(hipCtxPopCurrent(nullptr)); }
+};
+
+extern "C" hipModule_t mgpuModuleLoad(void *data) {
+  ScopedContext scopedContext;
   hipModule_t module = nullptr;
   HIP_REPORT_IF_ERROR(hipModuleLoadData(&module, data));
   return module;
-}
-
-extern "C" hipModule_t mgpuModuleLoadJIT(void *data, int optLevel) {
-  assert(false && "This function is not available in HIP.");
-  return nullptr;
 }
 
 extern "C" void mgpuModuleUnload(hipModule_t module) {
@@ -62,13 +77,15 @@ extern "C" void mgpuLaunchKernel(hipFunction_t function, intptr_t gridX,
                                  intptr_t blockX, intptr_t blockY,
                                  intptr_t blockZ, int32_t smem,
                                  hipStream_t stream, void **params,
-                                 void **extra, size_t /*paramsCount*/) {
+                                 void **extra) {
+  ScopedContext scopedContext;
   HIP_REPORT_IF_ERROR(hipModuleLaunchKernel(function, gridX, gridY, gridZ,
                                             blockX, blockY, blockZ, smem,
                                             stream, params, extra));
 }
 
 extern "C" hipStream_t mgpuStreamCreate() {
+  ScopedContext scopedContext;
   hipStream_t stream = nullptr;
   HIP_REPORT_IF_ERROR(hipStreamCreate(&stream));
   return stream;
@@ -87,6 +104,7 @@ extern "C" void mgpuStreamWaitEvent(hipStream_t stream, hipEvent_t event) {
 }
 
 extern "C" hipEvent_t mgpuEventCreate() {
+  ScopedContext scopedContext;
   hipEvent_t event = nullptr;
   HIP_REPORT_IF_ERROR(hipEventCreateWithFlags(&event, hipEventDisableTiming));
   return event;
@@ -104,8 +122,8 @@ extern "C" void mgpuEventRecord(hipEvent_t event, hipStream_t stream) {
   HIP_REPORT_IF_ERROR(hipEventRecord(event, stream));
 }
 
-extern "C" void *mgpuMemAlloc(uint64_t sizeBytes, hipStream_t /*stream*/,
-                              bool /*isHostShared*/) {
+extern "C" void *mgpuMemAlloc(uint64_t sizeBytes, hipStream_t /*stream*/) {
+  ScopedContext scopedContext;
   void *ptr;
   HIP_REPORT_IF_ERROR(hipMalloc(&ptr, sizeBytes));
   return ptr;
@@ -115,22 +133,18 @@ extern "C" void mgpuMemFree(void *ptr, hipStream_t /*stream*/) {
   HIP_REPORT_IF_ERROR(hipFree(ptr));
 }
 
-extern "C" void mgpuMemcpy(void *dst, void *src, size_t sizeBytes,
+extern "C" void mgpuMemcpy(void *dst, void *src, uint64_t sizeBytes,
                            hipStream_t stream) {
   HIP_REPORT_IF_ERROR(
       hipMemcpyAsync(dst, src, sizeBytes, hipMemcpyDefault, stream));
 }
 
-extern "C" void mgpuMemset32(void *dst, int value, size_t count,
-                             hipStream_t stream) {
-  HIP_REPORT_IF_ERROR(hipMemsetD32Async(reinterpret_cast<hipDeviceptr_t>(dst),
-                                        value, count, stream));
-}
 /// Helper functions for writing mlir example code
 
 // Allows to register byte array with the ROCM runtime. Helpful until we have
 // transfer functions implemented.
 extern "C" void mgpuMemHostRegister(void *ptr, uint64_t sizeBytes) {
+  ScopedContext scopedContext;
   HIP_REPORT_IF_ERROR(hipHostRegister(ptr, sizeBytes, /*flags=*/0));
 }
 
@@ -152,26 +166,10 @@ mgpuMemHostRegisterMemRef(int64_t rank, StridedMemRefType<char, 1> *descriptor,
   std::rotate(denseStrides.begin(), denseStrides.begin() + 1,
               denseStrides.end());
   denseStrides.back() = 1;
-  assert(strides == llvm::ArrayRef(denseStrides));
+  assert(strides == llvm::makeArrayRef(denseStrides));
 
   auto ptr = descriptor->data + descriptor->offset * elementSizeBytes;
   mgpuMemHostRegister(ptr, sizeBytes);
-}
-
-// Allows to unregister byte array with the ROCM runtime. Helpful until we have
-// transfer functions implemented.
-extern "C" void mgpuMemHostUnregister(void *ptr) {
-  HIP_REPORT_IF_ERROR(hipHostUnregister(ptr));
-}
-
-// Allows to unregister a MemRef with the ROCm runtime. Helpful until we have
-// transfer functions implemented.
-extern "C" void
-mgpuMemHostUnregisterMemRef(int64_t rank,
-                            StridedMemRefType<char, 1> *descriptor,
-                            int64_t elementSizeBytes) {
-  auto ptr = descriptor->data + descriptor->offset * elementSizeBytes;
-  mgpuMemHostUnregister(ptr);
 }
 
 template <typename T>
@@ -195,9 +193,4 @@ mgpuMemGetDeviceMemRef1dInt32(int32_t *allocated, int32_t *aligned,
   int32_t *devicePtr = nullptr;
   mgpuMemGetDevicePointer(aligned, &devicePtr);
   return {devicePtr, devicePtr, offset, {size}, {stride}};
-}
-
-extern "C" void mgpuSetDefaultDevice(int32_t device) {
-  defaultDevice = device;
-  HIP_REPORT_IF_ERROR(hipSetDevice(device));
 }

@@ -8,7 +8,6 @@
 
 #include "MCTargetDesc/SparcFixupKinds.h"
 #include "MCTargetDesc/SparcMCTargetDesc.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/MC/MCAsmBackend.h"
 #include "llvm/MC/MCELFObjectWriter.h"
 #include "llvm/MC/MCExpr.h"
@@ -16,8 +15,8 @@
 #include "llvm/MC/MCObjectWriter.h"
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/MC/MCValue.h"
-#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/EndianStream.h"
+#include "llvm/Support/TargetRegistry.h"
 
 using namespace llvm;
 
@@ -41,17 +40,11 @@ static unsigned adjustFixupValue(unsigned Kind, uint64_t Value) {
   case Sparc::fixup_sparc_br19:
     return (Value >> 2) & 0x7ffff;
 
-  case Sparc::fixup_sparc_br16: {
-    // A.3 Branch on Integer Register with Prediction (BPr)
-    // Inst{21-20} = d16hi;
-    // Inst{13-0}  = d16lo;
-    unsigned d16hi = (Value >> 16) & 0x3;
-    unsigned d16lo = (Value >> 2) & 0x3fff;
-    return (d16hi << 20) | d16lo;
-  }
+  case Sparc::fixup_sparc_br16_2:
+    return (Value >> 2) & 0xc000;
 
-  case Sparc::fixup_sparc_hix22:
-    return (~Value >> 10) & 0x3fffff;
+  case Sparc::fixup_sparc_br16_14:
+    return (Value >> 2) & 0x3fff;
 
   case Sparc::fixup_sparc_pc22:
   case Sparc::fixup_sparc_got22:
@@ -65,9 +58,6 @@ static unsigned adjustFixupValue(unsigned Kind, uint64_t Value) {
   case Sparc::fixup_sparc_got13:
   case Sparc::fixup_sparc_13:
     return Value & 0x1fff;
-
-  case Sparc::fixup_sparc_lox10:
-    return (Value & 0x3ff) | 0x1c00;
 
   case Sparc::fixup_sparc_pc10:
   case Sparc::fixup_sparc_got10:
@@ -107,9 +97,6 @@ static unsigned adjustFixupValue(unsigned Kind, uint64_t Value) {
   case Sparc::fixup_sparc_tls_ie_ld:
   case Sparc::fixup_sparc_tls_ie_ldx:
   case Sparc::fixup_sparc_tls_ie_add:
-  case Sparc::fixup_sparc_gotdata_lox10:
-  case Sparc::fixup_sparc_gotdata_hix22:
-  case Sparc::fixup_sparc_gotdata_op:
     return 0;
   }
 }
@@ -136,30 +123,12 @@ namespace {
 
   public:
     SparcAsmBackend(const Target &T)
-        : MCAsmBackend(StringRef(T.getName()) == "sparcel"
-                           ? llvm::endianness::little
-                           : llvm::endianness::big),
+        : MCAsmBackend(StringRef(T.getName()) == "sparcel" ? support::little
+                                                           : support::big),
           TheTarget(T), Is64Bit(StringRef(TheTarget.getName()) == "sparcv9") {}
 
     unsigned getNumFixupKinds() const override {
       return Sparc::NumTargetFixupKinds;
-    }
-
-    std::optional<MCFixupKind> getFixupKind(StringRef Name) const override {
-      unsigned Type;
-      Type = llvm::StringSwitch<unsigned>(Name)
-#define ELF_RELOC(X, Y) .Case(#X, Y)
-#include "llvm/BinaryFormat/ELFRelocs/Sparc.def"
-#undef ELF_RELOC
-                 .Case("BFD_RELOC_NONE", ELF::R_SPARC_NONE)
-                 .Case("BFD_RELOC_8", ELF::R_SPARC_8)
-                 .Case("BFD_RELOC_16", ELF::R_SPARC_16)
-                 .Case("BFD_RELOC_32", ELF::R_SPARC_32)
-                 .Case("BFD_RELOC_64", ELF::R_SPARC_64)
-                 .Default(-1u);
-      if (Type == -1u)
-        return std::nullopt;
-      return static_cast<MCFixupKind>(FirstLiteralRelocationKind + Type);
     }
 
     const MCFixupKindInfo &getFixupKindInfo(MCFixupKind Kind) const override {
@@ -168,7 +137,8 @@ namespace {
         { "fixup_sparc_call30",     2,     30,  MCFixupKindInfo::FKF_IsPCRel },
         { "fixup_sparc_br22",      10,     22,  MCFixupKindInfo::FKF_IsPCRel },
         { "fixup_sparc_br19",      13,     19,  MCFixupKindInfo::FKF_IsPCRel },
-        { "fixup_sparc_br16",       0,     32,  MCFixupKindInfo::FKF_IsPCRel },
+        { "fixup_sparc_br16_2",    10,      2,  MCFixupKindInfo::FKF_IsPCRel },
+        { "fixup_sparc_br16_14",   18,     14,  MCFixupKindInfo::FKF_IsPCRel },
         { "fixup_sparc_13",        19,     13,  0 },
         { "fixup_sparc_hi22",      10,     22,  0 },
         { "fixup_sparc_lo10",      22,     10,  0 },
@@ -201,12 +171,7 @@ namespace {
         { "fixup_sparc_tls_ie_ldx",     0,  0,  0 },
         { "fixup_sparc_tls_ie_add",     0,  0,  0 },
         { "fixup_sparc_tls_le_hix22",   0,  0,  0 },
-        { "fixup_sparc_tls_le_lox10",   0,  0,  0 },
-        { "fixup_sparc_hix22",         10, 22,  0 },
-        { "fixup_sparc_lox10",         19, 13,  0 },
-        { "fixup_sparc_gotdata_hix22",  0,  0,  0 },
-        { "fixup_sparc_gotdata_lox10",  0,  0,  0 },
-        { "fixup_sparc_gotdata_op",     0,  0,  0 },
+        { "fixup_sparc_tls_le_lox10",   0,  0,  0 }
       };
 
       const static MCFixupKindInfo InfosLE[Sparc::NumTargetFixupKinds] = {
@@ -214,7 +179,8 @@ namespace {
         { "fixup_sparc_call30",     0,     30,  MCFixupKindInfo::FKF_IsPCRel },
         { "fixup_sparc_br22",       0,     22,  MCFixupKindInfo::FKF_IsPCRel },
         { "fixup_sparc_br19",       0,     19,  MCFixupKindInfo::FKF_IsPCRel },
-        { "fixup_sparc_br16",      32,      0,  MCFixupKindInfo::FKF_IsPCRel },
+        { "fixup_sparc_br16_2",    20,      2,  MCFixupKindInfo::FKF_IsPCRel },
+        { "fixup_sparc_br16_14",    0,     14,  MCFixupKindInfo::FKF_IsPCRel },
         { "fixup_sparc_13",         0,     13,  0 },
         { "fixup_sparc_hi22",       0,     22,  0 },
         { "fixup_sparc_lo10",       0,     10,  0 },
@@ -247,25 +213,15 @@ namespace {
         { "fixup_sparc_tls_ie_ldx",     0,  0,  0 },
         { "fixup_sparc_tls_ie_add",     0,  0,  0 },
         { "fixup_sparc_tls_le_hix22",   0,  0,  0 },
-        { "fixup_sparc_tls_le_lox10",   0,  0,  0 },
-        { "fixup_sparc_hix22",          0, 22,  0 },
-        { "fixup_sparc_lox10",          0, 13,  0 },
-        { "fixup_sparc_gotdata_hix22",  0,  0,  0 },
-        { "fixup_sparc_gotdata_lox10",  0,  0,  0 },
-        { "fixup_sparc_gotdata_op",     0,  0,  0 },
+        { "fixup_sparc_tls_le_lox10",   0,  0,  0 }
       };
-
-      // Fixup kinds from .reloc directive are like R_SPARC_NONE. They do
-      // not require any extra processing.
-      if (Kind >= FirstLiteralRelocationKind)
-        return MCAsmBackend::getFixupKindInfo(FK_NONE);
 
       if (Kind < FirstTargetFixupKind)
         return MCAsmBackend::getFixupKindInfo(Kind);
 
       assert(unsigned(Kind - FirstTargetFixupKind) < getNumFixupKinds() &&
              "Invalid kind!");
-      if (Endian == llvm::endianness::little)
+      if (Endian == support::little)
         return InfosLE[Kind - FirstTargetFixupKind];
 
       return InfosBE[Kind - FirstTargetFixupKind];
@@ -273,15 +229,13 @@ namespace {
 
     bool shouldForceRelocation(const MCAssembler &Asm, const MCFixup &Fixup,
                                const MCValue &Target) override {
-      if (Fixup.getKind() >= FirstLiteralRelocationKind)
-        return true;
       switch ((Sparc::Fixups)Fixup.getKind()) {
       default:
         return false;
       case Sparc::fixup_sparc_wplt30:
         if (Target.getSymA()->getSymbol().isTemporary())
           return false;
-        [[fallthrough]];
+        LLVM_FALLTHROUGH;
       case Sparc::fixup_sparc_tls_gd_hi22:
       case Sparc::fixup_sparc_tls_gd_lo10:
       case Sparc::fixup_sparc_tls_gd_add:
@@ -320,8 +274,7 @@ namespace {
       llvm_unreachable("relaxInstruction() unimplemented");
     }
 
-    bool writeNopData(raw_ostream &OS, uint64_t Count,
-                      const MCSubtargetInfo *STI) const override {
+    bool writeNopData(raw_ostream &OS, uint64_t Count) const override {
       // Cannot emit NOP with size not multiple of 32 bits.
       if (Count % 4 != 0)
         return false;
@@ -345,8 +298,6 @@ namespace {
                     uint64_t Value, bool IsResolved,
                     const MCSubtargetInfo *STI) const override {
 
-      if (Fixup.getKind() >= FirstLiteralRelocationKind)
-        return;
       Value = adjustFixupValue(Fixup.getKind(), Value);
       if (!Value) return;           // Doesn't change encoding.
 
@@ -356,8 +307,7 @@ namespace {
       // from the fixup value. The Value has been "split up" into the
       // appropriate bitfields above.
       for (unsigned i = 0; i != NumBytes; ++i) {
-        unsigned Idx =
-            Endian == llvm::endianness::little ? i : (NumBytes - 1) - i;
+        unsigned Idx = Endian == support::little ? i : (NumBytes - 1) - i;
         Data[Offset + Idx] |= uint8_t((Value >> (i * 8)) & 0xff);
       }
     }

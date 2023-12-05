@@ -15,6 +15,7 @@
 
 #include "DebugOptions.h"
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/Support/CommandLine.h"
@@ -22,15 +23,14 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FileUtilities.h"
 #include "llvm/Support/Format.h"
+#include "llvm/Support/FormatAdapters.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/Path.h"
+#include "llvm/Support/Mutex.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/StringSaver.h"
 #include "llvm/Support/raw_ostream.h"
-#include <array>
-#include <cmath>
 #include <vector>
 
 //===----------------------------------------------------------------------===//
@@ -72,7 +72,6 @@ void llvm::initSignalsOptions() {
 
 constexpr char DisableSymbolizationEnv[] = "LLVM_DISABLE_SYMBOLIZATION";
 constexpr char LLVMSymbolizerPathEnv[] = "LLVM_SYMBOLIZER_PATH";
-constexpr char EnableSymbolizerMarkupEnv[] = "LLVM_ENABLE_SYMBOLIZER_MARKUP";
 
 // Callbacks to run in signal handler must be lock-free because a signal handler
 // could be running as we add new callbacks. We don't add unbounded numbers of
@@ -83,20 +82,13 @@ struct CallbackAndCookie {
   enum class Status { Empty, Initializing, Initialized, Executing };
   std::atomic<Status> Flag;
 };
-
 static constexpr size_t MaxSignalHandlerCallbacks = 8;
-
-// A global array of CallbackAndCookie may not compile with
-// -Werror=global-constructors in c++20 and above
-static std::array<CallbackAndCookie, MaxSignalHandlerCallbacks> &
-CallBacksToRun() {
-  static std::array<CallbackAndCookie, MaxSignalHandlerCallbacks> callbacks;
-  return callbacks;
-}
+static CallbackAndCookie CallBacksToRun[MaxSignalHandlerCallbacks];
 
 // Signal-safe.
 void sys::RunSignalHandlers() {
-  for (CallbackAndCookie &RunMe : CallBacksToRun()) {
+  for (size_t I = 0; I < MaxSignalHandlerCallbacks; ++I) {
+    auto &RunMe = CallBacksToRun[I];
     auto Expected = CallbackAndCookie::Status::Initialized;
     auto Desired = CallbackAndCookie::Status::Executing;
     if (!RunMe.Flag.compare_exchange_strong(Expected, Desired))
@@ -111,7 +103,8 @@ void sys::RunSignalHandlers() {
 // Signal-safe.
 static void insertSignalHandler(sys::SignalHandlerCallback FnPtr,
                                 void *Cookie) {
-  for (CallbackAndCookie &SetMe : CallBacksToRun()) {
+  for (size_t I = 0; I < MaxSignalHandlerCallbacks; ++I) {
+    auto &SetMe = CallBacksToRun[I];
     auto Expected = CallbackAndCookie::Status::Empty;
     auto Desired = CallbackAndCookie::Status::Initializing;
     if (!SetMe.Flag.compare_exchange_strong(Expected, Desired))
@@ -193,8 +186,8 @@ static bool printSymbolizedStackTrace(StringRef Argv0, void **StackTrace,
     }
   }
 
-  std::optional<StringRef> Redirects[] = {InputFile.str(), OutputFile.str(),
-                                          StringRef("")};
+  Optional<StringRef> Redirects[] = {InputFile.str(), OutputFile.str(),
+                                     StringRef("")};
   StringRef Args[] = {"llvm-symbolizer", "--functions=linkage", "--inlining",
 #ifdef _WIN32
                       // Pass --relative-address on Windows so that we don't
@@ -204,7 +197,7 @@ static bool printSymbolizedStackTrace(StringRef Argv0, void **StackTrace,
 #endif
                       "--demangle"};
   int RunResult =
-      sys::ExecuteAndWait(LLVMSymbolizerPath, Args, std::nullopt, Redirects);
+      sys::ExecuteAndWait(LLVMSymbolizerPath, Args, None, Redirects);
   if (RunResult != 0)
     return false;
 
@@ -238,37 +231,18 @@ static bool printSymbolizedStackTrace(StringRef Argv0, void **StackTrace,
       if (FunctionName.empty())
         break;
       PrintLineHeader();
-      if (!FunctionName.starts_with("??"))
+      if (!FunctionName.startswith("??"))
         OS << FunctionName << ' ';
       if (CurLine == Lines.end())
         return false;
       StringRef FileLineInfo = *CurLine++;
-      if (!FileLineInfo.starts_with("??"))
+      if (!FileLineInfo.startswith("??"))
         OS << FileLineInfo;
       else
         OS << "(" << Modules[i] << '+' << format_hex(Offsets[i], 0) << ")";
       OS << "\n";
     }
   }
-  return true;
-}
-
-static bool printMarkupContext(raw_ostream &OS, const char *MainExecutableName);
-
-LLVM_ATTRIBUTE_USED
-static bool printMarkupStackTrace(StringRef Argv0, void **StackTrace, int Depth,
-                                  raw_ostream &OS) {
-  const char *Env = getenv(EnableSymbolizerMarkupEnv);
-  if (!Env || !*Env)
-    return false;
-
-  std::string MainExecutableName =
-      sys::fs::exists(Argv0) ? std::string(Argv0)
-                             : sys::fs::getMainExecutable(nullptr, nullptr);
-  if (!printMarkupContext(OS, MainExecutableName.c_str()))
-    return false;
-  for (int I = 0; I < Depth; I++)
-    OS << format("{{{bt:%d:%#016x}}}\n", I, StackTrace[I]);
   return true;
 }
 

@@ -20,7 +20,6 @@
 #include "mlir/IR/TypeSupport.h"
 #include "mlir/IR/Types.h"
 
-#include <cstdint>
 #include <tuple>
 
 namespace mlir {
@@ -29,9 +28,7 @@ namespace spirv {
 namespace detail {
 struct ArrayTypeStorage;
 struct CooperativeMatrixTypeStorage;
-struct CooperativeMatrixNVTypeStorage;
 struct ImageTypeStorage;
-struct JointMatrixTypeStorage;
 struct MatrixTypeStorage;
 struct PointerTypeStorage;
 struct RuntimeArrayTypeStorage;
@@ -58,7 +55,7 @@ public:
   /// the given `storage` class. This method does not guarantee the uniqueness
   /// of extensions; the same extension may be appended multiple times.
   void getExtensions(ExtensionArrayRefVector &extensions,
-                     std::optional<StorageClass> storage = std::nullopt);
+                     Optional<StorageClass> storage = llvm::None);
 
   /// The capability requirements for each type are following the
   /// ((Capability::A OR Extension::B) AND (Capability::C OR Capability::D))
@@ -70,12 +67,12 @@ public:
   /// uniqueness of capabilities; the same capability may be appended multiple
   /// times.
   void getCapabilities(CapabilityArrayRefVector &capabilities,
-                       std::optional<StorageClass> storage = std::nullopt);
+                       Optional<StorageClass> storage = llvm::None);
 
   /// Returns the size in bytes for each type. If no size can be calculated,
-  /// returns `std::nullopt`. Note that if the type has explicit layout, it is
+  /// returns `llvm::None`. Note that if the type has explicit layout, it is
   /// also taken into account in calculation.
-  std::optional<int64_t> getSizeInBytes();
+  Optional<int64_t> getSizeInBytes();
 };
 
 // SPIR-V scalar type: bool type, integer type, floating point type.
@@ -91,11 +88,11 @@ public:
   static bool isValid(IntegerType);
 
   void getExtensions(SPIRVType::ExtensionArrayRefVector &extensions,
-                     std::optional<StorageClass> storage = std::nullopt);
+                     Optional<StorageClass> storage = llvm::None);
   void getCapabilities(SPIRVType::CapabilityArrayRefVector &capabilities,
-                       std::optional<StorageClass> storage = std::nullopt);
+                       Optional<StorageClass> storage = llvm::None);
 
-  std::optional<int64_t> getSizeInBytes();
+  Optional<int64_t> getSizeInBytes();
 };
 
 // SPIR-V composite type: VectorType, SPIR-V ArrayType, or SPIR-V StructType.
@@ -119,11 +116,11 @@ public:
   bool hasCompileTimeKnownNumElements() const;
 
   void getExtensions(SPIRVType::ExtensionArrayRefVector &extensions,
-                     std::optional<StorageClass> storage = std::nullopt);
+                     Optional<StorageClass> storage = llvm::None);
   void getCapabilities(SPIRVType::CapabilityArrayRefVector &capabilities,
-                       std::optional<StorageClass> storage = std::nullopt);
+                       Optional<StorageClass> storage = llvm::None);
 
-  std::optional<int64_t> getSizeInBytes();
+  Optional<int64_t> getSizeInBytes();
 };
 
 // SPIR-V array type
@@ -131,8 +128,6 @@ class ArrayType : public Type::TypeBase<ArrayType, CompositeType,
                                         detail::ArrayTypeStorage> {
 public:
   using Base::Base;
-
-  static constexpr StringLiteral name = "spirv.array";
 
   static ArrayType get(Type elementType, unsigned elementCount);
 
@@ -149,13 +144,13 @@ public:
   unsigned getArrayStride() const;
 
   void getExtensions(SPIRVType::ExtensionArrayRefVector &extensions,
-                     std::optional<StorageClass> storage = std::nullopt);
+                     Optional<StorageClass> storage = llvm::None);
   void getCapabilities(SPIRVType::CapabilityArrayRefVector &capabilities,
-                       std::optional<StorageClass> storage = std::nullopt);
+                       Optional<StorageClass> storage = llvm::None);
 
   /// Returns the array size in bytes. Since array type may have an explicit
   /// stride declaration (in bytes), we also include it in the calculation.
-  std::optional<int64_t> getSizeInBytes();
+  Optional<int64_t> getSizeInBytes();
 };
 
 // SPIR-V image type
@@ -163,8 +158,6 @@ class ImageType
     : public Type::TypeBase<ImageType, SPIRVType, detail::ImageTypeStorage> {
 public:
   using Base::Base;
-
-  static constexpr StringLiteral name = "spirv.image";
 
   static ImageType
   get(Type elementType, Dim dim,
@@ -194,9 +187,9 @@ public:
   // TODO: Add support for Access qualifier
 
   void getExtensions(SPIRVType::ExtensionArrayRefVector &extensions,
-                     std::optional<StorageClass> storage = std::nullopt);
+                     Optional<StorageClass> storage = llvm::None);
   void getCapabilities(SPIRVType::CapabilityArrayRefVector &capabilities,
-                       std::optional<StorageClass> storage = std::nullopt);
+                       Optional<StorageClass> storage = llvm::None);
 };
 
 // SPIR-V pointer type
@@ -205,8 +198,6 @@ class PointerType : public Type::TypeBase<PointerType, SPIRVType,
 public:
   using Base::Base;
 
-  static constexpr StringLiteral name = "spirv.pointer";
-
   static PointerType get(Type pointeeType, StorageClass storageClass);
 
   Type getPointeeType() const;
@@ -214,9 +205,9 @@ public:
   StorageClass getStorageClass() const;
 
   void getExtensions(SPIRVType::ExtensionArrayRefVector &extensions,
-                     std::optional<StorageClass> storage = std::nullopt);
+                     Optional<StorageClass> storage = llvm::None);
   void getCapabilities(SPIRVType::CapabilityArrayRefVector &capabilities,
-                       std::optional<StorageClass> storage = std::nullopt);
+                       Optional<StorageClass> storage = llvm::None);
 };
 
 // SPIR-V run-time array type
@@ -225,8 +216,6 @@ class RuntimeArrayType
                             detail::RuntimeArrayTypeStorage> {
 public:
   using Base::Base;
-
-  static constexpr StringLiteral name = "spirv.rtarray";
 
   static RuntimeArrayType get(Type elementType);
 
@@ -240,9 +229,9 @@ public:
   unsigned getArrayStride() const;
 
   void getExtensions(SPIRVType::ExtensionArrayRefVector &extensions,
-                     std::optional<StorageClass> storage = std::nullopt);
+                     Optional<StorageClass> storage = llvm::None);
   void getCapabilities(SPIRVType::CapabilityArrayRefVector &capabilities,
-                       std::optional<StorageClass> storage = std::nullopt);
+                       Optional<StorageClass> storage = llvm::None);
 };
 
 // SPIR-V sampled image type
@@ -251,8 +240,6 @@ class SampledImageType
                             detail::SampledImageTypeStorage> {
 public:
   using Base::Base;
-
-  static constexpr StringLiteral name = "spirv.sampled_image";
 
   static SampledImageType get(Type imageType);
 
@@ -265,10 +252,9 @@ public:
   Type getImageType() const;
 
   void getExtensions(SPIRVType::ExtensionArrayRefVector &extensions,
-                     std::optional<spirv::StorageClass> storage = std::nullopt);
-  void
-  getCapabilities(SPIRVType::CapabilityArrayRefVector &capabilities,
-                  std::optional<spirv::StorageClass> storage = std::nullopt);
+                     Optional<spirv::StorageClass> storage = llvm::None);
+  void getCapabilities(SPIRVType::CapabilityArrayRefVector &capabilities,
+                       Optional<spirv::StorageClass> storage = llvm::None);
 };
 
 /// SPIR-V struct type. Two kinds of struct types are supported:
@@ -284,21 +270,18 @@ public:
 ///
 /// would be represented in MLIR as:
 ///
-/// !spirv.struct<A, (!spirv.ptr<!spirv.struct<A>, Generic>)>
+/// !spv.struct<A, (!spv.ptr<!spv.struct<A>, Generic>)>
 ///
 /// In the above, expressing recursive struct types is accomplished by giving a
 /// recursive struct a unique identified and using that identifier in the struct
 /// definition for recursive references.
-class StructType
-    : public Type::TypeBase<StructType, CompositeType,
-                            detail::StructTypeStorage, TypeTrait::IsMutable> {
+class StructType : public Type::TypeBase<StructType, CompositeType,
+                                         detail::StructTypeStorage> {
 public:
   using Base::Base;
 
   // Type for specifying the offset of the struct members
   using OffsetInfo = uint32_t;
-
-  static constexpr StringLiteral name = "spirv.struct";
 
   // Type for specifying the decoration(s) on struct members
   struct MemberDecorationInfo {
@@ -359,7 +342,27 @@ public:
 
   Type getElementType(unsigned) const;
 
-  TypeRange getElementTypes() const;
+  /// Range class for element types.
+  class ElementTypeRange
+      : public ::llvm::detail::indexed_accessor_range_base<
+            ElementTypeRange, const Type *, Type, Type, Type> {
+  private:
+    using RangeBaseT::RangeBaseT;
+
+    /// See `llvm::detail::indexed_accessor_range_base` for details.
+    static const Type *offset_base(const Type *object, ptrdiff_t index) {
+      return object + index;
+    }
+    /// See `llvm::detail::indexed_accessor_range_base` for details.
+    static Type dereference_iterator(const Type *object, ptrdiff_t index) {
+      return object[index];
+    }
+
+    /// Allow base class access to `offset_base` and `dereference_iterator`.
+    friend RangeBaseT;
+  };
+
+  ElementTypeRange getElementTypes() const;
 
   bool hasOffset() const;
 
@@ -384,96 +387,36 @@ public:
              ArrayRef<MemberDecorationInfo> memberDecorations = {});
 
   void getExtensions(SPIRVType::ExtensionArrayRefVector &extensions,
-                     std::optional<StorageClass> storage = std::nullopt);
+                     Optional<StorageClass> storage = llvm::None);
   void getCapabilities(SPIRVType::CapabilityArrayRefVector &capabilities,
-                       std::optional<StorageClass> storage = std::nullopt);
+                       Optional<StorageClass> storage = llvm::None);
 };
 
 llvm::hash_code
 hash_value(const StructType::MemberDecorationInfo &memberDecorationInfo);
 
-// SPIR-V KHR cooperative matrix type
-class CooperativeMatrixType
-    : public Type::TypeBase<CooperativeMatrixType, CompositeType,
+// SPIR-V cooperative matrix type
+class CooperativeMatrixNVType
+    : public Type::TypeBase<CooperativeMatrixNVType, CompositeType,
                             detail::CooperativeMatrixTypeStorage> {
 public:
   using Base::Base;
-
-  static constexpr StringLiteral name = "spirv.coopmatrix";
-
-  static CooperativeMatrixType get(Type elementType, uint32_t rows,
-                                   uint32_t columns, Scope scope,
-                                   CooperativeMatrixUseKHR use);
-  Type getElementType() const;
-
-  /// Returns the scope of the matrix.
-  Scope getScope() const;
-  /// Returns the number of rows of the matrix.
-  uint32_t getRows() const;
-  /// Returns the number of columns of the matrix.
-  uint32_t getColumns() const;
-  /// Returns the use parameter of the cooperative matrix.
-  CooperativeMatrixUseKHR getUse() const;
-
-  void getExtensions(SPIRVType::ExtensionArrayRefVector &extensions,
-                     std::optional<StorageClass> storage = std::nullopt);
-  void getCapabilities(SPIRVType::CapabilityArrayRefVector &capabilities,
-                       std::optional<StorageClass> storage = std::nullopt);
-};
-
-// SPIR-V NV cooperative matrix type
-class CooperativeMatrixNVType
-    : public Type::TypeBase<CooperativeMatrixNVType, CompositeType,
-                            detail::CooperativeMatrixNVTypeStorage> {
-public:
-  using Base::Base;
-
-  static constexpr StringLiteral name = "spirv.NV.coopmatrix";
 
   static CooperativeMatrixNVType get(Type elementType, Scope scope,
                                      unsigned rows, unsigned columns);
   Type getElementType() const;
 
-  /// Returns the scope of the matrix.
-  Scope getScope() const;
-  /// Returns the number of rows of the matrix.
-  unsigned getRows() const;
-  /// Returns the number of columns of the matrix.
-  unsigned getColumns() const;
-
-  void getExtensions(SPIRVType::ExtensionArrayRefVector &extensions,
-                     std::optional<StorageClass> storage = std::nullopt);
-  void getCapabilities(SPIRVType::CapabilityArrayRefVector &capabilities,
-                       std::optional<StorageClass> storage = std::nullopt);
-};
-
-// SPIR-V joint matrix type
-class JointMatrixINTELType
-    : public Type::TypeBase<JointMatrixINTELType, CompositeType,
-                            detail::JointMatrixTypeStorage> {
-public:
-  using Base::Base;
-
-  static constexpr StringLiteral name = "spirv.jointmatrix";
-
-  static JointMatrixINTELType get(Type elementType, Scope scope, unsigned rows,
-                                  unsigned columns, MatrixLayout matrixLayout);
-  Type getElementType() const;
-
-  /// Return the scope of the joint matrix.
+  /// Return the scope of the cooperative matrix.
   Scope getScope() const;
   /// return the number of rows of the matrix.
   unsigned getRows() const;
   /// return the number of columns of the matrix.
   unsigned getColumns() const;
 
-  /// return the layout of the matrix
-  MatrixLayout getMatrixLayout() const;
-
   void getExtensions(SPIRVType::ExtensionArrayRefVector &extensions,
-                     std::optional<StorageClass> storage = std::nullopt);
+                     Optional<StorageClass> storage = llvm::None);
   void getCapabilities(SPIRVType::CapabilityArrayRefVector &capabilities,
-                       std::optional<StorageClass> storage = std::nullopt);
+                       Optional<StorageClass> storage = llvm::None);
 };
 
 // SPIR-V matrix type
@@ -481,8 +424,6 @@ class MatrixType : public Type::TypeBase<MatrixType, CompositeType,
                                          detail::MatrixTypeStorage> {
 public:
   using Base::Base;
-
-  static constexpr StringLiteral name = "spirv.matrix";
 
   static MatrixType get(Type columnType, uint32_t columnCount);
 
@@ -510,12 +451,12 @@ public:
   Type getElementType() const;
 
   void getExtensions(SPIRVType::ExtensionArrayRefVector &extensions,
-                     std::optional<StorageClass> storage = std::nullopt);
+                     Optional<StorageClass> storage = llvm::None);
   void getCapabilities(SPIRVType::CapabilityArrayRefVector &capabilities,
-                       std::optional<StorageClass> storage = std::nullopt);
+                       Optional<StorageClass> storage = llvm::None);
 };
 
-} // namespace spirv
-} // namespace mlir
+} // end namespace spirv
+} // end namespace mlir
 
 #endif // MLIR_DIALECT_SPIRV_IR_SPIRVTYPES_H_

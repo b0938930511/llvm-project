@@ -17,7 +17,9 @@ namespace lldb_private {
 class StackID {
 public:
   // Constructors and Destructors
-  StackID() = default;
+  StackID()
+
+  {}
 
   explicit StackID(lldb::addr_t pc, lldb::addr_t cfa,
                    SymbolContextScope *symbol_scope)

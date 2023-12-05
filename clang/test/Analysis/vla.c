@@ -12,7 +12,7 @@ void check_zero_sized_VLA(int x) {
   int vla[x]; // expected-warning{{Declared variable-length array (VLA) has zero size}}
 }
 
-void check_uninit_sized_VLA(void) {
+void check_uninit_sized_VLA() {
   int x;
   int vla[x]; // expected-warning{{Declared variable-length array (VLA) uses a garbage value as its size}}
 }
@@ -26,45 +26,45 @@ static void vla_allocate_unsigned(unsigned short x) {
   int vla[x]; // no-warning
 }
 
-void check_negative_sized_VLA_1(void) {
+void check_negative_sized_VLA_1() {
   vla_allocate_signed(-1);
 }
 
-void check_negative_sized_VLA_2(void) {
+void check_negative_sized_VLA_2() {
   vla_allocate_unsigned(-1);
 }
 
-void check_negative_sized_VLA_3(void) {
+void check_negative_sized_VLA_3() {
   short x = -1;
   int vla[x]; // expected-warning{{Declared variable-length array (VLA) has negative size}}
 }
 
-void check_negative_sized_VLA_4(void) {
+void check_negative_sized_VLA_4() {
   unsigned short x = -1;
   int vla[x]; // no-warning
 }
 
-void check_negative_sized_VLA_5(void) {
+void check_negative_sized_VLA_5() {
   signed char x = -1;
   int vla[x]; // expected-warning{{Declared variable-length array (VLA) has negative size}}
 }
 
-void check_negative_sized_VLA_6(void) {
+void check_negative_sized_VLA_6() {
   unsigned char x = -1;
   int vla[x]; // no-warning
 }
 
-void check_negative_sized_VLA_7(void) {
+void check_negative_sized_VLA_7() {
   signed char x = -1;
   int vla[x + 2]; // no-warning
 }
 
-void check_negative_sized_VLA_8(void) {
+void check_negative_sized_VLA_8() {
   signed char x = 1;
   int vla[x - 2]; // expected-warning{{Declared variable-length array (VLA) has negative size}}
 }
 
-void check_negative_sized_VLA_9(void) {
+void check_negative_sized_VLA_9() {
   int x = 1;
   int vla[x]; // no-warning
 }
@@ -89,12 +89,12 @@ void check_negative_sized_VLA_11(short x) {
     check_negative_sized_VLA_11_sub(x);
 }
 
-void check_VLA_typedef(void) {
+void check_VLA_typedef() {
   int x = -1;
   typedef int VLA[x]; // expected-warning{{Declared variable-length array (VLA) has negative size}}
 }
 
-size_t check_VLA_sizeof(void) {
+size_t check_VLA_sizeof() {
   int x = -1;
   size_t s = sizeof(int[x]); // expected-warning{{Declared variable-length array (VLA) has negative size}}
   return s;
@@ -118,7 +118,7 @@ void check_zero_sized_VLA_multi2(int x, int y) {
 
 // Check the extent.
 
-void check_VLA_extent(void) {
+void check_VLA_extent() {
   int x = 3;
 
   int vla1[x];
@@ -143,7 +143,7 @@ void check_VLA_extent(void) {
 // Just don't crash.
 extern void foo(void);
 int a;
-void b(void) {
+void b() {
   int c = a + 1;
   for (;;) {
     int d[c];

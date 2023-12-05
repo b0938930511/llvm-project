@@ -32,12 +32,14 @@ public:
 
   static lldb::ScriptInterpreterSP CreateInstance(Debugger &debugger);
 
-  static llvm::StringRef GetPluginNameStatic() { return "script-none"; }
+  static lldb_private::ConstString GetPluginNameStatic();
 
-  static llvm::StringRef GetPluginDescriptionStatic();
+  static const char *GetPluginDescriptionStatic();
 
   // PluginInterface protocol
-  llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
+  lldb_private::ConstString GetPluginName() override;
+
+  uint32_t GetPluginVersion() override;
 };
 
 } // namespace lldb_private

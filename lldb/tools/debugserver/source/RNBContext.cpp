@@ -24,7 +24,6 @@
 #include "DNB.h"
 #include "DNBLog.h"
 #include "RNBRemote.h"
-#include "MacOSX/MachException.h"
 
 // Destructor
 RNBContext::~RNBContext() { SetProcessID(INVALID_NUB_PROCESS); }
@@ -286,18 +285,4 @@ const char *RNBContext::LaunchStatusAsString(std::string &s) {
 bool RNBContext::ProcessStateRunning() const {
   nub_state_t pid_state = DNBProcessGetState(m_pid);
   return pid_state == eStateRunning || pid_state == eStateStepping;
-}
-
-bool RNBContext::AddIgnoredException(const char *exception_name) {
-  exception_mask_t exc_mask = MachException::ExceptionMask(exception_name);
-  if (exc_mask == 0)
-    return false;
-  m_ignored_exceptions.push_back(exc_mask);
-  return true;
-}
-
-void RNBContext::AddDefaultIgnoredExceptions() {
-  m_ignored_exceptions.push_back(EXC_MASK_BAD_ACCESS);
-  m_ignored_exceptions.push_back(EXC_MASK_BAD_INSTRUCTION);
-  m_ignored_exceptions.push_back(EXC_MASK_ARITHMETIC);
 }

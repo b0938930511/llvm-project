@@ -6,4 +6,4 @@ clrex:
 clrex
 
 @ CHECK-LABEL: clrex
-@ CHECK: f57ff01f    clrex
+@ CHECK: 1f f0 7f f5 clrex

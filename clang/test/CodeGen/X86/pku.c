@@ -3,7 +3,7 @@
 
 #include <immintrin.h>
 
-unsigned int test_rdpkru_u32(void) {
+unsigned int test_rdpkru_u32() {
   // CHECK-LABEL: @test_rdpkru_u32
   // CHECK: @llvm.x86.rdpkru
   return _rdpkru_u32(); 

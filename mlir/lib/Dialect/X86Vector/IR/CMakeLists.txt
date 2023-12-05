@@ -1,4 +1,4 @@
-add_mlir_dialect_library(MLIRX86VectorDialect
+add_mlir_dialect_library(MLIRX86Vector
   X86VectorDialect.cpp
 
   ADDITIONAL_HEADER_DIRS
@@ -9,6 +9,6 @@ add_mlir_dialect_library(MLIRX86VectorDialect
 
   LINK_LIBS PUBLIC
   MLIRIR
-  MLIRLLVMDialect
+  MLIRLLVMIR
   MLIRSideEffectInterfaces
   )

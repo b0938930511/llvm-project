@@ -22,9 +22,10 @@
 #ifndef LLVM_LIB_TRANSFORMS_OBJCARC_OBJCARC_H
 #define LLVM_LIB_TRANSFORMS_OBJCARC_OBJCARC_H
 
+#include "ARCRuntimeEntryPoints.h"
+#include "llvm/Analysis/EHPersonalities.h"
 #include "llvm/Analysis/ObjCARCAnalysisUtils.h"
 #include "llvm/Analysis/ObjCARCUtil.h"
-#include "llvm/IR/EHPersonalities.h"
 #include "llvm/Transforms/Utils/Local.h"
 
 namespace llvm {
@@ -104,7 +105,8 @@ CallInst *createCallInstWithColors(
 
 class BundledRetainClaimRVs {
 public:
-  BundledRetainClaimRVs(bool ContractPass) : ContractPass(ContractPass) {}
+  BundledRetainClaimRVs(ARCRuntimeEntryPoints &P, bool ContractPass)
+      : EP(P), ContractPass(ContractPass) {}
   ~BundledRetainClaimRVs();
 
   /// Insert a retainRV/claimRV call to the normal destination blocks of invokes
@@ -132,8 +134,8 @@ public:
     auto It = RVCalls.find(CI);
     if (It != RVCalls.end()) {
       // Remove call to @llvm.objc.clang.arc.noop.use.
-      for (User *U : It->second->users())
-        if (auto *CI = dyn_cast<CallInst>(U))
+      for (auto U = It->second->user_begin(), E = It->second->user_end(); U != E; ++U)
+        if (auto *CI = dyn_cast<CallInst>(*U))
           if (CI->getIntrinsicID() == Intrinsic::objc_clang_arc_noop_use) {
             CI->eraseFromParent();
             break;
@@ -153,6 +155,7 @@ private:
   /// A map of inserted retainRV/claimRV calls to annotated calls/invokes.
   DenseMap<CallInst *, CallBase *> RVCalls;
 
+  ARCRuntimeEntryPoints &EP;
   bool ContractPass;
 };
 

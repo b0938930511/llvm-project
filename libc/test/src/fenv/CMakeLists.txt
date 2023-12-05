@@ -1,4 +1,4 @@
-add_custom_target(libc_fenv_unittests)
+add_libc_testsuite(libc_fenv_unittests)
 
 add_libc_unittest(
   rounding_mode_test
@@ -21,7 +21,7 @@ add_libc_unittest(
     libc.src.fenv.feclearexcept
     libc.src.fenv.feraiseexcept
     libc.src.fenv.fetestexcept
-    libc.src.__support.FPUtil.fenv_impl
+    libc.utils.FPUtil.fputil
 )
 
 add_libc_unittest(
@@ -32,10 +32,8 @@ add_libc_unittest(
     getenv_and_setenv_test.cpp
   DEPENDS
     libc.src.fenv.fegetenv
-    libc.src.fenv.fegetround
     libc.src.fenv.fesetenv
-    libc.src.fenv.fesetround
-    libc.src.__support.FPUtil.fenv_impl
+    libc.utils.FPUtil.fputil
 )
 
 add_libc_unittest(
@@ -47,7 +45,7 @@ add_libc_unittest(
   DEPENDS
     libc.src.fenv.fegetexceptflag
     libc.src.fenv.fesetexceptflag
-    libc.src.__support.FPUtil.fenv_impl
+    libc.utils.FPUtil.fputil
 )
 
 add_libc_unittest(
@@ -59,7 +57,7 @@ add_libc_unittest(
   DEPENDS
     libc.include.signal
     libc.src.fenv.feupdateenv
-    libc.src.__support.FPUtil.fenv_impl
+    libc.utils.FPUtil.fputil
 )
 
 add_libc_unittest(
@@ -70,31 +68,16 @@ add_libc_unittest(
     feclearexcept_test.cpp
   DEPENDS
     libc.src.fenv.feclearexcept
-    libc.src.__support.FPUtil.fenv_impl
+    libc.utils.FPUtil.fputil
 )
 
-add_libc_unittest(
-  feenableexcept_test
-  SUITE
-    libc_fenv_unittests
-  SRCS
-    feenableexcept_test.cpp
-  DEPENDS
-    libc.src.fenv.fedisableexcept
-    libc.src.fenv.feenableexcept
-    libc.src.fenv.fegetexcept
-)
-
-if (NOT (LLVM_USE_SANITIZER OR (${LIBC_TARGET_OS} STREQUAL "windows")
-         OR (${LIBC_TARGET_OS} STREQUAL "darwin")))
+if (NOT (LLVM_USE_SANITIZER OR (${LIBC_TARGET_OS} STREQUAL "windows")))
   # Sanitizers don't like SIGFPE. So, we will run the 
   # tests which raise SIGFPE only in non-sanitizer builds.
-  # The tests are also disabled for Windows and MacOS as they fail currently.
-  # TODO: Investigate and fix the windows failures and enable them for Windows
-  # and MacOS.
+  # The tests are also disabled for Windows as they fail currently.
+  # TODO: Investigate and fix the windows failures and enable them for Windows.
   add_fp_unittest(
     enabled_exceptions_test
-    UNIT_TEST_ONLY
     SUITE
       libc_fenv_unittests
     SRCS
@@ -104,14 +87,11 @@ if (NOT (LLVM_USE_SANITIZER OR (${LIBC_TARGET_OS} STREQUAL "windows")
       libc.src.fenv.feclearexcept
       libc.src.fenv.feraiseexcept
       libc.src.fenv.fetestexcept
-      libc.src.__support.FPUtil.fenv_impl
-    LINK_LIBRARIES
-      LibcFPExceptionHelpers
+      libc.utils.FPUtil.fputil
   )
 
   add_fp_unittest(
     feholdexcept_test
-    UNIT_TEST_ONLY
     SUITE
       libc_fenv_unittests
     SRCS
@@ -119,8 +99,6 @@ if (NOT (LLVM_USE_SANITIZER OR (${LIBC_TARGET_OS} STREQUAL "windows")
     DEPENDS
       libc.include.fenv
       libc.src.fenv.feholdexcept
-      libc.src.__support.FPUtil.fenv_impl
-    LINK_LIBRARIES
-      LibcFPExceptionHelpers
+      libc.utils.FPUtil.fputil
   )
 endif()

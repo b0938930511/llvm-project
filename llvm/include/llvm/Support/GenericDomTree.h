@@ -14,8 +14,7 @@
 ///
 /// Unlike ADT/* graph algorithms, generic dominator tree has more requirements
 /// on the graph's NodeRef. The NodeRef should be a pointer and,
-/// either NodeRef->getParent() must return the parent node that is also a
-/// pointer or DomTreeNodeTraits needs to be specialized.
+/// NodeRef->getParent() must return the parent node that is also a pointer.
 ///
 /// FIXME: Maybe GenericDomTree needs a TreeTraits, instead of GraphTraits.
 ///
@@ -221,20 +220,6 @@ template <typename DomTreeT>
 bool Verify(const DomTreeT &DT, typename DomTreeT::VerificationLevel VL);
 }  // namespace DomTreeBuilder
 
-/// Default DomTreeNode traits for NodeT. The default implementation assume a
-/// Function-like NodeT. Can be specialized to support different node types.
-template <typename NodeT> struct DomTreeNodeTraits {
-  using NodeType = NodeT;
-  using NodePtr = NodeT *;
-  using ParentPtr = decltype(std::declval<NodePtr>()->getParent());
-  static_assert(std::is_pointer_v<ParentPtr>,
-                "Currently NodeT's parent must be a pointer type");
-  using ParentType = std::remove_pointer_t<ParentPtr>;
-
-  static NodeT *getEntryNode(ParentPtr Parent) { return &Parent->front(); }
-  static ParentPtr getParent(NodePtr BB) { return BB->getParent(); }
-};
-
 /// Core dominator tree base class.
 ///
 /// This class is a generic template over graph nodes. It is instantiated for
@@ -242,13 +227,12 @@ template <typename NodeT> struct DomTreeNodeTraits {
 template <typename NodeT, bool IsPostDom>
 class DominatorTreeBase {
  public:
-  static_assert(std::is_pointer_v<typename GraphTraits<NodeT *>::NodeRef>,
+  static_assert(std::is_pointer<typename GraphTraits<NodeT *>::NodeRef>::value,
                 "Currently DominatorTreeBase supports only pointer nodes");
-  using NodeTrait = DomTreeNodeTraits<NodeT>;
-  using NodeType = typename NodeTrait::NodeType;
-  using NodePtr = typename NodeTrait::NodePtr;
-  using ParentPtr = typename NodeTrait::ParentPtr;
-  static_assert(std::is_pointer_v<ParentPtr>,
+  using NodeType = NodeT;
+  using NodePtr = NodeT *;
+  using ParentPtr = decltype(std::declval<NodeT *>()->getParent());
+  static_assert(std::is_pointer<ParentPtr>::value,
                 "Currently NodeT's parent must be a pointer type");
   using ParentType = std::remove_pointer_t<ParentPtr>;
   static constexpr bool IsPostDominator = IsPostDom;
@@ -276,7 +260,7 @@ protected:
   friend struct DomTreeBuilder::SemiNCAInfo<DominatorTreeBase>;
 
  public:
-  DominatorTreeBase() = default;
+  DominatorTreeBase() {}
 
   DominatorTreeBase(DominatorTreeBase &&Arg)
       : Roots(std::move(Arg.Roots)),
@@ -483,14 +467,13 @@ protected:
   /// must have tree nodes.
   NodeT *findNearestCommonDominator(NodeT *A, NodeT *B) const {
     assert(A && B && "Pointers are not valid");
-    assert(NodeTrait::getParent(A) == NodeTrait::getParent(B) &&
+    assert(A->getParent() == B->getParent() &&
            "Two blocks are not in same function");
 
     // If either A or B is a entry block then it is nearest common dominator
     // (for forward-dominators).
     if (!isPostDominator()) {
-      NodeT &Entry =
-          *DomTreeNodeTraits<NodeT>::getEntryNode(NodeTrait::getParent(A));
+      NodeT &Entry = A->getParent()->front();
       if (A == &Entry || B == &Entry)
         return &Entry;
     }
@@ -545,9 +528,9 @@ protected:
   /// of CFG edges must not delete the CFG nodes before calling this function.
   ///
   /// The applyUpdates function can reorder the updates and remove redundant
-  /// ones internally (as long as it is done in a deterministic fashion). The
-  /// batch updater is also able to detect sequences of zero and exactly one
-  /// update -- it's optimized to do less work in these cases.
+  /// ones internally. The batch updater is also able to detect sequences of
+  /// zero and exactly one update -- it's optimized to do less work in these
+  /// cases.
   ///
   /// Note that for postdominators it automatically takes care of applying
   /// updates on reverse edges internally (so there's no need to swap the
@@ -555,8 +538,8 @@ protected:
   /// The type of updates is the same for DomTreeBase<T> and PostDomTreeBase<T>
   /// with the same template parameter T.
   ///
-  /// \param Updates An ordered sequence of updates to perform. The current CFG
-  /// and the reverse of these updates provides the pre-view of the CFG.
+  /// \param Updates An unordered sequence of updates to perform. The current
+  /// CFG and the reverse of these updates provides the pre-view of the CFG.
   ///
   void applyUpdates(ArrayRef<UpdateType> Updates) {
     GraphDiff<NodePtr, IsPostDominator> PreViewCFG(
@@ -564,9 +547,9 @@ protected:
     DomTreeBuilder::ApplyUpdates(*this, PreViewCFG, nullptr);
   }
 
-  /// \param Updates An ordered sequence of updates to perform. The current CFG
-  /// and the reverse of these updates provides the pre-view of the CFG.
-  /// \param PostViewUpdates An ordered sequence of update to perform in order
+  /// \param Updates An unordered sequence of updates to perform. The current
+  /// CFG and the reverse of these updates provides the pre-view of the CFG.
+  /// \param PostViewUpdates An unordered sequence of update to perform in order
   /// to obtain a post-view of the CFG. The DT will be updated assuming the
   /// obtained PostViewCFG is the desired end state.
   void applyUpdates(ArrayRef<UpdateType> Updates,
@@ -601,8 +584,8 @@ protected:
   void insertEdge(NodeT *From, NodeT *To) {
     assert(From);
     assert(To);
-    assert(NodeTrait::getParent(From) == Parent);
-    assert(NodeTrait::getParent(To) == Parent);
+    assert(From->getParent() == Parent);
+    assert(To->getParent() == Parent);
     DomTreeBuilder::InsertEdge(*this, From, To);
   }
 
@@ -619,8 +602,8 @@ protected:
   void deleteEdge(NodeT *From, NodeT *To) {
     assert(From);
     assert(To);
-    assert(NodeTrait::getParent(From) == Parent);
-    assert(NodeTrait::getParent(To) == Parent);
+    assert(From->getParent() == Parent);
+    assert(To->getParent() == Parent);
     DomTreeBuilder::DeleteEdge(*this, From, To);
   }
 
@@ -860,7 +843,7 @@ protected:
     assert(!PredBlocks.empty() && "No predblocks?");
 
     bool NewBBDominatesNewBBSucc = true;
-    for (auto *Pred : children<Inverse<N>>(NewBBSucc)) {
+    for (auto Pred : children<Inverse<N>>(NewBBSucc)) {
       if (Pred != NewBB && !dominates(NewBBSucc, Pred) &&
           isReachableFromEntry(Pred)) {
         NewBBDominatesNewBBSucc = false;

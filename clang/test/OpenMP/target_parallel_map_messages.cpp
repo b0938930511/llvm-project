@@ -1,12 +1,10 @@
-// RUN: %clang_cc1 -verify=expected,lt50,lt51 -fopenmp -fno-openmp-extensions -fopenmp-version=45 -ferror-limit 100 %s -Wno-openmp-mapping -Wuninitialized
-// RUN: %clang_cc1 -verify=expected,ge50,lt51 -fopenmp -fno-openmp-extensions -fopenmp-version=50 -ferror-limit 100 %s -Wno-openmp-mapping -Wuninitialized
-// RUN: %clang_cc1 -verify=expected,ge50,ge51 -fopenmp -fno-openmp-extensions -ferror-limit 100 %s -Wno-openmp-mapping -Wuninitialized
-// RUN: %clang_cc1 -verify=expected,ge50,lt51,omp52 -fopenmp -fno-openmp-extensions -fopenmp-version=52 -ferror-limit 100 %s -Wno-openmp-mapping -Wuninitialized
+// RUN: %clang_cc1 -verify=expected,lt50,lt51 -fopenmp -fopenmp-version=45 -ferror-limit 100 %s -Wno-openmp-mapping -Wuninitialized
+// RUN: %clang_cc1 -verify=expected,ge50,lt51 -fopenmp -fopenmp-version=50 -ferror-limit 100 %s -Wno-openmp-mapping -Wuninitialized
+// RUN: %clang_cc1 -verify=expected,ge50,ge51 -fopenmp -fopenmp-version=51 -ferror-limit 100 %s -Wno-openmp-mapping -Wuninitialized
 
-// RUN: %clang_cc1 -verify=expected,lt50,lt51 -fopenmp-simd -fno-openmp-extensions -fopenmp-version=45 -ferror-limit 100 %s -Wno-openmp-mapping -Wuninitialized
-// RUN: %clang_cc1 -verify=expected,ge50,lt51 -fopenmp-simd -fno-openmp-extensions -fopenmp-version=50 -ferror-limit 100 %s -Wno-openmp-mapping -Wuninitialized
-// RUN: %clang_cc1 -verify=expected,ge50,ge51 -fopenmp-simd -fno-openmp-extensions -ferror-limit 100 %s -Wno-openmp-mapping -Wuninitialized
-// RUN: %clang_cc1 -verify=expected,ge50,lt51,omp52 -fopenmp-simd -fno-openmp-extensions -fopenmp-version=52 -ferror-limit 100 %s -Wno-openmp-mapping -Wuninitialized
+// RUN: %clang_cc1 -verify=expected,lt50,lt51 -fopenmp-simd -fopenmp-version=45 -ferror-limit 100 %s -Wno-openmp-mapping -Wuninitialized
+// RUN: %clang_cc1 -verify=expected,ge50,lt51 -fopenmp-simd -fopenmp-version=50 -ferror-limit 100 %s -Wno-openmp-mapping -Wuninitialized
+// RUN: %clang_cc1 -verify=expected,ge50,ge51 -fopenmp-simd -fopenmp-version=51 -ferror-limit 100 %s -Wno-openmp-mapping -Wuninitialized
 
 void foo() {
 }
@@ -183,8 +181,8 @@ T tmain(T argc) {
   foo();
 #pragma omp target parallel map(always: x) // expected-error {{missing map type}}
   foo();
-// ge51-error@+3 {{incorrect map type modifier, expected one of: 'always', 'close', 'mapper', 'present'}}
-// lt51-error@+2 {{incorrect map type modifier, expected one of: 'always', 'close', 'mapper'}}
+// ge51-error@+3 {{incorrect map type modifier, expected 'always', 'close', 'mapper', or 'present'}}
+// lt51-error@+2 {{incorrect map type modifier, expected 'always', 'close', or 'mapper'}}
 // expected-error@+1 {{missing map type}}
 #pragma omp target parallel map(tofrom, always: x)
   foo();
@@ -298,14 +296,12 @@ int main(int argc, char **argv) {
   foo();
 #pragma omp target parallel map(always: x) // expected-error {{missing map type}}
   foo();
-// ge51-error@+3 {{incorrect map type modifier, expected one of: 'always', 'close', 'mapper', 'present'}}
-// lt51-error@+2 {{incorrect map type modifier, expected one of: 'always', 'close', 'mapper'}}
+// ge51-error@+3 {{incorrect map type modifier, expected 'always', 'close', 'mapper', or 'present'}}
+// lt51-error@+2 {{incorrect map type modifier, expected 'always', 'close', or 'mapper'}}
 // expected-error@+1 {{missing map type}}
 #pragma omp target parallel map(tofrom, always: x)
   foo();
 #pragma omp target parallel map(always, tofrom: always, tofrom, x)
-  foo();
-#pragma omp target parallel map(always tofrom: x) // omp52-error {{missing ',' after map type modifier}}
   foo();
 #pragma omp target parallel map(tofrom j) // expected-error {{expected ',' or ')' in 'map' clause}}
   foo();

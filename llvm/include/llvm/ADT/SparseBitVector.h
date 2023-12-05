@@ -5,11 +5,10 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-///
-/// \file
-/// This file defines the SparseBitVector class.  See the doxygen comment for
-/// SparseBitVector for more details on the algorithm used.
-///
+//
+// This file defines the SparseBitVector class.  See the doxygen comment for
+// SparseBitVector for more details on the algorithm used.
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef LLVM_ADT_SPARSEBITVECTOR_H
@@ -120,7 +119,7 @@ public:
   size_type count() const {
     unsigned NumBits = 0;
     for (unsigned i = 0; i < BITWORDS_PER_ELEMENT; ++i)
-      NumBits += llvm::popcount(Bits[i]);
+      NumBits += countPopulation(Bits[i]);
     return NumBits;
   }
 
@@ -128,7 +127,7 @@ public:
   int find_first() const {
     for (unsigned i = 0; i < BITWORDS_PER_ELEMENT; ++i)
       if (Bits[i] != 0)
-        return i * BITWORD_SIZE + llvm::countr_zero(Bits[i]);
+        return i * BITWORD_SIZE + countTrailingZeros(Bits[i]);
     llvm_unreachable("Illegal empty element");
   }
 
@@ -138,7 +137,7 @@ public:
       unsigned Idx = BITWORDS_PER_ELEMENT - I - 1;
       if (Bits[Idx] != 0)
         return Idx * BITWORD_SIZE + BITWORD_SIZE -
-               llvm::countl_zero(Bits[Idx]) - 1;
+               countLeadingZeros(Bits[Idx]) - 1;
     }
     llvm_unreachable("Illegal empty element");
   }
@@ -159,12 +158,12 @@ public:
     Copy &= ~0UL << BitPos;
 
     if (Copy != 0)
-      return WordPos * BITWORD_SIZE + llvm::countr_zero(Copy);
+      return WordPos * BITWORD_SIZE + countTrailingZeros(Copy);
 
     // Check subsequent words.
     for (unsigned i = WordPos+1; i < BITWORDS_PER_ELEMENT; ++i)
       if (Bits[i] != 0)
-        return i * BITWORD_SIZE + llvm::countr_zero(Bits[i]);
+        return i * BITWORD_SIZE + countTrailingZeros(Bits[i]);
     return -1;
   }
 

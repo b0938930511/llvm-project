@@ -2,8 +2,8 @@
 
 // RUN: %clang_cc1 -triple x86_64-macho -emit-llvm %s -o %t
 
-// Check that the backing store of CFStrings are constant with the
-// -fwritable-strings flag.
+// <rdar://problem/10657500>: Check that the backing store of CFStrings are
+// constant with the -fwritable-strings flag.
 //
 // RUN: %clang_cc1 -triple x86_64-macho -fwritable-strings -emit-llvm %s -o - | FileCheck %s
 //
@@ -13,12 +13,13 @@
 
 #define CFSTR __builtin___CFStringMakeConstantString
 
-void f(void) {
+void f() {
   CFSTR("Hello, World!");
 }
 
+// rdar://6248329
 void *G = CFSTR("yo joe");
 
-void h(void) {
+void h() {
   static void* h = CFSTR("Goodbye, World!");
 }

@@ -12,8 +12,6 @@
 
 // int max_length() const throw();
 
-// XFAIL: no-wide-characters
-
 #include <locale>
 #include <cassert>
 

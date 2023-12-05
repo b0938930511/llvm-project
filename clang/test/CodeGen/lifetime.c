@@ -1,21 +1,24 @@
-// RUN: %clang -S -emit-llvm -o - -O0 %s | FileCheck %s --implicit-check-not="call void @llvm.lifetime" -check-prefixes=CHECK
-// RUN: %clang -S -emit-llvm -o - -O1 %s | FileCheck %s --implicit-check-not="call void @llvm.lifetime" -check-prefixes=CHECK,LIFETIME
-// RUN: %clang -S -emit-llvm -o - -O2 %s | FileCheck %s --implicit-check-not="call void @llvm.lifetime" -check-prefixes=CHECK,LIFETIME
-// RUN: %clang -S -emit-llvm -o - -O3 %s | FileCheck %s --implicit-check-not="call void @llvm.lifetime" -check-prefixes=CHECK,LIFETIME
+// RUN: %clang -S -emit-llvm -o - -O0 -fno-experimental-new-pass-manager %s | FileCheck %s -check-prefix=O0
+// RUN: %clang -S -emit-llvm -o - -O1 -fno-experimental-new-pass-manager %s | FileCheck %s -check-prefix=O1
+// RUN: %clang -S -emit-llvm -o - -O2 -fno-experimental-new-pass-manager %s | FileCheck %s -check-prefix=O2
+// RUN: %clang -S -emit-llvm -o - -O3 -fno-experimental-new-pass-manager %s | FileCheck %s -check-prefix=O3
+// RUN: %clang -S -emit-llvm -o - -O0 -fexperimental-new-pass-manager %s | FileCheck %s -check-prefix=O0
 
 extern void use(char *a);
 
-// CHECK-LABEL: @helper_no_markers
-__attribute__((always_inline)) void helper_no_markers(void) {
+__attribute__((always_inline)) void helper_no_markers() {
   char a;
-  // LIFETIME: call void @llvm.lifetime.start.p0(i64 1,
   use(&a);
-  // LIFETIME: call void @llvm.lifetime.end.p0(i64 1,
 }
 
-// CHECK-LABEL: @lifetime_test
-void lifetime_test(void) {
-// LIFETIME: call void @llvm.lifetime.start.p0(i64 1,
+void lifetime_test() {
+// O0: lifetime_test
+// O1: lifetime_test
+// O2: lifetime_test
+// O3: lifetime_test
+// O0-NOT: @llvm.lifetime.start
+// O1: @llvm.lifetime.start
+// O2: @llvm.lifetime.start
+// O3: @llvm.lifetime.start
   helper_no_markers();
-// LIFETIME: call void @llvm.lifetime.end.p0(i64 1,
 }

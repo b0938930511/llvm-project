@@ -8,17 +8,17 @@
 long long buf[2];
 volatile int nreport;
 
-__attribute__((disable_sanitizer_instrumentation)) void
-__sanitizer_report_error_summary(const char *summary) {
+void __sanitizer_report_error_summary(const char *summary) {
   nreport++;
 }
 
 const int kEventPCBits = 61;
 
-extern "C" __attribute__((disable_sanitizer_instrumentation)) bool
-__tsan_symbolize_external(unsigned long pc, char *func_buf,
-                          unsigned long func_siz, char *file_buf,
-                          unsigned long file_siz, int *line, int *col) {
+extern "C" bool __tsan_symbolize_external(unsigned long pc, char *func_buf,
+                                          unsigned long func_siz,
+                                          char *file_buf,
+                                          unsigned long file_siz, int *line,
+                                          int *col) {
   if (pc >> kEventPCBits) {
     printf("bad PC passed to __tsan_symbolize_external: %lx\n", pc);
     _exit(1);
@@ -44,8 +44,9 @@ int main() {
 
 // CHECK: WARNING: ThreadSanitizer: data race
 // CHECK:   Write of size 8 at {{.*}} by thread T1:
-// CHECK:     #0 {{.*}}memset
+// CHECK:     #0 memset
 // CHECK:     #{{[12]}} Thread
 // CHECK-NOT: bad PC passed to __tsan_symbolize_external
-// CHECK-NOT: __sanitizer_report_error_summary
-// CHECK-NOT: WARNING: ThreadSanitizer: data race
+// CHECK: WARNING: ThreadSanitizer: data race
+// CHECK:   Write of size 8 at {{.*}} by thread T1:
+// CHECK:     #0 Thread

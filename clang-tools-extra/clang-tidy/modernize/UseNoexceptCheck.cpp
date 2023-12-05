@@ -12,7 +12,9 @@
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::modernize {
+namespace clang {
+namespace tidy {
+namespace modernize {
 
 namespace {
 AST_MATCHER(NamedDecl, isValid) { return !Node.isInvalidDecl(); }
@@ -63,7 +65,7 @@ void UseNoexceptCheck::check(const MatchFinder::MatchResult &Result) {
   } else if (const auto *ParmDecl =
                  Result.Nodes.getNodeAs<ParmVarDecl>("parmVarDecl")) {
     FnTy = ParmDecl->getType()
-               ->castAs<Type>()
+               ->getAs<Type>()
                ->getPointeeType()
                ->getAs<FunctionProtoType>();
 
@@ -87,10 +89,12 @@ void UseNoexceptCheck::check(const MatchFinder::MatchResult &Result) {
 
   bool IsNoThrow = FnTy->isNothrow();
   StringRef ReplacementStr =
-      IsNoThrow ? NoexceptMacro.empty() ? "noexcept" : NoexceptMacro
-      : NoexceptMacro.empty()
-          ? (DtorOrOperatorDel || UseNoexceptFalse) ? "noexcept(false)" : ""
-          : "";
+      IsNoThrow
+          ? NoexceptMacro.empty() ? "noexcept" : NoexceptMacro.c_str()
+          : NoexceptMacro.empty()
+                ? (DtorOrOperatorDel || UseNoexceptFalse) ? "noexcept(false)"
+                                                          : ""
+                : "";
 
   FixItHint FixIt;
   if ((IsNoThrow || NoexceptMacro.empty()) && CRange.isValid())
@@ -103,4 +107,6 @@ void UseNoexceptCheck::check(const MatchFinder::MatchResult &Result) {
       << ReplacementStr.empty() << ReplacementStr << FixIt;
 }
 
-} // namespace clang::tidy::modernize
+} // namespace modernize
+} // namespace tidy
+} // namespace clang

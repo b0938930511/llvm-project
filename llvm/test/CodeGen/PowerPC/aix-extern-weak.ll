@@ -1,35 +1,34 @@
 ; RUN: llc -verify-machineinstrs -mtriple powerpc-ibm-aix-xcoff -mcpu=pwr4 \
-; RUN:   -mattr=-altivec -data-sections=false -xcoff-traceback-table=false < %s | \
-; RUN:   FileCheck --check-prefixes=COMMON,BIT32 %s
+; RUN: -mattr=-altivec -data-sections=false -xcoff-traceback-table=false < %s | FileCheck --check-prefixes=COMMON,BIT32 %s
 
 ; RUN: llc -verify-machineinstrs -mtriple powerpc64-ibm-aix-xcoff -mcpu=pwr4 \
-; RUN:   -mattr=-altivec -data-sections=false -xcoff-traceback-table=false < %s | \
-; RUN:   FileCheck --check-prefixes=COMMON,BIT64 %s
+; RUN: -mattr=-altivec -data-sections=false -xcoff-traceback-table=false < %s | FileCheck --check-prefixes=COMMON,BIT64 %s
 
 ; RUN: llc -verify-machineinstrs -mtriple powerpc-ibm-aix-xcoff -mcpu=pwr4 \
-; RUN:   -mattr=-altivec -data-sections=false -xcoff-traceback-table=false \
-; RUN:   -filetype=obj -o %t.o < %s
-; RUN: llvm-readobj --symbols %t.o | FileCheck --check-prefixes=CHECKSYM,CHECKSYM32 %s
+; RUN: -mattr=-altivec -data-sections=false -xcoff-traceback-table=false -filetype=obj -o %t.o < %s
+; RUN: llvm-readobj --symbols %t.o | FileCheck --check-prefix=CHECKSYM %s
 
-; RUN: llc -verify-machineinstrs -mtriple powerpc64-ibm-aix-xcoff -mcpu=pwr4 \
-; RUN:   -mattr=-altivec -data-sections=false -xcoff-traceback-table=false \
-; RUN:   -filetype=obj -o %t64.o < %s
-; RUN: llvm-readobj --symbols %t64.o | FileCheck --check-prefixes=CHECKSYM,CHECKSYM64 %s
+; RUN: not --crash llc -verify-machineinstrs -mcpu=pwr4 -mtriple powerpc64-ibm-aix-xcoff \
+; RUN: -mattr=-altivec -data-sections=false -xcoff-traceback-table=false -filetype=obj -o %t.o 2>&1 < %s | \
+; RUN:   FileCheck --check-prefix=XCOFF64 %s
+; XCOFF64: LLVM ERROR: 64-bit XCOFF object files are not supported yet.
 
-@foo_ext_weak_p = global ptr @foo_ext_weak_ref
+
+@foo_ext_weak_p = global void (...)* bitcast (void ()* @foo_ext_weak_ref to void (...)*)
 @b_w = extern_weak global i32
 
 declare extern_weak void @foo_ext_weak_ref()
 
 define i32 @main() {
 entry:
-  %0 = load ptr, ptr @foo_ext_weak_p
-  call void %0()
-  call void @foo_ext_weak(ptr @b_w)
+  %0 = load void (...)*, void (...)** @foo_ext_weak_p
+  %callee.knr.cast = bitcast void (...)* %0 to void ()*
+  call void %callee.knr.cast()
+  call void @foo_ext_weak(i32* @b_w)
   ret i32 0
 }
 
-declare extern_weak void @foo_ext_weak(ptr)
+declare extern_weak void @foo_ext_weak(i32*)
 
 ; COMMON:         .globl	main[DS]                # -- Begin function main
 ; COMMON-NEXT:    .globl	.main
@@ -41,7 +40,7 @@ declare extern_weak void @foo_ext_weak(ptr)
 ; BIT64-NEXT:     .vbyte	8, .main                   # @main
 ; BIT64-NEXT:     .vbyte	8, TOC[TC0]
 ; BIT64-NEXT:     .vbyte	8, 0
-; COMMON-NEXT:    .csect  ..text..[PR]
+; COMMON-NEXT:    .csect  .text[PR]
 ; COMMON-NEXT:    .main:
 
 ; COMMON:         .csect  .data[RW]
@@ -65,12 +64,11 @@ declare extern_weak void @foo_ext_weak(ptr)
 ; CHECKSYM:      Symbols [
 ; CHECKSYM-NEXT:   Symbol {
 ; CHECKSYM-NEXT:     Index: 0
-; CHECKSYM-NEXT:     Name: <stdin>
+; CHECKSYM-NEXT:     Name: .file
 ; CHECKSYM-NEXT:     Value (SymbolTableIndex): 0x0
 ; CHECKSYM-NEXT:     Section: N_DEBUG
-; CHECKSYM-NEXT:     Source Language ID: TB_CPLUSPLUS (0x9)
-; CHECKSYM32-NEXT:   CPU Version ID: TCPU_COM (0x3)
-; CHECKSYM64-NEXT:   CPU Version ID: TCPU_PPC64 (0x2)
+; CHECKSYM-NEXT:     Source Language ID: TB_C (0x0)
+; CHECKSYM-NEXT:     CPU Version ID: 0x0
 ; CHECKSYM-NEXT:     StorageClass: C_FILE (0x67)
 ; CHECKSYM-NEXT:     NumberOfAuxEntries: 0
 ; CHECKSYM-NEXT:   }
@@ -90,9 +88,8 @@ declare extern_weak void @foo_ext_weak(ptr)
 ; CHECKSYM-NEXT:       SymbolAlignmentLog2: 0
 ; CHECKSYM-NEXT:       SymbolType: XTY_ER (0x0)
 ; CHECKSYM-NEXT:       StorageMappingClass: XMC_PR (0x0)
-; CHECKSYM32-NEXT:     StabInfoIndex: 0x0
-; CHECKSYM32-NEXT:     StabSectNum: 0x0
-; CHECKSYM64-NEXT:     Auxiliary Type: AUX_CSECT (0xFB)
+; CHECKSYM-NEXT:       StabInfoIndex: 0x0
+; CHECKSYM-NEXT:       StabSectNum: 0x0
 ; CHECKSYM-NEXT:     }
 ; CHECKSYM-NEXT:   }
 ; CHECKSYM-NEXT:   Symbol {
@@ -111,9 +108,8 @@ declare extern_weak void @foo_ext_weak(ptr)
 ; CHECKSYM-NEXT:       SymbolAlignmentLog2: 0
 ; CHECKSYM-NEXT:       SymbolType: XTY_ER (0x0)
 ; CHECKSYM-NEXT:       StorageMappingClass: XMC_DS (0xA)
-; CHECKSYM32-NEXT:     StabInfoIndex: 0x0
-; CHECKSYM32-NEXT:     StabSectNum: 0x0
-; CHECKSYM64-NEXT:     Auxiliary Type: AUX_CSECT (0xFB)
+; CHECKSYM-NEXT:       StabInfoIndex: 0x0
+; CHECKSYM-NEXT:       StabSectNum: 0x0
 ; CHECKSYM-NEXT:     }
 ; CHECKSYM-NEXT:   }
 ; CHECKSYM-NEXT:   Symbol {
@@ -132,9 +128,8 @@ declare extern_weak void @foo_ext_weak(ptr)
 ; CHECKSYM-NEXT:       SymbolAlignmentLog2: 0
 ; CHECKSYM-NEXT:       SymbolType: XTY_ER (0x0)
 ; CHECKSYM-NEXT:       StorageMappingClass: XMC_UA (0x4)
-; CHECKSYM32-NEXT:     StabInfoIndex: 0x0
-; CHECKSYM32-NEXT:     StabSectNum: 0x0
-; CHECKSYM64-NEXT:     Auxiliary Type: AUX_CSECT (0xFB)
+; CHECKSYM-NEXT:       StabInfoIndex: 0x0
+; CHECKSYM-NEXT:       StabSectNum: 0x0
 ; CHECKSYM-NEXT:     }
 ; CHECKSYM-NEXT:   }
 ; CHECKSYM-NEXT:   Symbol {
@@ -153,9 +148,8 @@ declare extern_weak void @foo_ext_weak(ptr)
 ; CHECKSYM-NEXT:       SymbolAlignmentLog2: 0
 ; CHECKSYM-NEXT:       SymbolType: XTY_ER (0x0)
 ; CHECKSYM-NEXT:       StorageMappingClass: XMC_PR (0x0)
-; CHECKSYM32-NEXT:     StabInfoIndex: 0x0
-; CHECKSYM32-NEXT:     StabSectNum: 0x0
-; CHECKSYM64-NEXT:     Auxiliary Type: AUX_CSECT (0xFB)
+; CHECKSYM-NEXT:       StabInfoIndex: 0x0
+; CHECKSYM-NEXT:       StabSectNum: 0x0
 ; CHECKSYM-NEXT:     }
 ; CHECKSYM-NEXT:   }
 ; CHECKSYM-NEXT:   Symbol {
@@ -174,14 +168,13 @@ declare extern_weak void @foo_ext_weak(ptr)
 ; CHECKSYM-NEXT:       SymbolAlignmentLog2: 0
 ; CHECKSYM-NEXT:       SymbolType: XTY_ER (0x0)
 ; CHECKSYM-NEXT:       StorageMappingClass: XMC_DS (0xA)
-; CHECKSYM32-NEXT:     StabInfoIndex: 0x0
-; CHECKSYM32-NEXT:     StabSectNum: 0x0
-; CHECKSYM64-NEXT:     Auxiliary Type: AUX_CSECT (0xFB)
+; CHECKSYM-NEXT:       StabInfoIndex: 0x0
+; CHECKSYM-NEXT:       StabSectNum: 0x0
 ; CHECKSYM-NEXT:     }
 ; CHECKSYM-NEXT:   }
 ; CHECKSYM-NEXT:   Symbol {
 ; CHECKSYM-NEXT:     Index: [[#Index+10]]
-; CHECKSYM-NEXT:     Name:
+; CHECKSYM-NEXT:     Name: .text
 ; CHECKSYM-NEXT:     Value (RelocatableAddress): 0x0
 ; CHECKSYM-NEXT:     Section: .text
 ; CHECKSYM-NEXT:     Type: 0x0
@@ -192,12 +185,11 @@ declare extern_weak void @foo_ext_weak(ptr)
 ; CHECKSYM-NEXT:       SectionLen: 80
 ; CHECKSYM-NEXT:       ParameterHashIndex: 0x0
 ; CHECKSYM-NEXT:       TypeChkSectNum: 0x0
-; CHECKSYM-NEXT:       SymbolAlignmentLog2: 5
+; CHECKSYM-NEXT:       SymbolAlignmentLog2: 4
 ; CHECKSYM-NEXT:       SymbolType: XTY_SD (0x1)
 ; CHECKSYM-NEXT:       StorageMappingClass: XMC_PR (0x0)
-; CHECKSYM32-NEXT:     StabInfoIndex: 0x0
-; CHECKSYM32-NEXT:     StabSectNum: 0x0
-; CHECKSYM64-NEXT:     Auxiliary Type: AUX_CSECT (0xFB)
+; CHECKSYM-NEXT:       StabInfoIndex: 0x0
+; CHECKSYM-NEXT:       StabSectNum: 0x0
 ; CHECKSYM-NEXT:     }
 ; CHECKSYM-NEXT:   }
 ; CHECKSYM-NEXT:   Symbol {
@@ -216,9 +208,8 @@ declare extern_weak void @foo_ext_weak(ptr)
 ; CHECKSYM-NEXT:       SymbolAlignmentLog2: 0
 ; CHECKSYM-NEXT:       SymbolType: XTY_LD (0x2)
 ; CHECKSYM-NEXT:       StorageMappingClass: XMC_PR (0x0)
-; CHECKSYM32-NEXT:     StabInfoIndex: 0x0
-; CHECKSYM32-NEXT:     StabSectNum: 0x0
-; CHECKSYM64-NEXT:     Auxiliary Type: AUX_CSECT (0xFB)
+; CHECKSYM-NEXT:       StabInfoIndex: 0x0
+; CHECKSYM-NEXT:       StabSectNum: 0x0
 ; CHECKSYM-NEXT:     }
 ; CHECKSYM-NEXT:   }
 ; CHECKSYM-NEXT:   Symbol {
@@ -231,17 +222,14 @@ declare extern_weak void @foo_ext_weak(ptr)
 ; CHECKSYM-NEXT:     NumberOfAuxEntries: 1
 ; CHECKSYM-NEXT:     CSECT Auxiliary Entry {
 ; CHECKSYM-NEXT:       Index: [[#Index+15]]
-; CHECKSYM32-NEXT:     SectionLen: 4
-; CHECKSYM64-NEXT:     SectionLen: 8
+; CHECKSYM-NEXT:       SectionLen: 4
 ; CHECKSYM-NEXT:       ParameterHashIndex: 0x0
 ; CHECKSYM-NEXT:       TypeChkSectNum: 0x0
-; CHECKSYM32-NEXT:     SymbolAlignmentLog2: 2
-; CHECKSYM64-NEXT:     SymbolAlignmentLog2: 3
+; CHECKSYM-NEXT:       SymbolAlignmentLog2: 2
 ; CHECKSYM-NEXT:       SymbolType: XTY_SD (0x1)
 ; CHECKSYM-NEXT:       StorageMappingClass: XMC_RW (0x5)
-; CHECKSYM32-NEXT:     StabInfoIndex: 0x0
-; CHECKSYM32-NEXT:     StabSectNum: 0x0
-; CHECKSYM64-NEXT:     Auxiliary Type: AUX_CSECT (0xFB)
+; CHECKSYM-NEXT:       StabInfoIndex: 0x0
+; CHECKSYM-NEXT:       StabSectNum: 0x0
 ; CHECKSYM-NEXT:     }
 ; CHECKSYM-NEXT:   }
 ; CHECKSYM-NEXT:   Symbol {
@@ -260,40 +248,34 @@ declare extern_weak void @foo_ext_weak(ptr)
 ; CHECKSYM-NEXT:       SymbolAlignmentLog2: 0
 ; CHECKSYM-NEXT:       SymbolType: XTY_LD (0x2)
 ; CHECKSYM-NEXT:       StorageMappingClass: XMC_RW (0x5)
-; CHECKSYM32-NEXT:     StabInfoIndex: 0x0
-; CHECKSYM32-NEXT:     StabSectNum: 0x0
-; CHECKSYM64-NEXT:     Auxiliary Type: AUX_CSECT (0xFB)
+; CHECKSYM-NEXT:       StabInfoIndex: 0x0
+; CHECKSYM-NEXT:       StabSectNum: 0x0
 ; CHECKSYM-NEXT:     }
 ; CHECKSYM-NEXT:   }
 ; CHECKSYM-NEXT:   Symbol {
 ; CHECKSYM-NEXT:     Index: [[#Index+18]]
 ; CHECKSYM-NEXT:     Name: main
-; CHECKSYM32-NEXT:   Value (RelocatableAddress): 0x54
-; CHECKSYM64-NEXT:   Value (RelocatableAddress): 0x58
+; CHECKSYM-NEXT:     Value (RelocatableAddress): 0x54
 ; CHECKSYM-NEXT:     Section: .data
 ; CHECKSYM-NEXT:     Type: 0x0
 ; CHECKSYM-NEXT:     StorageClass: C_EXT (0x2)
 ; CHECKSYM-NEXT:     NumberOfAuxEntries: 1
 ; CHECKSYM-NEXT:     CSECT Auxiliary Entry {
 ; CHECKSYM-NEXT:       Index: [[#Index+19]]
-; CHECKSYM32-NEXT:     SectionLen: 12
-; CHECKSYM64-NEXT:     SectionLen: 24
+; CHECKSYM-NEXT:       SectionLen: 12
 ; CHECKSYM-NEXT:       ParameterHashIndex: 0x0
 ; CHECKSYM-NEXT:       TypeChkSectNum: 0x0
-; CHECKSYM32-NEXT:     SymbolAlignmentLog2: 2
-; CHECKSYM64-NEXT:     SymbolAlignmentLog2: 3
+; CHECKSYM-NEXT:       SymbolAlignmentLog2: 2
 ; CHECKSYM-NEXT:       SymbolType: XTY_SD (0x1)
 ; CHECKSYM-NEXT:       StorageMappingClass: XMC_DS (0xA)
-; CHECKSYM32-NEXT:     StabInfoIndex: 0x0
-; CHECKSYM32-NEXT:     StabSectNum: 0x0
-; CHECKSYM64-NEXT:     Auxiliary Type: AUX_CSECT (0xFB)
+; CHECKSYM-NEXT:       StabInfoIndex: 0x0
+; CHECKSYM-NEXT:       StabSectNum: 0x0
 ; CHECKSYM-NEXT:     }
 ; CHECKSYM-NEXT:   }
 ; CHECKSYM-NEXT:   Symbol {
 ; CHECKSYM-NEXT:     Index: [[#Index+20]]
 ; CHECKSYM-NEXT:     Name: TOC
-; CHECKSYM32-NEXT:   Value (RelocatableAddress): 0x60
-; CHECKSYM64-NEXT:   Value (RelocatableAddress): 0x70
+; CHECKSYM-NEXT:     Value (RelocatableAddress): 0x60
 ; CHECKSYM-NEXT:     Section: .data
 ; CHECKSYM-NEXT:     Type: 0x0
 ; CHECKSYM-NEXT:     StorageClass: C_HIDEXT (0x6B)
@@ -306,57 +288,48 @@ declare extern_weak void @foo_ext_weak(ptr)
 ; CHECKSYM-NEXT:       SymbolAlignmentLog2: 2
 ; CHECKSYM-NEXT:       SymbolType: XTY_SD (0x1)
 ; CHECKSYM-NEXT:       StorageMappingClass: XMC_TC0 (0xF)
-; CHECKSYM32-NEXT:     StabInfoIndex: 0x0
-; CHECKSYM32-NEXT:     StabSectNum: 0x0
-; CHECKSYM64-NEXT:     Auxiliary Type: AUX_CSECT (0xFB)
+; CHECKSYM-NEXT:       StabInfoIndex: 0x0
+; CHECKSYM-NEXT:       StabSectNum: 0x0
 ; CHECKSYM-NEXT:     }
 ; CHECKSYM-NEXT:   }
 ; CHECKSYM-NEXT:   Symbol {
 ; CHECKSYM-NEXT:     Index: [[#Index+22]]
 ; CHECKSYM-NEXT:     Name: foo_ext_weak_p
-; CHECKSYM32-NEXT:   Value (RelocatableAddress): 0x60
-; CHECKSYM64-NEXT:   Value (RelocatableAddress): 0x70
+; CHECKSYM-NEXT:     Value (RelocatableAddress): 0x60
 ; CHECKSYM-NEXT:     Section: .data
 ; CHECKSYM-NEXT:     Type: 0x0
 ; CHECKSYM-NEXT:     StorageClass: C_HIDEXT (0x6B)
 ; CHECKSYM-NEXT:     NumberOfAuxEntries: 1
 ; CHECKSYM-NEXT:     CSECT Auxiliary Entry {
 ; CHECKSYM-NEXT:       Index: [[#Index+23]]
-; CHECKSYM32-NEXT:     SectionLen: 4
-; CHECKSYM64-NEXT:     SectionLen: 8
+; CHECKSYM-NEXT:       SectionLen: 4
 ; CHECKSYM-NEXT:       ParameterHashIndex: 0x0
 ; CHECKSYM-NEXT:       TypeChkSectNum: 0x0
-; CHECKSYM32-NEXT:     SymbolAlignmentLog2: 2
-; CHECKSYM64-NEXT:     SymbolAlignmentLog2: 3
+; CHECKSYM-NEXT:       SymbolAlignmentLog2: 2
 ; CHECKSYM-NEXT:       SymbolType: XTY_SD (0x1)
 ; CHECKSYM-NEXT:       StorageMappingClass: XMC_TC (0x3)
-; CHECKSYM32-NEXT:     StabInfoIndex: 0x0
-; CHECKSYM32-NEXT:     StabSectNum: 0x0
-; CHECKSYM64-NEXT:     Auxiliary Type: AUX_CSECT (0xFB)
+; CHECKSYM-NEXT:       StabInfoIndex: 0x0
+; CHECKSYM-NEXT:       StabSectNum: 0x0
 ; CHECKSYM-NEXT:     }
 ; CHECKSYM-NEXT:   }
 ; CHECKSYM-NEXT:   Symbol {
 ; CHECKSYM-NEXT:     Index: [[#Index+24]]
 ; CHECKSYM-NEXT:     Name: b_w
-; CHECKSYM32-NEXT:   Value (RelocatableAddress): 0x64
-; CHECKSYM64-NEXT:   Value (RelocatableAddress): 0x78
+; CHECKSYM-NEXT:     Value (RelocatableAddress): 0x64
 ; CHECKSYM-NEXT:     Section: .data
 ; CHECKSYM-NEXT:     Type: 0x0
 ; CHECKSYM-NEXT:     StorageClass: C_HIDEXT (0x6B)
 ; CHECKSYM-NEXT:     NumberOfAuxEntries: 1
 ; CHECKSYM-NEXT:     CSECT Auxiliary Entry {
 ; CHECKSYM-NEXT:       Index: [[#Index+25]]
-; CHECKSYM32-NEXT:     SectionLen: 4
-; CHECKSYM64-NEXT:     SectionLen: 8
+; CHECKSYM-NEXT:       SectionLen: 4
 ; CHECKSYM-NEXT:       ParameterHashIndex: 0x0
 ; CHECKSYM-NEXT:       TypeChkSectNum: 0x0
-; CHECKSYM32-NEXT:     SymbolAlignmentLog2: 2
-; CHECKSYM64-NEXT:     SymbolAlignmentLog2: 3
+; CHECKSYM-NEXT:       SymbolAlignmentLog2: 2
 ; CHECKSYM-NEXT:       SymbolType: XTY_SD (0x1)
 ; CHECKSYM-NEXT:       StorageMappingClass: XMC_TC (0x3)
-; CHECKSYM32-NEXT:     StabInfoIndex: 0x0
-; CHECKSYM32-NEXT:     StabSectNum: 0x0
-; CHECKSYM64-NEXT:     Auxiliary Type: AUX_CSECT (0xFB)
+; CHECKSYM-NEXT:       StabInfoIndex: 0x0
+; CHECKSYM-NEXT:       StabSectNum: 0x0
 ; CHECKSYM-NEXT:     }
 ; CHECKSYM-NEXT:   }
 ; CHECKSYM-NEXT: ]

@@ -29,6 +29,7 @@ namespace clang {
   class Type;
 
 namespace CodeGen {
+class CGRecordLayout;
 
 // TBAAAccessKind - A kind of TBAA memory access descriptor.
 enum class TBAAAccessKind : unsigned {

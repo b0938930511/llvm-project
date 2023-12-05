@@ -2,9 +2,9 @@
 
 
 void f(int *);
-int *getMem(void);
+int *getMem();
 
-int main(void) {
+int main() {
     f(getMem());
     return 0;
 }

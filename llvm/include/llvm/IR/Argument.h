@@ -14,6 +14,7 @@
 #define LLVM_IR_ARGUMENT_H
 
 #include "llvm/ADT/Twine.h"
+#include "llvm/ADT/ilist_node.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Value.h"
 
@@ -63,10 +64,6 @@ public:
   /// number of bytes known to be dereferenceable. Otherwise, zero is returned.
   uint64_t getDereferenceableOrNullBytes() const;
 
-  /// If this argument has nofpclass attribute, return the mask representing
-  /// disallowed floating-point values. Otherwise, fcNone is returned.
-  FPClassTest getNoFPClass() const;
-
   /// Return true if this argument has the byval attribute.
   bool hasByValAttr() const;
 
@@ -100,8 +97,7 @@ public:
   /// If this is a byval or inalloca argument, return its alignment.
   /// FIXME: Remove this function once transition to Align is over.
   /// Use getParamAlign() instead.
-  LLVM_DEPRECATED("Use getParamAlign() instead", "getParamAlign")
-  uint64_t getParamAlignment() const;
+  unsigned getParamAlignment() const;
 
   /// If this is a byval or inalloca argument, return its alignment.
   MaybeAlign getParamAlign() const;
@@ -166,7 +162,7 @@ public:
   /// Remove attributes from an argument.
   void removeAttr(Attribute::AttrKind Kind);
 
-  void removeAttrs(const AttributeMask &AM);
+  void removeAttrs(const AttrBuilder &B);
 
   /// Check if an argument has a given attribute.
   bool hasAttribute(Attribute::AttrKind Kind) const;

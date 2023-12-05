@@ -1,7 +1,8 @@
-! RUN: %python %S/test_errors.py %s %flang_fc1
+! RUN: %S/test_errors.sh %s %t %flang_fc1
+! REQUIRES: shell
 subroutine s1
-  !ERROR: Array 'x' without ALLOCATABLE or POINTER attribute must have explicit shape
-  common x(:), y(4), z
+  !ERROR: Array 'z' without ALLOCATABLE or POINTER attribute must have explicit shape
+  common x, y(4), z(:)
 end
 
 subroutine s2
@@ -28,9 +29,9 @@ subroutine s5
 end
 
 function f6(x) result(r)
-  !ERROR: ALLOCATABLE object 'y' may not appear in a COMMON block
   !ERROR: Dummy argument 'x' may not appear in a COMMON block
-  common y,x,z
+  !ERROR: ALLOCATABLE object 'y' may not appear in a COMMON block
+  common x,y,z
   allocatable y
   !ERROR: Function result 'r' may not appear in a COMMON block
   common r
@@ -83,7 +84,7 @@ module m11
   end type
   type(t2) :: x2
   !ERROR: Derived type variable 'x2' may not appear in a COMMON block due to ALLOCATABLE component
-  common /c2/ x2
+  common x2
 end
 
 module m12
@@ -98,7 +99,7 @@ module m12
   end type
   type(t2) :: x2
   !ERROR: Derived type variable 'x2' may not appear in a COMMON block due to component with default initialization
-  common /c3/ x2
+  common x2
 end
 
 subroutine s13

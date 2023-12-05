@@ -14,9 +14,10 @@
 
 extern "C" {
 
-__attribute__((weak)) const char *__scudo_default_options(void);
+__attribute__((weak)) const char *__scudo_default_options();
 
 // Post-allocation & pre-deallocation hooks.
+// They must be thread-safe and not use heap related functions.
 __attribute__((weak)) void __scudo_allocate_hook(void *ptr, size_t size);
 __attribute__((weak)) void __scudo_deallocate_hook(void *ptr);
 
@@ -100,14 +101,14 @@ struct scudo_error_info {
   struct scudo_error_report reports[3];
 };
 
-const char *__scudo_get_stack_depot_addr(void);
-size_t __scudo_get_stack_depot_size(void);
+const char *__scudo_get_stack_depot_addr();
+size_t __scudo_get_stack_depot_size();
 
-const char *__scudo_get_region_info_addr(void);
-size_t __scudo_get_region_info_size(void);
+const char *__scudo_get_region_info_addr();
+size_t __scudo_get_region_info_size();
 
-const char *__scudo_get_ring_buffer_addr(void);
-size_t __scudo_get_ring_buffer_size(void);
+const char *__scudo_get_ring_buffer_addr();
+size_t __scudo_get_ring_buffer_size();
 
 #ifndef M_DECAY_TIME
 #define M_DECAY_TIME -100
@@ -115,10 +116,6 @@ size_t __scudo_get_ring_buffer_size(void);
 
 #ifndef M_PURGE
 #define M_PURGE -101
-#endif
-
-#ifndef M_PURGE_ALL
-#define M_PURGE_ALL -104
 #endif
 
 // Tune the allocator's choice of memory tags to make it more likely that
@@ -156,11 +153,6 @@ size_t __scudo_get_ring_buffer_size(void);
 // Tune for use-after-free.
 #ifndef M_MEMTAG_TUNING_UAF
 #define M_MEMTAG_TUNING_UAF 1
-#endif
-
-// Print internal stats to the log.
-#ifndef M_LOG_STATS
-#define M_LOG_STATS -205
 #endif
 
 } // extern "C"

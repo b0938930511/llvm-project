@@ -11,8 +11,8 @@ add_mlir_library(MLIRRewrite
 
   LINK_LIBS PUBLIC
   MLIRIR
-  MLIRPDLDialect
-  MLIRPDLInterpDialect
+  MLIRPDL
+  MLIRPDLInterp
   MLIRPDLToPDLInterp
   MLIRSideEffectInterfaces
   )

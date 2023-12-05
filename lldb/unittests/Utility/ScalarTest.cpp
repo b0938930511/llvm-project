@@ -15,8 +15,6 @@
 #include "lldb/Utility/StreamString.h"
 #include "llvm/Testing/Support/Error.h"
 
-#include <cmath>
-
 using namespace lldb_private;
 using llvm::APFloat;
 using llvm::APInt;
@@ -241,7 +239,7 @@ TEST(ScalarTest, ExtractBitfield) {
 
 template <typename T> static std::string ScalarGetValue(T value) {
   StreamString stream;
-  Scalar(value).GetValue(stream, false);
+  Scalar(value).GetValue(&stream, false);
   return std::string(stream.GetString());
 }
 

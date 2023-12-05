@@ -23,8 +23,7 @@ class PassRegistry;
 namespace polly {
 llvm::Pass *createPruneUnprofitableWrapperPass();
 
-struct PruneUnprofitablePass final
-    : llvm::PassInfoMixin<PruneUnprofitablePass> {
+struct PruneUnprofitablePass : llvm::PassInfoMixin<PruneUnprofitablePass> {
   PruneUnprofitablePass() {}
 
   llvm::PreservedAnalyses run(Scop &S, ScopAnalysisManager &SAM,

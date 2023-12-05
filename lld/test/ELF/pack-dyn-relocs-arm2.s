@@ -45,7 +45,7 @@
 // CHECK-NEXT: }
 
 // RUN: llvm-readobj -S --dynamic-table %t.exe | FileCheck --check-prefix=HEADER %s
-// HEADER: 0x00000023 RELRSZ 12 (bytes)
+// HEADER: 0x00000023 RELRSZ 0xC
 
 .data
 .align 2

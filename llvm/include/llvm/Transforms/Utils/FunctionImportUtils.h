@@ -130,6 +130,9 @@ bool renameModuleForThinLTO(
     bool ClearDSOLocalOnDeclarations,
     SetVector<GlobalValue *> *GlobalsToImport = nullptr);
 
+/// Compute synthetic function entry counts.
+void computeSyntheticCounts(ModuleSummaryIndex &Index);
+
 } // End llvm namespace
 
 #endif

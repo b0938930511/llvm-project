@@ -13,6 +13,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/BinaryFormat/COFF.h"
 #include "llvm/Object/Binary.h"
@@ -24,8 +25,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
-#include "llvm/Support/MemoryBufferRef.h"
-#include "llvm/TargetParser/Triple.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include <algorithm>
 #include <cassert>
 #include <cinttypes>
@@ -447,8 +447,7 @@ Error COFFObjectFile::initSymbolTablePtr() {
 
   // Check that the string table is null terminated if has any in it.
   if (StringTableSize > 4 && StringTable[StringTableSize - 1] != 0)
-    return createStringError(object_error::parse_failed,
-                             "string table missing null terminator");
+    return errorCodeToError(object_error::parse_failed);
   return Error::success();
 }
 
@@ -470,43 +469,23 @@ Error COFFObjectFile::getVaPtr(uint64_t Addr, uintptr_t &Res) const {
 }
 
 // Returns the file offset for the given RVA.
-Error COFFObjectFile::getRvaPtr(uint32_t Addr, uintptr_t &Res,
-                                const char *ErrorContext) const {
+Error COFFObjectFile::getRvaPtr(uint32_t Addr, uintptr_t &Res) const {
   for (const SectionRef &S : sections()) {
     const coff_section *Section = getCOFFSection(S);
     uint32_t SectionStart = Section->VirtualAddress;
     uint32_t SectionEnd = Section->VirtualAddress + Section->VirtualSize;
     if (SectionStart <= Addr && Addr < SectionEnd) {
-      // A table/directory entry can be pointing to somewhere in a stripped
-      // section, in an object that went through `objcopy --only-keep-debug`.
-      // In this case we don't want to cause the parsing of the object file to
-      // fail, otherwise it will be impossible to use this object as debug info
-      // in LLDB. Return SectionStrippedError here so that
-      // COFFObjectFile::initialize can ignore the error.
-      // Somewhat common binaries may have RVAs pointing outside of the
-      // provided raw data. Instead of rejecting the binaries, just
-      // treat the section as stripped for these purposes.
-      if (Section->SizeOfRawData < Section->VirtualSize &&
-          Addr >= SectionStart + Section->SizeOfRawData) {
-        return make_error<SectionStrippedError>();
-      }
       uint32_t Offset = Addr - SectionStart;
       Res = reinterpret_cast<uintptr_t>(base()) + Section->PointerToRawData +
             Offset;
       return Error::success();
     }
   }
-  if (ErrorContext)
-    return createStringError(object_error::parse_failed,
-                             "RVA 0x%" PRIx32 " for %s not found", Addr,
-                             ErrorContext);
-  return createStringError(object_error::parse_failed,
-                           "RVA 0x%" PRIx32 " not found", Addr);
+  return errorCodeToError(object_error::parse_failed);
 }
 
 Error COFFObjectFile::getRvaAndSizeAsBytes(uint32_t RVA, uint32_t Size,
-                                           ArrayRef<uint8_t> &Contents,
-                                           const char *ErrorContext) const {
+                                           ArrayRef<uint8_t> &Contents) const {
   for (const SectionRef &S : sections()) {
     const coff_section *Section = getCOFFSection(S);
     uint32_t SectionStart = Section->VirtualAddress;
@@ -522,12 +501,7 @@ Error COFFObjectFile::getRvaAndSizeAsBytes(uint32_t RVA, uint32_t Size,
       return Error::success();
     }
   }
-  if (ErrorContext)
-    return createStringError(object_error::parse_failed,
-                             "RVA 0x%" PRIx32 " for %s not found", RVA,
-                             ErrorContext);
-  return createStringError(object_error::parse_failed,
-                           "RVA 0x%" PRIx32 " not found", RVA);
+  return errorCodeToError(object_error::parse_failed);
 }
 
 // Returns hint and name fields, assuming \p Rva is pointing to a Hint/Name
@@ -547,12 +521,11 @@ Error COFFObjectFile::getDebugPDBInfo(const debug_directory *DebugDir,
                                       const codeview::DebugInfo *&PDBInfo,
                                       StringRef &PDBFileName) const {
   ArrayRef<uint8_t> InfoBytes;
-  if (Error E =
-          getRvaAndSizeAsBytes(DebugDir->AddressOfRawData, DebugDir->SizeOfData,
-                               InfoBytes, "PDB info"))
+  if (Error E = getRvaAndSizeAsBytes(
+          DebugDir->AddressOfRawData, DebugDir->SizeOfData, InfoBytes))
     return E;
   if (InfoBytes.size() < sizeof(*PDBInfo) + 1)
-    return createStringError(object_error::parse_failed, "PDB info too small");
+    return errorCodeToError(object_error::parse_failed);
   PDBInfo = reinterpret_cast<const codeview::DebugInfo *>(InfoBytes.data());
   InfoBytes = InfoBytes.drop_front(sizeof(*PDBInfo));
   PDBFileName = StringRef(reinterpret_cast<const char *>(InfoBytes.data()),
@@ -590,7 +563,7 @@ Error COFFObjectFile::initImportTablePtr() {
   // Find the section that contains the RVA. This is needed because the RVA is
   // the import table's memory address which is different from its file offset.
   uintptr_t IntPtr = 0;
-  if (Error E = getRvaPtr(ImportTableRva, IntPtr, "import table"))
+  if (Error E = getRvaPtr(ImportTableRva, IntPtr))
     return E;
   if (Error E = checkOffset(Data, IntPtr, DataEntry->Size))
     return E;
@@ -613,11 +586,8 @@ Error COFFObjectFile::initDelayImportTablePtr() {
       sizeof(delay_import_directory_table_entry) - 1;
 
   uintptr_t IntPtr = 0;
-  if (Error E = getRvaPtr(RVA, IntPtr, "delay import table"))
+  if (Error E = getRvaPtr(RVA, IntPtr))
     return E;
-  if (Error E = checkOffset(Data, IntPtr, DataEntry->Size))
-    return E;
-
   DelayImportDirectory = reinterpret_cast<
       const delay_import_directory_table_entry *>(IntPtr);
   return Error::success();
@@ -637,11 +607,8 @@ Error COFFObjectFile::initExportTablePtr() {
 
   uint32_t ExportTableRva = DataEntry->RelativeVirtualAddress;
   uintptr_t IntPtr = 0;
-  if (Error E = getRvaPtr(ExportTableRva, IntPtr, "export table"))
+  if (Error E = getRvaPtr(ExportTableRva, IntPtr))
     return E;
-  if (Error E = checkOffset(Data, IntPtr, DataEntry->Size))
-    return E;
-
   ExportDirectory =
       reinterpret_cast<const export_directory_table_entry *>(IntPtr);
   return Error::success();
@@ -656,12 +623,8 @@ Error COFFObjectFile::initBaseRelocPtr() {
     return Error::success();
 
   uintptr_t IntPtr = 0;
-  if (Error E = getRvaPtr(DataEntry->RelativeVirtualAddress, IntPtr,
-                          "base reloc table"))
+  if (Error E = getRvaPtr(DataEntry->RelativeVirtualAddress, IntPtr))
     return E;
-  if (Error E = checkOffset(Data, IntPtr, DataEntry->Size))
-    return E;
-
   BaseRelocHeader = reinterpret_cast<const coff_base_reloc_block_header *>(
       IntPtr);
   BaseRelocEnd = reinterpret_cast<coff_base_reloc_block_header *>(
@@ -683,16 +646,11 @@ Error COFFObjectFile::initDebugDirectoryPtr() {
 
   // Check that the size is a multiple of the entry size.
   if (DataEntry->Size % sizeof(debug_directory) != 0)
-    return createStringError(object_error::parse_failed,
-                             "debug directory has uneven size");
+    return errorCodeToError(object_error::parse_failed);
 
   uintptr_t IntPtr = 0;
-  if (Error E = getRvaPtr(DataEntry->RelativeVirtualAddress, IntPtr,
-                          "debug directory"))
+  if (Error E = getRvaPtr(DataEntry->RelativeVirtualAddress, IntPtr))
     return E;
-  if (Error E = checkOffset(Data, IntPtr, DataEntry->Size))
-    return E;
-
   DebugDirectoryBegin = reinterpret_cast<const debug_directory *>(IntPtr);
   DebugDirectoryEnd = reinterpret_cast<const debug_directory *>(
       IntPtr + DataEntry->Size);
@@ -722,10 +680,7 @@ Error COFFObjectFile::initTLSDirectoryPtr() {
         static_cast<uint32_t>(DataEntry->Size), DirSize);
 
   uintptr_t IntPtr = 0;
-  if (Error E =
-          getRvaPtr(DataEntry->RelativeVirtualAddress, IntPtr, "TLS directory"))
-    return E;
-  if (Error E = checkOffset(Data, IntPtr, DataEntry->Size))
+  if (Error E = getRvaPtr(DataEntry->RelativeVirtualAddress, IntPtr))
     return E;
 
   if (is64())
@@ -746,61 +701,10 @@ Error COFFObjectFile::initLoadConfigPtr() {
   if (DataEntry->RelativeVirtualAddress == 0)
     return Error::success();
   uintptr_t IntPtr = 0;
-  if (Error E = getRvaPtr(DataEntry->RelativeVirtualAddress, IntPtr,
-                          "load config table"))
-    return E;
-  if (Error E = checkOffset(Data, IntPtr, DataEntry->Size))
+  if (Error E = getRvaPtr(DataEntry->RelativeVirtualAddress, IntPtr))
     return E;
 
   LoadConfig = (const void *)IntPtr;
-
-  if (is64()) {
-    auto Config = getLoadConfig64();
-    if (Config->Size >=
-            offsetof(coff_load_configuration64, CHPEMetadataPointer) +
-                sizeof(Config->CHPEMetadataPointer) &&
-        Config->CHPEMetadataPointer) {
-      uint64_t ChpeOff = Config->CHPEMetadataPointer;
-      if (Error E =
-              getRvaPtr(ChpeOff - getImageBase(), IntPtr, "CHPE metadata"))
-        return E;
-      if (Error E = checkOffset(Data, IntPtr, sizeof(CHPEMetadata)))
-        return E;
-
-      CHPEMetadata = reinterpret_cast<const chpe_metadata *>(IntPtr);
-
-      // Validate CHPE metadata
-      if (CHPEMetadata->CodeMapCount) {
-        if (Error E = getRvaPtr(CHPEMetadata->CodeMap, IntPtr, "CHPE code map"))
-          return E;
-        if (Error E = checkOffset(Data, IntPtr,
-                                  CHPEMetadata->CodeMapCount *
-                                      sizeof(chpe_range_entry)))
-          return E;
-      }
-
-      if (CHPEMetadata->CodeRangesToEntryPointsCount) {
-        if (Error E = getRvaPtr(CHPEMetadata->CodeRangesToEntryPoints, IntPtr,
-                                "CHPE entry point ranges"))
-          return E;
-        if (Error E = checkOffset(Data, IntPtr,
-                                  CHPEMetadata->CodeRangesToEntryPointsCount *
-                                      sizeof(chpe_code_range_entry)))
-          return E;
-      }
-
-      if (CHPEMetadata->RedirectionMetadataCount) {
-        if (Error E = getRvaPtr(CHPEMetadata->RedirectionMetadata, IntPtr,
-                                "CHPE redirection metadata"))
-          return E;
-        if (Error E = checkOffset(Data, IntPtr,
-                                  CHPEMetadata->RedirectionMetadataCount *
-                                      sizeof(chpe_redirection_entry)))
-          return E;
-      }
-    }
-  }
-
   return Error::success();
 }
 
@@ -822,14 +726,6 @@ COFFObjectFile::COFFObjectFile(MemoryBufferRef Object)
       BaseRelocHeader(nullptr), BaseRelocEnd(nullptr),
       DebugDirectoryBegin(nullptr), DebugDirectoryEnd(nullptr),
       TLSDirectory32(nullptr), TLSDirectory64(nullptr) {}
-
-static Error ignoreStrippedErrors(Error E) {
-  if (E.isA<SectionStrippedError>()) {
-    consumeError(std::move(E));
-    return Error::success();
-  }
-  return E;
-}
 
 Error COFFObjectFile::initialize() {
   // Check that we at least have enough room for a header.
@@ -853,8 +749,7 @@ Error COFFObjectFile::initialize() {
       CurPtr = DH->AddressOfNewExeHeader;
       // Check the PE magic bytes. ("PE\0\0")
       if (memcmp(base() + CurPtr, COFF::PEMagic, sizeof(COFF::PEMagic)) != 0) {
-        return createStringError(object_error::parse_failed,
-                                 "incorrect PE magic");
+        return errorCodeToError(object_error::parse_failed);
       }
       CurPtr += sizeof(COFF::PEMagic); // Skip the PE magic bytes.
       HasPEHeader = true;
@@ -910,8 +805,7 @@ Error COFFObjectFile::initialize() {
       DataDirSize = sizeof(data_directory) * PE32PlusHeader->NumberOfRvaAndSize;
     } else {
       // It's neither PE32 nor PE32+.
-      return createStringError(object_error::parse_failed,
-                               "incorrect PE magic");
+      return errorCodeToError(object_error::parse_failed);
     }
     if (Error E = getObject(DataDirectory, Data, DataDirAddr, DataDirSize))
       return E;
@@ -940,34 +834,33 @@ Error COFFObjectFile::initialize() {
   } else {
     // We had better not have any symbols if we don't have a symbol table.
     if (getNumberOfSymbols() != 0) {
-      return createStringError(object_error::parse_failed,
-                               "symbol table missing");
+      return errorCodeToError(object_error::parse_failed);
     }
   }
 
   // Initialize the pointer to the beginning of the import table.
-  if (Error E = ignoreStrippedErrors(initImportTablePtr()))
+  if (Error E = initImportTablePtr())
     return E;
-  if (Error E = ignoreStrippedErrors(initDelayImportTablePtr()))
+  if (Error E = initDelayImportTablePtr())
     return E;
 
   // Initialize the pointer to the export table.
-  if (Error E = ignoreStrippedErrors(initExportTablePtr()))
+  if (Error E = initExportTablePtr())
     return E;
 
   // Initialize the pointer to the base relocation table.
-  if (Error E = ignoreStrippedErrors(initBaseRelocPtr()))
+  if (Error E = initBaseRelocPtr())
     return E;
 
   // Initialize the pointer to the debug directory.
-  if (Error E = ignoreStrippedErrors(initDebugDirectoryPtr()))
+  if (Error E = initDebugDirectoryPtr())
     return E;
 
   // Initialize the pointer to the TLS directory.
-  if (Error E = ignoreStrippedErrors(initTLSDirectoryPtr()))
+  if (Error E = initTLSDirectoryPtr())
     return E;
 
-  if (Error E = ignoreStrippedErrors(initLoadConfigPtr()))
+  if (Error E = initLoadConfigPtr())
     return E;
 
   return Error::success();
@@ -1062,10 +955,6 @@ StringRef COFFObjectFile::getFileFormatName() const {
     return "COFF-ARM";
   case COFF::IMAGE_FILE_MACHINE_ARM64:
     return "COFF-ARM64";
-  case COFF::IMAGE_FILE_MACHINE_ARM64EC:
-    return "COFF-ARM64EC";
-  case COFF::IMAGE_FILE_MACHINE_ARM64X:
-    return "COFF-ARM64X";
   default:
     return "COFF-<unknown arch>";
   }
@@ -1080,8 +969,6 @@ Triple::ArchType COFFObjectFile::getArch() const {
   case COFF::IMAGE_FILE_MACHINE_ARMNT:
     return Triple::thumb;
   case COFF::IMAGE_FILE_MACHINE_ARM64:
-  case COFF::IMAGE_FILE_MACHINE_ARM64EC:
-  case COFF::IMAGE_FILE_MACHINE_ARM64X:
     return Triple::aarch64;
   default:
     return Triple::UnknownArch;
@@ -1134,14 +1021,13 @@ Expected<const coff_section *> COFFObjectFile::getSection(int32_t Index) const {
     // We already verified the section table data, so no need to check again.
     return SectionTable + (Index - 1);
   }
-  return createStringError(object_error::parse_failed,
-                           "section index out of bounds");
+  return errorCodeToError(object_error::parse_failed);
 }
 
 Expected<StringRef> COFFObjectFile::getString(uint32_t Offset) const {
   if (StringTableSize <= 4)
     // Tried to get a string from an empty string table.
-    return createStringError(object_error::parse_failed, "string table empty");
+    return errorCodeToError(object_error::parse_failed);
   if (Offset >= StringTableSize)
     return errorCodeToError(object_error::unexpected_eof);
   return StringRef(StringTable + Offset);
@@ -1185,7 +1071,7 @@ COFFObjectFile::getSymbolAuxData(COFFSymbolRef Symbol) const {
            "Aux Symbol data did not point to the beginning of a symbol");
 #endif
   }
-  return ArrayRef(Aux, Symbol.getNumberOfAuxSymbols() * SymbolSize);
+  return makeArrayRef(Aux, Symbol.getNumberOfAuxSymbols() * SymbolSize);
 }
 
 uint32_t COFFObjectFile::getSymbolIndex(COFFSymbolRef Symbol) const {
@@ -1200,7 +1086,13 @@ uint32_t COFFObjectFile::getSymbolIndex(COFFSymbolRef Symbol) const {
 
 Expected<StringRef>
 COFFObjectFile::getSectionName(const coff_section *Sec) const {
-  StringRef Name = StringRef(Sec->Name, COFF::NameSize).split('\0').first;
+  StringRef Name;
+  if (Sec->Name[COFF::NameSize - 1] == 0)
+    // Null terminated, let ::strlen figure out the length.
+    Name = Sec->Name;
+  else
+    // Not null terminated, use all 8 bytes.
+    Name = StringRef(Sec->Name, COFF::NameSize);
 
   // Check for string table entry. First byte is '/'.
   if (Name.startswith("/")) {
@@ -1250,7 +1142,7 @@ Error COFFObjectFile::getSectionContents(const coff_section *Sec,
   uint32_t SectionSize = getSectionSize(Sec);
   if (Error E = checkOffset(Data, ConStart, SectionSize))
     return E;
-  Res = ArrayRef(reinterpret_cast<const uint8_t *>(ConStart), SectionSize);
+  Res = makeArrayRef(reinterpret_cast<const uint8_t *>(ConStart), SectionSize);
   return Error::success();
 }
 
@@ -1368,8 +1260,6 @@ StringRef COFFObjectFile::getRelocationTypeName(uint16_t Type) const {
     }
     break;
   case COFF::IMAGE_FILE_MACHINE_ARM64:
-  case COFF::IMAGE_FILE_MACHINE_ARM64EC:
-  case COFF::IMAGE_FILE_MACHINE_ARM64X:
     switch (Type) {
     LLVM_COFF_SWITCH_RELOC_TYPE_NAME(IMAGE_REL_ARM64_ABSOLUTE);
     LLVM_COFF_SWITCH_RELOC_TYPE_NAME(IMAGE_REL_ARM64_ADDR32);
@@ -1524,8 +1414,7 @@ ImportDirectoryEntryRef::lookup_table_symbols() const {
 
 Error ImportDirectoryEntryRef::getName(StringRef &Result) const {
   uintptr_t IntPtr = 0;
-  if (Error E = OwningObject->getRvaPtr(ImportTable[Index].NameRVA, IntPtr,
-                                        "import directory name"))
+  if (Error E = OwningObject->getRvaPtr(ImportTable[Index].NameRVA, IntPtr))
     return E;
   Result = StringRef(reinterpret_cast<const char *>(IntPtr));
   return Error::success();
@@ -1571,8 +1460,7 @@ DelayImportDirectoryEntryRef::imported_symbols() const {
 
 Error DelayImportDirectoryEntryRef::getName(StringRef &Result) const {
   uintptr_t IntPtr = 0;
-  if (Error E = OwningObject->getRvaPtr(Table[Index].Name, IntPtr,
-                                        "delay import directory name"))
+  if (Error E = OwningObject->getRvaPtr(Table[Index].Name, IntPtr))
     return E;
   Result = StringRef(reinterpret_cast<const char *>(IntPtr));
   return Error::success();
@@ -1589,7 +1477,7 @@ Error DelayImportDirectoryEntryRef::getImportAddress(int AddrIndex,
   uint32_t RVA = Table[Index].DelayImportAddressTable +
       AddrIndex * (OwningObject->is64() ? 8 : 4);
   uintptr_t IntPtr = 0;
-  if (Error E = OwningObject->getRvaPtr(RVA, IntPtr, "import address"))
+  if (Error E = OwningObject->getRvaPtr(RVA, IntPtr))
     return E;
   if (OwningObject->is64())
     Result = *reinterpret_cast<const ulittle64_t *>(IntPtr);
@@ -1611,8 +1499,7 @@ void ExportDirectoryEntryRef::moveNext() {
 // by ordinal, the empty string is set as a result.
 Error ExportDirectoryEntryRef::getDllName(StringRef &Result) const {
   uintptr_t IntPtr = 0;
-  if (Error E =
-          OwningObject->getRvaPtr(ExportTable->NameRVA, IntPtr, "dll name"))
+  if (Error E = OwningObject->getRvaPtr(ExportTable->NameRVA, IntPtr))
     return E;
   Result = StringRef(reinterpret_cast<const char *>(IntPtr));
   return Error::success();
@@ -1633,8 +1520,8 @@ Error ExportDirectoryEntryRef::getOrdinal(uint32_t &Result) const {
 // Returns the address of the current export symbol.
 Error ExportDirectoryEntryRef::getExportRVA(uint32_t &Result) const {
   uintptr_t IntPtr = 0;
-  if (Error EC = OwningObject->getRvaPtr(ExportTable->ExportAddressTableRVA,
-                                         IntPtr, "export address"))
+  if (Error EC =
+          OwningObject->getRvaPtr(ExportTable->ExportAddressTableRVA, IntPtr))
     return EC;
   const export_address_table_entry *entry =
       reinterpret_cast<const export_address_table_entry *>(IntPtr);
@@ -1647,8 +1534,8 @@ Error ExportDirectoryEntryRef::getExportRVA(uint32_t &Result) const {
 Error
 ExportDirectoryEntryRef::getSymbolName(StringRef &Result) const {
   uintptr_t IntPtr = 0;
-  if (Error EC = OwningObject->getRvaPtr(ExportTable->OrdinalTableRVA, IntPtr,
-                                         "export ordinal table"))
+  if (Error EC =
+          OwningObject->getRvaPtr(ExportTable->OrdinalTableRVA, IntPtr))
     return EC;
   const ulittle16_t *Start = reinterpret_cast<const ulittle16_t *>(IntPtr);
 
@@ -1658,12 +1545,11 @@ ExportDirectoryEntryRef::getSymbolName(StringRef &Result) const {
        I < E; ++I, ++Offset) {
     if (*I != Index)
       continue;
-    if (Error EC = OwningObject->getRvaPtr(ExportTable->NamePointerRVA, IntPtr,
-                                           "export table entry"))
+    if (Error EC =
+            OwningObject->getRvaPtr(ExportTable->NamePointerRVA, IntPtr))
       return EC;
     const ulittle32_t *NamePtr = reinterpret_cast<const ulittle32_t *>(IntPtr);
-    if (Error EC = OwningObject->getRvaPtr(NamePtr[Offset], IntPtr,
-                                           "export symbol name"))
+    if (Error EC = OwningObject->getRvaPtr(NamePtr[Offset], IntPtr))
       return EC;
     Result = StringRef(reinterpret_cast<const char *>(IntPtr));
     return Error::success();
@@ -1676,8 +1562,7 @@ Error ExportDirectoryEntryRef::isForwarder(bool &Result) const {
   const data_directory *DataEntry =
       OwningObject->getDataDirectory(COFF::EXPORT_TABLE);
   if (!DataEntry)
-    return createStringError(object_error::parse_failed,
-                             "export table missing");
+    return errorCodeToError(object_error::parse_failed);
   uint32_t RVA;
   if (auto EC = getExportRVA(RVA))
     return EC;
@@ -1692,7 +1577,7 @@ Error ExportDirectoryEntryRef::getForwardTo(StringRef &Result) const {
   if (auto EC = getExportRVA(RVA))
     return EC;
   uintptr_t IntPtr = 0;
-  if (auto EC = OwningObject->getRvaPtr(RVA, IntPtr, "export forward target"))
+  if (auto EC = OwningObject->getRvaPtr(RVA, IntPtr))
     return EC;
   Result = StringRef(reinterpret_cast<const char *>(IntPtr));
   return Error::success();
@@ -1721,7 +1606,7 @@ Error ImportedSymbolRef::getSymbolName(StringRef &Result) const {
     RVA = Entry64[Index].getHintNameRVA();
   }
   uintptr_t IntPtr = 0;
-  if (Error EC = OwningObject->getRvaPtr(RVA, IntPtr, "import symbol name"))
+  if (Error EC = OwningObject->getRvaPtr(RVA, IntPtr))
     return EC;
   // +2 because the first two bytes is hint.
   Result = StringRef(reinterpret_cast<const char *>(IntPtr + 2));
@@ -1760,7 +1645,7 @@ Error ImportedSymbolRef::getOrdinal(uint16_t &Result) const {
     RVA = Entry64[Index].getHintNameRVA();
   }
   uintptr_t IntPtr = 0;
-  if (Error EC = OwningObject->getRvaPtr(RVA, IntPtr, "import symbol ordinal"))
+  if (Error EC = OwningObject->getRvaPtr(RVA, IntPtr))
     return EC;
   Result = *reinterpret_cast<const ulittle16_t *>(IntPtr);
   return Error::success();
@@ -1907,7 +1792,7 @@ Error ResourceSectionRef::load(const COFFObjectFile *O, const SectionRef &S) {
   Expected<StringRef> Contents = Section.getContents();
   if (!Contents)
     return Contents.takeError();
-  BBS = BinaryByteStream(*Contents, llvm::endianness::little);
+  BBS = BinaryByteStream(*Contents, support::little);
   const coff_section *COFFSect = Obj->getCOFFSection(Section);
   ArrayRef<coff_relocation> OrigRelocs = Obj->getRelocations(COFFSect);
   Relocs.reserve(OrigRelocs.size());
@@ -1952,8 +1837,6 @@ ResourceSectionRef::getContents(const coff_resource_data_entry &Entry) {
       RVAReloc = COFF::IMAGE_REL_ARM_ADDR32NB;
       break;
     case COFF::IMAGE_FILE_MACHINE_ARM64:
-    case COFF::IMAGE_FILE_MACHINE_ARM64EC:
-    case COFF::IMAGE_FILE_MACHINE_ARM64X:
       RVAReloc = COFF::IMAGE_REL_ARM64_ADDR32NB;
       break;
     default:

@@ -16,8 +16,10 @@
 using namespace lldb;
 using namespace lldb_private;
 
-static void __stdcall ExitThreadProxy(ULONG_PTR dwExitCode) {
+namespace {
+void __stdcall ExitThreadProxy(ULONG_PTR dwExitCode) {
   ::ExitThread(dwExitCode);
+}
 }
 
 HostThreadWindows::HostThreadWindows()

@@ -28,7 +28,7 @@
 
 #import "A.h"
 
-int bar(void) { return foo(); }
+int bar() { return foo(); }
 
 // expected-warning@Inputs/framework-public-includes-private/A.framework/Headers/A.h:1{{public framework header includes private framework header 'A/APriv.h'}}
 // expected-warning@Inputs/framework-public-includes-private/A.framework/Headers/A.h:2{{public framework header includes private framework header 'A/APriv2.h'}}

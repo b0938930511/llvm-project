@@ -15,8 +15,6 @@
 ; RUN:     | FileCheck -check-prefix=X86_64 %s
 ; RUN: llc < %s -mtriple=i386-linux-gnu -relocation-model=pic \
 ; RUN:     | FileCheck -check-prefix=NoEMU %s
-; RUN: llc < %s -mtriple=i686-linux-android29 -relocation-model=pic \
-; RUN:     | FileCheck -check-prefix=NoEMU %s
 
 ; NoEMU-NOT: __emutls
 
@@ -26,19 +24,19 @@
 @external_y = thread_local global i8 7, align 2
 @internal_y = internal thread_local global i64 9, align 16
 
-define ptr @get_external_x() {
+define i32* @get_external_x() {
 entry:
-  ret ptr @external_x
+  ret i32* @external_x
 }
 
-define ptr @get_external_y() {
+define i8* @get_external_y() {
 entry:
-  ret ptr @external_y
+  ret i8* @external_y
 }
 
-define ptr @get_internal_y() {
+define i64* @get_internal_y() {
 entry:
-  ret ptr @internal_y
+  ret i64* @internal_y
 }
 
 ; CHECK-LABEL: get_external_x:

@@ -1,4 +1,5 @@
-! RUN: %python %S/test_errors.py %s %flang_fc1
+! RUN: %S/test_errors.sh %s %t %flang_fc1
+! REQUIRES: shell
 
 ! 15.6.2.5(3)
 
@@ -16,8 +17,7 @@ end
 submodule(m1) sm1
 contains
   module procedure sub1
-    !ERROR: Left-hand side of assignment is not definable
-    !BECAUSE: 'a' is an INTENT(IN) dummy argument
+    !ERROR: Left-hand side of assignment is not modifiable
     a = 1.0
     b = 2.0
     !ERROR: No intrinsic or user-defined ASSIGNMENT(=) matches operand types REAL(4) and LOGICAL(4)

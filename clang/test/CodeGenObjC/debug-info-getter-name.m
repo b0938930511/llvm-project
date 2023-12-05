@@ -3,6 +3,8 @@
 
 // CHECK:  !DISubprogram(name: "-[InstanceVariablesEverywhereButTheInterface someString]"
 
+//rdar: //8498026
+
 @class NSString;
 
 @interface InstanceVariablesEverywhereButTheInterface 
@@ -46,7 +48,7 @@
 }
 @end
 
-int main(void)
+int main()
 {
   return 0;
 }

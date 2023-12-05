@@ -7,22 +7,21 @@
 ;; after, even if the inline-asm uses as an input the same value as
 ;; the PHI.
 
-declare void @foo(ptr)
+declare void @foo(i8*)
 
-define void @test1(ptr %arg, ptr %mem) nounwind {
+define void @test1(i8* %arg, i8** %mem) nounwind {
 ; CHECK-LABEL: test1:
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    pushq %r14
 ; CHECK-NEXT:    pushq %rbx
 ; CHECK-NEXT:    pushq %rax
-; CHECK-NEXT:    movq %rsi, %rbx
-; CHECK-NEXT:  .LBB0_1: # Block address taken
-; CHECK-NEXT:    # %loop
+; CHECK-NEXT:    movq %rsi, %r14
+; CHECK-NEXT:  .Ltmp0: # Block address taken
+; CHECK-NEXT:  .LBB0_1: # %loop
 ; CHECK-NEXT:    # =>This Inner Loop Header: Depth=1
-; CHECK-NEXT:    # Label of block must be emitted
-; CHECK-NEXT:    movq (%rbx), %r14
+; CHECK-NEXT:    movq (%r14), %rbx
 ; CHECK-NEXT:    callq foo@PLT
-; CHECK-NEXT:    movq %r14, %rdi
+; CHECK-NEXT:    movq %rbx, %rdi
 ; CHECK-NEXT:    #APP
 ; CHECK-NEXT:    #NO_APP
 ; CHECK-NEXT:  # %bb.2: # %end
@@ -34,10 +33,10 @@ entry:
   br label %loop
 
 loop:
-  %a = phi ptr [ %arg, %entry ], [ %b, %loop ]
-  %b = load ptr, ptr %mem, align 8
-  call void @foo(ptr %a)
-  callbr void asm sideeffect "", "*m,!i"(ptr elementtype(i8) %b)
+  %a = phi i8* [ %arg, %entry ], [ %b, %loop ]
+  %b = load i8*, i8** %mem, align 8
+  call void @foo(i8* %a)
+  callbr void asm sideeffect "", "*m,X"(i8* %b, i8* blockaddress(@test1, %loop))
           to label %end [label %loop]
 
 end:

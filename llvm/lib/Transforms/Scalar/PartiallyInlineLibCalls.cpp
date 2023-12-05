@@ -22,7 +22,6 @@
 #include "llvm/Support/DebugCounter.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
-#include <optional>
 
 using namespace llvm;
 
@@ -81,9 +80,9 @@ static bool optimizeSQRT(CallInst *Call, Function *CalledFunc,
   Instruction *LibCall = Call->clone();
   Builder.Insert(LibCall);
 
-  // Add memory(none) attribute, so that the backend can use a native sqrt
-  // instruction for this call.
-  Call->setDoesNotAccessMemory();
+  // Add attribute "readnone" so that backend can use a native sqrt instruction
+  // for this call.
+  Call->addAttribute(AttributeList::FunctionIndex, Attribute::ReadNone);
 
   // Insert a FP compare instruction and use it as the CurrBB branch condition.
   Builder.SetInsertPoint(CurrBBTerm);
@@ -104,7 +103,7 @@ static bool optimizeSQRT(CallInst *Call, Function *CalledFunc,
 static bool runPartiallyInlineLibCalls(Function &F, TargetLibraryInfo *TLI,
                                        const TargetTransformInfo *TTI,
                                        DominatorTree *DT) {
-  std::optional<DomTreeUpdater> DTU;
+  Optional<DomTreeUpdater> DTU;
   if (DT)
     DTU.emplace(DT, DomTreeUpdater::UpdateStrategy::Lazy);
 
@@ -125,9 +124,6 @@ static bool runPartiallyInlineLibCalls(Function &F, TargetLibraryInfo *TLI,
       if (Call->isNoBuiltin() || Call->isStrictFP())
         continue;
 
-      if (Call->isMustTailCall())
-        continue;
-
       // Skip if function either has local linkage or is not a known library
       // function.
       LibFunc LF;
@@ -140,7 +136,7 @@ static bool runPartiallyInlineLibCalls(Function &F, TargetLibraryInfo *TLI,
       case LibFunc_sqrt:
         if (TTI->haveFastSqrt(Call->getType()) &&
             optimizeSQRT(Call, CalledFunc, *CurrBB, BB, TTI,
-                         DTU ? &*DTU : nullptr))
+                         DTU.hasValue() ? DTU.getPointer() : nullptr))
           break;
         continue;
       default:

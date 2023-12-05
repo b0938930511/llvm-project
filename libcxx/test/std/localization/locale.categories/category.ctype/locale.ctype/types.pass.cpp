@@ -17,8 +17,6 @@
 //     typedef CharT char_type;
 // };
 
-// XFAIL: no-wide-characters
-
 #include <locale>
 #include <type_traits>
 #include <cassert>

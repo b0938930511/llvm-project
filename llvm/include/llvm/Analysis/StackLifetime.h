@@ -14,8 +14,10 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Support/raw_ostream.h"
+#include <cassert>
 #include <utility>
 
 namespace llvm {
@@ -24,7 +26,6 @@ class AllocaInst;
 class BasicBlock;
 class Function;
 class Instruction;
-class IntrinsicInst;
 
 /// Compute live ranges of allocas.
 /// Live ranges are represented as sets of "interesting" instructions, which are
@@ -190,8 +191,6 @@ public:
   StackLifetimePrinterPass(raw_ostream &OS, StackLifetime::LivenessType Type)
       : Type(Type), OS(OS) {}
   PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
-  void printPipeline(raw_ostream &OS,
-                     function_ref<StringRef(StringRef)> MapClassName2PassName);
 };
 
 } // end namespace llvm

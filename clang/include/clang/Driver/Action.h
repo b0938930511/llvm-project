@@ -58,7 +58,7 @@ public:
     OffloadClass,
     PreprocessJobClass,
     PrecompileJobClass,
-    ExtractAPIJobClass,
+    HeaderModulePrecompileJobClass,
     AnalyzeJobClass,
     MigrateJobClass,
     CompileJobClass,
@@ -72,13 +72,11 @@ public:
     VerifyPCHJobClass,
     OffloadBundlingJobClass,
     OffloadUnbundlingJobClass,
-    OffloadPackagerJobClass,
-    LinkerWrapperJobClass,
+    OffloadWrapperJobClass,
     StaticLibJobClass,
-    BinaryAnalyzeJobClass,
 
     JobClassFirst = PreprocessJobClass,
-    JobClassLast = BinaryAnalyzeJobClass
+    JobClassLast = StaticLibJobClass
   };
 
   // The offloading kind determines if this action is binded to a particular
@@ -127,9 +125,6 @@ protected:
 
   /// The Offloading architecture associated with this action.
   const char *OffloadingArch = nullptr;
-
-  /// The Offloading toolchain associated with this device action.
-  const ToolChain *OffloadingToolChain = nullptr;
 
   Action(ActionClass Kind, types::ID Type) : Action(Kind, ActionList(), Type) {}
   Action(ActionClass Kind, Action *Input, types::ID Type)
@@ -187,17 +182,11 @@ public:
 
   /// Set the device offload info of this action and propagate it to its
   /// dependences.
-  void propagateDeviceOffloadInfo(OffloadKind OKind, const char *OArch,
-                                  const ToolChain *OToolChain);
+  void propagateDeviceOffloadInfo(OffloadKind OKind, const char *OArch);
 
   /// Append the host offload info of this action and propagate it to its
   /// dependences.
   void propagateHostOffloadInfo(unsigned OKinds, const char *OArch);
-
-  void setHostOffloadInfo(unsigned OKinds, const char *OArch) {
-    ActiveOffloadKindMask |= OKinds;
-    OffloadingArch = OArch;
-  }
 
   /// Set the offload info of this action to be the same as the provided action,
   /// and propagate it to its dependences.
@@ -209,13 +198,10 @@ public:
 
   OffloadKind getOffloadingDeviceKind() const { return OffloadingDeviceKind; }
   const char *getOffloadingArch() const { return OffloadingArch; }
-  const ToolChain *getOffloadingToolChain() const {
-    return OffloadingToolChain;
-  }
 
   /// Check if this action have any offload kinds. Note that host offload kinds
   /// are only set if the action is a dependence to a host offload action.
-  bool isHostOffloading(unsigned int OKind) const {
+  bool isHostOffloading(OffloadKind OKind) const {
     return ActiveOffloadKindMask & OKind;
   }
   bool isDeviceOffloading(OffloadKind OKind) const {
@@ -296,15 +282,10 @@ public:
     OffloadKindList DeviceOffloadKinds;
 
   public:
-    /// Add an action along with the associated toolchain, bound arch, and
+    /// Add a action along with the associated toolchain, bound arch, and
     /// offload kind.
     void add(Action &A, const ToolChain &TC, const char *BoundArch,
              OffloadKind OKind);
-
-    /// Add an action along with the associated toolchain, bound arch, and
-    /// offload kinds.
-    void add(Action &A, const ToolChain &TC, const char *BoundArch,
-             unsigned OffloadKindMask);
 
     /// Get each of the individual arrays.
     const ActionList &getActions() const { return DeviceActions; }
@@ -431,21 +412,29 @@ public:
   PrecompileJobAction(Action *Input, types::ID OutputType);
 
   static bool classof(const Action *A) {
-    return A->getKind() == PrecompileJobClass;
+    return A->getKind() == PrecompileJobClass ||
+           A->getKind() == HeaderModulePrecompileJobClass;
   }
 };
 
-class ExtractAPIJobAction : public JobAction {
+class HeaderModulePrecompileJobAction : public PrecompileJobAction {
   void anchor() override;
 
+  const char *ModuleName;
+
 public:
-  ExtractAPIJobAction(Action *Input, types::ID OutputType);
+  HeaderModulePrecompileJobAction(Action *Input, types::ID OutputType,
+                                  const char *ModuleName);
 
   static bool classof(const Action *A) {
-    return A->getKind() == ExtractAPIJobClass;
+    return A->getKind() == HeaderModulePrecompileJobClass;
   }
 
-  void addHeaderInput(Action *Input) { getInputs().push_back(Input); }
+  void addModuleHeaderInput(Action *Input) {
+    getInputs().push_back(Input);
+  }
+
+  const char *getModuleName() const { return ModuleName; }
 };
 
 class AnalyzeJobAction : public JobAction {
@@ -642,25 +631,14 @@ public:
   }
 };
 
-class OffloadPackagerJobAction : public JobAction {
+class OffloadWrapperJobAction : public JobAction {
   void anchor() override;
 
 public:
-  OffloadPackagerJobAction(ActionList &Inputs, types::ID Type);
+  OffloadWrapperJobAction(ActionList &Inputs, types::ID Type);
 
   static bool classof(const Action *A) {
-    return A->getKind() == OffloadPackagerJobClass;
-  }
-};
-
-class LinkerWrapperJobAction : public JobAction {
-  void anchor() override;
-
-public:
-  LinkerWrapperJobAction(ActionList &Inputs, types::ID Type);
-
-  static bool classof(const Action *A) {
-    return A->getKind() == LinkerWrapperJobClass;
+    return A->getKind() == OffloadWrapperJobClass;
   }
 };
 
@@ -672,17 +650,6 @@ public:
 
   static bool classof(const Action *A) {
     return A->getKind() == StaticLibJobClass;
-  }
-};
-
-class BinaryAnalyzeJobAction : public JobAction {
-  void anchor() override;
-
-public:
-  BinaryAnalyzeJobAction(Action *Input, types::ID Type);
-
-  static bool classof(const Action *A) {
-    return A->getKind() == BinaryAnalyzeJobClass;
   }
 };
 

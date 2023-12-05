@@ -12,6 +12,7 @@
 
 #include "TableGenBackends.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -29,7 +30,6 @@
 #include <cctype>
 #include <functional>
 #include <map>
-#include <optional>
 #include <set>
 using namespace llvm;
 
@@ -129,14 +129,13 @@ namespace {
   };
 
   struct GroupInfo {
-    llvm::StringRef GroupName;
     std::vector<const Record*> DiagsInGroup;
     std::vector<std::string> SubGroups;
-    unsigned IDNo = 0;
+    unsigned IDNo;
 
     llvm::SmallVector<const Record *, 1> Defs;
 
-    GroupInfo() = default;
+    GroupInfo() : IDNo(0) {}
   };
 } // end anonymous namespace.
 
@@ -175,7 +174,6 @@ static void groupDiagnostics(const std::vector<Record*> &Diags,
     Record *Group = DiagGroups[i];
     GroupInfo &GI =
         DiagsInGroup[std::string(Group->getValueAsString("GroupName"))];
-    GI.GroupName = Group->getName();
     GI.Defs.push_back(Group);
 
     std::vector<Record*> SubGroups = Group->getValueAsListOfDefs("SubGroups");
@@ -250,9 +248,8 @@ typedef llvm::PointerUnion<RecordVec*, RecordSet*> VecOrSet;
 
 namespace {
 class InferPedantic {
-  typedef llvm::DenseMap<const Record *,
-                         std::pair<unsigned, std::optional<unsigned>>>
-      GMap;
+  typedef llvm::DenseMap<const Record*,
+                         std::pair<unsigned, Optional<unsigned> > > GMap;
 
   DiagGroupParentMap &DiagGroupParents;
   const std::vector<Record*> &Diags;
@@ -326,7 +323,7 @@ bool InferPedantic::isOffByDefault(const Record *Diag) {
 bool InferPedantic::groupInPedantic(const Record *Group, bool increment) {
   GMap::mapped_type &V = GroupCount[Group];
   // Lazily compute the threshold value for the group count.
-  if (!V.second) {
+  if (!V.second.hasValue()) {
     const GroupInfo &GI =
         DiagsInGroup[std::string(Group->getValueAsString("GroupName"))];
     V.second = GI.SubGroups.size() + GI.DiagsInGroup.size();
@@ -338,7 +335,7 @@ bool InferPedantic::groupInPedantic(const Record *Group, bool increment) {
   // Consider a group in -Wpendatic IFF if has at least one diagnostic
   // or subgroup AND all of those diagnostics and subgroups are covered
   // by -Wpedantic via our computation.
-  return V.first != 0 && V.first == *V.second;
+  return V.first != 0 && V.first == V.second.getValue();
 }
 
 void InferPedantic::markGroup(const Record *Group) {
@@ -405,14 +402,17 @@ void InferPedantic::compute(VecOrSet DiagsInPedantic,
     if (!groupInPedantic(Group))
       continue;
 
+    unsigned ParentsInPedantic = 0;
     const std::vector<Record*> &Parents = DiagGroupParents.getParents(Group);
-    bool AllParentsInPedantic =
-        llvm::all_of(Parents, [&](Record *R) { return groupInPedantic(R); });
+    for (unsigned j = 0, ej = Parents.size(); j != ej; ++j) {
+      if (groupInPedantic(Parents[j]))
+        ++ParentsInPedantic;
+    }
     // If all the parents are in -Wpedantic, this means that this diagnostic
     // group will be indirectly included by -Wpedantic already.  In that
     // case, do not add it directly to -Wpedantic.  If the group has no
     // parents, obviously it should go into -Wpedantic.
-    if (Parents.size() > 0 && AllParentsInPedantic)
+    if (Parents.size() > 0 && ParentsInPedantic == Parents.size())
       continue;
 
     if (RecordVec *V = GroupsInPedantic.dyn_cast<RecordVec*>())
@@ -653,14 +653,6 @@ private:
           Root(O.Root) {
       O.Root = nullptr;
     }
-    // The move assignment operator is defined as deleted pending further
-    // motivation.
-    DiagText &operator=(DiagText &&) = delete;
-
-    // The copy constrcutor and copy assignment operator is defined as deleted
-    // pending further motivation.
-    DiagText(const DiagText &) = delete;
-    DiagText &operator=(const DiagText &) = delete;
 
     ~DiagText() {
       for (Piece *P : AllocatedPieces)
@@ -684,7 +676,7 @@ private:
 };
 
 template <class Derived> struct DiagTextVisitor {
-  using ModifierMappingsType = std::optional<std::vector<int>>;
+  using ModifierMappingsType = Optional<std::vector<int>>;
 
 private:
   Derived &getDerived() { return static_cast<Derived &>(*this); }
@@ -715,7 +707,7 @@ public:
 
   private:
     DiagTextVisitor &Visitor;
-    std::optional<std::vector<int>> OldMappings;
+    Optional<std::vector<int>> OldMappings;
 
   public:
     Piece *Substitution;
@@ -1174,7 +1166,7 @@ std::vector<std::string>
 DiagnosticTextBuilder::buildForDocumentation(StringRef Severity,
                                              const Record *R) {
   EvaluatingRecordGuard Guard(&EvaluatingRecord, R);
-  StringRef Text = R->getValueAsString("Summary");
+  StringRef Text = R->getValueAsString("Text");
 
   DiagText D(*this, Text);
   TextPiece *Prefix = D.New<TextPiece>(Severity, Severity);
@@ -1193,7 +1185,7 @@ DiagnosticTextBuilder::buildForDocumentation(StringRef Severity,
 
 std::string DiagnosticTextBuilder::buildForDefinition(const Record *R) {
   EvaluatingRecordGuard Guard(&EvaluatingRecord, R);
-  StringRef Text = R->getValueAsString("Summary");
+  StringRef Text = R->getValueAsString("Text");
   DiagText D(*this, Text);
   std::string Result;
   DiagTextPrinter{*this, Result}.Visit(D.Root);
@@ -1287,8 +1279,8 @@ void clang::EmitClangDiagsDefs(RecordKeeper &Records, raw_ostream &OS,
     OS << ", \"";
     OS.write_escaped(DiagTextBuilder.buildForDefinition(&R)) << '"';
 
-    // Warning group associated with the diagnostic. This is stored as an index
-    // into the alphabetically sorted warning group table.
+    // Warning associated with the diagnostic. This is stored as an index into
+    // the alphabetically sorted warning table.
     if (DefInit *DI = dyn_cast<DefInit>(R.getValueInit("Group"))) {
       std::map<std::string, GroupInfo>::iterator I = DiagsInGroup.find(
           std::string(DI->getDef()->getValueAsString("GroupName")));
@@ -1313,11 +1305,6 @@ void clang::EmitClangDiagsDefs(RecordKeeper &Records, raw_ostream &OS,
       OS << ", false";
 
     if (R.getValueAsBit("ShowInSystemHeader"))
-      OS << ", true";
-    else
-      OS << ", false";
-
-    if (R.getValueAsBit("ShowInSystemMacro"))
       OS << ", true";
     else
       OS << ", false";
@@ -1500,20 +1487,18 @@ static void emitDiagTable(std::map<std::string, GroupInfo> &DiagsInGroup,
   for (auto const &I: DiagsInGroup)
     MaxLen = std::max(MaxLen, (unsigned)I.first.size());
 
-  OS << "\n#ifdef DIAG_ENTRY\n";
+  OS << "\n#ifdef GET_DIAG_TABLE\n";
   unsigned SubGroupIndex = 1, DiagArrayIndex = 1;
   for (auto const &I: DiagsInGroup) {
     // Group option string.
-    OS << "DIAG_ENTRY(";
-    OS << I.second.GroupName << " /* ";
-
+    OS << "  { /* ";
     if (I.first.find_first_not_of("abcdefghijklmnopqrstuvwxyz"
                                    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                                    "0123456789!@#$%^*-+=:?") !=
         std::string::npos)
       PrintFatalError("Invalid character in diagnostic group '" + I.first +
                       "'");
-    OS << I.first << " */, ";
+    OS << I.first << " */ " << std::string(MaxLen - I.first.size(), ' ');
     // Store a pascal-style length byte at the beginning of the string.
     std::string Name = char(I.first.size()) + I.first;
     OS << GroupNames.GetOrAddStringOffset(Name, false) << ", ";
@@ -1532,7 +1517,7 @@ static void emitDiagTable(std::map<std::string, GroupInfo> &DiagsInGroup,
         DiagArrayIndex += DiagsInPedantic.size();
       DiagArrayIndex += V.size() + 1;
     } else {
-      OS << "0, ";
+      OS << "/* Empty */     0, ";
     }
 
     // Subgroups.
@@ -1540,25 +1525,17 @@ static void emitDiagTable(std::map<std::string, GroupInfo> &DiagsInGroup,
     const bool hasSubGroups =
         !SubGroups.empty() || (IsPedantic && !GroupsInPedantic.empty());
     if (hasSubGroups) {
-      OS << "/* DiagSubGroup" << I.second.IDNo << " */ " << SubGroupIndex
-         << ", ";
+      OS << "/* DiagSubGroup" << I.second.IDNo << " */ " << SubGroupIndex;
       if (IsPedantic)
         SubGroupIndex += GroupsInPedantic.size();
       SubGroupIndex += SubGroups.size() + 1;
     } else {
-      OS << "0, ";
+      OS << "/* Empty */         0";
     }
 
-    std::string Documentation = I.second.Defs.back()
-                                    ->getValue("Documentation")
-                                    ->getValue()
-                                    ->getAsUnquotedString();
-
-    OS << "R\"(" << StringRef(Documentation).trim() << ")\"";
-
-    OS << ")\n";
+    OS << " },\n";
   }
-  OS << "#endif // DIAG_ENTRY\n\n";
+  OS << "#endif // GET_DIAG_TABLE\n\n";
 }
 
 /// Emit the table of diagnostic categories.
@@ -1711,7 +1688,7 @@ void writeHeader(StringRef Str, raw_ostream &OS, char Kind = '-') {
 
 void writeDiagnosticText(DiagnosticTextBuilder &Builder, const Record *R,
                          StringRef Role, raw_ostream &OS) {
-  StringRef Text = R->getValueAsString("Summary");
+  StringRef Text = R->getValueAsString("Text");
   if (Text == "%0")
     OS << "The text of this diagnostic is not controlled by Clang.\n\n";
   else {

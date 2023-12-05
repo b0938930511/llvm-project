@@ -12,6 +12,7 @@
 
 #include "CodeExpander.h"
 #include "CodeExpansions.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/TableGen/Error.h"
 
@@ -31,24 +32,24 @@ void CodeExpander::emit(raw_ostream &OS) const {
     OS << Current.substr(0, Pos);
     Current = Current.substr(Pos);
 
-    if (Current.starts_with("\n")) {
+    if (Current.startswith("\n")) {
       OS << "\n" << Indent;
       Current = Current.drop_front(1);
       continue;
     }
 
-    if (Current.starts_with("\\$") || Current.starts_with("\\\\")) {
+    if (Current.startswith("\\$") || Current.startswith("\\\\")) {
       OS << Current[1];
       Current = Current.drop_front(2);
       continue;
     }
 
-    if (Current.starts_with("\\")) {
+    if (Current.startswith("\\")) {
       Current = Current.drop_front(1);
       continue;
     }
 
-    if (Current.starts_with("${")) {
+    if (Current.startswith("${")) {
       StringRef StartVar = Current;
       Current = Current.drop_front(2);
       StringRef Var;

@@ -39,7 +39,7 @@
 @property double bar;
 @end
 
-int func1(void) {
+int func1() {
    id foo;
    double bar = [foo bar];
    return 0;
@@ -62,9 +62,11 @@ typedef id BYObjectIdentifier;
 @property int treeController;  // expected-error {{property has a previous declaration}}
 @end
 
+// rdar://10127639
 @synthesize window; // expected-error {{missing context for property implementation declaration}}
 
-Class test6_getClass(void);
+// rdar://10408414
+Class test6_getClass();
 @interface Test6
 @end
 @implementation Test6
@@ -76,5 +78,5 @@ Class test6_getClass(void);
 @property unsigned length;
 @end
 void test7(Test7 *t) {
-  char data[t.length] = {};
+  char data[t.length] = {}; // expected-error {{variable-sized object may not be initialized}}
 }

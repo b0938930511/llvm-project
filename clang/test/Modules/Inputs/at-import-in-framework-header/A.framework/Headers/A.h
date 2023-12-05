@@ -1,2 +1,2 @@
 @import B;
-int foo(void);
+int foo();

@@ -10,33 +10,33 @@ void t1(void) { M }
 void t2(void) { __asm int 2ch }
 void t3(void) { __asm M2 2ch }
 void t4(void) { __asm mov eax, fs:[10h] }
-void t5(void) {
+void t5() {
   __asm {
     int 0x2c ; } asm comments are fun! }{
   }
   __asm {}
 }
-int t6(void) {
+int t6() {
   __asm int 3 ; } comments for single-line asm
   __asm {}
 
   __asm int 4
   return 10;
 }
-void t7(void) {
+void t7() {
   __asm {
     push ebx
     mov ebx, 07h
     pop ebx
   }
 }
-void t8(void) {
+void t8() {
   __asm nop __asm nop __asm nop
 }
-void t9(void) {
+void t9() {
   __asm nop __asm nop ; __asm nop
 }
-void t10(void) {
+void t10() {
   __asm {
     mov eax, 0
     __asm {
@@ -47,33 +47,21 @@ void t10(void) {
     }
   }
 }
-void t11(void) {
+void t11() {
   do { __asm mov eax, 0 __asm { __asm mov edx, 1 } } while(0);
 }
-void t12(void) {
+void t12() {
   __asm jmp label // expected-error {{use of undeclared label 'label'}}
 }
-void t13(void) {
+void t13() {
   __asm m{o}v eax, ebx // expected-error {{unknown token in expression}}
 }
 
-void t14(void) {
+void t14() {
   enum { A = 1, B };
   __asm mov eax, offset A // expected-error {{offset operator cannot yet handle constants}}
 }
 
-// GH57791
-typedef struct S {
-  unsigned bf1:1; // expected-note {{bit-field is declared here}}
-  unsigned bf2:1; // expected-note {{bit-field is declared here}}
-} S;
-void t15(S s) {
-  __asm {
-    mov eax, s.bf1 // expected-error {{an inline asm block cannot have an operand which is a bit-field}}
-    mov s.bf2, eax // expected-error {{an inline asm block cannot have an operand which is a bit-field}}
-  }
-}
-
-int t_fail(void) { // expected-note {{to match this}}
+int t_fail() { // expected-note {{to match this}}
   __asm 
   __asm { // expected-error 3 {{expected}} expected-note {{to match this}}

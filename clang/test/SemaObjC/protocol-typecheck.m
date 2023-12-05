@@ -13,7 +13,7 @@
 
 @end
 
-void func(void) {
+void func() {
   NSObject <PWhatever, XCElementSpacerP> * flexer;
   NSObject <PWhatever, XCElementP> * flexer2;
   XX *obj;

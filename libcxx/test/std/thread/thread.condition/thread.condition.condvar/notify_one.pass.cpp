@@ -6,10 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// UNSUPPORTED: no-threads
-
-// This test occasionally fails on Android.
-// UNSUPPORTED: LIBCXX-ANDROID-FIXME
+// UNSUPPORTED: libcpp-has-no-threads
 
 // <condition_variable>
 

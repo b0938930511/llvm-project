@@ -3,8 +3,6 @@
 // RUN: %clang_analyze_cc1 -std=c++11 -analyzer-checker=core,debug.DumpCFG -analyzer-config inline-lambdas=true %s > %t 2>&1
 // RUN: FileCheck --input-file=%t %s
 
-#include "Inputs/system-header-simulator-cxx.h"
-
 void clang_analyzer_warnIfReached();
 void clang_analyzer_eval(int);
 
@@ -194,9 +192,8 @@ void testFunctionPointerCapture() {
 // Captured variable-length array.
 
 void testVariableLengthArrayCaptured() {
-  int n = 2;     // expected-note {{declared here}}
-  int array[n];  // expected-warning {{variable length arrays in C++ are a Clang extension}} \
-                    expected-note {{read of non-const variable 'n' is not allowed in a constant expression}}
+  int n = 2;
+  int array[n];
   array[0] = 7;
 
   int i = [&]{
@@ -339,7 +336,7 @@ void captureByReference() {
     local1++;
   };
 
-  // Don't treat as a dead store because local1 was captured by reference.
+  // Don't treat as a dead store because local1 was was captured by reference.
   local1 = 7; // no-warning
 
   lambda1();
@@ -350,7 +347,7 @@ void captureByReference() {
     local2++; // Implicit capture by reference
   };
 
-  // Don't treat as a dead store because local2 was captured by reference.
+  // Don't treat as a dead store because local2 was was captured by reference.
   local2 = 7; // no-warning
 
   lambda2();
@@ -402,8 +399,8 @@ int f() {
 // CHECK:   Succs (1): B1
 // CHECK: [B1]
 // CHECK:   1: x
-// CHECK:   2: [B1.1] (ImplicitCastExpr, NoOp, const X)
-// CHECK:   3: [B1.2] (CXXConstructExpr[B1.4]+0, X)
+// CHECK:   2: [B1.1] (ImplicitCastExpr, NoOp, const struct X)
+// CHECK:   3: [B1.2] (CXXConstructExpr, struct X)
 // CHECK:   4: [x]     {
 // CHECK:    }
 // CHECK:   5: (void)[B1.4] (CStyleCastExpr, ToVoid, void)
@@ -411,3 +408,4 @@ int f() {
 // CHECK:   Succs (1): B0
 // CHECK: [B0 (EXIT)]
 // CHECK:   Preds (1): B1
+

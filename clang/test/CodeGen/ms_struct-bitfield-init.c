@@ -1,4 +1,5 @@
 // RUN: %clang_cc1 -emit-llvm-only  -triple x86_64-apple-darwin9 %s
+// rdar://8823265
 
 extern void abort(void);
 #define ATTR __attribute__((__ms_struct__))
@@ -41,7 +42,7 @@ struct {
   int i4;
 } t3 = {1,2,3,4};
 
-int main(void) {
+int main() {
   if (sizeof(t1) != 2)
     abort();
   if (t1.foo != 'a')

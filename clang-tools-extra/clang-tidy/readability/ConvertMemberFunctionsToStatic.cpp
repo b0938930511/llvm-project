@@ -1,8 +1,9 @@
 //===--- ConvertMemberFunctionsToStatic.cpp - clang-tidy ------------------===//
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//                     The LLVM Compiler Infrastructure
+//
+// This file is distributed under the University of Illinois Open Source
+// License. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
 
@@ -16,7 +17,9 @@
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::readability {
+namespace clang {
+namespace tidy {
+namespace readability {
 
 AST_MATCHER(CXXMethodDecl, isStatic) { return Node.isStatic(); }
 
@@ -61,11 +64,6 @@ AST_MATCHER(CXXMethodDecl, usesThis) {
       Used = true;
       return false; // Stop traversal.
     }
-
-    // If we enter a class declaration, don't traverse into it as any usages of
-    // `this` will correspond to the nested class.
-    bool TraverseCXXRecordDecl(CXXRecordDecl *RD) { return true; }
-
   } UsageOfThis;
 
   // TraverseStmt does not modify its argument.
@@ -170,4 +168,6 @@ void ConvertMemberFunctionsToStatic::check(
   Diag << FixItHint::CreateInsertion(Declaration->getBeginLoc(), "static ");
 }
 
-} // namespace clang::tidy::readability
+} // namespace readability
+} // namespace tidy
+} // namespace clang

@@ -1,4 +1,5 @@
-! RUN: %python %S/test_errors.py %s %flang_fc1
+! RUN: %S/test_errors.sh %s %t %flang_fc1
+! REQUIRES: shell
 ! Tests for C760:
 ! The passed-object dummy argument shall be a scalar, nonpointer, nonallocatable
 ! dummy data object with the same declared type as the type being defined;
@@ -49,11 +50,6 @@ module m3
 contains
   subroutine s(x)
     class(t) :: x
-  end
-  subroutine test
-    type(t) x
-    !ERROR: Dummy argument 'x=' (#1) is not OPTIONAL and is not associated with an actual argument in this procedure reference
-    call x%p
   end
 end
 

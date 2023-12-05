@@ -1,4 +1,4 @@
-// RUN: %clang_analyze_cc1 -analyzer-checker=core,deadcode.DeadStores,alpha.deadcode.UnreachableCode -verify -Wno-unused-value %s
+// RUN: %clang_analyze_cc1 -analyzer-checker=core,deadcode.DeadStores,alpha.deadcode.UnreachableCode -verify -analyzer-opt-analyze-nested-blocks -Wno-unused-value %s
 
 extern void foo(int a);
 
@@ -34,7 +34,7 @@ void test3(unsigned a) {
 
 // These next tests are path-sensitive
 
-void test4(void) {
+void test4() {
   int a = 5;
 
   while (a > 1)
@@ -69,7 +69,7 @@ void test6(const char *c) {
 // Compile-time constant false positives
 #define CONSTANT 0
 enum test_enum { Off, On };
-void test7(void) {
+void test7() {
   if (CONSTANT)
     return; // no-warning
 
@@ -80,7 +80,7 @@ void test7(void) {
     return; // no-warning
 }
 
-void test8(void) {
+void test8() {
   static unsigned a = 0;
 
   if (a)
@@ -105,7 +105,7 @@ void test9(unsigned a) {
 }
 
 // Tests from flow-sensitive version
-void test10(void) {
+void test10() {
   goto c;
   d:
   goto e; // expected-warning {{never executed}}
@@ -127,7 +127,7 @@ void test10(void) {
 // test11: we can actually end up in the default case, even if it is not
 // obvious: there might be something wrong with the given argument.
 enum foobar { FOO, BAR };
-extern void error(void);
+extern void error();
 void test11(enum foobar fb) {
   switch (fb) {
     case FOO:
@@ -149,8 +149,8 @@ void inlined(int condition) {
   }
 }
 
-void testInlined(void) {
-  extern int coin(void);
+void testInlined() {
+  extern int coin();
   int cond = coin();
   if (!cond) {
     inlined(0);

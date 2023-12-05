@@ -5,19 +5,14 @@ set(LLVM_LINK_COMPONENTS
 
 add_clang_library(clangTidyReadabilityModule
   AvoidConstParamsInDecls.cpp
-  AvoidUnconditionalPreprocessorIfCheck.cpp
   BracesAroundStatementsCheck.cpp
   ConstReturnTypeCheck.cpp
-  ContainerContainsCheck.cpp
-  ContainerDataPointerCheck.cpp
   ContainerSizeEmptyCheck.cpp
   ConvertMemberFunctionsToStatic.cpp
   DeleteNullPointerCheck.cpp
-  DuplicateIncludeCheck.cpp
   ElseAfterReturnCheck.cpp
   FunctionCognitiveComplexityCheck.cpp
   FunctionSizeCheck.cpp
-  IdentifierLengthCheck.cpp
   IdentifierNamingCheck.cpp
   ImplicitBoolConversionCheck.cpp
   InconsistentDeclarationParameterNameCheck.cpp
@@ -29,7 +24,6 @@ add_clang_library(clangTidyReadabilityModule
   NamedParameterCheck.cpp
   NamespaceCommentCheck.cpp
   NonConstParameterCheck.cpp
-  OperatorsRepresentationCheck.cpp
   QualifiedAutoCheck.cpp
   ReadabilityTidyModule.cpp
   RedundantAccessSpecifiersCheck.cpp
@@ -41,7 +35,6 @@ add_clang_library(clangTidyReadabilityModule
   RedundantSmartptrGetCheck.cpp
   RedundantStringCStrCheck.cpp
   RedundantStringInitCheck.cpp
-  ReferenceToConstructedTemporaryCheck.cpp
   SimplifyBooleanExprCheck.cpp
   SimplifySubscriptExprCheck.cpp
   StaticAccessedThroughInstanceCheck.cpp
@@ -58,7 +51,6 @@ add_clang_library(clangTidyReadabilityModule
 
   DEPENDS
   omp_gen
-  ClangDriverOptions
   )
 
 clang_target_link_libraries(clangTidyReadabilityModule

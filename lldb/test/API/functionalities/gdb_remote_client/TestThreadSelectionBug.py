@@ -1,8 +1,7 @@
 import lldb
 from lldbsuite.test.lldbtest import *
 from lldbsuite.test.decorators import *
-from lldbsuite.test.gdbclientutils import *
-from lldbsuite.test.lldbgdbclient import GDBRemoteTestBase
+from gdbclientutils import *
 
 
 class TestThreadSelectionBug(GDBRemoteTestBase):
@@ -15,10 +14,10 @@ class TestThreadSelectionBug(GDBRemoteTestBase):
         self.server.responder = MyResponder()
         target = self.createTarget("a.yaml")
         process = self.connect(target)
-        python_os_plugin_path = os.path.join(self.getSourceDir(), "operating_system.py")
+        python_os_plugin_path = os.path.join(self.getSourceDir(),
+                                             'operating_system.py')
         command = "settings set target.process.python-os-plugin-path '{}'".format(
-            python_os_plugin_path
-        )
+            python_os_plugin_path)
         self.dbg.HandleCommand(command)
 
         self.assertTrue(process, PROCESS_IS_VALID)
@@ -28,18 +27,15 @@ class TestThreadSelectionBug(GDBRemoteTestBase):
         thread = process.GetThreadByID(0x1)
         self.assertTrue(
             thread.IsValid(),
-            "Make sure there is a thread 0x1 after we load the python OS plug-in",
-        )
+            "Make sure there is a thread 0x1 after we load the python OS plug-in")
         thread = process.GetThreadByID(0x2)
         self.assertTrue(
             thread.IsValid(),
-            "Make sure there is a thread 0x2 after we load the python OS plug-in",
-        )
+            "Make sure there is a thread 0x2 after we load the python OS plug-in")
         thread = process.GetThreadByID(0x3)
         self.assertTrue(
             thread.IsValid(),
-            "Make sure there is a thread 0x3 after we load the python OS plug-in",
-        )
+            "Make sure there is a thread 0x3 after we load the python OS plug-in")
 
         # Verify that a thread other than 3 is selected.
         thread = process.GetSelectedThread()

@@ -53,20 +53,18 @@ using namespace llvm;
 
 #define DEBUG_TYPE "uselistorder"
 
-static cl::OptionCategory Cat("verify-uselistorder Options");
-
 static cl::opt<std::string> InputFilename(cl::Positional,
                                           cl::desc("<input bitcode file>"),
                                           cl::init("-"),
                                           cl::value_desc("filename"));
 
 static cl::opt<bool> SaveTemps("save-temps", cl::desc("Save temp files"),
-                               cl::cat(Cat));
+                               cl::init(false));
 
 static cl::opt<unsigned>
     NumShuffles("num-shuffles",
                 cl::desc("Number of times to shuffle and verify use-lists"),
-                cl::init(1), cl::cat(Cat));
+                cl::init(1));
 
 namespace {
 
@@ -204,9 +202,14 @@ ValueMapping::ValueMapping(const Module &M) {
     map(A.getAliasee());
   for (const GlobalIFunc &IF : M.ifuncs())
     map(IF.getResolver());
-  for (const Function &F : M)
-    for (Value *Op : F.operands())
-      map(Op);
+  for (const Function &F : M) {
+    if (F.hasPrefixData())
+      map(F.getPrefixData());
+    if (F.hasPrologueData())
+      map(F.getPrologueData());
+    if (F.hasPersonalityFn())
+      map(F.getPersonalityFn());
+  }
 
   // Function bodies.
   for (const Function &F : M) {
@@ -398,7 +401,7 @@ static void shuffleValueUseLists(Value *V, std::minstd_rand0 &Gen,
     return;
 
   // Generate random numbers between 10 and 99, which will line up nicely in
-  // debug output.  We're not worried about collisions here.
+  // debug output.  We're not worried about collisons here.
   LLVM_DEBUG(dbgs() << "V = "; V->dump());
   std::uniform_int_distribution<short> Dist(10, 99);
   SmallDenseMap<const Use *, short, 16> Order;
@@ -481,9 +484,14 @@ static void changeUseLists(Module &M, Changer changeValueUseList) {
     changeValueUseList(A.getAliasee());
   for (GlobalIFunc &IF : M.ifuncs())
     changeValueUseList(IF.getResolver());
-  for (Function &F : M)
-    for (Value *Op : F.operands())
-      changeValueUseList(Op);
+  for (Function &F : M) {
+    if (F.hasPrefixData())
+      changeValueUseList(F.getPrefixData());
+    if (F.hasPrologueData())
+      changeValueUseList(F.getPrologueData());
+    if (F.hasPersonalityFn())
+      changeValueUseList(F.getPersonalityFn());
+  }
 
   // Function bodies.
   for (Function &F : M) {
@@ -532,11 +540,11 @@ int main(int argc, char **argv) {
   // Enable debug stream buffering.
   EnableDebugBuffering = true;
 
-  cl::HideUnrelatedOptions(Cat);
+  LLVMContext Context;
+
   cl::ParseCommandLineOptions(argc, argv,
                               "llvm tool to verify use-list order\n");
 
-  LLVMContext Context;
   SMDiagnostic Err;
 
   // Load the input module...

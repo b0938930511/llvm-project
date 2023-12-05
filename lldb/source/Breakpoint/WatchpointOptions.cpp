@@ -27,12 +27,14 @@ bool WatchpointOptions::NullCallback(void *baton,
 
 // WatchpointOptions constructor
 WatchpointOptions::WatchpointOptions()
-    : m_callback(WatchpointOptions::NullCallback) {}
+    : m_callback(WatchpointOptions::NullCallback), m_callback_baton_sp(),
+      m_thread_spec_up() {}
 
 // WatchpointOptions copy constructor
 WatchpointOptions::WatchpointOptions(const WatchpointOptions &rhs)
     : m_callback(rhs.m_callback), m_callback_baton_sp(rhs.m_callback_baton_sp),
-      m_callback_is_synchronous(rhs.m_callback_is_synchronous) {
+      m_callback_is_synchronous(rhs.m_callback_is_synchronous),
+      m_thread_spec_up() {
   if (rhs.m_thread_spec_up != nullptr)
     m_thread_spec_up = std::make_unique<ThreadSpec>(*rhs.m_thread_spec_up);
 }

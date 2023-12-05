@@ -11,10 +11,10 @@ typedef signed char BOOL;
 
 typedef int dispatch_semaphore_t;
 typedef int dispatch_group_t;
-typedef void (^block_t)(void);
+typedef void (^block_t)();
 
 dispatch_semaphore_t dispatch_semaphore_create(int);
-dispatch_group_t dispatch_group_create(void);
+dispatch_group_t dispatch_group_create();
 void dispatch_group_enter(dispatch_group_t);
 void dispatch_group_leave(dispatch_group_t);
 void dispatch_group_wait(dispatch_group_t, int);
@@ -26,9 +26,9 @@ void dispatch_semaphore_signal(dispatch_semaphore_t);
 void func(void (^)(void));
 void func_w_typedef(block_t);
 
-int coin(void);
+int coin();
 
-void use_semaphor_antipattern(void) {
+void use_semaphor_antipattern() {
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
   func(^{
@@ -39,7 +39,7 @@ void use_semaphor_antipattern(void) {
 
 // It's OK to use pattern in tests.
 // We simply match the containing function name against ^test.
-void test_no_warning(void) {
+void test_no_warning() {
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
   func(^{
@@ -48,7 +48,7 @@ void test_no_warning(void) {
   dispatch_semaphore_wait(sema, 100);
 }
 
-void use_semaphor_antipattern_multiple_times(void) {
+void use_semaphor_antipattern_multiple_times() {
   dispatch_semaphore_t sema1 = dispatch_semaphore_create(0);
 
   func(^{
@@ -64,7 +64,7 @@ void use_semaphor_antipattern_multiple_times(void) {
   dispatch_semaphore_wait(sema2, 100); // expected-warning{{Waiting on a callback using a semaphore}}
 }
 
-void use_semaphor_antipattern_multiple_wait(void) {
+void use_semaphor_antipattern_multiple_wait() {
   dispatch_semaphore_t sema1 = dispatch_semaphore_create(0);
 
   func(^{
@@ -75,7 +75,7 @@ void use_semaphor_antipattern_multiple_wait(void) {
   dispatch_semaphore_wait(sema1, 100); // expected-warning{{Waiting on a callback using a semaphore}}
 }
 
-void warn_incorrect_order(void) {
+void warn_incorrect_order() {
   // FIXME: ASTMatchers do not allow ordered matching, so would match even
   // if out of order.
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
@@ -86,7 +86,7 @@ void warn_incorrect_order(void) {
   });
 }
 
-void warn_w_typedef(void) {
+void warn_w_typedef() {
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
   func_w_typedef(^{
@@ -95,7 +95,7 @@ void warn_w_typedef(void) {
   dispatch_semaphore_wait(sema, 100); // expected-warning{{Waiting on a callback using a semaphore}}
 }
 
-void warn_nested_ast(void) {
+void warn_nested_ast() {
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
   if (coin()) {
@@ -110,7 +110,7 @@ void warn_nested_ast(void) {
   dispatch_semaphore_wait(sema, 100); // expected-warning{{Waiting on a callback using a semaphore}}
 }
 
-void use_semaphore_assignment(void) {
+void use_semaphore_assignment() {
   dispatch_semaphore_t sema;
   sema = dispatch_semaphore_create(0);
 
@@ -120,7 +120,7 @@ void use_semaphore_assignment(void) {
   dispatch_semaphore_wait(sema, 100); // expected-warning{{Waiting on a callback using a semaphore}}
 }
 
-void use_semaphore_assignment_init(void) {
+void use_semaphore_assignment_init() {
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
   sema = dispatch_semaphore_create(1);
 
@@ -130,7 +130,7 @@ void use_semaphore_assignment_init(void) {
   dispatch_semaphore_wait(sema, 100); // expected-warning{{Waiting on a callback using a semaphore}}
 }
 
-void differentsemaphoreok(void) {
+void differentsemaphoreok() {
   dispatch_semaphore_t sema1 = dispatch_semaphore_create(0);
   dispatch_semaphore_t sema2 = dispatch_semaphore_create(0);
 
@@ -140,25 +140,25 @@ void differentsemaphoreok(void) {
   dispatch_semaphore_wait(sema2, 100); // no-warning
 }
 
-void nosignalok(void) {
+void nosignalok() {
   dispatch_semaphore_t sema1 = dispatch_semaphore_create(0);
   dispatch_semaphore_wait(sema1, 100);
 }
 
-void nowaitok(void) {
+void nowaitok() {
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
   func(^{
       dispatch_semaphore_signal(sema);
   });
 }
 
-void noblockok(void) {
+void noblockok() {
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
   dispatch_semaphore_signal(sema);
   dispatch_semaphore_wait(sema, 100);
 }
 
-void storedblockok(void) {
+void storedblockok() {
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
   block_t b = ^{
       dispatch_semaphore_signal(sema);
@@ -173,7 +173,7 @@ void passed_semaphore_ok(dispatch_semaphore_t sema) {
   dispatch_semaphore_wait(sema, 100);
 }
 
-void warn_with_cast(void) {
+void warn_with_cast() {
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
   func(^{

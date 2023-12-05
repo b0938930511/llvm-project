@@ -348,8 +348,23 @@ private:
 //===----------------------------------------------------------------------===//
 
 LiveRange::iterator LiveRange::find(SlotIndex Pos) {
-  return llvm::partition_point(*this,
-                               [&](const Segment &X) { return X.end <= Pos; });
+  // This algorithm is basically std::upper_bound.
+  // Unfortunately, std::upper_bound cannot be used with mixed types until we
+  // adopt C++0x. Many libraries can do it, but not all.
+  if (empty() || Pos >= endIndex())
+    return end();
+  iterator I = begin();
+  size_t Len = size();
+  do {
+    size_t Mid = Len >> 1;
+    if (Pos < I[Mid].end) {
+      Len = Mid;
+    } else {
+      I += Mid + 1;
+      Len -= Mid + 1;
+    }
+  } while (Len);
+  return I;
 }
 
 VNInfo *LiveRange::createDeadDef(SlotIndex Def, VNInfo::Allocator &VNIAlloc) {
@@ -445,7 +460,7 @@ bool LiveRange::overlaps(const LiveRange &Other, const CoalescerPair &CP,
 
   while (true) {
     // J has just been advanced to satisfy:
-    assert(J->end > I->start);
+    assert(J->end >= I->start);
     // Check for an overlap.
     if (J->start < I->end) {
       // I and J are overlapping. Find the later start.
@@ -460,11 +475,11 @@ bool LiveRange::overlaps(const LiveRange &Other, const CoalescerPair &CP,
       std::swap(I, J);
       std::swap(IE, JE);
     }
-    // Advance J until J->end > I->start.
+    // Advance J until J->end >= I->start.
     do
       if (++J == JE)
         return false;
-    while (J->end <= I->start);
+    while (J->end < I->start);
   }
 }
 
@@ -563,15 +578,13 @@ VNInfo *LiveRange::extendInBlock(SlotIndex StartIdx, SlotIndex Kill) {
   return CalcLiveRangeUtilVector(this).extendInBlock(StartIdx, Kill);
 }
 
+/// Remove the specified segment from this range.  Note that the segment must
+/// be in a single Segment in its entirety.
 void LiveRange::removeSegment(SlotIndex Start, SlotIndex End,
                               bool RemoveDeadValNo) {
   // Find the Segment containing this span.
   iterator I = find(Start);
-
-  // No Segment found, so nothing to do.
-  if (I == end())
-    return;
-
+  assert(I != end() && "Segment is not in range!");
   assert(I->containsInterval(Start, End)
          && "Segment is not entirely in range!");
 
@@ -579,10 +592,21 @@ void LiveRange::removeSegment(SlotIndex Start, SlotIndex End,
   VNInfo *ValNo = I->valno;
   if (I->start == Start) {
     if (I->end == End) {
-      segments.erase(I);  // Removed the whole Segment.
+      if (RemoveDeadValNo) {
+        // Check if val# is dead.
+        bool isDead = true;
+        for (const_iterator II = begin(), EE = end(); II != EE; ++II)
+          if (II != I && II->valno == ValNo) {
+            isDead = false;
+            break;
+          }
+        if (isDead) {
+          // Now that ValNo is dead, remove it.
+          markValNoForDeletion(ValNo);
+        }
+      }
 
-      if (RemoveDeadValNo)
-        removeValNoIfDead(ValNo);
+      segments.erase(I);  // Removed the whole Segment.
     } else
       I->start = End;
     return;
@@ -603,25 +627,13 @@ void LiveRange::removeSegment(SlotIndex Start, SlotIndex End,
   segments.insert(std::next(I), Segment(End, OldEnd, ValNo));
 }
 
-LiveRange::iterator LiveRange::removeSegment(iterator I, bool RemoveDeadValNo) {
-  VNInfo *ValNo = I->valno;
-  I = segments.erase(I);
-  if (RemoveDeadValNo)
-    removeValNoIfDead(ValNo);
-  return I;
-}
-
-void LiveRange::removeValNoIfDead(VNInfo *ValNo) {
-  if (none_of(*this, [=](const Segment &S) { return S.valno == ValNo; }))
-    markValNoForDeletion(ValNo);
-}
-
 /// removeValNo - Remove all the segments defined by the specified value#.
 /// Also remove the value# from value# list.
 void LiveRange::removeValNo(VNInfo *ValNo) {
   if (empty()) return;
-  llvm::erase_if(segments,
-                 [ValNo](const Segment &S) { return S.valno == ValNo; });
+  segments.erase(remove_if(*this, [ValNo](const Segment &S) {
+    return S.valno == ValNo;
+  }), end());
   // Now that ValNo is dead, remove it.
   markValNoForDeletion(ValNo);
 }
@@ -631,7 +643,6 @@ void LiveRange::join(LiveRange &Other,
                      const int *RHSValNoAssignments,
                      SmallVectorImpl<VNInfo *> &NewVNInfo) {
   verify();
-  Other.verify();
 
   // Determine if any of our values are mapped.  This is uncommon, so we want
   // to avoid the range scan if not.
@@ -966,7 +977,7 @@ void LiveInterval::computeSubRangeUndefs(SmallVectorImpl<SlotIndex> &Undefs,
                                          LaneBitmask LaneMask,
                                          const MachineRegisterInfo &MRI,
                                          const SlotIndexes &Indexes) const {
-  assert(reg().isVirtual());
+  assert(Register::isVirtualRegister(reg()));
   LaneBitmask VRegMask = MRI.getMaxLaneMaskForVReg(reg());
   assert((VRegMask & LaneMask).any());
   const TargetRegisterInfo &TRI = *MRI.getTargetRegisterInfo();
@@ -1008,7 +1019,7 @@ void LiveRange::print(raw_ostream &OS) const {
 
   // Print value number info.
   if (getNumValNums()) {
-    OS << ' ';
+    OS << "  ";
     unsigned vnum = 0;
     for (const_vni_iterator i = vni_begin(), e = vni_end(); i != e;
          ++i, ++vnum) {
@@ -1027,8 +1038,8 @@ void LiveRange::print(raw_ostream &OS) const {
 }
 
 void LiveInterval::SubRange::print(raw_ostream &OS) const {
-  OS << "  L" << PrintLaneMask(LaneMask) << ' '
-     << static_cast<const LiveRange &>(*this);
+  OS << " L" << PrintLaneMask(LaneMask) << ' '
+     << static_cast<const LiveRange&>(*this);
 }
 
 void LiveInterval::print(raw_ostream &OS) const {
@@ -1037,7 +1048,7 @@ void LiveInterval::print(raw_ostream &OS) const {
   // Print subranges
   for (const SubRange &SR : subranges())
     OS << SR;
-  OS << "  weight:" << Weight;
+  OS << " weight:" << Weight;
 }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)

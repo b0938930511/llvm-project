@@ -1,6 +1,6 @@
 // RUN: %clang_cc1 -triple x86_64-apple-macosx10.10 -fsyntax-only -verify -fobjc-exceptions %s
 // RUN: %clang_cc1 -triple x86_64-apple-macosx10.10 -fsyntax-only -verify -fobjc-exceptions -x objective-c++ %s
-void * proc(void);
+void * proc();
 
 @interface NSConstantString
 @end
@@ -11,7 +11,7 @@ void * proc(void);
 @interface Frob1
 @end
 
-void * foo(void)
+void * foo()
 {
   @try {
     return proc();
@@ -28,13 +28,14 @@ void * foo(void)
     }
     @catch (Frob* ex) {
       @throw 1,2; // expected-error {{@throw requires an Objective-C object type ('int' invalid)}} \
-				  // expected-warning {{left operand of comma operator has no effect}}
+				  // expected-warning {{expression result unused}}
     }
     @catch (float x) {  // expected-error {{@catch parameter is not a pointer to an interface type}}
       
     }
     @catch(...) {
-      @throw (4,3,proc()); // expected-warning 2{{left operand of comma operator has no effect}}
+      @throw (4,3,proc()); // expected-warning {{expression result unused}} \
+						   // expected-warning {{expression result unused}}
     }
   }
 
@@ -44,20 +45,20 @@ void * foo(void)
 }
 
 
-void bar(void)
+void bar()
 {
   @try {}// expected-error {{@try statement without a @catch and @finally clause}}
   @"s"; //  expected-warning {{result unused}}
 }
 
-void baz(void)
+void baz()
 {
   @try {}// expected-error {{@try statement without a @catch and @finally clause}}
   @try {}
   @finally {}
 }
 
-void noTwoTokenLookAheadRequiresABitOfFancyFootworkInTheParser(void) {
+void noTwoTokenLookAheadRequiresABitOfFancyFootworkInTheParser() {
     @try {
         // Do something
     } @catch (...) {}

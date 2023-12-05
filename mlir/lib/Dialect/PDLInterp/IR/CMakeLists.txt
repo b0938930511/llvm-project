@@ -1,4 +1,4 @@
-add_mlir_dialect_library(MLIRPDLInterpDialect
+add_mlir_dialect_library(MLIRPDLInterp
   PDLInterp.cpp
 
   ADDITIONAL_HEADER_DIRS
@@ -8,9 +8,8 @@ add_mlir_dialect_library(MLIRPDLInterpDialect
   MLIRPDLInterpOpsIncGen
 
   LINK_LIBS PUBLIC
-  MLIRFunctionInterfaces
   MLIRIR
-  MLIRPDLDialect
+  MLIRPDL
   MLIRInferTypeOpInterface
   MLIRSideEffectInterfaces
   )

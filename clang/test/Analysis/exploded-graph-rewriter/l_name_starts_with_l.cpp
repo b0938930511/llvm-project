@@ -4,6 +4,7 @@
 // RUN:                     -analyzer-checker=core \
 // RUN:                     -analyzer-dump-egraph=%t.dot %s
 // RUN: %exploded_graph_rewriter %t.dot | FileCheck %s
+// REQUIRES: asserts
 
 void test1() {
   // Here __FILE__ macros produces a string with `\` delimiters on Windows

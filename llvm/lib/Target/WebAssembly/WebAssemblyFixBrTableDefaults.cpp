@@ -16,7 +16,6 @@
 
 #include "MCTargetDesc/WebAssemblyMCTargetDesc.h"
 #include "WebAssembly.h"
-#include "WebAssemblySubtarget.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
@@ -62,13 +61,9 @@ void fixBrTableIndex(MachineInstr &MI, MachineBasicBlock *MBB,
   auto ExtMI = MF.getRegInfo().getVRegDef(MI.getOperand(0).getReg());
   if (ExtMI->getOpcode() == WebAssembly::I64_EXTEND_U_I32) {
     // Unnecessarily extending a 32-bit value to 64, remove it.
-    auto ExtDefReg = ExtMI->getOperand(0).getReg();
-    assert(MI.getOperand(0).getReg() == ExtDefReg);
+    assert(MI.getOperand(0).getReg() == ExtMI->getOperand(0).getReg());
     MI.getOperand(0).setReg(ExtMI->getOperand(1).getReg());
-    if (MF.getRegInfo().use_nodbg_empty(ExtDefReg)) {
-      // No more users of extend, delete it.
-      ExtMI->eraseFromParent();
-    }
+    ExtMI->eraseFromParent();
   } else {
     // Incoming 64-bit value that needs to be truncated.
     Register Reg32 =
@@ -131,7 +126,7 @@ MachineBasicBlock *fixBrTableDefault(MachineInstr &MI, MachineBasicBlock *MBB,
       return nullptr;
 
     // Remove the dummy default target and install the real one.
-    MI.removeOperand(MI.getNumExplicitOperands() - 1);
+    MI.RemoveOperand(MI.getNumExplicitOperands() - 1);
     MI.addOperand(MF, MachineOperand::CreateMBB(TBB));
   }
 
@@ -167,7 +162,7 @@ bool WebAssemblyFixBrTableDefaults::runOnMachineFunction(MachineFunction &MF) {
     MachineBasicBlock *MBB = *MBBSet.begin();
     MBBSet.erase(MBB);
     for (auto &MI : *MBB) {
-      if (WebAssembly::isBrTable(MI.getOpcode())) {
+      if (WebAssembly::isBrTable(MI)) {
         fixBrTableIndex(MI, MBB, MF);
         auto *Fixed = fixBrTableDefault(MI, MBB, MF);
         if (Fixed != nullptr) {

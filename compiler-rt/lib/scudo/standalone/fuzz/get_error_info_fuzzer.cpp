@@ -46,14 +46,15 @@ extern "C" int LLVMFuzzerTestOneInput(uint8_t *Data, size_t Size) {
   }
 
   std::string RingBufferBytes = FDP.ConsumeRemainingBytesAsString();
-  // RingBuffer is too short.
-  if (!AllocatorT::setRingBufferSizeForBuffer(RingBufferBytes.data(),
-                                              RingBufferBytes.size()))
-    return 0;
+  std::vector<char> RingBuffer(AllocatorT::getRingBufferSize(), 0);
+  for (size_t i = 0; i < RingBufferBytes.length() && i < RingBuffer.size();
+       ++i) {
+    RingBuffer[i] = RingBufferBytes[i];
+  }
 
   scudo_error_info ErrorInfo;
   AllocatorT::getErrorInfo(&ErrorInfo, FaultAddr, StackDepot.data(),
-                           RegionInfo.data(), RingBufferBytes.data(), Memory,
+                           RegionInfo.data(), RingBuffer.data(), Memory,
                            MemoryTags, MemoryAddr, MemorySize);
   return 0;
 }

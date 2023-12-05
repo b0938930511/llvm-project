@@ -3,6 +3,7 @@ Use lldb Python API to make sure the dynamic checkers are doing their jobs.
 """
 
 
+
 import lldb
 from lldbsuite.test.decorators import *
 from lldbsuite.test.lldbtest import *
@@ -10,6 +11,9 @@ from lldbsuite.test import lldbutil
 
 
 class ObjCCheckerTestCase(TestBase):
+
+    mydir = TestBase.compute_mydir(__file__)
+
     NO_DEBUG_INFO_TESTCASE = True
 
     def setUp(self):
@@ -17,12 +21,12 @@ class ObjCCheckerTestCase(TestBase):
         TestBase.setUp(self)
 
         # Find the line number to break for main.c.
-        self.source_name = "main.m"
+        self.source_name = 'main.m'
 
-    @add_test_categories(["pyapi"])
+    @add_test_categories(['pyapi'])
     def test_objc_checker(self):
         """Test that checkers catch unrecognized selectors"""
-        if self.getArchitecture() == "i386":
+        if self.getArchitecture() == 'i386':
             self.skipTest("requires Objective-C 2.0 runtime")
 
         self.build()
@@ -36,18 +40,20 @@ class ObjCCheckerTestCase(TestBase):
         # Set up our breakpoints:
 
         main_bkpt = target.BreakpointCreateBySourceRegex(
-            "Set a breakpoint here.", lldb.SBFileSpec(self.source_name)
-        )
-        self.assertTrue(
-            main_bkpt and main_bkpt.GetNumLocations() == 1, VALID_BREAKPOINT
-        )
+            "Set a breakpoint here.", lldb.SBFileSpec(self.source_name))
+        self.assertTrue(main_bkpt and
+                        main_bkpt.GetNumLocations() == 1,
+                        VALID_BREAKPOINT)
 
         # Now launch the process, and do not stop at the entry point.
-        process = target.LaunchSimple(None, None, self.get_process_working_directory())
+        process = target.LaunchSimple(
+            None, None, self.get_process_working_directory())
 
-        self.assertState(process.GetState(), lldb.eStateStopped, PROCESS_STOPPED)
+        self.assertEqual(process.GetState(), lldb.eStateStopped,
+                        PROCESS_STOPPED)
 
-        threads = lldbutil.get_threads_stopped_at_breakpoint(process, main_bkpt)
+        threads = lldbutil.get_threads_stopped_at_breakpoint(
+            process, main_bkpt)
         self.assertEqual(len(threads), 1)
         thread = threads[0]
 
@@ -78,5 +84,6 @@ class ObjCCheckerTestCase(TestBase):
         #
         expr_value = frame.EvaluateExpression("[my_simple getBigStruct]", False)
         expr_error = expr_value.GetError()
-
-        self.assertSuccess(expr_error)
+        
+        self.assertTrue(expr_error.Success())
+        

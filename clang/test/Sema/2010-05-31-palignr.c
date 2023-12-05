@@ -5,7 +5,7 @@
 
 extern int i;
 
-int main (void)
+int main ()
 {
   typedef int16_t     vSInt16         __attribute__ ((__vector_size__ (16)));
 

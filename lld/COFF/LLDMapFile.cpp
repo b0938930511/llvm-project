@@ -19,13 +19,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "LLDMapFile.h"
-#include "COFFLinkerContext.h"
 #include "SymbolTable.h"
 #include "Symbols.h"
 #include "Writer.h"
 #include "lld/Common/ErrorHandler.h"
 #include "llvm/Support/Parallel.h"
-#include "llvm/Support/TimeProfiler.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
@@ -46,9 +44,9 @@ static void writeHeader(raw_ostream &os, uint64_t addr, uint64_t size,
 }
 
 // Returns a list of all symbols that we want to print out.
-static std::vector<DefinedRegular *> getSymbols(const COFFLinkerContext &ctx) {
+static std::vector<DefinedRegular *> getSymbols() {
   std::vector<DefinedRegular *> v;
-  for (ObjFile *file : ctx.objFileInstances)
+  for (ObjFile *file : ObjFile::instances)
     for (Symbol *b : file->getSymbols())
       if (auto *sym = dyn_cast_or_null<DefinedRegular>(b))
         if (sym && !sym->getCOFFSymbol().isSectionDefinition())
@@ -74,13 +72,12 @@ static SymbolMapTy getSectionSyms(ArrayRef<DefinedRegular *> syms) {
 
 // Construct a map from symbols to their stringified representations.
 static DenseMap<DefinedRegular *, std::string>
-getSymbolStrings(const COFFLinkerContext &ctx,
-                 ArrayRef<DefinedRegular *> syms) {
+getSymbolStrings(ArrayRef<DefinedRegular *> syms) {
   std::vector<std::string> str(syms.size());
-  parallelFor((size_t)0, syms.size(), [&](size_t i) {
+  parallelForEachN((size_t)0, syms.size(), [&](size_t i) {
     raw_string_ostream os(str[i]);
     writeHeader(os, syms[i]->getRVA(), 0, 0);
-    os << indent16 << toString(ctx, *syms[i]);
+    os << indent16 << toString(*syms[i]);
   });
 
   DenseMap<DefinedRegular *, std::string> ret;
@@ -89,26 +86,25 @@ getSymbolStrings(const COFFLinkerContext &ctx,
   return ret;
 }
 
-void lld::coff::writeLLDMapFile(const COFFLinkerContext &ctx) {
-  if (ctx.config.lldmapFile.empty())
+void lld::coff::writeLLDMapFile(ArrayRef<OutputSection *> outputSections) {
+  if (config->lldmapFile.empty())
     return;
 
-  llvm::TimeTraceScope timeScope(".lldmap file");
   std::error_code ec;
-  raw_fd_ostream os(ctx.config.lldmapFile, ec, sys::fs::OF_None);
+  raw_fd_ostream os(config->lldmapFile, ec, sys::fs::OF_None);
   if (ec)
-    fatal("cannot open " + ctx.config.lldmapFile + ": " + ec.message());
+    fatal("cannot open " + config->lldmapFile + ": " + ec.message());
 
   // Collect symbol info that we want to print out.
-  std::vector<DefinedRegular *> syms = getSymbols(ctx);
+  std::vector<DefinedRegular *> syms = getSymbols();
   SymbolMapTy sectionSyms = getSectionSyms(syms);
-  DenseMap<DefinedRegular *, std::string> symStr = getSymbolStrings(ctx, syms);
+  DenseMap<DefinedRegular *, std::string> symStr = getSymbolStrings(syms);
 
   // Print out the header line.
   os << "Address  Size     Align Out     In      Symbol\n";
 
   // Print out file contents.
-  for (OutputSection *sec : ctx.outputSections) {
+  for (OutputSection *sec : outputSections) {
     writeHeader(os, sec->getRVA(), sec->getVirtualSize(), /*align=*/pageSize);
     os << sec->name << '\n';
 

@@ -2,14 +2,10 @@ add_llvm_component_library(LLVMTextAPI
   Architecture.cpp
   ArchitectureSet.cpp
   InterfaceFile.cpp
-  TextStubV5.cpp
   PackedVersion.cpp
   Platform.cpp
-  RecordsSlice.cpp
   Symbol.cpp
-  SymbolSet.cpp
   Target.cpp
-  TextAPIError.cpp
   TextStub.cpp
   TextStubCommon.cpp
 
@@ -19,5 +15,4 @@ add_llvm_component_library(LLVMTextAPI
   LINK_COMPONENTS
   Support
   BinaryFormat
-  TargetParser
 )

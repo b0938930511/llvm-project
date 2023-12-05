@@ -20,11 +20,11 @@
 // CHECK-BC-LABEL: attributes #0 = {{.*}} alwaysinline
 // CHECK-CMD: -O2
 
-__attribute__((always_inline)) void bar(void) {
+__attribute__((always_inline)) void bar() {
   return;
 }
 
-void foo(void) {
+void foo() {
   bar();
   return;
 }

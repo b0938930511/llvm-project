@@ -10,12 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "mlir/Dialect/DLTI/DLTI.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Target/LLVMIR/Dialect/All.h"
 #include "mlir/Target/LLVMIR/Export.h"
-#include "mlir/Tools/mlir-translate/Translation.h"
+#include "mlir/Translation.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 
@@ -24,10 +22,10 @@ using namespace mlir;
 namespace mlir {
 void registerToLLVMIRTranslation() {
   TranslateFromMLIRRegistration registration(
-      "mlir-to-llvmir", "Translate MLIR to LLVMIR",
-      [](Operation *op, raw_ostream &output) {
+      "mlir-to-llvmir",
+      [](ModuleOp module, raw_ostream &output) {
         llvm::LLVMContext llvmContext;
-        auto llvmModule = translateModuleToLLVMIR(op, llvmContext);
+        auto llvmModule = translateModuleToLLVMIR(module, llvmContext);
         if (!llvmModule)
           return failure();
 
@@ -35,7 +33,6 @@ void registerToLLVMIRTranslation() {
         return success();
       },
       [](DialectRegistry &registry) {
-        registry.insert<DLTIDialect, func::FuncDialect>();
         registerAllToLLVMIRTranslations(registry);
       });
 }

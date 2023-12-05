@@ -26,12 +26,12 @@
 #include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/MC/MCSymbol.h"
+#include "llvm/MC/SubtargetFeature.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/TargetParser/SubtargetFeature.h"
 #include <cassert>
 #include <cstdint>
 
@@ -44,16 +44,17 @@ STATISTIC(MCNumEmitted, "Number of MC instructions emitted");
 namespace {
 
 class SparcMCCodeEmitter : public MCCodeEmitter {
+  const MCInstrInfo &MCII;
   MCContext &Ctx;
 
 public:
-  SparcMCCodeEmitter(const MCInstrInfo &, MCContext &ctx)
-      : Ctx(ctx) {}
+  SparcMCCodeEmitter(const MCInstrInfo &mcii, MCContext &ctx)
+      : MCII(mcii), Ctx(ctx) {}
   SparcMCCodeEmitter(const SparcMCCodeEmitter &) = delete;
   SparcMCCodeEmitter &operator=(const SparcMCCodeEmitter &) = delete;
   ~SparcMCCodeEmitter() override = default;
 
-  void encodeInstruction(const MCInst &MI, SmallVectorImpl<char> &CB,
+  void encodeInstruction(const MCInst &MI, raw_ostream &OS,
                          SmallVectorImpl<MCFixup> &Fixups,
                          const MCSubtargetInfo &STI) const override;
 
@@ -83,33 +84,37 @@ public:
   unsigned getBranchOnRegTargetOpValue(const MCInst &MI, unsigned OpNo,
                                        SmallVectorImpl<MCFixup> &Fixups,
                                        const MCSubtargetInfo &STI) const;
+
+private:
+  FeatureBitset computeAvailableFeatures(const FeatureBitset &FB) const;
+  void
+  verifyInstructionPredicates(const MCInst &MI,
+                              const FeatureBitset &AvailableFeatures) const;
 };
 
 } // end anonymous namespace
 
-void SparcMCCodeEmitter::encodeInstruction(const MCInst &MI,
-                                           SmallVectorImpl<char> &CB,
+void SparcMCCodeEmitter::encodeInstruction(const MCInst &MI, raw_ostream &OS,
                                            SmallVectorImpl<MCFixup> &Fixups,
                                            const MCSubtargetInfo &STI) const {
-  unsigned Bits = getBinaryCodeForInstr(MI, Fixups, STI);
-  support::endian::write(CB, Bits,
-                         Ctx.getAsmInfo()->isLittleEndian()
-                             ? llvm::endianness::little
-                             : llvm::endianness::big);
+  verifyInstructionPredicates(MI,
+                              computeAvailableFeatures(STI.getFeatureBits()));
 
-  // Some instructions have phantom operands that only contribute a fixup entry.
-  unsigned SymOpNo = 0;
+  unsigned Bits = getBinaryCodeForInstr(MI, Fixups, STI);
+  support::endian::write(OS, Bits,
+                         Ctx.getAsmInfo()->isLittleEndian() ? support::little
+                                                            : support::big);
+  unsigned tlsOpNo = 0;
   switch (MI.getOpcode()) {
   default: break;
-  case SP::TLS_CALL:   SymOpNo = 1; break;
-  case SP::GDOP_LDrr:
-  case SP::GDOP_LDXrr:
+  case SP::TLS_CALL:   tlsOpNo = 1; break;
   case SP::TLS_ADDrr:
+  case SP::TLS_ADDXrr:
   case SP::TLS_LDrr:
-  case SP::TLS_LDXrr:  SymOpNo = 3; break;
+  case SP::TLS_LDXrr:  tlsOpNo = 3; break;
   }
-  if (SymOpNo != 0) {
-    const MCOperand &MO = MI.getOperand(SymOpNo);
+  if (tlsOpNo != 0) {
+    const MCOperand &MO = MI.getOperand(tlsOpNo);
     uint64_t op = getMachineOpValue(MI, MO, Fixups, STI);
     assert(op == 0 && "Unexpected operand value!");
     (void)op; // suppress warning.
@@ -236,15 +241,19 @@ getBranchOnRegTargetOpValue(const MCInst &MI, unsigned OpNo,
   if (MO.isReg() || MO.isImm())
     return getMachineOpValue(MI, MO, Fixups, STI);
 
-  Fixups.push_back(
-      MCFixup::create(0, MO.getExpr(), (MCFixupKind)Sparc::fixup_sparc_br16));
+  Fixups.push_back(MCFixup::create(0, MO.getExpr(),
+                                   (MCFixupKind)Sparc::fixup_sparc_br16_2));
+  Fixups.push_back(MCFixup::create(0, MO.getExpr(),
+                                   (MCFixupKind)Sparc::fixup_sparc_br16_14));
 
   return 0;
 }
 
+#define ENABLE_INSTR_PREDICATE_VERIFIER
 #include "SparcGenMCCodeEmitter.inc"
 
 MCCodeEmitter *llvm::createSparcMCCodeEmitter(const MCInstrInfo &MCII,
+                                              const MCRegisterInfo &MRI,
                                               MCContext &Ctx) {
   return new SparcMCCodeEmitter(MCII, Ctx);
 }

@@ -15,7 +15,9 @@
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::objc {
+namespace clang {
+namespace tidy {
+namespace objc {
 
 namespace {
 
@@ -49,9 +51,14 @@ ForbiddenSubclassingCheck::ForbiddenSubclassingCheck(
 void ForbiddenSubclassingCheck::registerMatchers(MatchFinder *Finder) {
   Finder->addMatcher(
       objcInterfaceDecl(
-          isDerivedFrom(objcInterfaceDecl(hasAnyName(ForbiddenSuperClassNames))
-                            .bind("superclass")))
-          .bind("subclass"),
+          isDerivedFrom(
+              objcInterfaceDecl(
+                  hasAnyName(
+                      std::vector<StringRef>(
+                          ForbiddenSuperClassNames.begin(),
+                          ForbiddenSuperClassNames.end())))
+              .bind("superclass")))
+      .bind("subclass"),
       this);
 }
 
@@ -78,4 +85,6 @@ void ForbiddenSubclassingCheck::storeOptions(
       utils::options::serializeStringList(ForbiddenSuperClassNames));
 }
 
-} // namespace clang::tidy::objc
+} // namespace objc
+} // namespace tidy
+} // namespace clang

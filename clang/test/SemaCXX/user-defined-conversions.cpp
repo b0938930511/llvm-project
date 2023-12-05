@@ -1,5 +1,4 @@
-// RUN: %clang_cc1 -fsyntax-only -verify=expected,precxx17 %std_cxx98-14 %s
-// RUN: %clang_cc1 -fsyntax-only -verify=expected %std_cxx17- %s
+// RUN: %clang_cc1 -fsyntax-only -verify %s 
 struct X {
   operator bool();
 };
@@ -70,7 +69,7 @@ void test_conversion(ConvertibleToBase ctb, ConvertibleToDerived ctd,
 }
 
 struct X1 {
-  X1(X1&); // precxx17-note{{candidate constructor not viable: expects an lvalue for 1st argument}}
+  X1(X1&); // expected-note{{candidate constructor not viable: expects an lvalue for 1st argument}}
 };
 
 struct X2 {
@@ -81,7 +80,7 @@ int &f(X1);
 float &f(...);
 
 void g(X2 b) {
-  int &ir = f(b); // precxx17-error{{no viable constructor copying parameter of type 'X1'}}
+  int &ir = f(b); // expected-error{{no viable constructor copying parameter of type 'X1'}}
 }
 
 namespace rdar10202900 {

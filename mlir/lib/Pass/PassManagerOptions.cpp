@@ -21,11 +21,11 @@ struct PassManagerOptions {
   // Crash Reproducer Generator
   //===--------------------------------------------------------------------===//
   llvm::cl::opt<std::string> reproducerFile{
-      "mlir-pass-pipeline-crash-reproducer",
+      "pass-pipeline-crash-reproducer",
       llvm::cl::desc("Generate a .mlir reproducer file at the given output path"
                      " if the pass manager crashes or fails")};
   llvm::cl::opt<bool> localReproducer{
-      "mlir-pass-pipeline-local-reproducer",
+      "pass-pipeline-local-reproducer",
       llvm::cl::desc("When generating a crash reproducer, attempt to generated "
                      "a reproducer with the smallest pipeline."),
       llvm::cl::init(false)};
@@ -33,28 +33,28 @@ struct PassManagerOptions {
   //===--------------------------------------------------------------------===//
   // IR Printing
   //===--------------------------------------------------------------------===//
-  PassNameCLParser printBefore{"mlir-print-ir-before",
+  PassNameCLParser printBefore{"print-ir-before",
                                "Print IR before specified passes"};
-  PassNameCLParser printAfter{"mlir-print-ir-after",
+  PassNameCLParser printAfter{"print-ir-after",
                               "Print IR after specified passes"};
   llvm::cl::opt<bool> printBeforeAll{
-      "mlir-print-ir-before-all", llvm::cl::desc("Print IR before each pass"),
+      "print-ir-before-all", llvm::cl::desc("Print IR before each pass"),
       llvm::cl::init(false)};
-  llvm::cl::opt<bool> printAfterAll{"mlir-print-ir-after-all",
+  llvm::cl::opt<bool> printAfterAll{"print-ir-after-all",
                                     llvm::cl::desc("Print IR after each pass"),
                                     llvm::cl::init(false)};
   llvm::cl::opt<bool> printAfterChange{
-      "mlir-print-ir-after-change",
+      "print-ir-after-change",
       llvm::cl::desc(
           "When printing the IR after a pass, only print if the IR changed"),
       llvm::cl::init(false)};
   llvm::cl::opt<bool> printAfterFailure{
-      "mlir-print-ir-after-failure",
+      "print-ir-after-failure",
       llvm::cl::desc(
           "When printing the IR after a pass, only print if the pass failed"),
       llvm::cl::init(false)};
   llvm::cl::opt<bool> printModuleScope{
-      "mlir-print-ir-module-scope",
+      "print-ir-module-scope",
       llvm::cl::desc("When printing IR for print-ir-[before|after]{-all} "
                      "always print the top-level operation"),
       llvm::cl::init(false)};
@@ -66,10 +66,9 @@ struct PassManagerOptions {
   // Pass Statistics
   //===--------------------------------------------------------------------===//
   llvm::cl::opt<bool> passStatistics{
-      "mlir-pass-statistics",
-      llvm::cl::desc("Display the statistics of each pass")};
+      "pass-statistics", llvm::cl::desc("Display the statistics of each pass")};
   llvm::cl::opt<PassDisplayMode> passStatisticsDisplayMode{
-      "mlir-pass-statistics-display",
+      "pass-statistics-display",
       llvm::cl::desc("Display method for pass statistics"),
       llvm::cl::init(PassDisplayMode::Pipeline),
       llvm::cl::values(
@@ -79,7 +78,7 @@ struct PassManagerOptions {
           clEnumValN(PassDisplayMode::Pipeline, "pipeline",
                      "display the results with a nested pipeline view"))};
 };
-} // namespace
+} // end anonymous namespace
 
 static llvm::ManagedStatic<PassManagerOptions> options;
 
@@ -130,9 +129,9 @@ void mlir::registerPassManagerCLOptions() {
   *options;
 }
 
-LogicalResult mlir::applyPassManagerCLOptions(PassManager &pm) {
+void mlir::applyPassManagerCLOptions(PassManager &pm) {
   if (!options.isConstructed())
-    return failure();
+    return;
 
   // Generate a reproducer on crash/failure.
   if (options->reproducerFile.getNumOccurrences())
@@ -143,16 +142,8 @@ LogicalResult mlir::applyPassManagerCLOptions(PassManager &pm) {
   if (options->passStatistics)
     pm.enableStatistics(options->passStatisticsDisplayMode);
 
-  if (options->printModuleScope && pm.getContext()->isMultithreadingEnabled()) {
-    emitError(UnknownLoc::get(pm.getContext()))
-        << "IR print for module scope can't be setup on a pass-manager "
-           "without disabling multi-threading first.\n";
-    return failure();
-  }
-
   // Add the IR printing instrumentation.
   options->addPrinterInstrumentation(pm);
-  return success();
 }
 
 void mlir::applyDefaultTimingPassManagerCLOptions(PassManager &pm) {

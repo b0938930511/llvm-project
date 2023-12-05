@@ -7,6 +7,6 @@
 
 // expected-no-diagnostics
 
-void hello(void) {
+void hello() {
   printf("Hello, World!");
 }

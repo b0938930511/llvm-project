@@ -30,18 +30,20 @@
 #include "deleter_types.h"
 #include "unique_ptr_test_helper.h"
 
-#if TEST_STD_VER >= 11
-TEST_CONSTINIT std::unique_ptr<int> global_static_unique_ptr_single;
-TEST_CONSTINIT std::unique_ptr<int[]> global_static_unique_ptr_runtime;
+#if defined(_LIBCPP_VERSION) && TEST_STD_VER >= 11
+_LIBCPP_SAFE_STATIC std::unique_ptr<int> global_static_unique_ptr_single;
+_LIBCPP_SAFE_STATIC std::unique_ptr<int[]> global_static_unique_ptr_runtime;
+#endif
 
+#if TEST_STD_VER >= 11
 struct NonDefaultDeleter {
   NonDefaultDeleter() = delete;
-  TEST_CONSTEXPR_CXX23 void operator()(void*) const {}
+  void operator()(void*) const {}
 };
 #endif
 
 template <class ElemType>
-TEST_CONSTEXPR_CXX23 void test_sfinae() {
+void test_sfinae() {
 #if TEST_STD_VER >= 11
   { // the constructor does not participate in overload resolution when
     // the deleter is a pointer type
@@ -51,9 +53,9 @@ TEST_CONSTEXPR_CXX23 void test_sfinae() {
   { // the constructor does not participate in overload resolution when
     // the deleter is not default constructible
     using Del = CDeleter<ElemType>;
-    using U1  = std::unique_ptr<ElemType, NonDefaultDeleter>;
-    using U2  = std::unique_ptr<ElemType, Del&>;
-    using U3  = std::unique_ptr<ElemType, Del const&>;
+    using U1 = std::unique_ptr<ElemType, NonDefaultDeleter>;
+    using U2 = std::unique_ptr<ElemType, Del&>;
+    using U3 = std::unique_ptr<ElemType, Del const&>;
     static_assert(!std::is_default_constructible<U1>::value, "");
     static_assert(!std::is_default_constructible<U2>::value, "");
     static_assert(!std::is_default_constructible<U3>::value, "");
@@ -62,7 +64,7 @@ TEST_CONSTEXPR_CXX23 void test_sfinae() {
 }
 
 template <class ElemType>
-TEST_CONSTEXPR_CXX23 bool test_basic() {
+void test_basic() {
 #if TEST_STD_VER >= 11
   {
     using U1 = std::unique_ptr<ElemType>;
@@ -82,13 +84,6 @@ TEST_CONSTEXPR_CXX23 bool test_basic() {
     p.get_deleter().set_state(5);
     assert(p.get_deleter().state() == 5);
   }
-  {
-    std::unique_ptr<ElemType, DefaultCtorDeleter<ElemType> > p;
-    assert(p.get() == 0);
-    assert(p.get_deleter().state() == 0);
-  }
-
-  return true;
 }
 
 DEFINE_AND_RUN_IS_INCOMPLETE_TEST({
@@ -99,7 +94,7 @@ DEFINE_AND_RUN_IS_INCOMPLETE_TEST({
   doIncompleteTypeTest<IncompleteType[], Deleter<IncompleteType[]> >(0);
 })
 
-TEST_CONSTEXPR_CXX23 bool test() {
+int main(int, char**) {
   {
     test_sfinae<int>();
     test_basic<int>();
@@ -108,15 +103,6 @@ TEST_CONSTEXPR_CXX23 bool test() {
     test_sfinae<int[]>();
     test_basic<int[]>();
   }
-
-  return true;
-}
-
-int main(int, char**) {
-  test();
-#if TEST_STD_VER >= 23
-  static_assert(test());
-#endif
 
   return 0;
 }

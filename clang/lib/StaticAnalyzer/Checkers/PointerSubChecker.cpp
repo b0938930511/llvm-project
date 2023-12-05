@@ -17,7 +17,6 @@
 #include "clang/StaticAnalyzer/Core/Checker.h"
 #include "clang/StaticAnalyzer/Core/CheckerManager.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CheckerContext.h"
-#include "llvm/ADT/StringRef.h"
 
 using namespace clang;
 using namespace ento;
@@ -25,7 +24,7 @@ using namespace ento;
 namespace {
 class PointerSubChecker
   : public Checker< check::PreStmt<BinaryOperator> > {
-  mutable std::unique_ptr<BugType> BT;
+  mutable std::unique_ptr<BuiltinBug> BT;
 
 public:
   void checkPreStmt(const BinaryOperator *B, CheckerContext &C) const;
@@ -60,11 +59,12 @@ void PointerSubChecker::checkPreStmt(const BinaryOperator *B,
 
   if (ExplodedNode *N = C.generateNonFatalErrorNode()) {
     if (!BT)
-      BT.reset(new BugType(this, "Pointer subtraction"));
-    constexpr llvm::StringLiteral Msg =
-        "Subtraction of two pointers that do not point to the same memory "
-        "chunk may cause incorrect result.";
-    auto R = std::make_unique<PathSensitiveBugReport>(*BT, Msg, N);
+      BT.reset(
+          new BuiltinBug(this, "Pointer subtraction",
+                         "Subtraction of two pointers that do not point to "
+                         "the same memory chunk may cause incorrect result."));
+    auto R =
+        std::make_unique<PathSensitiveBugReport>(*BT, BT->getDescription(), N);
     R->addRange(B->getSourceRange());
     C.emitReport(std::move(R));
   }

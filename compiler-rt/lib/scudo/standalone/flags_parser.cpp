@@ -10,7 +10,6 @@
 #include "common.h"
 #include "report.h"
 
-#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -81,7 +80,7 @@ void FlagParser::parseFlag() {
       ++Pos;
     Value = Buffer + ValueStart;
   }
-  if (!runHandler(Name, Value, '='))
+  if (!runHandler(Name, Value))
     reportError("flag parsing failed.");
 }
 
@@ -123,16 +122,10 @@ inline bool parseBool(const char *Value, bool *b) {
   return false;
 }
 
-void FlagParser::parseStringPair(const char *Name, const char *Value) {
-  if (!runHandler(Name, Value, '\0'))
-    reportError("flag parsing failed.");
-}
-
-bool FlagParser::runHandler(const char *Name, const char *Value,
-                            const char Sep) {
+bool FlagParser::runHandler(const char *Name, const char *Value) {
   for (u32 I = 0; I < NumberOfFlags; ++I) {
     const uptr Len = strlen(Flags[I].Name);
-    if (strncmp(Name, Flags[I].Name, Len) != 0 || Name[Len] != Sep)
+    if (strncmp(Name, Flags[I].Name, Len) != 0 || Name[Len] != '=')
       continue;
     bool Ok = false;
     switch (Flags[I].Type) {
@@ -143,15 +136,8 @@ bool FlagParser::runHandler(const char *Name, const char *Value,
       break;
     case FlagType::FT_int:
       char *ValueEnd;
-      long V = strtol(Value, &ValueEnd, 10);
-      // strtol returns LONG_MAX on overflow and LONG_MIN on underflow.
-      // This is why we compare-equal here (and lose INT_MIN and INT_MAX as a
-      // value, but that's okay)
-      if (V >= INT_MAX || V <= INT_MIN) {
-        reportInvalidFlag("int", Value);
-        return false;
-      }
-      *reinterpret_cast<int *>(Flags[I].Var) = static_cast<int>(V);
+      *reinterpret_cast<int *>(Flags[I].Var) =
+          static_cast<int>(strtol(Value, &ValueEnd, 10));
       Ok =
           *ValueEnd == '"' || *ValueEnd == '\'' || isSeparatorOrNull(*ValueEnd);
       if (!Ok)

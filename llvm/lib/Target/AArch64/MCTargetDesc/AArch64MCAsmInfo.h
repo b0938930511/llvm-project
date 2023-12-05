@@ -19,6 +19,7 @@
 
 namespace llvm {
 class MCStreamer;
+class Target;
 class Triple;
 
 struct AArch64MCAsmInfoDarwin : public MCAsmInfoDarwin {

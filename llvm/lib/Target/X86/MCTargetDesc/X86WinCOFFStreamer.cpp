@@ -9,7 +9,6 @@
 #include "X86MCTargetDesc.h"
 #include "X86TargetStreamer.h"
 #include "llvm/MC/MCAsmBackend.h"
-#include "llvm/MC/MCAssembler.h"
 #include "llvm/MC/MCCodeEmitter.h"
 #include "llvm/MC/MCObjectWriter.h"
 #include "llvm/MC/MCWin64EH.h"
@@ -26,15 +25,15 @@ public:
                      std::unique_ptr<MCObjectWriter> OW)
       : MCWinCOFFStreamer(C, std::move(AB), std::move(CE), std::move(OW)) {}
 
-  void emitWinEHHandlerData(SMLoc Loc) override;
-  void emitWindowsUnwindTables(WinEH::FrameInfo *Frame) override;
-  void emitWindowsUnwindTables() override;
-  void emitCVFPOData(const MCSymbol *ProcSym, SMLoc Loc) override;
+  void EmitWinEHHandlerData(SMLoc Loc) override;
+  void EmitWindowsUnwindTables(WinEH::FrameInfo *Frame) override;
+  void EmitWindowsUnwindTables() override;
+  void EmitCVFPOData(const MCSymbol *ProcSym, SMLoc Loc) override;
   void finishImpl() override;
 };
 
-void X86WinCOFFStreamer::emitWinEHHandlerData(SMLoc Loc) {
-  MCStreamer::emitWinEHHandlerData(Loc);
+void X86WinCOFFStreamer::EmitWinEHHandlerData(SMLoc Loc) {
+  MCStreamer::EmitWinEHHandlerData(Loc);
 
   // We have to emit the unwind info now, because this directive
   // actually switches to the .xdata section.
@@ -42,17 +41,17 @@ void X86WinCOFFStreamer::emitWinEHHandlerData(SMLoc Loc) {
     EHStreamer.EmitUnwindInfo(*this, CurFrame, /* HandlerData = */ true);
 }
 
-void X86WinCOFFStreamer::emitWindowsUnwindTables(WinEH::FrameInfo *Frame) {
+void X86WinCOFFStreamer::EmitWindowsUnwindTables(WinEH::FrameInfo *Frame) {
   EHStreamer.EmitUnwindInfo(*this, Frame, /* HandlerData = */ false);
 }
 
-void X86WinCOFFStreamer::emitWindowsUnwindTables() {
+void X86WinCOFFStreamer::EmitWindowsUnwindTables() {
   if (!getNumWinFrameInfos())
     return;
   EHStreamer.Emit(*this);
 }
 
-void X86WinCOFFStreamer::emitCVFPOData(const MCSymbol *ProcSym, SMLoc Loc) {
+void X86WinCOFFStreamer::EmitCVFPOData(const MCSymbol *ProcSym, SMLoc Loc) {
   X86TargetStreamer *XTS =
       static_cast<X86TargetStreamer *>(getTargetStreamer());
   XTS->emitFPOData(ProcSym, Loc);
@@ -60,7 +59,7 @@ void X86WinCOFFStreamer::emitCVFPOData(const MCSymbol *ProcSym, SMLoc Loc) {
 
 void X86WinCOFFStreamer::finishImpl() {
   emitFrames(nullptr);
-  emitWindowsUnwindTables();
+  EmitWindowsUnwindTables();
 
   MCWinCOFFStreamer::finishImpl();
 }

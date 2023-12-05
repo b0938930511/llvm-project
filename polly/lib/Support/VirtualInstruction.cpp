@@ -56,8 +56,7 @@ VirtualUse VirtualUse::create(Scop *S, ScopStmt *UserStmt, Loop *UserScope,
   if (isa<BasicBlock>(Val))
     return VirtualUse(UserStmt, Val, Block, nullptr, nullptr);
 
-  if (isa<llvm::Constant>(Val) || isa<MetadataAsValue>(Val) ||
-      isa<InlineAsm>(Val))
+  if (isa<llvm::Constant>(Val) || isa<MetadataAsValue>(Val))
     return VirtualUse(UserStmt, Val, Constant, nullptr, nullptr);
 
   // Is the value synthesizable? If the user has been pruned
@@ -300,7 +299,7 @@ static void walkReachable(Scop *S, LoopInfo *LI,
       // enabled.
       if (!VUse.getMemoryAccess())
         break;
-      [[fallthrough]];
+      LLVM_FALLTHROUGH;
     case VirtualUse::Inter:
       assert(VUse.getMemoryAccess());
       WorklistAccs.push_back(VUse.getMemoryAccess());

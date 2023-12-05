@@ -2,7 +2,7 @@
 
 #include "../Inputs/system-header-simulator-for-nullability.h"
 
-extern int coin(void);
+extern int coin();
 
 @interface I : NSObject
 - (int)initVar:(int *)var param:(int)param;
@@ -41,7 +41,7 @@ int initializer1(int *p, int x) {
   }
 }
 
-int initFromBlock(void) {
+int initFromBlock() {
   __block int z;
   ^{                     // expected-note {{Calling anonymous block}}
     int p;               // expected-note{{'p' declared without an initial value}}

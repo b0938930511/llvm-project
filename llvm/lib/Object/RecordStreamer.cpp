@@ -81,6 +81,11 @@ RecordStreamer::const_iterator RecordStreamer::begin() {
 
 RecordStreamer::const_iterator RecordStreamer::end() { return Symbols.end(); }
 
+void RecordStreamer::emitInstruction(const MCInst &Inst,
+                                     const MCSubtargetInfo &STI) {
+  MCStreamer::emitInstruction(Inst, STI);
+}
+
 void RecordStreamer::emitLabel(MCSymbol *Symbol, SMLoc Loc) {
   MCStreamer::emitLabel(Symbol);
   markDefined(*Symbol);
@@ -101,13 +106,13 @@ bool RecordStreamer::emitSymbolAttribute(MCSymbol *Symbol,
 }
 
 void RecordStreamer::emitZerofill(MCSection *Section, MCSymbol *Symbol,
-                                  uint64_t Size, Align ByteAlignment,
+                                  uint64_t Size, unsigned ByteAlignment,
                                   SMLoc Loc) {
   markDefined(*Symbol);
 }
 
 void RecordStreamer::emitCommonSymbol(MCSymbol *Symbol, uint64_t Size,
-                                      Align ByteAlignment) {
+                                      unsigned ByteAlignment) {
   markDefined(*Symbol);
 }
 

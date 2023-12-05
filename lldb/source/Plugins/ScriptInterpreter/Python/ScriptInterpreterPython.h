@@ -13,6 +13,8 @@
 
 #if LLDB_ENABLE_PYTHON
 
+#include "ScriptedProcessPythonInterface.h"
+
 #include "lldb/Breakpoint/BreakpointOptions.h"
 #include "lldb/Core/IOHandler.h"
 #include "lldb/Core/StructuredDataImpl.h"
@@ -33,23 +35,23 @@ public:
     CommandDataPython() : BreakpointOptions::CommandData() {
       interpreter = lldb::eScriptLanguagePython;
     }
-    CommandDataPython(StructuredData::ObjectSP extra_args_sp)
-        : BreakpointOptions::CommandData(),
-          m_extra_args(std::move(extra_args_sp)) {
-      interpreter = lldb::eScriptLanguagePython;
+    CommandDataPython(StructuredData::ObjectSP extra_args_sp) :
+        BreakpointOptions::CommandData(),
+        m_extra_args_up(new StructuredDataImpl()) {
+        interpreter = lldb::eScriptLanguagePython;
+        m_extra_args_up->SetObjectSP(extra_args_sp);
     }
-    StructuredDataImpl m_extra_args;
+    lldb::StructuredDataImplUP m_extra_args_up;
   };
 
   ScriptInterpreterPython(Debugger &debugger)
       : ScriptInterpreter(debugger, lldb::eScriptLanguagePython),
         IOHandlerDelegateMultiline("DONE") {}
 
-  StructuredData::DictionarySP GetInterpreterInfo() override;
   static void Initialize();
   static void Terminate();
-  static llvm::StringRef GetPluginNameStatic() { return "script-python"; }
-  static llvm::StringRef GetPluginDescriptionStatic();
+  static lldb_private::ConstString GetPluginNameStatic();
+  static const char *GetPluginDescriptionStatic();
   static FileSpec GetPythonDir();
   static void SharedLibraryDirectoryHelper(FileSpec &this_file);
 

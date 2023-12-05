@@ -12,17 +12,11 @@
 
 #include "flang/Optimizer/Dialect/FIRAttr.h"
 #include "flang/Optimizer/Dialect/FIRDialect.h"
-#include "flang/Optimizer/Dialect/Support/KindMapping.h"
+#include "flang/Optimizer/Support/KindMapping.h"
 #include "mlir/IR/AttributeSupport.h"
-#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/StringExtras.h"
-#include "llvm/ADT/TypeSwitch.h"
-
-#include "flang/Optimizer/Dialect/FIREnumAttr.cpp.inc"
-#define GET_ATTRDEF_CLASSES
-#include "flang/Optimizer/Dialect/FIRAttr.cpp.inc"
 
 using namespace fir;
 
@@ -169,41 +163,10 @@ static mlir::Attribute parseFirRealAttr(FIROpsDialect *dialect,
       parser.emitError(parser.getNameLoc(), "expected real constant '>'");
       return {};
     }
-    const llvm::fltSemantics &sem = kindMap.getFloatSemantics(kind);
-    unsigned int numBits = llvm::APFloat::semanticsSizeInBits(sem);
-    auto bits = llvm::APInt(numBits, hex.drop_front(), 16);
-    value = llvm::APFloat(sem, bits);
+    auto bits = llvm::APInt(kind * 8, hex.drop_front(), 16);
+    value = llvm::APFloat(kindMap.getFloatSemantics(kind), bits);
   }
   return RealAttr::get(dialect->getContext(), {kind, value});
-}
-
-mlir::Attribute fir::FortranVariableFlagsAttr::parse(mlir::AsmParser &parser,
-                                                     mlir::Type type) {
-  if (mlir::failed(parser.parseLess()))
-    return {};
-
-  fir::FortranVariableFlagsEnum flags = {};
-  if (mlir::failed(parser.parseOptionalGreater())) {
-    auto parseFlags = [&]() -> mlir::ParseResult {
-      llvm::StringRef elemName;
-      if (mlir::failed(parser.parseKeyword(&elemName)))
-        return mlir::failure();
-
-      auto elem = fir::symbolizeFortranVariableFlagsEnum(elemName);
-      if (!elem)
-        return parser.emitError(parser.getNameLoc(),
-                                "Unknown fortran variable attribute: ")
-               << elemName;
-
-      flags = flags | *elem;
-      return mlir::success();
-    };
-    if (mlir::failed(parser.parseCommaSeparatedList(parseFlags)) ||
-        parser.parseGreater())
-      return {};
-  }
-
-  return FortranVariableFlagsAttr::get(parser.getContext(), flags);
 }
 
 mlir::Attribute fir::parseFirAttribute(FIROpsDialect *dialect,
@@ -211,13 +174,10 @@ mlir::Attribute fir::parseFirAttribute(FIROpsDialect *dialect,
                                        mlir::Type type) {
   auto loc = parser.getNameLoc();
   llvm::StringRef attrName;
-  mlir::Attribute attr;
-  mlir::OptionalParseResult result =
-      generatedAttributeParser(parser, &attrName, type, attr);
-  if (result.has_value())
-    return attr;
-  if (attrName.empty())
-    return {}; // error reported by generatedAttributeParser
+  if (parser.parseKeyword(&attrName)) {
+    parser.emitError(loc, "expected an attribute name");
+    return {};
+  }
 
   if (attrName == ExactTypeAttr::getAttrName()) {
     mlir::Type type;
@@ -254,12 +214,6 @@ mlir::Attribute fir::parseFirAttribute(FIROpsDialect *dialect,
 // FIR attribute pretty printer
 //===----------------------------------------------------------------------===//
 
-void fir::FortranVariableFlagsAttr::print(mlir::AsmPrinter &printer) const {
-  printer << "<";
-  printer << fir::stringifyFortranVariableFlagsEnum(this->getFlags());
-  printer << ">";
-}
-
 void fir::printFirAttribute(FIROpsDialect *dialect, mlir::Attribute attr,
                             mlir::DialectAsmPrinter &p) {
   auto &os = p.getStream();
@@ -284,7 +238,7 @@ void fir::printFirAttribute(FIROpsDialect *dialect, mlir::Attribute attr,
     llvm::SmallString<40> ss;
     a.getValue().bitcastToAPInt().toStringUnsigned(ss, 16);
     os << ss << '>';
-  } else if (mlir::failed(generatedAttributePrinter(attr, p))) {
+  } else {
     // don't know how to print the attribute, so use a default
     os << "<(unknown attribute)>";
   }
@@ -295,7 +249,6 @@ void fir::printFirAttribute(FIROpsDialect *dialect, mlir::Attribute attr,
 //===----------------------------------------------------------------------===//
 
 void FIROpsDialect::registerAttributes() {
-  addAttributes<ClosedIntervalAttr, ExactTypeAttr, FortranVariableFlagsAttr,
-                LowerBoundAttr, PointIntervalAttr, RealAttr, SubclassAttr,
-                UpperBoundAttr>();
+  addAttributes<ClosedIntervalAttr, ExactTypeAttr, LowerBoundAttr,
+                PointIntervalAttr, RealAttr, SubclassAttr, UpperBoundAttr>();
 }

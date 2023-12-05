@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/None.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
@@ -75,13 +76,6 @@ bool ArgList::hasFlag(OptSpecifier Pos, OptSpecifier Neg, bool Default) const {
   return Default;
 }
 
-bool ArgList::hasFlagNoClaim(OptSpecifier Pos, OptSpecifier Neg,
-                             bool Default) const {
-  if (Arg *A = getLastArgNoClaim(Pos, Neg))
-    return A->getOption().matches(Pos);
-  return Default;
-}
-
 bool ArgList::hasFlag(OptSpecifier Pos, OptSpecifier PosAlias, OptSpecifier Neg,
                       bool Default) const {
   if (Arg *A = getLastArg(Pos, PosAlias, Neg))
@@ -99,13 +93,6 @@ std::vector<std::string> ArgList::getAllArgValues(OptSpecifier Id) const {
   SmallVector<const char *, 16> Values;
   AddAllArgValues(Values, Id);
   return std::vector<std::string>(Values.begin(), Values.end());
-}
-
-void ArgList::addOptInFlag(ArgStringList &Output, OptSpecifier Pos,
-                           OptSpecifier Neg) const {
-  if (Arg *A = getLastArg(Pos, Neg))
-    if (A->getOption().matches(Pos))
-      A->render(*this, Output);
 }
 
 void ArgList::AddAllArgsExcept(ArgStringList &Output,
@@ -132,14 +119,17 @@ void ArgList::AddAllArgsExcept(ArgStringList &Output,
 }
 
 /// This is a nicer interface when you don't have a list of Ids to exclude.
-void ArgList::addAllArgs(ArgStringList &Output,
+void ArgList::AddAllArgs(ArgStringList &Output,
                          ArrayRef<OptSpecifier> Ids) const {
-  ArrayRef<OptSpecifier> Exclude = std::nullopt;
+  ArrayRef<OptSpecifier> Exclude = None;
   AddAllArgsExcept(Output, Ids, Exclude);
 }
 
-void ArgList::AddAllArgs(ArgStringList &Output, OptSpecifier Id0) const {
-  for (auto *Arg : filtered(Id0)) {
+/// This 3-opt variant of AddAllArgs could be eliminated in favor of one
+/// that accepts a single specifier, given the above which accepts any number.
+void ArgList::AddAllArgs(ArgStringList &Output, OptSpecifier Id0,
+                         OptSpecifier Id1, OptSpecifier Id2) const {
+  for (auto Arg: filtered(Id0, Id1, Id2)) {
     Arg->claim();
     Arg->render(*this, Output);
   }
@@ -147,7 +137,7 @@ void ArgList::AddAllArgs(ArgStringList &Output, OptSpecifier Id0) const {
 
 void ArgList::AddAllArgValues(ArgStringList &Output, OptSpecifier Id0,
                               OptSpecifier Id1, OptSpecifier Id2) const {
-  for (auto *Arg : filtered(Id0, Id1, Id2)) {
+  for (auto Arg : filtered(Id0, Id1, Id2)) {
     Arg->claim();
     const auto &Values = Arg->getValues();
     Output.append(Values.begin(), Values.end());
@@ -157,7 +147,7 @@ void ArgList::AddAllArgValues(ArgStringList &Output, OptSpecifier Id0,
 void ArgList::AddAllArgsTranslated(ArgStringList &Output, OptSpecifier Id0,
                                    const char *Translation,
                                    bool Joined) const {
-  for (auto *Arg : filtered(Id0)) {
+  for (auto Arg: filtered(Id0)) {
     Arg->claim();
 
     if (Joined) {

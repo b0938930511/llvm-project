@@ -13,10 +13,7 @@
 // bool is(mask m, charT c) const;
 
 // REQUIRES: locale.en_US.UTF-8
-// XFAIL: no-wide-characters
-
-// Bionic has minimal locale support, investigate this later.
-// XFAIL: LIBCXX-ANDROID-FIXME
+// XFAIL: LIBCXX-WINDOWS-FIXME
 
 #include <locale>
 #include <type_traits>
@@ -109,15 +106,8 @@ int main(int, char**)
             assert(f.is(F::graph, L'.'));
             assert(!f.is(F::graph,  L'\x07'));
 
-#if defined(_WIN32)
-            // On Windows, these wchars are classified according to their
-            // Unicode interpretation even in the "C" locale.
-            assert(f.is(F::alpha, L'\x00DA'));
-            assert(f.is(F::upper, L'\x00DA'));
-#else
             assert(!f.is(F::alpha, L'\x00DA'));
             assert(!f.is(F::upper, L'\x00DA'));
-#endif
         }
     }
 

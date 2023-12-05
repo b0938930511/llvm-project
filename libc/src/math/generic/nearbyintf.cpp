@@ -7,13 +7,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "src/math/nearbyintf.h"
-#include "src/__support/FPUtil/NearestIntegerOperations.h"
 #include "src/__support/common.h"
+#include "utils/FPUtil/NearestIntegerOperations.h"
 
-namespace LIBC_NAMESPACE {
+namespace __llvm_libc {
 
 LLVM_LIBC_FUNCTION(float, nearbyintf, (float x)) {
-  return fputil::round_using_current_rounding_mode(x);
+  return fputil::roundUsingCurrentRoundingMode(x);
 }
 
-} // namespace LIBC_NAMESPACE
+} // namespace __llvm_libc

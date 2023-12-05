@@ -11,10 +11,9 @@
 
 #include "clang/Driver/ToolChain.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Option/ArgList.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/Option/Option.h"
-#include "llvm/TargetParser/ARMTargetParser.h"
-#include "llvm/TargetParser/Triple.h"
+#include "llvm/Support/TargetParser.h"
 #include <string>
 #include <vector>
 
@@ -25,7 +24,7 @@ namespace arm {
 
 std::string getARMTargetCPU(StringRef CPU, llvm::StringRef Arch,
                             const llvm::Triple &Triple);
-std::string getARMArch(llvm::StringRef Arch, const llvm::Triple &Triple);
+const std::string getARMArch(llvm::StringRef Arch, const llvm::Triple &Triple);
 StringRef getARMCPUForMArch(llvm::StringRef Arch, const llvm::Triple &Triple);
 llvm::ARM::ArchKind getLLVMArchKindForARM(StringRef CPU, StringRef Arch,
                                           const llvm::Triple &Triple);
@@ -38,9 +37,7 @@ void appendBE8LinkFlag(const llvm::opt::ArgList &Args,
 enum class ReadTPMode {
   Invalid,
   Soft,
-  TPIDRURW,
-  TPIDRURO,
-  TPIDRPRW,
+  Cp15,
 };
 
 enum class FloatABI {
@@ -56,9 +53,7 @@ FloatABI getARMFloatABI(const Driver &D, const llvm::Triple &Triple,
                         const llvm::opt::ArgList &Args);
 void setFloatABIInTriple(const Driver &D, const llvm::opt::ArgList &Args,
                          llvm::Triple &triple);
-bool isHardTPSupported(const llvm::Triple &Triple);
-ReadTPMode getReadTPMode(const Driver &D, const llvm::opt::ArgList &Args,
-                         const llvm::Triple &Triple, bool ForAS);
+ReadTPMode getReadTPMode(const Driver &D, const llvm::opt::ArgList &Args);
 void setArchNameInTriple(const Driver &D, const llvm::opt::ArgList &Args,
                          types::ID InputType, llvm::Triple &Triple);
 
@@ -66,15 +61,13 @@ bool useAAPCSForMachO(const llvm::Triple &T);
 void getARMArchCPUFromArgs(const llvm::opt::ArgList &Args,
                            llvm::StringRef &Arch, llvm::StringRef &CPU,
                            bool FromAs = false);
-llvm::ARM::FPUKind getARMTargetFeatures(const Driver &D,
-                                        const llvm::Triple &Triple,
-                                        const llvm::opt::ArgList &Args,
-                                        std::vector<llvm::StringRef> &Features,
-                                        bool ForAS, bool ForMultilib = false);
+void getARMTargetFeatures(const Driver &D, const llvm::Triple &Triple,
+                          const llvm::opt::ArgList &Args,
+                          llvm::opt::ArgStringList &CmdArgs,
+                          std::vector<llvm::StringRef> &Features, bool ForAS);
 int getARMSubArchVersionNumber(const llvm::Triple &Triple);
 bool isARMMProfile(const llvm::Triple &Triple);
 bool isARMAProfile(const llvm::Triple &Triple);
-bool isARMBigEndian(const llvm::Triple &Triple, const llvm::opt::ArgList &Args);
 
 } // end namespace arm
 } // end namespace tools

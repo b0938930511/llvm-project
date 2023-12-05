@@ -9,7 +9,7 @@
 # RUN: llvm-symbolizer 0 --relativenames --obj=%t.o \
 # RUN:    | FileCheck %s -DDIR=%p --check-prefix=RELATIVENAMES
 
-## A basic correctness check for default.
+## Sanity check for default.
 # RUN: llvm-symbolizer 0 --obj=%t.o \
 # RUN:    | FileCheck %s -DDIR=%p --check-prefix=ABSOLUTENAMES
 

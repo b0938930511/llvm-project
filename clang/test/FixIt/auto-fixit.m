@@ -3,7 +3,9 @@
    RUN: %clang_cc1 -x objective-c -Werror %t
  */
 
-int main(void) {
+// rdar://9036633
+
+int main() {
   auto int i = 0;
   return i;
 }

@@ -70,35 +70,35 @@ BasicBlock *TileInfo::CreateLoop(BasicBlock *Preheader, BasicBlock *Exit,
 BasicBlock *TileInfo::CreateTiledLoops(BasicBlock *Start, BasicBlock *End,
                                        IRBuilderBase &B, DomTreeUpdater &DTU,
                                        LoopInfo &LI) {
-  Loop *ColumnLoopInfo = LI.AllocateLoop();
-  Loop *RowLoopInfo = LI.AllocateLoop();
-  Loop *KLoopInfo = LI.AllocateLoop();
-  RowLoopInfo->addChildLoop(KLoopInfo);
-  ColumnLoopInfo->addChildLoop(RowLoopInfo);
+  Loop *ColLoop = LI.AllocateLoop();
+  Loop *RowLoop = LI.AllocateLoop();
+  Loop *InnerLoop = LI.AllocateLoop();
+  RowLoop->addChildLoop(InnerLoop);
+  ColLoop->addChildLoop(RowLoop);
   if (Loop *ParentL = LI.getLoopFor(Start))
-    ParentL->addChildLoop(ColumnLoopInfo);
+    ParentL->addChildLoop(ColLoop);
   else
-    LI.addTopLevelLoop(ColumnLoopInfo);
+    LI.addTopLevelLoop(ColLoop);
 
   BasicBlock *ColBody =
       CreateLoop(Start, End, B.getInt64(NumColumns), B.getInt64(TileSize),
-                 "cols", B, DTU, ColumnLoopInfo, LI);
-  ColumnLoop.Latch = ColBody->getSingleSuccessor();
+                 "cols", B, DTU, ColLoop, LI);
+  BasicBlock *ColLatch = ColBody->getSingleSuccessor();
   BasicBlock *RowBody =
-      CreateLoop(ColBody, ColumnLoop.Latch, B.getInt64(NumRows),
-                 B.getInt64(TileSize), "rows", B, DTU, RowLoopInfo, LI);
-  RowLoop.Latch = RowBody->getSingleSuccessor();
+      CreateLoop(ColBody, ColLatch, B.getInt64(NumRows), B.getInt64(TileSize),
+                 "rows", B, DTU, RowLoop, LI);
+  RowLoopLatch = RowBody->getSingleSuccessor();
 
   BasicBlock *InnerBody =
-      CreateLoop(RowBody, RowLoop.Latch, B.getInt64(NumInner),
-                 B.getInt64(TileSize), "inner", B, DTU, KLoopInfo, LI);
-  KLoop.Latch = InnerBody->getSingleSuccessor();
-  ColumnLoop.Header = ColBody->getSinglePredecessor();
-  RowLoop.Header = RowBody->getSinglePredecessor();
-  KLoop.Header = InnerBody->getSinglePredecessor();
-  RowLoop.Index = &*RowLoop.Header->begin();
-  ColumnLoop.Index = &*ColumnLoop.Header->begin();
-  KLoop.Index = &*KLoop.Header->begin();
+      CreateLoop(RowBody, RowLoopLatch, B.getInt64(NumInner),
+                 B.getInt64(TileSize), "inner", B, DTU, InnerLoop, LI);
+  InnerLoopLatch = InnerBody->getSingleSuccessor();
+  ColumnLoopHeader = ColBody->getSinglePredecessor();
+  RowLoopHeader = RowBody->getSinglePredecessor();
+  InnerLoopHeader = InnerBody->getSinglePredecessor();
+  CurrentRow = &*RowLoopHeader->begin();
+  CurrentCol = &*ColumnLoopHeader->begin();
+  CurrentK = &*InnerLoopHeader->begin();
 
   return InnerBody;
 }

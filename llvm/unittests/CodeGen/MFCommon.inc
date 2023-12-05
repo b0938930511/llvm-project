@@ -23,7 +23,7 @@ class BogusRegisterInfo : public TargetRegisterInfo {
 public:
   BogusRegisterInfo()
       : TargetRegisterInfo(nullptr, BogusRegisterClasses, BogusRegisterClasses,
-                           nullptr, nullptr, LaneBitmask(~0u), nullptr, nullptr) {
+                           nullptr, nullptr, LaneBitmask(~0u), nullptr) {
     InitMCRegisterInfo(nullptr, 0, 0, 0, nullptr, 0, nullptr, 0, nullptr,
                        nullptr, nullptr, nullptr, nullptr, 0, nullptr, nullptr);
   }
@@ -32,8 +32,8 @@ public:
   getCalleeSavedRegs(const MachineFunction *MF) const override {
     return nullptr;
   }
-  ArrayRef<const uint32_t *> getRegMasks() const override { return std::nullopt; }
-  ArrayRef<const char *> getRegMaskNames() const override { return std::nullopt; }
+  ArrayRef<const uint32_t *> getRegMasks() const override { return None; }
+  ArrayRef<const char *> getRegMaskNames() const override { return None; }
   BitVector getReservedRegs(const MachineFunction &MF) const override {
     return BitVector();
   }
@@ -64,12 +64,9 @@ public:
   Register getFrameRegister(const MachineFunction &MF) const override {
     return 0;
   }
-  bool eliminateFrameIndex(MachineBasicBlock::iterator MI, int SPAdj,
+  void eliminateFrameIndex(MachineBasicBlock::iterator MI, int SPAdj,
                            unsigned FIOperandNum,
-                           RegScavenger *RS = nullptr) const override {
-    return false;
-
-  }
+                           RegScavenger *RS = nullptr) const override {}
 };
 
 class BogusSubtarget : public TargetSubtargetInfo {
@@ -106,7 +103,7 @@ public:
   BogusTargetMachine()
       : LLVMTargetMachine(Target(), "", Triple(""), "", "",
                           getTargetOptionsForBogusMachine(), Reloc::Static,
-                          CodeModel::Small, CodeGenOptLevel::Default),
+                          CodeModel::Small, CodeGenOpt::Default),
         ST(*this) {}
 
   ~BogusTargetMachine() override {}
@@ -119,9 +116,8 @@ private:
   BogusSubtarget ST;
 };
 
-BogusTargetMachine *createTargetMachine() {
-  static BogusTargetMachine BogusTM;
-  return &BogusTM;
+std::unique_ptr<BogusTargetMachine> createTargetMachine() {
+  return std::make_unique<BogusTargetMachine>();
 }
 
 std::unique_ptr<MachineFunction> createMachineFunction(LLVMContext &Ctx,
@@ -131,7 +127,7 @@ std::unique_ptr<MachineFunction> createMachineFunction(LLVMContext &Ctx,
 
   auto TM = createTargetMachine();
   unsigned FunctionNum = 42;
-  MachineModuleInfo MMI(TM);
+  MachineModuleInfo MMI(TM.get());
   const TargetSubtargetInfo &STI = *TM->getSubtargetImpl(*F);
 
   return std::make_unique<MachineFunction>(*F, *TM, STI, FunctionNum, MMI);

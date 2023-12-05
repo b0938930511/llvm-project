@@ -1,4 +1,4 @@
-; RUN: opt -passes=correlated-propagation -S < %s | FileCheck %s
+; RUN: opt -correlated-propagation -S < %s | FileCheck %s
 
 declare void @llvm.experimental.guard(i1,...)
 

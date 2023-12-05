@@ -97,7 +97,8 @@ void llvm::LowerSparcMachineInstrToMCInst(const MachineInstr *MI,
 
   OutMI.setOpcode(MI->getOpcode());
 
-  for (const MachineOperand &MO : MI->operands()) {
+  for (unsigned i = 0, e = MI->getNumOperands(); i != e; ++i) {
+    const MachineOperand &MO = MI->getOperand(i);
     MCOperand MCOp = LowerOperand(MI, MO, AP);
 
     if (MCOp.isValid())

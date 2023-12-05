@@ -32,7 +32,6 @@ template<typename Callable>
 void ForEachChunk(const Callable &callback);
 
 void GetAllocatorCacheRange(uptr *begin, uptr *end);
-void AllocatorThreadStart();
 void AllocatorThreadFinish();
 void InitializeAllocator();
 
@@ -50,7 +49,8 @@ struct ChunkMetadata {
   u32 stack_trace_id;
 };
 
-#if !SANITIZER_CAN_USE_ALLOCATOR64
+#if defined(__mips64) || defined(__aarch64__) || defined(__i386__) || \
+    defined(__arm__) || SANITIZER_RISCV64
 template <typename AddressSpaceViewTy>
 struct AP32 {
   static const uptr kSpaceBeg = 0;
@@ -65,45 +65,26 @@ struct AP32 {
 template <typename AddressSpaceView>
 using PrimaryAllocatorASVT = SizeClassAllocator32<AP32<AddressSpaceView>>;
 using PrimaryAllocator = PrimaryAllocatorASVT<LocalAddressSpaceView>;
-#else
-# if SANITIZER_FUCHSIA || defined(__powerpc64__)
+#elif defined(__x86_64__) || defined(__powerpc64__) || defined(__s390x__)
+# if SANITIZER_FUCHSIA
 const uptr kAllocatorSpace = ~(uptr)0;
-#    if SANITIZER_RISCV64
-// See the comments in compiler-rt/lib/asan/asan_allocator.h for why these
-// values were chosen.
-const uptr kAllocatorSize = UINT64_C(1) << 33;  // 8GB
-using LSanSizeClassMap = SizeClassMap</*kNumBits=*/2,
-                                      /*kMinSizeLog=*/5,
-                                      /*kMidSizeLog=*/8,
-                                      /*kMaxSizeLog=*/18,
-                                      /*kNumCachedHintT=*/8,
-                                      /*kMaxBytesCachedLog=*/10>;
-static_assert(LSanSizeClassMap::kNumClassesRounded <= 32,
-              "32 size classes is the optimal number to ensure tests run "
-              "effieciently on Fuchsia.");
-#    else
 const uptr kAllocatorSize  =  0x40000000000ULL;  // 4T.
-using LSanSizeClassMap = DefaultSizeClassMap;
-#    endif
-#  elif SANITIZER_RISCV64
-const uptr kAllocatorSpace = ~(uptr)0;
-const uptr kAllocatorSize = 0x2000000000ULL;  // 128G.
-using LSanSizeClassMap = DefaultSizeClassMap;
-#  elif SANITIZER_APPLE
+# elif defined(__powerpc64__)
+const uptr kAllocatorSpace = 0xa0000000000ULL;
+const uptr kAllocatorSize  = 0x20000000000ULL;  // 2T.
+#elif defined(__s390x__)
+const uptr kAllocatorSpace = 0x40000000000ULL;
+const uptr kAllocatorSize = 0x40000000000ULL;  // 4T.
+# else
 const uptr kAllocatorSpace = 0x600000000000ULL;
 const uptr kAllocatorSize  = 0x40000000000ULL;  // 4T.
-using LSanSizeClassMap = DefaultSizeClassMap;
-#  else
-const uptr kAllocatorSpace = 0x500000000000ULL;
-const uptr kAllocatorSize = 0x40000000000ULL;  // 4T.
-using LSanSizeClassMap = DefaultSizeClassMap;
-#  endif
+# endif
 template <typename AddressSpaceViewTy>
 struct AP64 {  // Allocator64 parameters. Deliberately using a short name.
   static const uptr kSpaceBeg = kAllocatorSpace;
   static const uptr kSpaceSize = kAllocatorSize;
   static const uptr kMetadataSize = sizeof(ChunkMetadata);
-  using SizeClassMap = LSanSizeClassMap;
+  typedef DefaultSizeClassMap SizeClassMap;
   typedef NoOpMapUnmapCallback MapUnmapCallback;
   static const uptr kFlags = 0;
   using AddressSpaceView = AddressSpaceViewTy;

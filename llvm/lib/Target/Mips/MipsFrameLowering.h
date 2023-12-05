@@ -34,10 +34,7 @@ public:
 
   bool hasBP(const MachineFunction &MF) const;
 
-  bool allocateScavengingFrameIndexesNearIncomingSP(
-    const MachineFunction &MF) const override {
-    return false;
-  }
+  bool isFPCloseToIncomingSP() const override { return false; }
 
   bool enableShrinkWrapping(const MachineFunction &MF) const override {
     return true;

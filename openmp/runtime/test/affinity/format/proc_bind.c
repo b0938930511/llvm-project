@@ -4,21 +4,26 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <omp.h>
-#include "omp_testsuite.h"
 
 int main(int argc, char** argv) {
   omp_set_affinity_format("TESTER: tl:%L tn:%n nt:%N aff:{%A}");
   omp_set_num_threads(8);
   // Initial parallel
-  go_parallel_spread();
-  go_parallel_spread();
+  #pragma omp parallel proc_bind(spread)
+  { }
+  #pragma omp parallel proc_bind(spread)
+  { }
   // Affinity changes here
-  go_parallel_close();
-  go_parallel_close();
+  #pragma omp parallel proc_bind(close)
+  { }
+  #pragma omp parallel proc_bind(close)
+  { }
   // Affinity changes here
-  go_parallel_master();
-  go_parallel_master();
-  return get_exit_value();
+  #pragma omp parallel proc_bind(master)
+  { }
+  #pragma omp parallel proc_bind(master)
+  { }
+  return 0;
 }
 
 // CHECK: num_threads=8 TESTER: tl:1 tn:[0-7] nt:8 aff:

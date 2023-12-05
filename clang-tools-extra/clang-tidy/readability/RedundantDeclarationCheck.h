@@ -11,12 +11,14 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::readability {
+namespace clang {
+namespace tidy {
+namespace readability {
 
 /// Find redundant variable declarations.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/readability/redundant-declaration.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/readability-redundant-declaration.html
 class RedundantDeclarationCheck : public ClangTidyCheck {
 public:
   RedundantDeclarationCheck(StringRef Name, ClangTidyContext *Context);
@@ -28,6 +30,8 @@ private:
   const bool IgnoreMacros;
 };
 
-} // namespace clang::tidy::readability
+} // namespace readability
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_READABILITY_REDUNDANT_DECLARATION_H

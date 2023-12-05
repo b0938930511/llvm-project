@@ -5,7 +5,7 @@ struct S {
   char c;
 };
 
-void test(void) {
+void test() {
   offsetof(struct S, c); 
 }
 

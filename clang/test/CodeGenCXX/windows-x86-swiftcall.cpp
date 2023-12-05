@@ -18,12 +18,12 @@ struct NonTrivial {
 
 SWIFTCALL int receiveNonTrivial(NonTrivial o) { return o.o; }
 
-// CHECK-LABEL: define dso_local swiftcc noundef i32 @"?receiveNonTrivial@@YSHUNonTrivial@@@Z"(ptr noundef %o)
+// CHECK-LABEL: define dso_local swiftcc i32 @"?receiveNonTrivial@@YSHUNonTrivial@@@Z"(%struct.NonTrivial* %o)
 
 int passNonTrivial() {
   return receiveNonTrivial({});
 }
 
-// CHECK-LABEL: define dso_local noundef i32 @"?passNonTrivial@@YAHXZ"()
+// CHECK-LABEL: define dso_local i32 @"?passNonTrivial@@YAHXZ"()
 // CHECK-NOT: stacksave
-// CHECK: call swiftcc noundef i32 @"?receiveNonTrivial@@YSHUNonTrivial@@@Z"(ptr noundef %{{.*}})
+// CHECK: call swiftcc i32 @"?receiveNonTrivial@@YSHUNonTrivial@@@Z"(%struct.NonTrivial* %{{.*}})

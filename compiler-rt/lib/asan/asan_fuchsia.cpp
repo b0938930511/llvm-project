@@ -14,16 +14,15 @@
 #include "sanitizer_common/sanitizer_fuchsia.h"
 #if SANITIZER_FUCHSIA
 
+#include "asan_interceptors.h"
+#include "asan_internal.h"
+#include "asan_stack.h"
+#include "asan_thread.h"
+
 #include <limits.h>
 #include <zircon/sanitizer.h>
 #include <zircon/syscalls.h>
 #include <zircon/threads.h>
-
-#  include "asan_interceptors.h"
-#  include "asan_internal.h"
-#  include "asan_stack.h"
-#  include "asan_thread.h"
-#  include "lsan/lsan_common.h"
 
 namespace __asan {
 
@@ -119,12 +118,14 @@ struct AsanThread::InitOptions {
 
 // Shared setup between thread creation and startup for the initial thread.
 static AsanThread *CreateAsanThread(StackTrace *stack, u32 parent_tid,
-                                    bool detached, const char *name) {
+                                    uptr user_id, bool detached,
+                                    const char *name) {
   // In lieu of AsanThread::Create.
   AsanThread *thread = (AsanThread *)MmapOrDie(AsanThreadMmapSize(), __func__);
 
   AsanThreadContext::CreateThreadContextArgs args = {thread, stack};
-  u32 tid = asanThreadRegistry().CreateThread(0, detached, parent_tid, &args);
+  u32 tid =
+      asanThreadRegistry().CreateThread(user_id, detached, parent_tid, &args);
   asanThreadRegistry().SetThreadName(tid, name);
 
   return thread;
@@ -151,7 +152,7 @@ AsanThread *CreateMainThread() {
   CHECK_NE(__sanitizer::MainThreadStackBase, 0);
   CHECK_GT(__sanitizer::MainThreadStackSize, 0);
   AsanThread *t = CreateAsanThread(
-      nullptr, 0, true,
+      nullptr, 0, reinterpret_cast<uptr>(self), true,
       _zx_object_get_property(thrd_get_zx_handle(self), ZX_PROP_NAME, name,
                               sizeof(name)) == ZX_OK
           ? name
@@ -181,7 +182,8 @@ static void *BeforeThreadCreateHook(uptr user_id, bool detached,
   GET_STACK_TRACE_THREAD;
   u32 parent_tid = GetCurrentTidOrInvalid();
 
-  AsanThread *thread = CreateAsanThread(&stack, parent_tid, detached, name);
+  AsanThread *thread =
+      CreateAsanThread(&stack, parent_tid, user_id, detached, name);
 
   // On other systems, AsanThread::Init() is called from the new
   // thread itself.  But on Fuchsia we already know the stack address
@@ -236,17 +238,7 @@ void FlushUnneededASanShadowMemory(uptr p, uptr size) {
   __sanitizer_fill_shadow(p, size, 0, 0);
 }
 
-// On Fuchsia, leak detection is done by a special hook after atexit hooks.
-// So this doesn't install any atexit hook like on other platforms.
-void InstallAtExitCheckLeaks() {}
-
 }  // namespace __asan
-
-namespace __lsan {
-
-bool UseExitcodeOnLeak() { return __asan::flags()->halt_on_error; }
-
-}  // namespace __lsan
 
 // These are declared (in extern "C") by <zircon/sanitizer.h>.
 // The system runtime will call our definitions directly.

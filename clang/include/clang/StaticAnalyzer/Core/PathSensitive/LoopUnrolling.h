@@ -28,6 +28,7 @@
 #include "clang/StaticAnalyzer/Core/PathSensitive/ExplodedGraph.h"
 namespace clang {
 namespace ento {
+class AnalysisManager;
 
 /// Returns if the given State indicates that is inside a completely unrolled
 /// loop.

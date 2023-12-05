@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Demangle/MicrosoftDemangleNodes.h"
+#include "llvm/Demangle/DemangleConfig.h"
 #include "llvm/Demangle/Utility.h"
 #include <cctype>
 #include <string>
@@ -20,97 +21,97 @@ using namespace ms_demangle;
 
 #define OUTPUT_ENUM_CLASS_VALUE(Enum, Value, Desc)                             \
   case Enum::Value:                                                            \
-    OB << Desc;                                                                \
+    OS << Desc;                                                                \
     break;
 
 // Writes a space if the last token does not end with a punctuation.
-static void outputSpaceIfNecessary(OutputBuffer &OB) {
-  if (OB.empty())
+static void outputSpaceIfNecessary(OutputStream &OS) {
+  if (OS.empty())
     return;
 
-  char C = OB.back();
+  char C = OS.back();
   if (std::isalnum(C) || C == '>')
-    OB << " ";
+    OS << " ";
 }
 
-static void outputSingleQualifier(OutputBuffer &OB, Qualifiers Q) {
+static void outputSingleQualifier(OutputStream &OS, Qualifiers Q) {
   switch (Q) {
   case Q_Const:
-    OB << "const";
+    OS << "const";
     break;
   case Q_Volatile:
-    OB << "volatile";
+    OS << "volatile";
     break;
   case Q_Restrict:
-    OB << "__restrict";
+    OS << "__restrict";
     break;
   default:
     break;
   }
 }
 
-static bool outputQualifierIfPresent(OutputBuffer &OB, Qualifiers Q,
+static bool outputQualifierIfPresent(OutputStream &OS, Qualifiers Q,
                                      Qualifiers Mask, bool NeedSpace) {
   if (!(Q & Mask))
     return NeedSpace;
 
   if (NeedSpace)
-    OB << " ";
+    OS << " ";
 
-  outputSingleQualifier(OB, Mask);
+  outputSingleQualifier(OS, Mask);
   return true;
 }
 
-static void outputQualifiers(OutputBuffer &OB, Qualifiers Q, bool SpaceBefore,
+static void outputQualifiers(OutputStream &OS, Qualifiers Q, bool SpaceBefore,
                              bool SpaceAfter) {
   if (Q == Q_None)
     return;
 
-  size_t Pos1 = OB.getCurrentPosition();
-  SpaceBefore = outputQualifierIfPresent(OB, Q, Q_Const, SpaceBefore);
-  SpaceBefore = outputQualifierIfPresent(OB, Q, Q_Volatile, SpaceBefore);
-  SpaceBefore = outputQualifierIfPresent(OB, Q, Q_Restrict, SpaceBefore);
-  size_t Pos2 = OB.getCurrentPosition();
+  size_t Pos1 = OS.getCurrentPosition();
+  SpaceBefore = outputQualifierIfPresent(OS, Q, Q_Const, SpaceBefore);
+  SpaceBefore = outputQualifierIfPresent(OS, Q, Q_Volatile, SpaceBefore);
+  SpaceBefore = outputQualifierIfPresent(OS, Q, Q_Restrict, SpaceBefore);
+  size_t Pos2 = OS.getCurrentPosition();
   if (SpaceAfter && Pos2 > Pos1)
-    OB << " ";
+    OS << " ";
 }
 
-static void outputCallingConvention(OutputBuffer &OB, CallingConv CC) {
-  outputSpaceIfNecessary(OB);
+static void outputCallingConvention(OutputStream &OS, CallingConv CC) {
+  outputSpaceIfNecessary(OS);
 
   switch (CC) {
   case CallingConv::Cdecl:
-    OB << "__cdecl";
+    OS << "__cdecl";
     break;
   case CallingConv::Fastcall:
-    OB << "__fastcall";
+    OS << "__fastcall";
     break;
   case CallingConv::Pascal:
-    OB << "__pascal";
+    OS << "__pascal";
     break;
   case CallingConv::Regcall:
-    OB << "__regcall";
+    OS << "__regcall";
     break;
   case CallingConv::Stdcall:
-    OB << "__stdcall";
+    OS << "__stdcall";
     break;
   case CallingConv::Thiscall:
-    OB << "__thiscall";
+    OS << "__thiscall";
     break;
   case CallingConv::Eabi:
-    OB << "__eabi";
+    OS << "__eabi";
     break;
   case CallingConv::Vectorcall:
-    OB << "__vectorcall";
+    OS << "__vectorcall";
     break;
   case CallingConv::Clrcall:
-    OB << "__clrcall";
+    OS << "__clrcall";
     break;
   case CallingConv::Swift:
-    OB << "__attribute__((__swiftcall__)) ";
+    OS << "__attribute__((__swiftcall__)) ";
     break;
   case CallingConv::SwiftAsync:
-    OB << "__attribute__((__swiftasynccall__)) ";
+    OS << "__attribute__((__swiftasynccall__)) ";
     break;
   default:
     break;
@@ -118,15 +119,16 @@ static void outputCallingConvention(OutputBuffer &OB, CallingConv CC) {
 }
 
 std::string Node::toString(OutputFlags Flags) const {
-  OutputBuffer OB;
-  this->output(OB, Flags);
-  std::string_view SV = OB;
-  std::string Owned(SV.begin(), SV.end());
-  std::free(OB.getBuffer());
+  OutputStream OS;
+  initializeOutputStream(nullptr, nullptr, OS, 1024);
+  this->output(OS, Flags);
+  OS << '\0';
+  std::string Owned(OS.getBuffer());
+  std::free(OS.getBuffer());
   return Owned;
 }
 
-void PrimitiveTypeNode::outputPre(OutputBuffer &OB, OutputFlags Flags) const {
+void PrimitiveTypeNode::outputPre(OutputStream &OS, OutputFlags Flags) const {
   switch (PrimKind) {
     OUTPUT_ENUM_CLASS_VALUE(PrimitiveKind, Void, "void");
     OUTPUT_ENUM_CLASS_VALUE(PrimitiveKind, Bool, "bool");
@@ -150,107 +152,107 @@ void PrimitiveTypeNode::outputPre(OutputBuffer &OB, OutputFlags Flags) const {
     OUTPUT_ENUM_CLASS_VALUE(PrimitiveKind, Ldouble, "long double");
     OUTPUT_ENUM_CLASS_VALUE(PrimitiveKind, Nullptr, "std::nullptr_t");
   }
-  outputQualifiers(OB, Quals, true, false);
+  outputQualifiers(OS, Quals, true, false);
 }
 
-void NodeArrayNode::output(OutputBuffer &OB, OutputFlags Flags) const {
-  output(OB, Flags, ", ");
+void NodeArrayNode::output(OutputStream &OS, OutputFlags Flags) const {
+  output(OS, Flags, ", ");
 }
 
-void NodeArrayNode::output(OutputBuffer &OB, OutputFlags Flags,
-                           std::string_view Separator) const {
+void NodeArrayNode::output(OutputStream &OS, OutputFlags Flags,
+                           StringView Separator) const {
   if (Count == 0)
     return;
   if (Nodes[0])
-    Nodes[0]->output(OB, Flags);
+    Nodes[0]->output(OS, Flags);
   for (size_t I = 1; I < Count; ++I) {
-    OB << Separator;
-    Nodes[I]->output(OB, Flags);
+    OS << Separator;
+    Nodes[I]->output(OS, Flags);
   }
 }
 
-void EncodedStringLiteralNode::output(OutputBuffer &OB,
+void EncodedStringLiteralNode::output(OutputStream &OS,
                                       OutputFlags Flags) const {
   switch (Char) {
   case CharKind::Wchar:
-    OB << "L\"";
+    OS << "L\"";
     break;
   case CharKind::Char:
-    OB << "\"";
+    OS << "\"";
     break;
   case CharKind::Char16:
-    OB << "u\"";
+    OS << "u\"";
     break;
   case CharKind::Char32:
-    OB << "U\"";
+    OS << "U\"";
     break;
   }
-  OB << DecodedString << "\"";
+  OS << DecodedString << "\"";
   if (IsTruncated)
-    OB << "...";
+    OS << "...";
 }
 
-void IntegerLiteralNode::output(OutputBuffer &OB, OutputFlags Flags) const {
+void IntegerLiteralNode::output(OutputStream &OS, OutputFlags Flags) const {
   if (IsNegative)
-    OB << '-';
-  OB << Value;
+    OS << '-';
+  OS << Value;
 }
 
-void TemplateParameterReferenceNode::output(OutputBuffer &OB,
+void TemplateParameterReferenceNode::output(OutputStream &OS,
                                             OutputFlags Flags) const {
   if (ThunkOffsetCount > 0)
-    OB << "{";
+    OS << "{";
   else if (Affinity == PointerAffinity::Pointer)
-    OB << "&";
+    OS << "&";
 
   if (Symbol) {
-    Symbol->output(OB, Flags);
+    Symbol->output(OS, Flags);
     if (ThunkOffsetCount > 0)
-      OB << ", ";
+      OS << ", ";
   }
 
   if (ThunkOffsetCount > 0)
-    OB << ThunkOffsets[0];
+    OS << ThunkOffsets[0];
   for (int I = 1; I < ThunkOffsetCount; ++I) {
-    OB << ", " << ThunkOffsets[I];
+    OS << ", " << ThunkOffsets[I];
   }
   if (ThunkOffsetCount > 0)
-    OB << "}";
+    OS << "}";
 }
 
-void IdentifierNode::outputTemplateParameters(OutputBuffer &OB,
+void IdentifierNode::outputTemplateParameters(OutputStream &OS,
                                               OutputFlags Flags) const {
   if (!TemplateParams)
     return;
-  OB << "<";
-  TemplateParams->output(OB, Flags);
-  OB << ">";
+  OS << "<";
+  TemplateParams->output(OS, Flags);
+  OS << ">";
 }
 
-void DynamicStructorIdentifierNode::output(OutputBuffer &OB,
+void DynamicStructorIdentifierNode::output(OutputStream &OS,
                                            OutputFlags Flags) const {
   if (IsDestructor)
-    OB << "`dynamic atexit destructor for ";
+    OS << "`dynamic atexit destructor for ";
   else
-    OB << "`dynamic initializer for ";
+    OS << "`dynamic initializer for ";
 
   if (Variable) {
-    OB << "`";
-    Variable->output(OB, Flags);
-    OB << "''";
+    OS << "`";
+    Variable->output(OS, Flags);
+    OS << "''";
   } else {
-    OB << "'";
-    Name->output(OB, Flags);
-    OB << "''";
+    OS << "'";
+    Name->output(OS, Flags);
+    OS << "''";
   }
 }
 
-void NamedIdentifierNode::output(OutputBuffer &OB, OutputFlags Flags) const {
-  OB << Name;
-  outputTemplateParameters(OB, Flags);
+void NamedIdentifierNode::output(OutputStream &OS, OutputFlags Flags) const {
+  OS << Name;
+  outputTemplateParameters(OS, Flags);
 }
 
-void IntrinsicFunctionIdentifierNode::output(OutputBuffer &OB,
+void IntrinsicFunctionIdentifierNode::output(OutputStream &OS,
                                              OutputFlags Flags) const {
   switch (Operator) {
     OUTPUT_ENUM_CLASS_VALUE(IntrinsicFunctionKind, New, "operator new");
@@ -348,188 +350,188 @@ void IntrinsicFunctionIdentifierNode::output(OutputBuffer &OB,
   case IntrinsicFunctionKind::None:
     break;
   }
-  outputTemplateParameters(OB, Flags);
+  outputTemplateParameters(OS, Flags);
 }
 
-void LocalStaticGuardIdentifierNode::output(OutputBuffer &OB,
+void LocalStaticGuardIdentifierNode::output(OutputStream &OS,
                                             OutputFlags Flags) const {
   if (IsThread)
-    OB << "`local static thread guard'";
+    OS << "`local static thread guard'";
   else
-    OB << "`local static guard'";
+    OS << "`local static guard'";
   if (ScopeIndex > 0)
-    OB << "{" << ScopeIndex << "}";
+    OS << "{" << ScopeIndex << "}";
 }
 
-void ConversionOperatorIdentifierNode::output(OutputBuffer &OB,
+void ConversionOperatorIdentifierNode::output(OutputStream &OS,
                                               OutputFlags Flags) const {
-  OB << "operator";
-  outputTemplateParameters(OB, Flags);
-  OB << " ";
-  TargetType->output(OB, Flags);
+  OS << "operator";
+  outputTemplateParameters(OS, Flags);
+  OS << " ";
+  TargetType->output(OS, Flags);
 }
 
-void StructorIdentifierNode::output(OutputBuffer &OB, OutputFlags Flags) const {
+void StructorIdentifierNode::output(OutputStream &OS, OutputFlags Flags) const {
   if (IsDestructor)
-    OB << "~";
-  Class->output(OB, Flags);
-  outputTemplateParameters(OB, Flags);
+    OS << "~";
+  Class->output(OS, Flags);
+  outputTemplateParameters(OS, Flags);
 }
 
-void LiteralOperatorIdentifierNode::output(OutputBuffer &OB,
+void LiteralOperatorIdentifierNode::output(OutputStream &OS,
                                            OutputFlags Flags) const {
-  OB << "operator \"\"" << Name;
-  outputTemplateParameters(OB, Flags);
+  OS << "operator \"\"" << Name;
+  outputTemplateParameters(OS, Flags);
 }
 
-void FunctionSignatureNode::outputPre(OutputBuffer &OB,
+void FunctionSignatureNode::outputPre(OutputStream &OS,
                                       OutputFlags Flags) const {
   if (!(Flags & OF_NoAccessSpecifier)) {
     if (FunctionClass & FC_Public)
-      OB << "public: ";
+      OS << "public: ";
     if (FunctionClass & FC_Protected)
-      OB << "protected: ";
+      OS << "protected: ";
     if (FunctionClass & FC_Private)
-      OB << "private: ";
+      OS << "private: ";
   }
 
   if (!(Flags & OF_NoMemberType)) {
     if (!(FunctionClass & FC_Global)) {
       if (FunctionClass & FC_Static)
-        OB << "static ";
+        OS << "static ";
     }
     if (FunctionClass & FC_Virtual)
-      OB << "virtual ";
+      OS << "virtual ";
 
     if (FunctionClass & FC_ExternC)
-      OB << "extern \"C\" ";
+      OS << "extern \"C\" ";
   }
 
   if (!(Flags & OF_NoReturnType) && ReturnType) {
-    ReturnType->outputPre(OB, Flags);
-    OB << " ";
+    ReturnType->outputPre(OS, Flags);
+    OS << " ";
   }
 
   if (!(Flags & OF_NoCallingConvention))
-    outputCallingConvention(OB, CallConvention);
+    outputCallingConvention(OS, CallConvention);
 }
 
-void FunctionSignatureNode::outputPost(OutputBuffer &OB,
+void FunctionSignatureNode::outputPost(OutputStream &OS,
                                        OutputFlags Flags) const {
   if (!(FunctionClass & FC_NoParameterList)) {
-    OB << "(";
+    OS << "(";
     if (Params)
-      Params->output(OB, Flags);
+      Params->output(OS, Flags);
     else
-      OB << "void";
+      OS << "void";
 
     if (IsVariadic) {
-      if (OB.back() != '(')
-        OB << ", ";
-      OB << "...";
+      if (OS.back() != '(')
+        OS << ", ";
+      OS << "...";
     }
-    OB << ")";
+    OS << ")";
   }
 
   if (Quals & Q_Const)
-    OB << " const";
+    OS << " const";
   if (Quals & Q_Volatile)
-    OB << " volatile";
+    OS << " volatile";
   if (Quals & Q_Restrict)
-    OB << " __restrict";
+    OS << " __restrict";
   if (Quals & Q_Unaligned)
-    OB << " __unaligned";
+    OS << " __unaligned";
 
   if (IsNoexcept)
-    OB << " noexcept";
+    OS << " noexcept";
 
   if (RefQualifier == FunctionRefQualifier::Reference)
-    OB << " &";
+    OS << " &";
   else if (RefQualifier == FunctionRefQualifier::RValueReference)
-    OB << " &&";
+    OS << " &&";
 
   if (!(Flags & OF_NoReturnType) && ReturnType)
-    ReturnType->outputPost(OB, Flags);
+    ReturnType->outputPost(OS, Flags);
 }
 
-void ThunkSignatureNode::outputPre(OutputBuffer &OB, OutputFlags Flags) const {
-  OB << "[thunk]: ";
+void ThunkSignatureNode::outputPre(OutputStream &OS, OutputFlags Flags) const {
+  OS << "[thunk]: ";
 
-  FunctionSignatureNode::outputPre(OB, Flags);
+  FunctionSignatureNode::outputPre(OS, Flags);
 }
 
-void ThunkSignatureNode::outputPost(OutputBuffer &OB, OutputFlags Flags) const {
+void ThunkSignatureNode::outputPost(OutputStream &OS, OutputFlags Flags) const {
   if (FunctionClass & FC_StaticThisAdjust) {
-    OB << "`adjustor{" << ThisAdjust.StaticOffset << "}'";
+    OS << "`adjustor{" << ThisAdjust.StaticOffset << "}'";
   } else if (FunctionClass & FC_VirtualThisAdjust) {
     if (FunctionClass & FC_VirtualThisAdjustEx) {
-      OB << "`vtordispex{" << ThisAdjust.VBPtrOffset << ", "
+      OS << "`vtordispex{" << ThisAdjust.VBPtrOffset << ", "
          << ThisAdjust.VBOffsetOffset << ", " << ThisAdjust.VtordispOffset
          << ", " << ThisAdjust.StaticOffset << "}'";
     } else {
-      OB << "`vtordisp{" << ThisAdjust.VtordispOffset << ", "
+      OS << "`vtordisp{" << ThisAdjust.VtordispOffset << ", "
          << ThisAdjust.StaticOffset << "}'";
     }
   }
 
-  FunctionSignatureNode::outputPost(OB, Flags);
+  FunctionSignatureNode::outputPost(OS, Flags);
 }
 
-void PointerTypeNode::outputPre(OutputBuffer &OB, OutputFlags Flags) const {
+void PointerTypeNode::outputPre(OutputStream &OS, OutputFlags Flags) const {
   if (Pointee->kind() == NodeKind::FunctionSignature) {
     // If this is a pointer to a function, don't output the calling convention.
     // It needs to go inside the parentheses.
     const FunctionSignatureNode *Sig =
         static_cast<const FunctionSignatureNode *>(Pointee);
-    Sig->outputPre(OB, OF_NoCallingConvention);
+    Sig->outputPre(OS, OF_NoCallingConvention);
   } else
-    Pointee->outputPre(OB, Flags);
+    Pointee->outputPre(OS, Flags);
 
-  outputSpaceIfNecessary(OB);
+  outputSpaceIfNecessary(OS);
 
   if (Quals & Q_Unaligned)
-    OB << "__unaligned ";
+    OS << "__unaligned ";
 
   if (Pointee->kind() == NodeKind::ArrayType) {
-    OB << "(";
+    OS << "(";
   } else if (Pointee->kind() == NodeKind::FunctionSignature) {
-    OB << "(";
+    OS << "(";
     const FunctionSignatureNode *Sig =
         static_cast<const FunctionSignatureNode *>(Pointee);
-    outputCallingConvention(OB, Sig->CallConvention);
-    OB << " ";
+    outputCallingConvention(OS, Sig->CallConvention);
+    OS << " ";
   }
 
   if (ClassParent) {
-    ClassParent->output(OB, Flags);
-    OB << "::";
+    ClassParent->output(OS, Flags);
+    OS << "::";
   }
 
   switch (Affinity) {
   case PointerAffinity::Pointer:
-    OB << "*";
+    OS << "*";
     break;
   case PointerAffinity::Reference:
-    OB << "&";
+    OS << "&";
     break;
   case PointerAffinity::RValueReference:
-    OB << "&&";
+    OS << "&&";
     break;
   default:
     assert(false);
   }
-  outputQualifiers(OB, Quals, false, false);
+  outputQualifiers(OS, Quals, false, false);
 }
 
-void PointerTypeNode::outputPost(OutputBuffer &OB, OutputFlags Flags) const {
+void PointerTypeNode::outputPost(OutputStream &OS, OutputFlags Flags) const {
   if (Pointee->kind() == NodeKind::ArrayType ||
       Pointee->kind() == NodeKind::FunctionSignature)
-    OB << ")";
+    OS << ")";
 
-  Pointee->outputPost(OB, Flags);
+  Pointee->outputPost(OS, Flags);
 }
 
-void TagTypeNode::outputPre(OutputBuffer &OB, OutputFlags Flags) const {
+void TagTypeNode::outputPre(OutputStream &OS, OutputFlags Flags) const {
   if (!(Flags & OF_NoTagSpecifier)) {
     switch (Tag) {
       OUTPUT_ENUM_CLASS_VALUE(TagKind, Class, "class");
@@ -537,59 +539,59 @@ void TagTypeNode::outputPre(OutputBuffer &OB, OutputFlags Flags) const {
       OUTPUT_ENUM_CLASS_VALUE(TagKind, Union, "union");
       OUTPUT_ENUM_CLASS_VALUE(TagKind, Enum, "enum");
     }
-    OB << " ";
+    OS << " ";
   }
-  QualifiedName->output(OB, Flags);
-  outputQualifiers(OB, Quals, true, false);
+  QualifiedName->output(OS, Flags);
+  outputQualifiers(OS, Quals, true, false);
 }
 
-void TagTypeNode::outputPost(OutputBuffer &OB, OutputFlags Flags) const {}
+void TagTypeNode::outputPost(OutputStream &OS, OutputFlags Flags) const {}
 
-void ArrayTypeNode::outputPre(OutputBuffer &OB, OutputFlags Flags) const {
-  ElementType->outputPre(OB, Flags);
-  outputQualifiers(OB, Quals, true, false);
+void ArrayTypeNode::outputPre(OutputStream &OS, OutputFlags Flags) const {
+  ElementType->outputPre(OS, Flags);
+  outputQualifiers(OS, Quals, true, false);
 }
 
-void ArrayTypeNode::outputOneDimension(OutputBuffer &OB, OutputFlags Flags,
+void ArrayTypeNode::outputOneDimension(OutputStream &OS, OutputFlags Flags,
                                        Node *N) const {
   assert(N->kind() == NodeKind::IntegerLiteral);
   IntegerLiteralNode *ILN = static_cast<IntegerLiteralNode *>(N);
   if (ILN->Value != 0)
-    ILN->output(OB, Flags);
+    ILN->output(OS, Flags);
 }
 
-void ArrayTypeNode::outputDimensionsImpl(OutputBuffer &OB,
+void ArrayTypeNode::outputDimensionsImpl(OutputStream &OS,
                                          OutputFlags Flags) const {
   if (Dimensions->Count == 0)
     return;
 
-  outputOneDimension(OB, Flags, Dimensions->Nodes[0]);
+  outputOneDimension(OS, Flags, Dimensions->Nodes[0]);
   for (size_t I = 1; I < Dimensions->Count; ++I) {
-    OB << "][";
-    outputOneDimension(OB, Flags, Dimensions->Nodes[I]);
+    OS << "][";
+    outputOneDimension(OS, Flags, Dimensions->Nodes[I]);
   }
 }
 
-void ArrayTypeNode::outputPost(OutputBuffer &OB, OutputFlags Flags) const {
-  OB << "[";
-  outputDimensionsImpl(OB, Flags);
-  OB << "]";
+void ArrayTypeNode::outputPost(OutputStream &OS, OutputFlags Flags) const {
+  OS << "[";
+  outputDimensionsImpl(OS, Flags);
+  OS << "]";
 
-  ElementType->outputPost(OB, Flags);
+  ElementType->outputPost(OS, Flags);
 }
 
-void SymbolNode::output(OutputBuffer &OB, OutputFlags Flags) const {
-  Name->output(OB, Flags);
+void SymbolNode::output(OutputStream &OS, OutputFlags Flags) const {
+  Name->output(OS, Flags);
 }
 
-void FunctionSymbolNode::output(OutputBuffer &OB, OutputFlags Flags) const {
-  Signature->outputPre(OB, Flags);
-  outputSpaceIfNecessary(OB);
-  Name->output(OB, Flags);
-  Signature->outputPost(OB, Flags);
+void FunctionSymbolNode::output(OutputStream &OS, OutputFlags Flags) const {
+  Signature->outputPre(OS, Flags);
+  outputSpaceIfNecessary(OS);
+  Name->output(OS, Flags);
+  Signature->outputPost(OS, Flags);
 }
 
-void VariableSymbolNode::output(OutputBuffer &OB, OutputFlags Flags) const {
+void VariableSymbolNode::output(OutputStream &OS, OutputFlags Flags) const {
   const char *AccessSpec = nullptr;
   bool IsStatic = true;
   switch (SC) {
@@ -607,52 +609,52 @@ void VariableSymbolNode::output(OutputBuffer &OB, OutputFlags Flags) const {
     break;
   }
   if (!(Flags & OF_NoAccessSpecifier) && AccessSpec)
-    OB << AccessSpec << ": ";
+    OS << AccessSpec << ": ";
   if (!(Flags & OF_NoMemberType) && IsStatic)
-    OB << "static ";
+    OS << "static ";
 
-  if (!(Flags & OF_NoVariableType) && Type) {
-    Type->outputPre(OB, Flags);
-    outputSpaceIfNecessary(OB);
+  if (Type) {
+    Type->outputPre(OS, Flags);
+    outputSpaceIfNecessary(OS);
   }
-  Name->output(OB, Flags);
-  if (!(Flags & OF_NoVariableType) && Type)
-    Type->outputPost(OB, Flags);
+  Name->output(OS, Flags);
+  if (Type)
+    Type->outputPost(OS, Flags);
 }
 
-void CustomTypeNode::outputPre(OutputBuffer &OB, OutputFlags Flags) const {
-  Identifier->output(OB, Flags);
+void CustomTypeNode::outputPre(OutputStream &OS, OutputFlags Flags) const {
+  Identifier->output(OS, Flags);
 }
-void CustomTypeNode::outputPost(OutputBuffer &OB, OutputFlags Flags) const {}
+void CustomTypeNode::outputPost(OutputStream &OS, OutputFlags Flags) const {}
 
-void QualifiedNameNode::output(OutputBuffer &OB, OutputFlags Flags) const {
-  Components->output(OB, Flags, "::");
+void QualifiedNameNode::output(OutputStream &OS, OutputFlags Flags) const {
+  Components->output(OS, Flags, "::");
 }
 
-void RttiBaseClassDescriptorNode::output(OutputBuffer &OB,
+void RttiBaseClassDescriptorNode::output(OutputStream &OS,
                                          OutputFlags Flags) const {
-  OB << "`RTTI Base Class Descriptor at (";
-  OB << NVOffset << ", " << VBPtrOffset << ", " << VBTableOffset << ", "
+  OS << "`RTTI Base Class Descriptor at (";
+  OS << NVOffset << ", " << VBPtrOffset << ", " << VBTableOffset << ", "
      << this->Flags;
-  OB << ")'";
+  OS << ")'";
 }
 
-void LocalStaticGuardVariableNode::output(OutputBuffer &OB,
+void LocalStaticGuardVariableNode::output(OutputStream &OS,
                                           OutputFlags Flags) const {
-  Name->output(OB, Flags);
+  Name->output(OS, Flags);
 }
 
-void VcallThunkIdentifierNode::output(OutputBuffer &OB,
+void VcallThunkIdentifierNode::output(OutputStream &OS,
                                       OutputFlags Flags) const {
-  OB << "`vcall'{" << OffsetInVTable << ", {flat}}";
+  OS << "`vcall'{" << OffsetInVTable << ", {flat}}";
 }
 
-void SpecialTableSymbolNode::output(OutputBuffer &OB, OutputFlags Flags) const {
-  outputQualifiers(OB, Quals, false, true);
-  Name->output(OB, Flags);
+void SpecialTableSymbolNode::output(OutputStream &OS, OutputFlags Flags) const {
+  outputQualifiers(OS, Quals, false, true);
+  Name->output(OS, Flags);
   if (TargetName) {
-    OB << "{for `";
-    TargetName->output(OB, Flags);
-    OB << "'}";
+    OS << "{for `";
+    TargetName->output(OS, Flags);
+    OS << "'}";
   }
 }

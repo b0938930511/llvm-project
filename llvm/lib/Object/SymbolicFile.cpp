@@ -17,16 +17,17 @@
 #include "llvm/Object/Error.h"
 #include "llvm/Object/IRObjectFile.h"
 #include "llvm/Object/ObjectFile.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/ErrorOr.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include <algorithm>
 #include <memory>
 
 using namespace llvm;
 using namespace object;
-
-namespace llvm {
-class LLVMContext;
-}
 
 SymbolicFile::SymbolicFile(unsigned int Type, MemoryBufferRef Source)
     : Binary(Type, Source) {}
@@ -63,7 +64,6 @@ SymbolicFile::createSymbolicFile(MemoryBufferRef Object, file_magic Type,
   case file_magic::macho_dynamically_linked_shared_lib_stub:
   case file_magic::macho_dsym_companion:
   case file_magic::macho_kext_bundle:
-  case file_magic::macho_file_set:
   case file_magic::pecoff_executable:
   case file_magic::xcoff_object_32:
   case file_magic::xcoff_object_64:
@@ -114,7 +114,6 @@ bool SymbolicFile::isSymbolicFile(file_magic Type, const LLVMContext *Context) {
   case file_magic::macho_dynamically_linked_shared_lib_stub:
   case file_magic::macho_dsym_companion:
   case file_magic::macho_kext_bundle:
-  case file_magic::macho_file_set:
   case file_magic::pecoff_executable:
   case file_magic::xcoff_object_32:
   case file_magic::xcoff_object_64:

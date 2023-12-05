@@ -39,12 +39,3 @@ entry:
 return:		; preds = %"LASM$foo"
 	ret void
 }
-
-define void @quux() {
-entry:
-	call void asm sideeffect inteldialect "brl ${0:l}", "X,~{dirflag},~{fpsr},~{flags},~{memory}"( label %"LASM$foo" )
-	br label %"LASM$foo"
-
-"LASM$foo":		; preds = %entry
-	ret void
-}

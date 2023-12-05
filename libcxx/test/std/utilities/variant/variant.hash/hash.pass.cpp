@@ -1,3 +1,4 @@
+// -*- C++ -*-
 //===----------------------------------------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -24,7 +25,7 @@
 #ifndef TEST_HAS_NO_EXCEPTIONS
 namespace std {
 template <> struct hash<::MakeEmptyT> {
-  std::size_t operator()(const ::MakeEmptyT &) const {
+  size_t operator()(const ::MakeEmptyT &) const {
     assert(false);
     return 0;
   }
@@ -127,7 +128,7 @@ namespace std {
 
 template <>
 struct hash<B> {
-  std::size_t operator()(B const&) const {
+  size_t operator()(B const&) const {
     return 0;
   }
 };

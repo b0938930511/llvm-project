@@ -19,6 +19,8 @@
 #include "clang/Format/Format.h"
 
 namespace clang {
+class SourceManager;
+
 namespace format {
 
 enum LineType {
@@ -31,32 +33,18 @@ enum LineType {
   LT_PreprocessorDirective,
   LT_VirtualFunctionDecl,
   LT_ArrayOfStructInitializer,
-  LT_CommentAbovePPDirective,
-};
-
-enum ScopeType {
-  // Contained in class declaration/definition.
-  ST_Class,
-  // Contained within function definition.
-  ST_Function,
-  // Contained within other scope block (loop, if/else, etc).
-  ST_Other,
 };
 
 class AnnotatedLine {
 public:
   AnnotatedLine(const UnwrappedLine &Line)
       : First(Line.Tokens.front().Tok), Level(Line.Level),
-        PPLevel(Line.PPLevel),
         MatchingOpeningBlockLineIndex(Line.MatchingOpeningBlockLineIndex),
         MatchingClosingBlockLineIndex(Line.MatchingClosingBlockLineIndex),
         InPPDirective(Line.InPPDirective),
-        InPragmaDirective(Line.InPragmaDirective),
-        InMacroBody(Line.InMacroBody),
         MustBeDeclaration(Line.MustBeDeclaration), MightBeFunctionDecl(false),
         IsMultiVariableDeclStmt(false), Affected(false),
         LeadingEmptyLinesAffected(false), ChildrenAffected(false),
-        ReturnTypeWrapped(false), IsContinuation(Line.IsContinuation),
         FirstStartColumn(Line.FirstStartColumn) {
     assert(!Line.Tokens.empty());
 
@@ -65,52 +53,33 @@ public:
     // left them in a different state.
     First->Previous = nullptr;
     FormatToken *Current = First;
-    addChildren(Line.Tokens.front(), Current);
-    for (const UnwrappedLineNode &Node : llvm::drop_begin(Line.Tokens)) {
-      if (Node.Tok->MacroParent)
-        ContainsMacroCall = true;
-      Current->Next = Node.Tok;
-      Node.Tok->Previous = Current;
+    for (std::list<UnwrappedLineNode>::const_iterator I = ++Line.Tokens.begin(),
+                                                      E = Line.Tokens.end();
+         I != E; ++I) {
+      const UnwrappedLineNode &Node = *I;
+      Current->Next = I->Tok;
+      I->Tok->Previous = Current;
       Current = Current->Next;
-      addChildren(Node, Current);
-      // FIXME: if we add children, previous will point to the token before
-      // the children; changing this requires significant changes across
-      // clang-format.
+      Current->Children.clear();
+      for (const auto &Child : Node.Children) {
+        Children.push_back(new AnnotatedLine(Child));
+        Current->Children.push_back(Children.back());
+      }
     }
     Last = Current;
     Last->Next = nullptr;
   }
 
-  void addChildren(const UnwrappedLineNode &Node, FormatToken *Current) {
-    Current->Children.clear();
-    for (const auto &Child : Node.Children) {
-      Children.push_back(new AnnotatedLine(Child));
-      if (Children.back()->ContainsMacroCall)
-        ContainsMacroCall = true;
-      Current->Children.push_back(Children.back());
-    }
-  }
-
-  size_t size() const {
-    size_t Size = 1;
-    for (const auto *Child : Children)
-      Size += Child->size();
-    return Size;
-  }
-
   ~AnnotatedLine() {
-    for (AnnotatedLine *Child : Children)
-      delete Child;
+    for (unsigned i = 0, e = Children.size(); i != e; ++i) {
+      delete Children[i];
+    }
     FormatToken *Current = First;
     while (Current) {
       Current->Children.clear();
       Current->Role.reset();
       Current = Current->Next;
     }
-  }
-
-  bool isComment() const {
-    return First && First->is(tok::comment) && !First->getNextNonComment();
   }
 
   /// \c true if this line starts with the given tokens in order, ignoring
@@ -151,11 +120,6 @@ public:
            startsWith(tok::kw_export, tok::kw_namespace);
   }
 
-  FormatToken *getFirstNonComment() const {
-    assert(First);
-    return First->is(tok::comment) ? First->getNextNonComment() : First;
-  }
-
   FormatToken *First;
   FormatToken *Last;
 
@@ -163,18 +127,12 @@ public:
 
   LineType Type;
   unsigned Level;
-  unsigned PPLevel;
   size_t MatchingOpeningBlockLineIndex;
   size_t MatchingClosingBlockLineIndex;
   bool InPPDirective;
-  bool InPragmaDirective;
-  bool InMacroBody;
   bool MustBeDeclaration;
   bool MightBeFunctionDecl;
   bool IsMultiVariableDeclStmt;
-
-  /// \c True if this line contains a macro call for which an expansion exists.
-  bool ContainsMacroCall = false;
 
   /// \c True if this line should be formatted, i.e. intersects directly or
   /// indirectly with one of the input ranges.
@@ -186,13 +144,6 @@ public:
 
   /// \c True if one of this line's children intersects with an input range.
   bool ChildrenAffected;
-
-  /// \c True if breaking after last attribute group in function return type.
-  bool ReturnTypeWrapped;
-
-  /// \c True if this line should be indented by ContinuationIndent in addition
-  /// to the normal indention level.
-  bool IsContinuation;
 
   unsigned FirstStartColumn;
 
@@ -212,52 +163,47 @@ public:
   /// Adapts the indent levels of comment lines to the indent of the
   /// subsequent line.
   // FIXME: Can/should this be done in the UnwrappedLineParser?
-  void setCommentLineLevels(SmallVectorImpl<AnnotatedLine *> &Lines) const;
+  void setCommentLineLevels(SmallVectorImpl<AnnotatedLine *> &Lines);
 
   void annotate(AnnotatedLine &Line);
-  void calculateFormattingInformation(AnnotatedLine &Line) const;
+  void calculateFormattingInformation(AnnotatedLine &Line);
 
 private:
   /// Calculate the penalty for splitting before \c Tok.
   unsigned splitPenalty(const AnnotatedLine &Line, const FormatToken &Tok,
-                        bool InFunctionDecl) const;
+                        bool InFunctionDecl);
 
   bool spaceRequiredBeforeParens(const FormatToken &Right) const;
 
   bool spaceRequiredBetween(const AnnotatedLine &Line, const FormatToken &Left,
-                            const FormatToken &Right) const;
+                            const FormatToken &Right);
 
-  bool spaceRequiredBefore(const AnnotatedLine &Line,
-                           const FormatToken &Right) const;
+  bool spaceRequiredBefore(const AnnotatedLine &Line, const FormatToken &Right);
 
-  bool mustBreakBefore(const AnnotatedLine &Line,
-                       const FormatToken &Right) const;
+  bool mustBreakBefore(const AnnotatedLine &Line, const FormatToken &Right);
 
-  bool canBreakBefore(const AnnotatedLine &Line,
-                      const FormatToken &Right) const;
+  bool canBreakBefore(const AnnotatedLine &Line, const FormatToken &Right);
 
   bool mustBreakForReturnType(const AnnotatedLine &Line) const;
 
-  void printDebugInfo(const AnnotatedLine &Line) const;
+  void printDebugInfo(const AnnotatedLine &Line);
 
-  void calculateUnbreakableTailLengths(AnnotatedLine &Line) const;
+  void calculateUnbreakableTailLengths(AnnotatedLine &Line);
 
-  void calculateArrayInitializerColumnList(AnnotatedLine &Line) const;
+  void calculateArrayInitializerColumnList(AnnotatedLine &Line);
 
   FormatToken *calculateInitializerColumnList(AnnotatedLine &Line,
                                               FormatToken *CurrentToken,
-                                              unsigned Depth) const;
+                                              unsigned Depth);
   FormatStyle::PointerAlignmentStyle
-  getTokenReferenceAlignment(const FormatToken &PointerOrReference) const;
+  getTokenReferenceAlignment(const FormatToken &PointerOrReference);
 
-  FormatStyle::PointerAlignmentStyle getTokenPointerOrReferenceAlignment(
-      const FormatToken &PointerOrReference) const;
+  FormatStyle::PointerAlignmentStyle
+  getTokenPointerOrReferenceAlignment(const FormatToken &PointerOrReference);
 
   const FormatStyle &Style;
 
   const AdditionalKeywords &Keywords;
-
-  SmallVector<ScopeType> Scopes;
 };
 
 } // end namespace format

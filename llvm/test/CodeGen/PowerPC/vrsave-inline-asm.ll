@@ -29,7 +29,7 @@ entry:
   ret i32 %0
 }
 
-; CHECK-LABEL: moveToVRSave:
+; CHECK-LABEl: moveToVRSave:
 ; CHECK:         mtvrsave 3
 
 ; CHECK-LABEL: moveFromVRSave:

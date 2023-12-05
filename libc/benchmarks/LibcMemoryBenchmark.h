@@ -13,13 +13,10 @@
 #define LLVM_LIBC_UTILS_BENCHMARK_MEMORY_BENCHMARK_H
 
 #include "LibcBenchmark.h"
-#include "LibcFunctionPrototypes.h"
 #include "MemorySizeDistributions.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Alignment.h"
-#include "llvm/Support/MathExtras.h"
 #include <cstdint>
-#include <optional>
 #include <random>
 
 namespace llvm {
@@ -32,7 +29,7 @@ namespace libc_benchmarks {
 struct StudyConfiguration {
   // One of 'memcpy', 'memset', 'memcmp'.
   // The underlying implementation is always the llvm libc one.
-  // e.g. 'memcpy' will test 'LIBC_NAMESPACE::memcpy'
+  // e.g. 'memcpy' will test '__llvm_libc::memcpy'
   std::string Function;
 
   // The number of trials to run for this benchmark.
@@ -60,7 +57,7 @@ struct StudyConfiguration {
   // None : Use a fixed address that is at least cache line aligned,
   //    1 : Use random address,
   //   >1 : Use random address aligned to value.
-  MaybeAlign AccessAlignment = std::nullopt;
+  MaybeAlign AccessAlignment = None;
 
   // When Function == 'memcmp', this is the buffers mismatch position.
   //  0 : Buffers always compare equal,
@@ -108,11 +105,10 @@ class AlignedBuffer {
   size_t Size = 0;
 
 public:
-  static constexpr size_t Alignment = 512;
+  static constexpr size_t Alignment = 1024;
 
   explicit AlignedBuffer(size_t Size)
-      : Buffer(static_cast<char *>(
-            aligned_alloc(Alignment, alignTo(Size, Alignment)))),
+      : Buffer(static_cast<char *>(aligned_alloc(Alignment, Size))),
         Size(Size) {}
   ~AlignedBuffer() { free(Buffer); }
 
@@ -189,6 +185,32 @@ struct ParameterBatch {
   std::vector<ParameterType> Parameters;
 };
 
+/// Memory function prototype and configuration.
+using MemcpyFunction = void *(*)(void *__restrict, const void *__restrict,
+                                 size_t);
+struct MemcpyConfiguration {
+  MemcpyFunction Function;
+  llvm::StringRef Name;
+};
+
+using MemsetFunction = void *(*)(void *, int, size_t);
+struct MemsetConfiguration {
+  MemsetFunction Function;
+  llvm::StringRef Name;
+};
+
+using BzeroFunction = void (*)(void *, size_t);
+struct BzeroConfiguration {
+  BzeroFunction Function;
+  llvm::StringRef Name;
+};
+
+using MemcmpFunction = int (*)(const void *, const void *, size_t);
+struct MemcmpConfiguration {
+  MemcmpFunction Function;
+  llvm::StringRef Name;
+};
+
 /// Provides source and destination buffers for the Copy operation as well as
 /// the associated size distributions.
 struct CopySetup : public ParameterBatch {
@@ -206,24 +228,6 @@ struct CopySetup : public ParameterBatch {
 private:
   AlignedBuffer SrcBuffer;
   AlignedBuffer DstBuffer;
-};
-
-/// Provides source and destination buffers for the Move operation as well as
-/// the associated size distributions.
-struct MoveSetup : public ParameterBatch {
-  MoveSetup();
-
-  inline static const ArrayRef<MemorySizeDistribution> getDistributions() {
-    return getMemmoveSizeDistributions();
-  }
-
-  inline void *Call(ParameterType Parameter, MemmoveFunction Memmove) {
-    return Memmove(Buffer + ParameterBatch::BufferSize / 3,
-                   Buffer + Parameter.OffsetBytes, Parameter.SizeBytes);
-  }
-
-private:
-  AlignedBuffer Buffer;
 };
 
 /// Provides destination buffer for the Set operation as well as the associated
@@ -258,9 +262,9 @@ struct ComparisonSetup : public ParameterBatch {
     return getMemcmpSizeDistributions();
   }
 
-  inline int Call(ParameterType Parameter, MemcmpOrBcmpFunction MemcmpOrBcmp) {
-    return MemcmpOrBcmp(LhsBuffer + Parameter.OffsetBytes,
-                        RhsBuffer + Parameter.OffsetBytes, Parameter.SizeBytes);
+  inline int Call(ParameterType Parameter, MemcmpFunction Memcmp) {
+    return Memcmp(LhsBuffer + Parameter.OffsetBytes,
+                  RhsBuffer + Parameter.OffsetBytes, Parameter.SizeBytes);
   }
 
 private:

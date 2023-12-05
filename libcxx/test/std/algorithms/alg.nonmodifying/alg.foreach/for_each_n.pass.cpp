@@ -16,7 +16,6 @@
 
 #include <algorithm>
 #include <cassert>
-#include <functional>
 
 #include "test_macros.h"
 #include "test_iterators.h"
@@ -25,7 +24,7 @@
 TEST_CONSTEXPR bool test_constexpr() {
     int ia[] = {1, 3, 6, 7};
     int expected[] = {3, 5, 8, 9};
-    const std::size_t N = 4;
+    const size_t N = 4;
 
     auto it = std::for_each_n(std::begin(ia), N, [](int &a) { a += 2; });
     return it == (std::begin(ia) + N)

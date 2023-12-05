@@ -8,7 +8,6 @@
 
 #include "AArch64WinCOFFStreamer.h"
 #include "llvm/MC/MCAsmBackend.h"
-#include "llvm/MC/MCAssembler.h"
 #include "llvm/MC/MCCodeEmitter.h"
 #include "llvm/MC/MCObjectWriter.h"
 #include "llvm/MC/MCWin64EH.h"
@@ -27,14 +26,14 @@ public:
                          std::unique_ptr<MCObjectWriter> OW)
       : MCWinCOFFStreamer(C, std::move(AB), std::move(CE), std::move(OW)) {}
 
-  void emitWinEHHandlerData(SMLoc Loc) override;
-  void emitWindowsUnwindTables() override;
-  void emitWindowsUnwindTables(WinEH::FrameInfo *Frame) override;
+  void EmitWinEHHandlerData(SMLoc Loc) override;
+  void EmitWindowsUnwindTables() override;
+  void EmitWindowsUnwindTables(WinEH::FrameInfo *Frame) override;
   void finishImpl() override;
 };
 
-void AArch64WinCOFFStreamer::emitWinEHHandlerData(SMLoc Loc) {
-  MCStreamer::emitWinEHHandlerData(Loc);
+void AArch64WinCOFFStreamer::EmitWinEHHandlerData(SMLoc Loc) {
+  MCStreamer::EmitWinEHHandlerData(Loc);
 
   // We have to emit the unwind info now, because this directive
   // actually switches to the .xdata section!
@@ -42,11 +41,11 @@ void AArch64WinCOFFStreamer::emitWinEHHandlerData(SMLoc Loc) {
                             /* HandlerData = */ true);
 }
 
-void AArch64WinCOFFStreamer::emitWindowsUnwindTables(WinEH::FrameInfo *Frame) {
+void AArch64WinCOFFStreamer::EmitWindowsUnwindTables(WinEH::FrameInfo *Frame) {
   EHStreamer.EmitUnwindInfo(*this, Frame, /* HandlerData = */ false);
 }
 
-void AArch64WinCOFFStreamer::emitWindowsUnwindTables() {
+void AArch64WinCOFFStreamer::EmitWindowsUnwindTables() {
   if (!getNumWinFrameInfos())
     return;
   EHStreamer.Emit(*this);
@@ -54,7 +53,7 @@ void AArch64WinCOFFStreamer::emitWindowsUnwindTables() {
 
 void AArch64WinCOFFStreamer::finishImpl() {
   emitFrames(nullptr);
-  emitWindowsUnwindTables();
+  EmitWindowsUnwindTables();
 
   MCWinCOFFStreamer::finishImpl();
 }
@@ -72,9 +71,10 @@ void AArch64TargetWinCOFFStreamer::emitARM64WinUnwindCode(unsigned UnwindCode,
   WinEH::FrameInfo *CurFrame = S.EnsureValidWinFrameInfo(SMLoc());
   if (!CurFrame)
     return;
-  auto Inst = WinEH::Instruction(UnwindCode, /*Label=*/nullptr, Reg, Offset);
+  MCSymbol *Label = S.emitCFILabel();
+  auto Inst = WinEH::Instruction(UnwindCode, Label, Reg, Offset);
   if (InEpilogCFI)
-    CurFrame->EpilogMap[CurrentEpilog].Instructions.push_back(Inst);
+    CurFrame->EpilogMap[CurrentEpilog].push_back(Inst);
   else
     CurFrame->Instructions.push_back(Inst);
 }
@@ -176,8 +176,7 @@ void AArch64TargetWinCOFFStreamer::emitARM64WinCFIPrologEnd() {
 
   MCSymbol *Label = S.emitCFILabel();
   CurFrame->PrologEnd = Label;
-  WinEH::Instruction Inst =
-      WinEH::Instruction(Win64EH::UOP_End, /*Label=*/nullptr, -1, 0);
+  WinEH::Instruction Inst = WinEH::Instruction(Win64EH::UOP_End, Label, -1, 0);
   auto it = CurFrame->Instructions.begin();
   CurFrame->Instructions.insert(it, Inst);
 }
@@ -199,11 +198,9 @@ void AArch64TargetWinCOFFStreamer::emitARM64WinCFIEpilogEnd() {
     return;
 
   InEpilogCFI = false;
-  WinEH::Instruction Inst =
-      WinEH::Instruction(Win64EH::UOP_End, /*Label=*/nullptr, -1, 0);
-  CurFrame->EpilogMap[CurrentEpilog].Instructions.push_back(Inst);
   MCSymbol *Label = S.emitCFILabel();
-  CurFrame->EpilogMap[CurrentEpilog].End = Label;
+  WinEH::Instruction Inst = WinEH::Instruction(Win64EH::UOP_End, Label, -1, 0);
+  CurFrame->EpilogMap[CurrentEpilog].push_back(Inst);
   CurrentEpilog = nullptr;
 }
 
@@ -219,76 +216,8 @@ void AArch64TargetWinCOFFStreamer::emitARM64WinCFIContext() {
   emitARM64WinUnwindCode(Win64EH::UOP_Context, -1, 0);
 }
 
-void AArch64TargetWinCOFFStreamer::emitARM64WinCFIECContext() {
-  emitARM64WinUnwindCode(Win64EH::UOP_ECContext, -1, 0);
-}
-
 void AArch64TargetWinCOFFStreamer::emitARM64WinCFIClearUnwoundToCall() {
   emitARM64WinUnwindCode(Win64EH::UOP_ClearUnwoundToCall, -1, 0);
-}
-
-void AArch64TargetWinCOFFStreamer::emitARM64WinCFIPACSignLR() {
-  emitARM64WinUnwindCode(Win64EH::UOP_PACSignLR, -1, 0);
-}
-
-void AArch64TargetWinCOFFStreamer::emitARM64WinCFISaveAnyRegI(unsigned Reg,
-                                                              int Offset) {
-  emitARM64WinUnwindCode(Win64EH::UOP_SaveAnyRegI, Reg, Offset);
-}
-
-void AArch64TargetWinCOFFStreamer::emitARM64WinCFISaveAnyRegIP(unsigned Reg,
-                                                               int Offset) {
-  emitARM64WinUnwindCode(Win64EH::UOP_SaveAnyRegIP, Reg, Offset);
-}
-
-void AArch64TargetWinCOFFStreamer::emitARM64WinCFISaveAnyRegD(unsigned Reg,
-                                                              int Offset) {
-  emitARM64WinUnwindCode(Win64EH::UOP_SaveAnyRegD, Reg, Offset);
-}
-
-void AArch64TargetWinCOFFStreamer::emitARM64WinCFISaveAnyRegDP(unsigned Reg,
-                                                               int Offset) {
-  emitARM64WinUnwindCode(Win64EH::UOP_SaveAnyRegDP, Reg, Offset);
-}
-
-void AArch64TargetWinCOFFStreamer::emitARM64WinCFISaveAnyRegQ(unsigned Reg,
-                                                              int Offset) {
-  emitARM64WinUnwindCode(Win64EH::UOP_SaveAnyRegQ, Reg, Offset);
-}
-
-void AArch64TargetWinCOFFStreamer::emitARM64WinCFISaveAnyRegQP(unsigned Reg,
-                                                               int Offset) {
-  emitARM64WinUnwindCode(Win64EH::UOP_SaveAnyRegQP, Reg, Offset);
-}
-
-void AArch64TargetWinCOFFStreamer::emitARM64WinCFISaveAnyRegIX(unsigned Reg,
-                                                               int Offset) {
-  emitARM64WinUnwindCode(Win64EH::UOP_SaveAnyRegIX, Reg, Offset);
-}
-
-void AArch64TargetWinCOFFStreamer::emitARM64WinCFISaveAnyRegIPX(unsigned Reg,
-                                                                int Offset) {
-  emitARM64WinUnwindCode(Win64EH::UOP_SaveAnyRegIPX, Reg, Offset);
-}
-
-void AArch64TargetWinCOFFStreamer::emitARM64WinCFISaveAnyRegDX(unsigned Reg,
-                                                               int Offset) {
-  emitARM64WinUnwindCode(Win64EH::UOP_SaveAnyRegDX, Reg, Offset);
-}
-
-void AArch64TargetWinCOFFStreamer::emitARM64WinCFISaveAnyRegDPX(unsigned Reg,
-                                                                int Offset) {
-  emitARM64WinUnwindCode(Win64EH::UOP_SaveAnyRegDPX, Reg, Offset);
-}
-
-void AArch64TargetWinCOFFStreamer::emitARM64WinCFISaveAnyRegQX(unsigned Reg,
-                                                               int Offset) {
-  emitARM64WinUnwindCode(Win64EH::UOP_SaveAnyRegQX, Reg, Offset);
-}
-
-void AArch64TargetWinCOFFStreamer::emitARM64WinCFISaveAnyRegQPX(unsigned Reg,
-                                                                int Offset) {
-  emitARM64WinUnwindCode(Win64EH::UOP_SaveAnyRegQPX, Reg, Offset);
 }
 
 MCWinCOFFStreamer *llvm::createAArch64WinCOFFStreamer(

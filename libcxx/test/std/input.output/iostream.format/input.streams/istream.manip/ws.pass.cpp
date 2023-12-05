@@ -45,41 +45,37 @@ int main(int, char**)
     {
         testbuf<char> sb("   123");
         std::istream is(&sb);
-        std::ws(is);
+        ws(is);
         assert(is.good());
         assert(is.peek() == '1');
     }
-#ifndef TEST_HAS_NO_WIDE_CHARACTERS
     {
         testbuf<wchar_t> sb(L"   123");
         std::wistream is(&sb);
-        std::ws(is);
+        ws(is);
         assert(is.good());
         assert(is.peek() == L'1');
     }
-#endif
     {
         testbuf<char> sb("  ");
         std::istream is(&sb);
-        std::ws(is);
+        ws(is);
         assert(!is.fail());
         assert(is.eof());
-        std::ws(is);
+        ws(is);
         assert(is.eof());
         assert(is.fail());
     }
-#ifndef TEST_HAS_NO_WIDE_CHARACTERS
     {
         testbuf<wchar_t> sb(L"  ");
         std::wistream is(&sb);
-        std::ws(is);
+        ws(is);
         assert(!is.fail());
         assert(is.eof());
-        std::ws(is);
+        ws(is);
         assert(is.eof());
         assert(is.fail());
     }
-#endif
 #ifndef TEST_HAS_NO_EXCEPTIONS
     {
         testbuf<char> sb("  ");
@@ -98,7 +94,6 @@ int main(int, char**)
         assert( is.eof());
         assert(threw);
     }
-#ifndef TEST_HAS_NO_WIDE_CHARACTERS
     {
         testbuf<wchar_t> sb(L"  ");
         std::basic_istream<wchar_t> is(&sb);
@@ -116,8 +111,7 @@ int main(int, char**)
         assert( is.eof());
         assert(threw);
     }
-#endif // TEST_HAS_NO_WIDE_CHARACTERS
-#endif // TEST_HAS_NO_EXCEPTIONS
+#endif
 
     return 0;
 }

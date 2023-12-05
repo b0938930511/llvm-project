@@ -15,12 +15,12 @@
 #include "llvm/Transforms/CFGuard.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Pass.h"
-#include "llvm/TargetParser/Triple.h"
 
 using namespace llvm;
 
@@ -165,19 +165,14 @@ void CFGuard::insertCFGuardCheck(CallBase *CB) {
   IRBuilder<> B(CB);
   Value *CalledOperand = CB->getCalledOperand();
 
-  // If the indirect call is called within catchpad or cleanuppad,
-  // we need to copy "funclet" bundle of the call.
-  SmallVector<llvm::OperandBundleDef, 1> Bundles;
-  if (auto Bundle = CB->getOperandBundle(LLVMContext::OB_funclet))
-    Bundles.push_back(OperandBundleDef(*Bundle));
-
   // Load the global symbol as a pointer to the check function.
   LoadInst *GuardCheckLoad = B.CreateLoad(GuardFnPtrType, GuardFnGlobal);
 
   // Create new call instruction. The CFGuard check should always be a call,
   // even if the original CallBase is an Invoke or CallBr instruction.
   CallInst *GuardCheck =
-      B.CreateCall(GuardFnType, GuardCheckLoad, {CalledOperand}, Bundles);
+      B.CreateCall(GuardFnType, GuardCheckLoad,
+                   {B.CreateBitCast(CalledOperand, B.getInt8PtrTy())});
 
   // Ensure that the first argument is passed in the correct register
   // (e.g. ECX on 32-bit X86 targets).
@@ -194,6 +189,11 @@ void CFGuard::insertCFGuardDispatch(CallBase *CB) {
   IRBuilder<> B(CB);
   Value *CalledOperand = CB->getCalledOperand();
   Type *CalledOperandType = CalledOperand->getType();
+
+  // Cast the guard dispatch global to the type of the called operand.
+  PointerType *PTy = PointerType::get(CalledOperandType, 0);
+  if (GuardFnGlobal->getType() != PTy)
+    GuardFnGlobal = ConstantExpr::getBitCast(GuardFnGlobal, PTy);
 
   // Load the global as a pointer to a function of the same type.
   LoadInst *GuardDispatchLoad = B.CreateLoad(CalledOperandType, GuardFnGlobal);
@@ -230,27 +230,19 @@ bool CFGuard::doInitialization(Module &M) {
     return false;
 
   // Set up prototypes for the guard check and dispatch functions.
-  GuardFnType =
-      FunctionType::get(Type::getVoidTy(M.getContext()),
-                        {PointerType::getUnqual(M.getContext())}, false);
+  GuardFnType = FunctionType::get(Type::getVoidTy(M.getContext()),
+                                  {Type::getInt8PtrTy(M.getContext())}, false);
   GuardFnPtrType = PointerType::get(GuardFnType, 0);
 
   // Get or insert the guard check or dispatch global symbols.
-  llvm::StringRef GuardFnName;
   if (GuardMechanism == CF_Check) {
-    GuardFnName = "__guard_check_icall_fptr";
-  } else if (GuardMechanism == CF_Dispatch) {
-    GuardFnName = "__guard_dispatch_icall_fptr";
+    GuardFnGlobal =
+        M.getOrInsertGlobal("__guard_check_icall_fptr", GuardFnPtrType);
   } else {
-    assert(false && "Invalid CFGuard mechanism");
+    assert(GuardMechanism == CF_Dispatch && "Invalid CFGuard mechanism");
+    GuardFnGlobal =
+        M.getOrInsertGlobal("__guard_dispatch_icall_fptr", GuardFnPtrType);
   }
-  GuardFnGlobal = M.getOrInsertGlobal(GuardFnName, GuardFnPtrType, [&] {
-    auto *Var = new GlobalVariable(M, GuardFnPtrType, false,
-                                   GlobalVariable::ExternalLinkage, nullptr,
-                                   GuardFnName);
-    Var->setDSOLocal(true);
-    return Var;
-  });
 
   return true;
 }
@@ -267,8 +259,8 @@ bool CFGuard::runOnFunction(Function &F) {
   // instructions. Make a separate list of pointers to indirect
   // call/invoke/callbr instructions because the original instructions will be
   // deleted as the checks are added.
-  for (BasicBlock &BB : F) {
-    for (Instruction &I : BB) {
+  for (BasicBlock &BB : F.getBasicBlockList()) {
+    for (Instruction &I : BB.getInstList()) {
       auto *CB = dyn_cast<CallBase>(&I);
       if (CB && CB->isIndirectCall() && !CB->hasFnAttr("guard_nocf")) {
         IndirectCalls.push_back(CB);

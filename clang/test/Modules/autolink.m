@@ -1,4 +1,3 @@
-// UNSUPPORTED: target={{.*}}-zos{{.*}}, target={{.*}}-aix{{.*}}
 // RUN: rm -rf %t
 // RUN: %clang_cc1 -emit-pch -fmodules-cache-path=%t -fmodules -fimplicit-module-maps -o %t.pch -I %S/Inputs -x objective-c-header %S/Inputs/autolink-sub3.pch
 // RUN: %clang_cc1 -emit-llvm -o - -fmodules-cache-path=%t -fmodules -fimplicit-module-maps -F %S/Inputs -I %S/Inputs -include-pch %t.pch %s | FileCheck %s
@@ -6,32 +5,32 @@
 
 @import autolink.sub2;
 
-int f(void) {
+int f() {
   return autolink_sub2();
 }
 
 @import autolink;
 
-int g(void) {
+int g() {
   return autolink;
 }
 
 @import Module.SubFramework;
-const char *get_module_subframework(void) {
+const char *get_module_subframework() {
   return module_subframework;
 }
 
 @import DependsOnModule.SubFramework;
-float *get_module_subframework_dep(void) {
+float *get_module_subframework_dep() {
   return sub_framework;
 }
 
 @import NoUmbrella;
-int use_no_umbrella(void) {
+int use_no_umbrella() {
   return no_umbrella_A;
 }
 
-int use_autolink_sub3(void) {
+int use_autolink_sub3() {
   return autolink_sub3();
 }
 

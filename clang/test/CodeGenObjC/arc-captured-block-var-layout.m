@@ -1,12 +1,14 @@
 // RUN: %clang_cc1 -fblocks -fobjc-arc -fobjc-runtime-has-weak -triple x86_64-apple-darwin -print-ivar-layout -emit-llvm -o /dev/null %s > %t-64.layout
 // RUN: FileCheck -check-prefix CHECK-LP64 --input-file=%t-64.layout %s
+// rdar://12184410
+// rdar://12752901
 
 void x(id y) {}
 void y(int a) {}
 
-extern id opaque_id(void);
+extern id opaque_id();
 
-void f(void) {
+void f() {
     __weak id wid;
     __block int byref_int = 0;
     char ch = 'a';
@@ -33,7 +35,7 @@ void f(void) {
 // Test 1
 // Inline instruction for block variable layout: 0x0320 (3 strong 2 byref)
 // CHECK-LP64: Inline block variable layout: 0x0320, BL_STRONG:3, BL_BYREF:2, BL_OPERATOR:0
-    void (^b)(void) = ^{
+    void (^b)() = ^{
         byref_int = sh + ch+ch1+ch2 ;
         x(bar);
         x(baz);
@@ -45,7 +47,7 @@ void f(void) {
 // Test 2
 // Inline instruction for block variable layout: 0x0331 (3 strong 3 byref 1 weak)
 // CHECK-LP64: Inline block variable layout: 0x0331, BL_STRONG:3, BL_BYREF:3, BL_WEAK:1, BL_OPERATOR:0
-    void (^c)(void) = ^{
+    void (^c)() = ^{
         byref_int = sh + ch+ch1+ch2 ;
         x(bar);
         x(baz);
@@ -57,7 +59,7 @@ void f(void) {
 }
 
 @class NSString, NSNumber;
-void g(void) {
+void g() {
   NSString *foo;
    NSNumber *bar;
    unsigned int bletch;
@@ -67,7 +69,7 @@ void g(void) {
   NSString *z;
 // Inline instruction for block variable layout: 0x0401 (4 strong 0 byref 1 weak)
 // CHECK-LP64: Inline block variable layout: 0x0401, BL_STRONG:4, BL_WEAK:1, BL_OPERATOR:0
-  void (^c)(void) = ^{
+  void (^c)() = ^{
    int j = i + bletch;
    x(foo);
    x(bar);
@@ -79,7 +81,7 @@ void g(void) {
 }
 
 // Test 5 (unions/structs and their nesting):
-void h(void) {
+void h() {
   struct S5 {
     int i1;
     __unsafe_unretained id o1;
@@ -108,7 +110,7 @@ void h(void) {
   __block id block_id;
 
 // CHECK-LP64: Block variable layout: BL_BYREF:1, BL_NON_OBJECT_WORD:1, BL_UNRETAINED:1, BL_NON_OBJECT_WORD:1, BL_UNRETAINED:1, BL_OPERATOR:0
-  void (^c)(void) = ^{
+  void (^c)() = ^{
     x(s2.ui.o1);
     x(u2.o1);
     block_id = 0;
@@ -117,13 +119,13 @@ void h(void) {
 }
 
 // Test for array of stuff.
-void arr1(void) {
+void arr1() {
   struct S {
     __unsafe_unretained id unsafe_unretained_var[4];
  } imported_s;
 
 // CHECK-LP64: Block variable layout: BL_UNRETAINED:4, BL_OPERATOR:0
-    void (^c)(void) = ^{
+    void (^c)() = ^{
         x(imported_s.unsafe_unretained_var[2]);
     };    
 
@@ -131,14 +133,14 @@ void arr1(void) {
 }
 
 // Test2 for array of stuff.
-void arr2(void) {
+void arr2() {
   struct S {
    int a;
     __unsafe_unretained id unsafe_unretained_var[4];
  } imported_s;
 
 // CHECK-LP64: Block variable layout: BL_NON_OBJECT_WORD:1, BL_UNRETAINED:4, BL_OPERATOR:0
-    void (^c)(void) = ^{
+    void (^c)() = ^{
         x(imported_s.unsafe_unretained_var[2]);
     };    
 
@@ -146,14 +148,14 @@ void arr2(void) {
 }
 
 // Test3 for array of stuff.
-void arr3(void) {
+void arr3() {
   struct S {
    int a;
     __unsafe_unretained id unsafe_unretained_var[0];
  } imported_s;
 
 // CHECK-LP64: Block variable layout: BL_OPERATOR:0
-    void (^c)(void) = ^{
+    void (^c)() = ^{
       int i = imported_s.a;
     };    
 
@@ -163,7 +165,7 @@ void arr3(void) {
 
 // Test4 for array of stuff.
 @class B;
-void arr4(void) {
+void arr4() {
   struct S {
     struct s0 {
       __unsafe_unretained id s_f0;
@@ -179,7 +181,7 @@ void arr4(void) {
   } captured_s;
 
 // CHECK-LP64: Block variable layout: BL_UNRETAINED:3, BL_NON_OBJECT_WORD:1, BL_UNRETAINED:1, BL_NON_OBJECT_WORD:1, BL_UNRETAINED:1, BL_NON_OBJECT_WORD:1, BL_UNRETAINED:1, BL_NON_OBJECT_WORD:1, BL_UNRETAINED:1, BL_OPERATOR:0
-  void (^c)(void) = ^{
+  void (^c)() = ^{
       id i = captured_s.f0.s_f1;
   };
 
@@ -187,7 +189,7 @@ void arr4(void) {
 }
 
 // Test1 bitfield in cpatured aggregate.
-void bf1(void) {
+void bf1() {
   struct S {
     int flag : 25;
     int flag1: 7;
@@ -197,27 +199,27 @@ void bf1(void) {
   } s;
 
 // CHECK-LP64: Block variable layout: BL_OPERATOR:0
-  int (^c)(void) = ^{
+  int (^c)() = ^{
       return s.flag;
   };
   c();
 }
 
 // Test2 bitfield in cpatured aggregate.
-void bf2(void) {
+void bf2() {
   struct S {
     int flag : 1;
   } s;
 
 // CHECK-LP64: Block variable layout: BL_OPERATOR:0
-  int (^c)(void) = ^{
+  int (^c)() = ^{
       return s.flag;
   };
   c();
 }
 
 // Test3 bitfield in cpatured aggregate.
-void bf3(void) {
+void bf3() {
 
      struct {
         unsigned short _reserved : 16;
@@ -241,7 +243,7 @@ void bf3(void) {
     } _flags;
 
 // CHECK-LP64: Block variable layout: BL_OPERATOR:0
-  unsigned char (^c)(void) = ^{
+  unsigned char (^c)() = ^{
       return _flags._draggedNodesAreDeletable;
   };
 
@@ -249,7 +251,7 @@ void bf3(void) {
 }
 
 // Test4 unnamed bitfield
-void bf4(void) {
+void bf4() {
 
      struct {
         unsigned short _reserved : 16;
@@ -276,7 +278,7 @@ void bf4(void) {
     } _flags;
 
 // CHECK-LP64: Block variable layout: BL_OPERATOR:0
-  unsigned char (^c)(void) = ^{
+  unsigned char (^c)() = ^{
       return _flags._draggedNodesAreDeletable;
   };
 
@@ -286,7 +288,7 @@ void bf4(void) {
 
 
 // Test5 unnamed bitfield.
-void bf5(void) {
+void bf5() {
      struct {
         unsigned char flag : 1;
         unsigned int  : 32;
@@ -294,7 +296,7 @@ void bf5(void) {
     } _flags;
 
 // CHECK-LP64: Block variable layout: BL_OPERATOR:0
-  unsigned char (^c)(void) = ^{
+  unsigned char (^c)() = ^{
       return _flags.flag;
   };
 
@@ -303,7 +305,7 @@ void bf5(void) {
 
 
 // Test6 0 length bitfield.
-void bf6(void) {
+void bf6() {
      struct {
         unsigned char flag : 1;
         unsigned int  : 0;
@@ -311,7 +313,7 @@ void bf6(void) {
     } _flags;
 
 // CHECK-LP64: Block variable layout: BL_OPERATOR:0
-  unsigned char (^c)(void) = ^{
+  unsigned char (^c)() = ^{
       return _flags.flag;
   };
 
@@ -319,7 +321,7 @@ void bf6(void) {
 }
 
 // Test7 large number of captured variables.
-void Test7(void) {
+void Test7() {
     __weak id wid;
     __weak id wid1, wid2, wid3, wid4;
     __weak id wid5, wid6, wid7, wid8;
@@ -327,7 +329,7 @@ void Test7(void) {
     __weak id wid13, wid14, wid15, wid16;
     const id bar = (id) opaque_id();
 // CHECK-LP64: Block variable layout: BL_STRONG:1, BL_WEAK:16, BL_OPERATOR:0
-    void (^b)(void) = ^{
+    void (^b)() = ^{
       x(bar);
       x(wid1);
       x(wid2);
@@ -350,7 +352,7 @@ void Test7(void) {
 
 
 // Test 8 very large number of captured variables.
-void Test8(void) {
+void Test8() {
 __weak id wid;
     __weak id wid1, wid2, wid3, wid4;
     __weak id wid5, wid6, wid7, wid8;
@@ -362,7 +364,7 @@ __weak id wid;
     __weak id w13, w14, w15, w16;
     const id bar = (id) opaque_id();
 // CHECK-LP64: Block variable layout: BL_STRONG:1, BL_WEAK:16, BL_WEAK:16, BL_WEAK:1, BL_OPERATOR:0
-    void (^b)(void) = ^{
+    void (^b)() = ^{
       x(bar);
       x(wid1);
       x(wid2);

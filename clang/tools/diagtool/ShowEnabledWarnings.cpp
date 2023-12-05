@@ -59,16 +59,15 @@ createDiagnostics(unsigned int argc, char **argv) {
   // Buffer diagnostics from argument parsing so that we can output them using a
   // well formed diagnostic object.
   TextDiagnosticBuffer *DiagsBuffer = new TextDiagnosticBuffer;
+  IntrusiveRefCntPtr<DiagnosticsEngine> InterimDiags(
+    new DiagnosticsEngine(DiagIDs, new DiagnosticOptions(), DiagsBuffer));
 
   // Try to build a CompilerInvocation.
   SmallVector<const char *, 4> Args;
   Args.push_back("diagtool");
   Args.append(argv, argv + argc);
-  CreateInvocationOptions CIOpts;
-  CIOpts.Diags =
-      new DiagnosticsEngine(DiagIDs, new DiagnosticOptions(), DiagsBuffer);
   std::unique_ptr<CompilerInvocation> Invocation =
-      createInvocation(Args, CIOpts);
+      createInvocationFromCommandLine(Args, InterimDiags);
   if (!Invocation)
     return nullptr;
 

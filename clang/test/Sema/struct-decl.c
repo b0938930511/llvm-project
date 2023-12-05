@@ -18,7 +18,7 @@ struct s {
 
 struct st;
 
-int foo(void) {
+int foo() {
   struct st *f;
   return f->v + f[0].v;
 }
@@ -42,11 +42,12 @@ struct s0 {
 
 struct s0 f0(void) {}
 
-// This previously triggered an assertion failure.
+// <rdar://problem/8177927> - This previously triggered an assertion failure.
 struct x0 {
   unsigned int x1;
 };
 
+// rdar://problem/9150338
 static struct test1 { // expected-warning {{'static' ignored on this declaration}}
   int x;
 };
@@ -59,8 +60,8 @@ inline struct test3 { // expected-error {{'inline' can only appear on functions}
 
 struct hiding_1 {};
 struct hiding_2 {};
-void test_hiding(void) {
-  struct hiding_1 *hiding_1(void);
+void test_hiding() {
+  struct hiding_1 *hiding_1();
   extern struct hiding_2 *hiding_2;
   struct hiding_1 *p = hiding_1();
   struct hiding_2 *q = hiding_2;

@@ -14,14 +14,14 @@
 
 #include <vector>
 
-namespace lld::macho {
+namespace lld {
+namespace macho {
 
 struct TrieNode;
 class Symbol;
 
 class TrieBuilder {
 public:
-  ~TrieBuilder();
   void setImageBase(uint64_t addr) { imageBase = addr; }
   void addSymbol(const Symbol &sym) { exported.push_back(&sym); }
   // Returns the size in bytes of the serialized trie.
@@ -43,6 +43,7 @@ using TrieEntryCallback =
 
 void parseTrie(const uint8_t *buf, size_t size, const TrieEntryCallback &);
 
-} // namespace lld::macho
+} // namespace macho
+} // namespace lld
 
 #endif

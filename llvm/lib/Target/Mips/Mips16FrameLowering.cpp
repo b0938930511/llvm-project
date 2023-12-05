@@ -72,9 +72,10 @@ void Mips16FrameLowering::emitPrologue(MachineFunction &MF,
   if (!CSI.empty()) {
     const std::vector<CalleeSavedInfo> &CSI = MFI.getCalleeSavedInfo();
 
-    for (const CalleeSavedInfo &I : CSI) {
-      int64_t Offset = MFI.getObjectOffset(I.getFrameIdx());
-      Register Reg = I.getReg();
+    for (std::vector<CalleeSavedInfo>::const_iterator I = CSI.begin(),
+         E = CSI.end(); I != E; ++I) {
+      int64_t Offset = MFI.getObjectOffset(I->getFrameIdx());
+      unsigned Reg = I->getReg();
       unsigned DReg = MRI->getDwarfRegNum(Reg, true);
       unsigned CFIIndex = MF.addFrameInst(
           MCCFIInstruction::createOffset(nullptr, DReg, Offset));
@@ -118,13 +119,13 @@ bool Mips16FrameLowering::spillCalleeSavedRegisters(
   // will be saved with the "save" instruction
   // during emitPrologue
   //
-  for (const CalleeSavedInfo &I : CSI) {
+  for (unsigned i = 0, e = CSI.size(); i != e; ++i) {
     // Add the callee-saved register as live-in. Do not add if the register is
     // RA and return address is taken, because it has already been added in
     // method MipsTargetLowering::lowerRETURNADDR.
     // It's killed at the spill, unless the register is RA and return address
     // is taken.
-    Register Reg = I.getReg();
+    unsigned Reg = CSI[i].getReg();
     bool IsRAAndRetAddrIsTaken = (Reg == Mips::RA)
       && MF->getFrameInfo().isReturnAddressTaken();
     if (!IsRAAndRetAddrIsTaken)

@@ -1,5 +1,4 @@
 import("//llvm/lib/Target/targets.gni")
-import("//llvm/lib/Target/targets_with_exegesis.gni")
 
 static_library("lib") {
   output_name = "LLVMExegesis"
@@ -8,17 +7,12 @@ static_library("lib") {
     "//llvm/lib/CodeGen",
     "//llvm/lib/CodeGen/GlobalISel",
     "//llvm/lib/ExecutionEngine",
-    "//llvm/lib/ExecutionEngine/Orc",
-    "//llvm/lib/ExecutionEngine/RuntimeDyld",
+    "//llvm/lib/ExecutionEngine/MCJIT",
     "//llvm/lib/IR",
     "//llvm/lib/MC",
-    "//llvm/lib/MC/MCDisassembler",
-    "//llvm/lib/MC/MCParser",
-    "//llvm/lib/MCA",
     "//llvm/lib/Object",
     "//llvm/lib/ObjectYAML",
     "//llvm/lib/Support",
-    "//llvm/lib/TargetParser",
   ]
   sources = [
     "Analysis.cpp",
@@ -27,7 +21,6 @@ static_library("lib") {
     "BenchmarkRunner.cpp",
     "Clustering.cpp",
     "CodeTemplate.cpp",
-    "DisassemblerHelper.cpp",
     "Error.cpp",
     "LatencyBenchmarkRunner.cpp",
     "LlvmState.cpp",
@@ -41,10 +34,17 @@ static_library("lib") {
     "SnippetFile.cpp",
     "SnippetGenerator.cpp",
     "SnippetRepetitor.cpp",
-    "SubprocessMemory.cpp",
     "Target.cpp",
     "UopsBenchmarkRunner.cpp",
   ]
 
-  deps += targets_with_exegesis
+  if (llvm_build_AArch64) {
+    deps += [ "AArch64" ]
+  }
+  if (llvm_build_PowerPC) {
+    deps += [ "PowerPC" ]
+  }
+  if (llvm_build_X86) {
+    deps += [ "X86" ]
+  }
 }

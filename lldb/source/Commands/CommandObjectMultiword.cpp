@@ -10,7 +10,6 @@
 #include "lldb/Interpreter/CommandInterpreter.h"
 #include "lldb/Interpreter/CommandReturnObject.h"
 #include "lldb/Interpreter/Options.h"
-#include <optional>
 
 using namespace lldb;
 using namespace lldb_private;
@@ -27,48 +26,36 @@ CommandObjectMultiword::CommandObjectMultiword(CommandInterpreter &interpreter,
 
 CommandObjectMultiword::~CommandObjectMultiword() = default;
 
-CommandObjectSP
-CommandObjectMultiword::GetSubcommandSPExact(llvm::StringRef sub_cmd) {
-  if (m_subcommand_dict.empty())
-    return {};
-
-  auto pos = m_subcommand_dict.find(std::string(sub_cmd));
-  if (pos == m_subcommand_dict.end())
-    return {};
-
-  return pos->second;
-}
-
 CommandObjectSP CommandObjectMultiword::GetSubcommandSP(llvm::StringRef sub_cmd,
                                                         StringList *matches) {
-  if (m_subcommand_dict.empty())
-    return {};
-
-  CommandObjectSP return_cmd_sp = GetSubcommandSPExact(sub_cmd);
-  if (return_cmd_sp) {
-    if (matches)
-      matches->AppendString(sub_cmd);
-    return return_cmd_sp;
-  }
-
+  CommandObjectSP return_cmd_sp;
   CommandObject::CommandMap::iterator pos;
 
-  StringList local_matches;
-  if (matches == nullptr)
-    matches = &local_matches;
-  int num_matches =
-      AddNamesMatchingPartialString(m_subcommand_dict, sub_cmd, *matches);
-
-  if (num_matches == 1) {
-    // Cleaner, but slightly less efficient would be to call back into this
-    // function, since I now know I have an exact match...
-
-    sub_cmd = matches->GetStringAtIndex(0);
+  if (!m_subcommand_dict.empty()) {
     pos = m_subcommand_dict.find(std::string(sub_cmd));
-    if (pos != m_subcommand_dict.end())
+    if (pos != m_subcommand_dict.end()) {
+      // An exact match; append the sub_cmd to the 'matches' string list.
+      if (matches)
+        matches->AppendString(sub_cmd);
       return_cmd_sp = pos->second;
-  }
+    } else {
+      StringList local_matches;
+      if (matches == nullptr)
+        matches = &local_matches;
+      int num_matches =
+          AddNamesMatchingPartialString(m_subcommand_dict, sub_cmd, *matches);
 
+      if (num_matches == 1) {
+        // Cleaner, but slightly less efficient would be to call back into this
+        // function, since I now know I have an exact match...
+
+        sub_cmd = matches->GetStringAtIndex(0);
+        pos = m_subcommand_dict.find(std::string(sub_cmd));
+        if (pos != m_subcommand_dict.end())
+          return_cmd_sp = pos->second;
+      }
+    }
+  }
   return return_cmd_sp;
 }
 
@@ -79,9 +66,9 @@ CommandObjectMultiword::GetSubcommandObject(llvm::StringRef sub_cmd,
 }
 
 bool CommandObjectMultiword::LoadSubCommand(llvm::StringRef name,
-                                            const CommandObjectSP &cmd_obj_sp) {
-  if (cmd_obj_sp)
-    lldbassert((&GetCommandInterpreter() == &cmd_obj_sp->GetCommandInterpreter()) &&
+                                            const CommandObjectSP &cmd_obj) {
+  if (cmd_obj)
+    assert((&GetCommandInterpreter() == &cmd_obj->GetCommandInterpreter()) &&
            "tried to add a CommandObject from a different interpreter");
 
   CommandMap::iterator pos;
@@ -89,95 +76,37 @@ bool CommandObjectMultiword::LoadSubCommand(llvm::StringRef name,
 
   pos = m_subcommand_dict.find(std::string(name));
   if (pos == m_subcommand_dict.end()) {
-    m_subcommand_dict[std::string(name)] = cmd_obj_sp;
+    m_subcommand_dict[std::string(name)] = cmd_obj;
   } else
     success = false;
 
   return success;
 }
 
-llvm::Error CommandObjectMultiword::LoadUserSubcommand(
-    llvm::StringRef name, const CommandObjectSP &cmd_obj_sp, bool can_replace) {
-  Status result;
-  if (cmd_obj_sp)
-    lldbassert((&GetCommandInterpreter() == &cmd_obj_sp->GetCommandInterpreter()) &&
-           "tried to add a CommandObject from a different interpreter");
-  if (!IsUserCommand()) {
-    return llvm::createStringError(llvm::inconvertibleErrorCode(),
-                              "can't add a user subcommand to a builtin container command.");
-  }
-  // Make sure this a user command if it isn't already:
-  cmd_obj_sp->SetIsUserCommand(true);
-
-  std::string str_name(name);
-
-  auto pos = m_subcommand_dict.find(str_name);
-  if (pos == m_subcommand_dict.end()) {
-    m_subcommand_dict[str_name] = cmd_obj_sp;
-    return llvm::Error::success();
-  }
-
-  const char *error_str = nullptr;
-  if (!can_replace)
-    error_str = "sub-command already exists";
-  if (!(*pos).second->IsUserCommand())
-    error_str = "can't replace a builtin subcommand";
-
-  if (error_str) {
-    return llvm::createStringError(llvm::inconvertibleErrorCode(), error_str);
-  }
-  m_subcommand_dict[str_name] = cmd_obj_sp;
-  return llvm::Error::success();
-}
-
-llvm::Error CommandObjectMultiword::RemoveUserSubcommand(llvm::StringRef cmd_name,
-                                                    bool must_be_multiword) {
-  CommandMap::iterator pos;
-  std::string str_name(cmd_name);
-
-  pos = m_subcommand_dict.find(str_name);
-  if (pos == m_subcommand_dict.end()) {
-    return llvm::createStringError(llvm::inconvertibleErrorCode(),"subcommand '%s' not found.",
-                                   str_name.c_str());
-  }
-  if (!(*pos).second->IsUserCommand()) {
-    return llvm::createStringError(llvm::inconvertibleErrorCode(),"subcommand '%s' not a user command.",
-                                   str_name.c_str());
-  }
-
-  if (must_be_multiword && !(*pos).second->IsMultiwordObject()) {
-    return llvm::createStringError(llvm::inconvertibleErrorCode(),"subcommand '%s' is not a container command",
-                                   str_name.c_str());
-  }
-  if (!must_be_multiword && (*pos).second->IsMultiwordObject()) {
-    return llvm::createStringError(llvm::inconvertibleErrorCode(),"subcommand '%s' is not a user command",
-                                   str_name.c_str());
-  }
-
-  m_subcommand_dict.erase(pos);
-
-  return llvm::Error::success();
-}
-
-void CommandObjectMultiword::Execute(const char *args_string,
+bool CommandObjectMultiword::Execute(const char *args_string,
                                      CommandReturnObject &result) {
   Args args(args_string);
   const size_t argc = args.GetArgumentCount();
   if (argc == 0) {
     this->CommandObject::GenerateHelpText(result);
-    return;
+    return result.Succeeded();
   }
 
   auto sub_command = args[0].ref();
   if (sub_command.empty()) {
     result.AppendError("Need to specify a non-empty subcommand.");
-    return;
+    return result.Succeeded();
+  }
+
+  if (sub_command.equals_insensitive("help")) {
+    this->CommandObject::GenerateHelpText(result);
+    return result.Succeeded();
   }
 
   if (m_subcommand_dict.empty()) {
     result.AppendErrorWithFormat("'%s' does not have any subcommands.\n",
                                  GetCommandName().str().c_str());
-    return;
+    return false;
   }
 
   StringList matches;
@@ -189,7 +118,7 @@ void CommandObjectMultiword::Execute(const char *args_string,
 
     args.Shift();
     sub_cmd_obj->Execute(args_string, result);
-    return;
+    return result.Succeeded();
   }
 
   std::string error_msg;
@@ -214,6 +143,7 @@ void CommandObjectMultiword::Execute(const char *args_string,
   }
   error_msg.append("\n");
   result.AppendRawError(error_msg.c_str());
+  return false;
 }
 
 void CommandObjectMultiword::GenerateHelpText(Stream &output_stream) {
@@ -273,10 +203,10 @@ void CommandObjectMultiword::HandleCompletion(CompletionRequest &request) {
 
   StringList new_matches;
   CommandObject *sub_command_object = GetSubcommandObject(arg0, &new_matches);
-
-  // The subcommand is ambiguous. The completion isn't meaningful.
-  if (!sub_command_object)
+  if (sub_command_object == nullptr) {
+    request.AddCompletions(new_matches);
     return;
+  }
 
   // Remove the one match that we got from calling GetSubcommandObject.
   new_matches.DeleteStringAtIndex(0);
@@ -285,17 +215,41 @@ void CommandObjectMultiword::HandleCompletion(CompletionRequest &request) {
   sub_command_object->HandleCompletion(request);
 }
 
-std::optional<std::string>
-CommandObjectMultiword::GetRepeatCommand(Args &current_command_args,
-                                         uint32_t index) {
+const char *CommandObjectMultiword::GetRepeatCommand(Args &current_command_args,
+                                                     uint32_t index) {
   index++;
   if (current_command_args.GetArgumentCount() <= index)
-    return std::nullopt;
+    return nullptr;
   CommandObject *sub_command_object =
       GetSubcommandObject(current_command_args[index].ref());
   if (sub_command_object == nullptr)
-    return std::nullopt;
+    return nullptr;
   return sub_command_object->GetRepeatCommand(current_command_args, index);
+}
+
+void CommandObjectMultiword::AproposAllSubCommands(llvm::StringRef prefix,
+                                                   llvm::StringRef search_word,
+                                                   StringList &commands_found,
+                                                   StringList &commands_help) {
+  CommandObject::CommandMap::const_iterator pos;
+
+  for (pos = m_subcommand_dict.begin(); pos != m_subcommand_dict.end(); ++pos) {
+    const char *command_name = pos->first.c_str();
+    CommandObject *sub_cmd_obj = pos->second.get();
+    StreamString complete_command_name;
+
+    complete_command_name << prefix << " " << command_name;
+
+    if (sub_cmd_obj->HelpTextContainsWord(search_word)) {
+      commands_found.AppendString(complete_command_name.GetString());
+      commands_help.AppendString(sub_cmd_obj->GetHelp());
+    }
+
+    if (sub_cmd_obj->IsMultiwordObject())
+      sub_cmd_obj->AproposAllSubCommands(complete_command_name.GetString(),
+                                         search_word, commands_found,
+                                         commands_help);
+  }
 }
 
 CommandObjectProxy::CommandObjectProxy(CommandInterpreter &interpreter,
@@ -380,6 +334,16 @@ CommandObject *CommandObjectProxy::GetSubcommandObject(llvm::StringRef sub_cmd,
   return nullptr;
 }
 
+void CommandObjectProxy::AproposAllSubCommands(llvm::StringRef prefix,
+                                               llvm::StringRef search_word,
+                                               StringList &commands_found,
+                                               StringList &commands_help) {
+  CommandObject *proxy_command = GetProxyCommandObject();
+  if (proxy_command)
+    return proxy_command->AproposAllSubCommands(prefix, search_word,
+                                                commands_found, commands_help);
+}
+
 bool CommandObjectProxy::LoadSubCommand(
     llvm::StringRef cmd_name, const lldb::CommandObjectSP &command_sp) {
   CommandObject *proxy_command = GetProxyCommandObject();
@@ -415,23 +379,23 @@ void CommandObjectProxy::HandleArgumentCompletion(
     proxy_command->HandleArgumentCompletion(request, opt_element_vector);
 }
 
-std::optional<std::string>
-CommandObjectProxy::GetRepeatCommand(Args &current_command_args,
-                                     uint32_t index) {
+const char *CommandObjectProxy::GetRepeatCommand(Args &current_command_args,
+                                                 uint32_t index) {
   CommandObject *proxy_command = GetProxyCommandObject();
   if (proxy_command)
     return proxy_command->GetRepeatCommand(current_command_args, index);
-  return std::nullopt;
+  return nullptr;
 }
 
 llvm::StringRef CommandObjectProxy::GetUnsupportedError() {
   return "command is not implemented";
 }
 
-void CommandObjectProxy::Execute(const char *args_string,
+bool CommandObjectProxy::Execute(const char *args_string,
                                  CommandReturnObject &result) {
-  if (CommandObject *proxy_command = GetProxyCommandObject())
-    proxy_command->Execute(args_string, result);
-  else
-    result.AppendError(GetUnsupportedError());
+  CommandObject *proxy_command = GetProxyCommandObject();
+  if (proxy_command)
+    return proxy_command->Execute(args_string, result);
+  result.AppendError(GetUnsupportedError());
+  return false;
 }

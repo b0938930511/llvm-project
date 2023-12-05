@@ -13,16 +13,15 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/Support/ErrorHandling.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/Format.h"
 #include "llvm/Support/FormatVariadic.h"
-#include "llvm/Support/SMLoc.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/TableGen/Error.h"
 #include "llvm/TableGen/Record.h"
-#include <map>
-#include <memory>
+#include "llvm/TableGen/TableGenBackend.h"
 #include <string>
 #include <utility>
 

@@ -17,6 +17,10 @@
 #include <utility>
 
 namespace clang {
+class CXXRecordDecl;
+class CXXBaseSpecifier;
+class FunctionDecl;
+class CXXMethodDecl;
 class Expr;
 
 /// This function de-facto defines a set of transformations that we consider
@@ -25,7 +29,7 @@ class Expr;
 /// values).
 ///
 /// For more context see Static Analyzer checkers documentation - specifically
-/// webkit.UncountedCallArgsChecker checker. Allowed list of transformations:
+/// webkit.UncountedCallArgsChecker checker. Whitelist of transformations:
 /// - constructors of ref-counted types (including factory methods)
 /// - getters of ref-counted types
 /// - member overloaded operators

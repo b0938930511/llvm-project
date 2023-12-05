@@ -14,7 +14,9 @@
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::readability {
+namespace clang {
+namespace tidy {
+namespace readability {
 
 static tok::TokenKind getTokenKind(SourceLocation Loc, const SourceManager &SM,
                                    const ASTContext *Context) {
@@ -79,7 +81,7 @@ static SourceLocation findEndLocation(const Stmt &S, const SourceManager &SM,
     SourceRange TokRange(Loc, TokEndLoc);
     StringRef Comment = Lexer::getSourceText(
         CharSourceRange::getTokenRange(TokRange), SM, Context->getLangOpts());
-    if (Comment.startswith("/*") && Comment.contains('\n')) {
+    if (Comment.startswith("/*") && Comment.find('\n') != StringRef::npos) {
       // Multi-line block comment, insert brace before.
       break;
     }
@@ -129,10 +131,6 @@ void BracesAroundStatementsCheck::check(
       return;
     checkStmt(Result, S->getBody(), StartLoc);
   } else if (const auto *S = Result.Nodes.getNodeAs<IfStmt>("if")) {
-    // "if consteval" always has braces.
-    if (S->isConsteval())
-      return;
-
     SourceLocation StartLoc = findRParenLoc(S, SM, Context);
     if (StartLoc.isInvalid())
       return;
@@ -159,27 +157,27 @@ BracesAroundStatementsCheck::findRParenLoc(const IfOrWhileStmt *S,
                                            const ASTContext *Context) {
   // Skip macros.
   if (S->getBeginLoc().isMacroID())
-    return {};
+    return SourceLocation();
 
   SourceLocation CondEndLoc = S->getCond()->getEndLoc();
   if (const DeclStmt *CondVar = S->getConditionVariableDeclStmt())
     CondEndLoc = CondVar->getEndLoc();
 
   if (!CondEndLoc.isValid()) {
-    return {};
+    return SourceLocation();
   }
 
   SourceLocation PastCondEndLoc =
       Lexer::getLocForEndOfToken(CondEndLoc, 0, SM, Context->getLangOpts());
   if (PastCondEndLoc.isInvalid())
-    return {};
+    return SourceLocation();
   SourceLocation RParenLoc =
       forwardSkipWhitespaceAndComments(PastCondEndLoc, SM, Context);
   if (RParenLoc.isInvalid())
-    return {};
+    return SourceLocation();
   tok::TokenKind TokKind = getTokenKind(RParenLoc, SM, Context);
   if (TokKind != tok::r_paren)
-    return {};
+    return SourceLocation();
   return RParenLoc;
 }
 
@@ -187,14 +185,7 @@ BracesAroundStatementsCheck::findRParenLoc(const IfOrWhileStmt *S,
 /// Returns true if braces where added.
 bool BracesAroundStatementsCheck::checkStmt(
     const MatchFinder::MatchResult &Result, const Stmt *S,
-    SourceLocation StartLoc, SourceLocation EndLocHint) {
-
-  while (const auto *AS = dyn_cast<AttributedStmt>(S))
-    S = AS->getSubStmt();
-
-  const SourceManager &SM = *Result.SourceManager;
-  const ASTContext *Context = Result.Context;
-
+    SourceLocation InitialLoc, SourceLocation EndLocHint) {
   // 1) If there's a corresponding "else" or "while", the check inserts "} "
   // right before that token.
   // 2) If there's a multi-line block comment starting on the same line after
@@ -207,27 +198,22 @@ bool BracesAroundStatementsCheck::checkStmt(
     return false;
   }
 
-  // When TreeTransform, Stmt in constexpr IfStmt will be transform to NullStmt.
-  // This NullStmt can be detected according to beginning token.
-  const SourceLocation StmtBeginLoc = S->getBeginLoc();
-  if (isa<NullStmt>(S) && StmtBeginLoc.isValid() &&
-      getTokenKind(StmtBeginLoc, SM, Context) == tok::l_brace)
+  if (!InitialLoc.isValid())
     return false;
+  const SourceManager &SM = *Result.SourceManager;
+  const ASTContext *Context = Result.Context;
 
-  if (StartLoc.isInvalid())
-    return false;
-
-  // Convert StartLoc to file location, if it's on the same macro expansion
+  // Convert InitialLoc to file location, if it's on the same macro expansion
   // level as the start of the statement. We also need file locations for
   // Lexer::getLocForEndOfToken working properly.
-  StartLoc = Lexer::makeFileCharRange(
-                 CharSourceRange::getCharRange(StartLoc, S->getBeginLoc()), SM,
-                 Context->getLangOpts())
-                 .getBegin();
-  if (StartLoc.isInvalid())
+  InitialLoc = Lexer::makeFileCharRange(
+                   CharSourceRange::getCharRange(InitialLoc, S->getBeginLoc()),
+                   SM, Context->getLangOpts())
+                   .getBegin();
+  if (InitialLoc.isInvalid())
     return false;
-  StartLoc =
-      Lexer::getLocForEndOfToken(StartLoc, 0, SM, Context->getLangOpts());
+  SourceLocation StartLoc =
+      Lexer::getLocForEndOfToken(InitialLoc, 0, SM, Context->getLangOpts());
 
   // StartLoc points at the location of the opening brace to be inserted.
   SourceLocation EndLoc;
@@ -275,4 +261,6 @@ void BracesAroundStatementsCheck::onEndOfTranslationUnit() {
   ForceBracesStmts.clear();
 }
 
-} // namespace clang::tidy::readability
+} // namespace readability
+} // namespace tidy
+} // namespace clang

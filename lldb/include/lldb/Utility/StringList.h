@@ -10,7 +10,6 @@
 #define LLDB_UTILITY_STRINGLIST_H
 
 #include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/Twine.h"
 
 #include <cstddef>
 #include <string>
@@ -44,8 +43,6 @@ public:
   void AppendString(const char *str, size_t str_len);
 
   void AppendString(llvm::StringRef str);
-
-  void AppendString(const llvm::Twine &str);
 
   void AppendList(const char **strv, int strc);
 

@@ -11,7 +11,6 @@
 # RUN:     -exported_symbols_list main.exports \
 # RUN:     -order_file main.order \
 # RUN:     -sectcreate __COMPLETELY __legit sectdata.txt \
-# RUN:     -rpath /usr/lib/swift \
 # RUN:     build1/foo.o -o bar --reproduce repro1.tar
 
 # RUN: tar tf repro1.tar | FileCheck -DPATH='%:t.dir' --check-prefix=LIST %s
@@ -31,7 +30,6 @@
 # RSP1-NEXT: -exported_symbols_list [[BASEDIR:.+]]/main.exports
 # RSP1-NEXT: -order_file [[BASEDIR]]/main.order
 # RSP1-NEXT: -sectcreate __COMPLETELY __legit [[BASEDIR]]/sectdata.txt
-# RSP1-NEXT: -rpath /usr/lib/swift
 # RSP1-NOT:  {{^}}repro1{{[/\\]}}
 # RSP1-NEXT: [[BASEDIR]]/build1/foo.o
 # RSP1-NEXT: -o bar
@@ -40,7 +38,7 @@
 # RUN: FileCheck %s --check-prefix=VERSION < repro1/version.txt
 # VERSION: LLD
 
-# RUN: cd repro1; %no-arg-lld @response.txt
+# RUN: cd repro1; ld64.lld @response.txt
 
 # RUN: mkdir -p %t.dir/build2/a/b/c
 # RUN: llvm-mc -filetype=obj -triple=x86_64-apple-macos %s -o %t.dir/build2/foo.o
@@ -53,7 +51,7 @@
 # RSP2-NOT:  {{^}}repro2{{[/\\]}}
 # RSP2:      {{[/\\]}}foo.o
 
-# RUN: cd repro2; %no-arg-lld @response.txt
+# RUN: cd repro2; ld64.lld @response.txt
 
 .globl _main
 _main:

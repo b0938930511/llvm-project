@@ -12,7 +12,6 @@
 #include "clang/StaticAnalyzer/Core/BugReporter/BugReporter.h"
 #include "clang/StaticAnalyzer/Core/BugReporter/BugType.h"
 #include "clang/StaticAnalyzer/Core/Checker.h"
-#include "clang/StaticAnalyzer/Core/PathSensitive/CallDescription.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CallEvent.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CheckerContext.h"
 #include "clang/StaticAnalyzer/Frontend/AnalysisConsumer.h"
@@ -26,13 +25,13 @@ namespace {
 
 class FalsePositiveGenerator : public Checker<eval::Call> {
   using Self = FalsePositiveGenerator;
-  const BugType FalsePositiveGeneratorBug{this, "FalsePositiveGenerator"};
+  const BuiltinBug FalsePositiveGeneratorBug{this, "FalsePositiveGenerator"};
   using HandlerFn = bool (Self::*)(const CallEvent &Call,
                                    CheckerContext &) const;
   CallDescriptionMap<HandlerFn> Callbacks = {
-      {{{"reachedWithContradiction"}, 0}, &Self::reachedWithContradiction},
-      {{{"reachedWithNoContradiction"}, 0}, &Self::reachedWithNoContradiction},
-      {{{"reportIfCanBeTrue"}, 1}, &Self::reportIfCanBeTrue},
+      {{"reachedWithContradiction", 0}, &Self::reachedWithContradiction},
+      {{"reachedWithNoContradiction", 0}, &Self::reachedWithNoContradiction},
+      {{"reportIfCanBeTrue", 1}, &Self::reportIfCanBeTrue},
   };
 
   bool report(CheckerContext &C, ProgramStateRef State,
@@ -127,18 +126,18 @@ TEST_F(FalsePositiveRefutationBRVisitorTestBase, UnSatInTheMiddleNoReport) {
 
   std::string Diags;
   EXPECT_TRUE(runCheckerOnCodeWithArgs<addFalsePositiveGenerator>(
-      Code, LazyAssumeAndCrossCheckArgs, Diags, /*OnlyEmitWarnings=*/ true));
+      Code, LazyAssumeAndCrossCheckArgs, Diags));
   EXPECT_EQ(Diags,
-            "test.FalsePositiveGenerator: REACHED_WITH_NO_CONTRADICTION\n");
+            "test.FalsePositiveGenerator:REACHED_WITH_NO_CONTRADICTION\n");
   // Single warning. The second report was invalidated by the visitor.
 
   // Without enabling the crosscheck-with-z3 both reports are displayed.
   std::string Diags2;
   EXPECT_TRUE(runCheckerOnCodeWithArgs<addFalsePositiveGenerator>(
-      Code, LazyAssumeArgs, Diags2, /*OnlyEmitWarnings=*/ true));
+      Code, LazyAssumeArgs, Diags2));
   EXPECT_EQ(Diags2,
-            "test.FalsePositiveGenerator: REACHED_WITH_NO_CONTRADICTION\n"
-            "test.FalsePositiveGenerator: REACHED_WITH_CONTRADICTION\n");
+            "test.FalsePositiveGenerator:REACHED_WITH_NO_CONTRADICTION\n"
+            "test.FalsePositiveGenerator:REACHED_WITH_CONTRADICTION\n");
 }
 
 TEST_F(FalsePositiveRefutationBRVisitorTestBase,
@@ -158,18 +157,18 @@ TEST_F(FalsePositiveRefutationBRVisitorTestBase,
     })";
   std::string Diags;
   EXPECT_TRUE(runCheckerOnCodeWithArgs<addFalsePositiveGenerator>(
-      Code, LazyAssumeAndCrossCheckArgs, Diags, /*OnlyEmitWarnings=*/ true));
+      Code, LazyAssumeAndCrossCheckArgs, Diags));
   EXPECT_EQ(Diags,
-            "test.FalsePositiveGenerator: REACHED_WITH_NO_CONTRADICTION\n");
+            "test.FalsePositiveGenerator:REACHED_WITH_NO_CONTRADICTION\n");
   // Single warning. The second report was invalidated by the visitor.
 
   // Without enabling the crosscheck-with-z3 both reports are displayed.
   std::string Diags2;
   EXPECT_TRUE(runCheckerOnCodeWithArgs<addFalsePositiveGenerator>(
-      Code, LazyAssumeArgs, Diags2, /*OnlyEmitWarnings=*/ true));
+      Code, LazyAssumeArgs, Diags2));
   EXPECT_EQ(Diags2,
-            "test.FalsePositiveGenerator: REACHED_WITH_NO_CONTRADICTION\n"
-            "test.FalsePositiveGenerator: CAN_BE_TRUE\n");
+            "test.FalsePositiveGenerator:REACHED_WITH_NO_CONTRADICTION\n"
+            "test.FalsePositiveGenerator:CAN_BE_TRUE\n");
 }
 
 TEST_F(FalsePositiveRefutationBRVisitorTestBase,
@@ -205,18 +204,18 @@ TEST_F(FalsePositiveRefutationBRVisitorTestBase,
 
   std::string Diags;
   EXPECT_TRUE(runCheckerOnCodeWithArgs<addFalsePositiveGenerator>(
-      Code, LazyAssumeAndCrossCheckArgs, Diags, /*OnlyEmitWarnings=*/ true));
+      Code, LazyAssumeAndCrossCheckArgs, Diags));
   EXPECT_EQ(Diags,
-            "test.FalsePositiveGenerator: REACHED_WITH_NO_CONTRADICTION\n");
+            "test.FalsePositiveGenerator:REACHED_WITH_NO_CONTRADICTION\n");
   // Single warning. The second report was invalidated by the visitor.
 
   // Without enabling the crosscheck-with-z3 both reports are displayed.
   std::string Diags2;
   EXPECT_TRUE(runCheckerOnCodeWithArgs<addFalsePositiveGenerator>(
-      Code, LazyAssumeArgs, Diags2, /*OnlyEmitWarnings=*/ true));
+      Code, LazyAssumeArgs, Diags2));
   EXPECT_EQ(Diags2,
-            "test.FalsePositiveGenerator: REACHED_WITH_NO_CONTRADICTION\n"
-            "test.FalsePositiveGenerator: CAN_BE_TRUE\n");
+            "test.FalsePositiveGenerator:REACHED_WITH_NO_CONTRADICTION\n"
+            "test.FalsePositiveGenerator:CAN_BE_TRUE\n");
 }
 
 } // namespace

@@ -108,10 +108,9 @@ sub process(\%) {
     foreach my $entry ( keys( %$entries ) ) {
         if ( not $entries->{ $entry }->{ obsolete } ) {
             my $ordinal = $entries->{ $entry }->{ ordinal };
-            # omp_alloc and omp_free are C/C++ only functions, skip "1000+ordinal" for them
-            if ( $entry =~ m{\A[ok]mp_} and $entry ne "omp_alloc" and $entry ne "omp_free" and
-                $entry ne "omp_calloc" and $entry ne "omp_realloc" and
-                $entry ne "omp_aligned_alloc" and $entry ne "omp_aligned_calloc" ) {
+            # omp_alloc, omp_calloc, omp_realloc and omp_free are C/C++ only functions, skip "1000+ordinal" for them
+            if ( $entry =~ m{\A[ok]mp_} and $entry ne "omp_alloc" and $entry ne "omp_calloc" and
+                $entry ne "omp_realloc" and $entry ne "omp_free" ) {
                 if ( not defined( $ordinal ) ) {
                     runtime_error(
                         "Bad entry \"$entry\": ordinal number is not specified."
@@ -128,16 +127,12 @@ sub process(\%) {
 
 }; # sub process
 
-sub generate_output(\%$\%) {
+sub generate_output(\%$) {
 
-    my ( $entries, $output, $defs ) = @_;
-    my $lib = %$defs {'NAME'};
+    my ( $entries, $output ) = @_;
     my $bulk;
 
-    if (defined($lib)) {
-        $bulk = sprintf("NAME %s\n", $lib);
-    }
-    $bulk .= sprintf("EXPORTS\n");
+    $bulk = "EXPORTS\n";
     foreach my $entry ( sort( keys( %$entries ) ) ) {
         if ( not $entries->{ $entry }->{ obsolete } ) {
             $bulk .= sprintf( "    %-40s ", $entry );
@@ -146,9 +141,7 @@ sub generate_output(\%$\%) {
                 if ( $ordinal eq "DATA" ) {
                     $bulk .= "DATA";
                 } else {
-                    if (not %$defs {'NOORDINALS'}) {
-                        $bulk .= "\@" . $ordinal;
-                    }
+                    $bulk .= "\@" . $ordinal;
                 }; # if
             }; # if
             $bulk .= "\n";
@@ -199,7 +192,7 @@ $input = shift( @ARGV );
 
 my %data = parse_input( $input, %defs );
 %data = process( %data );
-generate_output( %data, $output, %defs );
+generate_output( %data, $output );
 exit( 0 );
 
 __END__

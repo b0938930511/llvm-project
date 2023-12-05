@@ -1,4 +1,4 @@
-//===-- M68kCallingConv.h - M68k Custom CC Routines -------------*- C++ -*-===//
+//===-- M68kCallingConv.h - M68k Custom CC Routines ---------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -24,13 +24,14 @@
 namespace llvm {
 
 /// Custom state to propagate llvm type info to register CC assigner
-struct M68kCCState : public CCState {
-  ArrayRef<Type *> ArgTypeList;
+class M68kCCState : public CCState {
+public:
+  const llvm::Function &F;
 
-  M68kCCState(ArrayRef<Type *> ArgTypes, CallingConv::ID CC, bool IsVarArg,
+  M68kCCState(const llvm::Function &F, CallingConv::ID CC, bool IsVarArg,
               MachineFunction &MF, SmallVectorImpl<CCValAssign> &Locs,
               LLVMContext &C)
-      : CCState(CC, IsVarArg, MF, Locs, C), ArgTypeList(ArgTypes) {}
+      : CCState(CC, IsVarArg, MF, Locs, C), F(F) {}
 };
 
 /// NOTE this function is used to select registers for formal arguments and call
@@ -38,7 +39,7 @@ struct M68kCCState : public CCState {
 inline bool CC_M68k_Any_AssignToReg(unsigned &ValNo, MVT &ValVT, MVT &LocVT,
                                     CCValAssign::LocInfo &LocInfo,
                                     ISD::ArgFlagsTy &ArgFlags, CCState &State) {
-  const M68kCCState &CCInfo = static_cast<M68kCCState &>(State);
+  M68kCCState CCInfo = static_cast<M68kCCState &>(State);
 
   static const MCPhysReg DataRegList[] = {M68k::D0, M68k::D1, M68k::A0,
                                           M68k::A1};
@@ -51,15 +52,14 @@ inline bool CC_M68k_Any_AssignToReg(unsigned &ValNo, MVT &ValVT, MVT &LocVT,
       M68k::D1,
   };
 
-  const auto &ArgTypes = CCInfo.ArgTypeList;
-  auto I = ArgTypes.begin(), End = ArgTypes.end();
+  auto I = CCInfo.F.arg_begin();
   int No = ValNo;
-  while (No > 0 && I != End) {
-    No -= (*I)->isIntegerTy(64) ? 2 : 1;
-    ++I;
+  while (No > 0) {
+    No -= I->getType()->isIntegerTy(64) ? 2 : 1;
+    I++;
   }
 
-  bool IsPtr = I != End && (*I)->isPointerTy();
+  bool IsPtr = I != CCInfo.F.arg_end() && I->getType()->isPointerTy();
 
   unsigned Reg =
       IsPtr ? State.AllocateReg(AddrRegList) : State.AllocateReg(DataRegList);
@@ -74,4 +74,4 @@ inline bool CC_M68k_Any_AssignToReg(unsigned &ValNo, MVT &ValVT, MVT &LocVT,
 
 } // namespace llvm
 
-#endif // LLVM_LIB_TARGET_M68K_M68KCALLINGCONV_H
+#endif

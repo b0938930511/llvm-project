@@ -3,9 +3,8 @@
 #define _JBLEN ((9 * 2) + 3 + 16)
 typedef int sigjmp_buf[_JBLEN + 1];
 int sigsetjmp(sigjmp_buf env, int savemask);
-void bar(void);
 sigjmp_buf B;
-int foo(void) {
+int foo() {
   sigsetjmp(B, 1);
   bar();
 }

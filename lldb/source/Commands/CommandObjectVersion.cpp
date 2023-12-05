@@ -9,7 +9,7 @@
 #include "CommandObjectVersion.h"
 
 #include "lldb/Interpreter/CommandReturnObject.h"
-#include "lldb/Version/Version.h"
+#include "lldb/lldb-private.h"
 
 using namespace lldb;
 using namespace lldb_private;
@@ -22,7 +22,12 @@ CommandObjectVersion::CommandObjectVersion(CommandInterpreter &interpreter)
 
 CommandObjectVersion::~CommandObjectVersion() = default;
 
-void CommandObjectVersion::DoExecute(Args &args, CommandReturnObject &result) {
-  result.AppendMessageWithFormat("%s\n", lldb_private::GetVersion());
-  result.SetStatus(eReturnStatusSuccessFinishResult);
+bool CommandObjectVersion::DoExecute(Args &args, CommandReturnObject &result) {
+  if (args.GetArgumentCount() == 0) {
+    result.AppendMessageWithFormat("%s\n", lldb_private::GetVersion());
+    result.SetStatus(eReturnStatusSuccessFinishResult);
+  } else {
+    result.AppendError("the version command takes no arguments.");
+  }
+  return true;
 }

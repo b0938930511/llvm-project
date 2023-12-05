@@ -21,7 +21,6 @@
 #include "test_iterators.h"
 
 #if TEST_STD_VER > 17
-
 TEST_CONSTEXPR bool eq(int a, int b) { return a == b; }
 
 TEST_CONSTEXPR bool test_constexpr() {

@@ -23,56 +23,56 @@ void f14(int *a) {
   }
 }
 
-void foo(void) {
+void foo() {
   int *x = malloc(sizeof(int));
   memset(x, 0, sizeof(int));
   int n = 1 / *x; // expected-warning {{Division by zero}}
   free(x);
 }
 
-void bar(void) {
+void bar() {
   int *x = malloc(sizeof(int));
   memset(x, 0, 1);
   int n = 1 / *x; // no-warning
   free(x);
 }
 
-void testConcreteNull(void) {
+void testConcreteNull() {
   int *x = 0;
   memset(x, 0, 1); // expected-warning {{Null pointer passed as 1st argument to memory set function}}
 }
 
-void testStackArray(void) {
+void testStackArray() {
   char buf[13];
   memset(buf, 0, 1); // no-warning
 }
 
-void testHeapSymbol(void) {
+void testHeapSymbol() {
   char *buf = (char *)malloc(13);
   memset(buf, 0, 1); // no-warning
   free(buf);
 }
 
-void testStackArrayOutOfBound(void) {
+void testStackArrayOutOfBound() {
   char buf[1];
   memset(buf, 0, 1024);
   // expected-warning@-1 {{Memory set function overflows the destination buffer}}
   // expected-warning@-2 {{'memset' will always overflow; destination buffer has size 1, but size argument is 1024}}
 }
 
-void testHeapSymbolOutOfBound(void) {
+void testHeapSymbolOutOfBound() {
   char *buf = (char *)malloc(1);
   memset(buf, 0, 1024);
   // expected-warning@-1 {{Memory set function overflows the destination buffer}}
   free(buf);
 }
 
-void testStackArraySameSize(void) {
+void testStackArraySameSize() {
   char buf[1];
   memset(buf, 0, sizeof(buf)); // no-warning
 }
 
-void testHeapSymbolSameSize(void) {
+void testHeapSymbolSameSize() {
   char *buf = (char *)malloc(1);
   memset(buf, 0, 1); // no-warning
   free(buf);

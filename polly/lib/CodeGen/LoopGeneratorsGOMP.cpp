@@ -30,8 +30,8 @@ void ParallelLoopGeneratorGOMP::createCallSpawnThreads(Value *SubFn,
     GlobalValue::LinkageTypes Linkage = Function::ExternalLinkage;
 
     Type *Params[] = {PointerType::getUnqual(FunctionType::get(
-                          Builder.getVoidTy(), Builder.getPtrTy(), false)),
-                      Builder.getPtrTy(),
+                          Builder.getVoidTy(), Builder.getInt8PtrTy(), false)),
+                      Builder.getInt8PtrTy(),
                       Builder.getInt32Ty(),
                       LongType,
                       LongType,
@@ -44,8 +44,7 @@ void ParallelLoopGeneratorGOMP::createCallSpawnThreads(Value *SubFn,
   Value *Args[] = {SubFn, SubFnParam, Builder.getInt32(PollyNumThreads),
                    LB,    UB,         Stride};
 
-  CallInst *Call = Builder.CreateCall(F, Args);
-  Call->setDebugLoc(DLGenerated);
+  Builder.CreateCall(F, Args);
 }
 
 void ParallelLoopGeneratorGOMP::deployParallelExecution(Function *SubFn,
@@ -54,14 +53,13 @@ void ParallelLoopGeneratorGOMP::deployParallelExecution(Function *SubFn,
                                                         Value *Stride) {
   // Tell the runtime we start a parallel loop
   createCallSpawnThreads(SubFn, SubFnParam, LB, UB, Stride);
-  CallInst *Call = Builder.CreateCall(SubFn, SubFnParam);
-  Call->setDebugLoc(DLGenerated);
+  Builder.CreateCall(SubFn, SubFnParam);
   createCallJoinThreads();
 }
 
 Function *ParallelLoopGeneratorGOMP::prepareSubFnDefinition(Function *F) const {
   FunctionType *FT =
-      FunctionType::get(Builder.getVoidTy(), {Builder.getPtrTy()}, false);
+      FunctionType::get(Builder.getVoidTy(), {Builder.getInt8PtrTy()}, false);
   Function *SubFn = Function::Create(FT, Function::InternalLinkage,
                                      F->getName() + "_polly_subfn", M);
   // Name the function's arguments
@@ -128,7 +126,8 @@ ParallelLoopGeneratorGOMP::createSubFn(Value *Stride, AllocaInst *StructData,
   Builder.SetInsertPoint(HeaderBB);
   Value *LBPtr = Builder.CreateAlloca(LongType, nullptr, "polly.par.LBPtr");
   Value *UBPtr = Builder.CreateAlloca(LongType, nullptr, "polly.par.UBPtr");
-  Value *UserContext = &*SubFn->arg_begin();
+  Value *UserContext = Builder.CreateBitCast(
+      &*SubFn->arg_begin(), StructData->getType(), "polly.par.userContext");
 
   extractValuesFromStruct(Data, StructData->getAllocatedType(), UserContext,
                           Map);
@@ -185,10 +184,9 @@ Value *ParallelLoopGeneratorGOMP::createCallGetWorkItem(Value *LBPtr,
   }
 
   Value *Args[] = {LBPtr, UBPtr};
-  CallInst *Call = Builder.CreateCall(F, Args);
-  Call->setDebugLoc(DLGenerated);
-  Value *Return = Builder.CreateICmpNE(
-      Call, Builder.CreateZExt(Builder.getFalse(), Call->getType()));
+  Value *Return = Builder.CreateCall(F, Args);
+  Return = Builder.CreateICmpNE(
+      Return, Builder.CreateZExt(Builder.getFalse(), Return->getType()));
   return Return;
 }
 
@@ -205,8 +203,7 @@ void ParallelLoopGeneratorGOMP::createCallJoinThreads() {
     F = Function::Create(Ty, Linkage, Name, M);
   }
 
-  CallInst *Call = Builder.CreateCall(F, {});
-  Call->setDebugLoc(DLGenerated);
+  Builder.CreateCall(F, {});
 }
 
 void ParallelLoopGeneratorGOMP::createCallCleanupThread() {
@@ -222,6 +219,5 @@ void ParallelLoopGeneratorGOMP::createCallCleanupThread() {
     F = Function::Create(Ty, Linkage, Name, M);
   }
 
-  CallInst *Call = Builder.CreateCall(F, {});
-  Call->setDebugLoc(DLGenerated);
+  Builder.CreateCall(F, {});
 }

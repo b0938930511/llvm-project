@@ -14,23 +14,25 @@
 #include "llvm/Support/Regex.h"
 #include <algorithm>
 #include <cctype>
-#include <functional>
 
-namespace clang::tidy::cppcoreguidelines {
-
-static bool isCapsOnly(StringRef Name) {
-  return llvm::all_of(Name, [](const char C) {
-    return std::isupper(C) || std::isdigit(C) || C == '_';
-  });
-}
+namespace clang {
+namespace tidy {
+namespace cppcoreguidelines {
 
 namespace {
+
+bool isCapsOnly(StringRef Name) {
+  return std::all_of(Name.begin(), Name.end(), [](const char C) {
+    if (std::isupper(C) || std::isdigit(C) || C == '_')
+      return true;
+    return false;
+  });
+}
 
 class MacroUsageCallbacks : public PPCallbacks {
 public:
   MacroUsageCallbacks(MacroUsageCheck *Check, const SourceManager &SM,
-                      StringRef RegExpStr, bool CapsOnly,
-                      bool IgnoreCommandLine)
+                      StringRef RegExpStr, bool CapsOnly, bool IgnoreCommandLine)
       : Check(Check), SM(SM), RegExp(RegExpStr), CheckCapsOnly(CapsOnly),
         IgnoreCommandLineMacros(IgnoreCommandLine) {}
   void MacroDefined(const Token &MacroNameTok,
@@ -77,24 +79,21 @@ void MacroUsageCheck::registerPPCallbacks(const SourceManager &SM,
 }
 
 void MacroUsageCheck::warnMacro(const MacroDirective *MD, StringRef MacroName) {
-  const MacroInfo *Info = MD->getMacroInfo();
-  StringRef Message;
+  StringRef Message =
+      "macro '%0' used to declare a constant; consider using a 'constexpr' "
+      "constant";
 
-  if (llvm::all_of(Info->tokens(), std::mem_fn(&Token::isLiteral)))
-    Message = "macro '%0' used to declare a constant; consider using a "
-              "'constexpr' constant";
-  // A variadic macro is function-like at the same time. Therefore variadic
-  // macros are checked first and will be excluded for the function-like
-  // diagnostic.
-  else if (Info->isVariadic())
+  /// A variadic macro is function-like at the same time. Therefore variadic
+  /// macros are checked first and will be excluded for the function-like
+  /// diagnostic.
+  if (MD->getMacroInfo()->isVariadic())
     Message = "variadic macro '%0' used; consider using a 'constexpr' "
               "variadic template function";
-  else if (Info->isFunctionLike())
+  else if (MD->getMacroInfo()->isFunctionLike())
     Message = "function-like macro '%0' used; consider a 'constexpr' template "
               "function";
 
-  if (!Message.empty())
-    diag(MD->getLocation(), Message) << MacroName;
+  diag(MD->getLocation(), Message) << MacroName;
 }
 
 void MacroUsageCheck::warnNaming(const MacroDirective *MD,
@@ -104,4 +103,6 @@ void MacroUsageCheck::warnNaming(const MacroDirective *MD,
       << MacroName;
 }
 
-} // namespace clang::tidy::cppcoreguidelines
+} // namespace cppcoreguidelines
+} // namespace tidy
+} // namespace clang

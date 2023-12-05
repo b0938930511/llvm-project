@@ -1,10 +1,13 @@
 // RUN: %clang_cc1 %s -fsyntax-only -fblocks -verify -Wno-unreachable-code
 
+// rdar://6597252
 Class test1(Class X) {
   return 1 ? X : X;
 }
 
-void test2(void) {
+
+// rdar://6079877
+void test2() {
   id str = @"foo" 
           "bar\0"    // no-warning
           @"baz"  " blarg";
@@ -20,6 +23,9 @@ void test2(void) {
 #define MAX(A,B) ({ __typeof__(A) __a = (A); __typeof__(B) __b = (B); __a < __b ? __b : __a; })
 void (^foo)(int, int) = ^(int x, int y) { int z = MAX(x, y); };
 
+
+
+// rdar://8445858
 @class Object;
 static Object *g;
 void test3(Object *o) {
@@ -30,7 +36,7 @@ void test3(Object *o) {
 @class Incomplete_ObjC_class; // expected-note{{forward declaration of class here}}
 struct Incomplete_struct; // expected-note {{forward declaration}}
 
-void test_encode(void) {
+void test_encode() {
   (void)@encode(Incomplete_ObjC_class); // expected-error {{incomplete type}}
   (void)@encode(struct Incomplete_struct); // expected-error {{incomplete type}}
   (void)@encode(Incomplete_ObjC_class*);

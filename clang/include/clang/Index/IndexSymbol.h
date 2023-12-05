@@ -57,8 +57,6 @@ enum class SymbolKind : uint8_t {
   TemplateTypeParm,
   TemplateTemplateParm,
   NonTypeTemplateParm,
-
-  Concept, /// C++20 concept.
 };
 
 enum class SymbolLanguage : uint8_t {

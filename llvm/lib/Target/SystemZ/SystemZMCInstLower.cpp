@@ -93,8 +93,10 @@ MCOperand SystemZMCInstLower::lowerOperand(const MachineOperand &MO) const {
 
 void SystemZMCInstLower::lower(const MachineInstr *MI, MCInst &OutMI) const {
   OutMI.setOpcode(MI->getOpcode());
-  for (const MachineOperand &MO : MI->operands())
+  for (unsigned I = 0, E = MI->getNumOperands(); I != E; ++I) {
+    const MachineOperand &MO = MI->getOperand(I);
     // Ignore all implicit register operands.
     if (!MO.isReg() || !MO.isImplicit())
       OutMI.addOperand(lowerOperand(MO));
+  }
 }

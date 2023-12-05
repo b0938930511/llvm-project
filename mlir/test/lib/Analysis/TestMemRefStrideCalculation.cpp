@@ -14,25 +14,22 @@ using namespace mlir;
 
 namespace {
 struct TestMemRefStrideCalculation
-    : public PassWrapper<TestMemRefStrideCalculation,
-                         InterfacePass<SymbolOpInterface>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TestMemRefStrideCalculation)
-
+    : public PassWrapper<TestMemRefStrideCalculation, FunctionPass> {
   StringRef getArgument() const final {
     return "test-memref-stride-calculation";
   }
   StringRef getDescription() const final {
     return "Test operation constant folding";
   }
-  void runOnOperation() override;
+  void runOnFunction() override;
 };
-} // namespace
+} // end anonymous namespace
 
 /// Traverse AllocOp and compute strides of each MemRefType independently.
-void TestMemRefStrideCalculation::runOnOperation() {
-  llvm::outs() << "Testing: " << getOperation().getName() << "\n";
-  getOperation().walk([&](memref::AllocOp allocOp) {
-    auto memrefType = cast<MemRefType>(allocOp.getResult().getType());
+void TestMemRefStrideCalculation::runOnFunction() {
+  llvm::outs() << "Testing: " << getFunction().getName() << "\n";
+  getFunction().walk([&](memref::AllocOp allocOp) {
+    auto memrefType = allocOp.getResult().getType().cast<MemRefType>();
     int64_t offset;
     SmallVector<int64_t, 4> strides;
     if (failed(getStridesAndOffset(memrefType, strides, offset))) {
@@ -41,13 +38,13 @@ void TestMemRefStrideCalculation::runOnOperation() {
       return;
     }
     llvm::outs() << "MemRefType offset: ";
-    if (ShapedType::isDynamic(offset))
+    if (offset == MemRefType::getDynamicStrideOrOffset())
       llvm::outs() << "?";
     else
       llvm::outs() << offset;
     llvm::outs() << " strides: ";
     llvm::interleaveComma(strides, llvm::outs(), [&](int64_t v) {
-      if (ShapedType::isDynamic(v))
+      if (v == MemRefType::getDynamicStrideOrOffset())
         llvm::outs() << "?";
       else
         llvm::outs() << v;

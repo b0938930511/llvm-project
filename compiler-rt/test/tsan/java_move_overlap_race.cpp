@@ -1,6 +1,6 @@
 // RUN: %clangxx_tsan -O1 %s -o %t
-// RUN: %run %t 2>&1 | FileCheck %s
-// RUN: %run %t arg 2>&1 | FileCheck %s
+// RUN: %deflake %run %t 2>&1 | FileCheck %s
+// RUN: %deflake %run %t arg 2>&1 | FileCheck %s
 #include "java.h"
 
 jptr varaddr1_old;
@@ -50,7 +50,6 @@ int main(int argc, char **argv) {
   return __tsan_java_fini();
 }
 
-// Note: there is a race on the moved object (which we used to detect),
-// but now __tsan_java_move resets the object shadow, so we don't detect it anymore.
-// CHECK-NOT: WARNING: ThreadSanitizer: data race
+// CHECK: WARNING: ThreadSanitizer: data race
+// CHECK: WARNING: ThreadSanitizer: data race
 // CHECK: DONE

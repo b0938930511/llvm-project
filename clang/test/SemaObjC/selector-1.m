@@ -9,12 +9,13 @@
 - (id) compare: (id) arg1; // expected-note {{method 'compare:' declared here}}
 @end
 
-SEL func(void)
+SEL func()
 {
 	return @selector(compare:);	// expected-warning {{several methods with selector 'compare:' of mismatched types are found for the @selector expression}}
 }
 
-void Test16458579(void) {
+// rdar://16458579
+void Test16458579() {
  SEL s = @selector((retain));
  SEL s1 = @selector((meth1:));
  SEL s2 = @selector((retainArgument::));
@@ -25,7 +26,7 @@ void Test16458579(void) {
  SEL s7 = @selector((char:float:double:unsigned:short:long:));
  SEL s9 = @selector((:enum:bool:));
 }
-int main(void) {
+int main() {
  SEL s = @selector(retain);
  SEL s1 = @selector(meth1:);
  SEL s2 = @selector(retainArgument::);
@@ -38,6 +39,7 @@ int main(void) {
  SEL s9 = @selector(:enum:bool:);
 }
 
+// rdar://15794055
 @interface NSObject @end
 
 @class NSNumber;

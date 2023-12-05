@@ -37,8 +37,6 @@ public:
 
   void Clear();
 
-  bool IsFileBacked() const;
-
   /// Get const accessor for the module file specification.
   ///
   /// This function returns the file for the module on the host system

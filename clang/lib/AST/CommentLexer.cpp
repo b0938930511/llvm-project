@@ -94,12 +94,31 @@ void Lexer::skipLineStartingDecorations() {
   if (BufferPtr == CommentEnd)
     return;
 
-  const char *NewBufferPtr = BufferPtr;
-  while (isHorizontalWhitespace(*NewBufferPtr))
-    if (++NewBufferPtr == CommentEnd)
+  switch (*BufferPtr) {
+  case ' ':
+  case '\t':
+  case '\f':
+  case '\v': {
+    const char *NewBufferPtr = BufferPtr;
+    NewBufferPtr++;
+    if (NewBufferPtr == CommentEnd)
       return;
-  if (*NewBufferPtr == '*')
-    BufferPtr = NewBufferPtr + 1;
+
+    char C = *NewBufferPtr;
+    while (isHorizontalWhitespace(C)) {
+      NewBufferPtr++;
+      if (NewBufferPtr == CommentEnd)
+        return;
+      C = *NewBufferPtr;
+    }
+    if (C == '*')
+      BufferPtr = NewBufferPtr + 1;
+    break;
+  }
+  case '*':
+    BufferPtr++;
+    break;
+  }
 }
 
 namespace {
@@ -270,29 +289,6 @@ void Lexer::formTokenWithChars(Token &Result, const char *TokEnd,
   BufferPtr = TokEnd;
 }
 
-const char *Lexer::skipTextToken() {
-  const char *TokenPtr = BufferPtr;
-  assert(TokenPtr < CommentEnd);
-  StringRef TokStartSymbols = ParseCommands ? "\n\r\\@\"&<" : "\n\r";
-
-again:
-  size_t End =
-      StringRef(TokenPtr, CommentEnd - TokenPtr).find_first_of(TokStartSymbols);
-  if (End == StringRef::npos)
-    return CommentEnd;
-
-  // Doxygen doesn't recognize any commands in a one-line double quotation.
-  // If we don't find an ending quotation mark, we pretend it never began.
-  if (*(TokenPtr + End) == '\"') {
-    TokenPtr += End + 1;
-    End = StringRef(TokenPtr, CommentEnd - TokenPtr).find_first_of("\n\r\"");
-    if (End != StringRef::npos && *(TokenPtr + End) == '\"')
-      TokenPtr += End + 1;
-    goto again;
-  }
-  return TokenPtr + End;
-}
-
 void Lexer::lexCommentText(Token &T) {
   assert(CommentState == LCS_InsideBCPLComment ||
          CommentState == LCS_InsideCComment);
@@ -313,8 +309,17 @@ void Lexer::lexCommentText(Token &T) {
             skipLineStartingDecorations();
           return;
 
-      default:
-        return formTextToken(T, skipTextToken());
+      default: {
+          StringRef TokStartSymbols = ParseCommands ? "\n\r\\@&<" : "\n\r";
+          size_t End = StringRef(TokenPtr, CommentEnd - TokenPtr)
+                           .find_first_of(TokStartSymbols);
+          if (End != StringRef::npos)
+            TokenPtr += End;
+          else
+            TokenPtr = CommentEnd;
+          formTextToken(T, TokenPtr);
+          return;
+      }
     }
   };
 
@@ -387,11 +392,10 @@ void Lexer::lexCommentText(Token &T) {
       unsigned Length = TokenPtr - (BufferPtr + 1);
 
       // Hardcoded support for lexing LaTeX formula commands
-      // \f$ \f( \f) \f[ \f] \f{ \f} as a single command.
+      // \f$ \f[ \f] \f{ \f} as a single command.
       if (Length == 1 && TokenPtr[-1] == 'f' && TokenPtr != CommentEnd) {
         C = *TokenPtr;
-        if (C == '$' || C == '(' || C == ')' || C == '[' || C == ']' ||
-            C == '{' || C == '}') {
+        if (C == '$' || C == '[' || C == ']' || C == '{' || C == '}') {
           TokenPtr++;
           Length++;
         }
@@ -701,7 +705,7 @@ void Lexer::lexHTMLStartTag(Token &T) {
 
   C = *BufferPtr;
   if (!isHTMLIdentifierStartingCharacter(C) &&
-      C != '=' && C != '\"' && C != '\'' && C != '>' && C != '/') {
+      C != '=' && C != '\"' && C != '\'' && C != '>') {
     State = LS_Normal;
     return;
   }

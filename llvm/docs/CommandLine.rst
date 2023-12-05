@@ -767,7 +767,7 @@ The idiom for usage is like this:
 .. code-block:: c++
 
   static cl::list<std::string> Files(cl::Positional, cl::OneOrMore);
-  static cl::list<std::string> Libraries("l");
+  static cl::list<std::string> Libraries("l", cl::ZeroOrMore);
 
   int main(int argc, char**argv) {
     // ...

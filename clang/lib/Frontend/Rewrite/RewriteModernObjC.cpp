@@ -24,7 +24,6 @@
 #include "clang/Lex/Lexer.h"
 #include "clang/Rewrite/Core/Rewriter.h"
 #include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -600,8 +599,8 @@ namespace {
     StringLiteral *getStringLiteral(StringRef Str) {
       QualType StrType = Context->getConstantArrayType(
           Context->CharTy, llvm::APInt(32, Str.size() + 1), nullptr,
-          ArraySizeModifier::Normal, 0);
-      return StringLiteral::Create(*Context, Str, StringLiteralKind::Ordinary,
+          ArrayType::Normal, 0);
+      return StringLiteral::Create(*Context, Str, StringLiteral::Ascii,
                                    /*Pascal=*/false, StrType, SourceLocation());
     }
   };
@@ -634,7 +633,7 @@ static bool IsHeaderFile(const std::string &Filename) {
     return false;
   }
 
-  std::string Ext = Filename.substr(DotPos + 1);
+  std::string Ext = std::string(Filename.begin()+DotPos+1, Filename.end());
   // C header: .h
   // C++ header: .hh or .H;
   return Ext == "h" || Ext == "hh" || Ext == "H";
@@ -853,7 +852,7 @@ RewriteModernObjC::getIvarAccessString(ObjCIvarDecl *D) {
   if (D->isBitField())
     IvarT = GetGroupRecordTypeForObjCIvarBitfield(D);
 
-  if (!IvarT->getAs<TypedefType>() && IvarT->isRecordType()) {
+  if (!isa<TypedefType>(IvarT) && IvarT->isRecordType()) {
     RecordDecl *RD = IvarT->castAs<RecordType>()->getDecl();
     RD = RD->getDefinition();
     if (RD && !RD->getDeclName().getAsIdentifierInfo()) {
@@ -864,9 +863,9 @@ RewriteModernObjC::getIvarAccessString(ObjCIvarDecl *D) {
         CDecl = CatDecl->getClassInterface();
       std::string RecName = std::string(CDecl->getName());
       RecName += "_IMPL";
-      RecordDecl *RD = RecordDecl::Create(*Context, TagTypeKind::Struct, TUDecl,
-                                          SourceLocation(), SourceLocation(),
-                                          &Context->Idents.get(RecName));
+      RecordDecl *RD =
+          RecordDecl::Create(*Context, TTK_Struct, TUDecl, SourceLocation(),
+                             SourceLocation(), &Context->Idents.get(RecName));
       QualType PtrStructIMPL = Context->getPointerType(Context->getTagDeclType(RD));
       unsigned UnsignedIntSize =
       static_cast<unsigned>(Context->getTypeSize(Context->UnsignedIntTy));
@@ -1958,15 +1957,15 @@ Stmt *RewriteModernObjC::RewriteObjCTryStmt(ObjCAtTryStmt *S) {
     // @try -> try
     ReplaceText(startLoc, 1, "");
 
-  for (ObjCAtCatchStmt *Catch : S->catch_stmts()) {
+  for (unsigned I = 0, N = S->getNumCatchStmts(); I != N; ++I) {
+    ObjCAtCatchStmt *Catch = S->getCatchStmt(I);
     VarDecl *catchDecl = Catch->getCatchParamDecl();
 
     startLoc = Catch->getBeginLoc();
     bool AtRemoved = false;
     if (catchDecl) {
       QualType t = catchDecl->getType();
-      if (const ObjCObjectPointerType *Ptr =
-              t->getAs<ObjCObjectPointerType>()) {
+      if (const ObjCObjectPointerType *Ptr = t->getAs<ObjCObjectPointerType>()) {
         // Should be a pointer to a class.
         ObjCInterfaceDecl *IDecl = Ptr->getObjectType()->getInterface();
         if (IDecl) {
@@ -2978,9 +2977,9 @@ Stmt *RewriteModernObjC::RewriteObjCDictionaryLiteralExpr(ObjCDictionaryLiteral 
 // };
 QualType RewriteModernObjC::getSuperStructType() {
   if (!SuperStructDecl) {
-    SuperStructDecl = RecordDecl::Create(
-        *Context, TagTypeKind::Struct, TUDecl, SourceLocation(),
-        SourceLocation(), &Context->Idents.get("__rw_objc_super"));
+    SuperStructDecl = RecordDecl::Create(*Context, TTK_Struct, TUDecl,
+                                         SourceLocation(), SourceLocation(),
+                                         &Context->Idents.get("__rw_objc_super"));
     QualType FieldTypes[2];
 
     // struct objc_object *object;
@@ -3006,9 +3005,9 @@ QualType RewriteModernObjC::getSuperStructType() {
 
 QualType RewriteModernObjC::getConstantStringStructType() {
   if (!ConstantStringDecl) {
-    ConstantStringDecl = RecordDecl::Create(
-        *Context, TagTypeKind::Struct, TUDecl, SourceLocation(),
-        SourceLocation(), &Context->Idents.get("__NSConstantStringImpl"));
+    ConstantStringDecl = RecordDecl::Create(*Context, TTK_Struct, TUDecl,
+                                            SourceLocation(), SourceLocation(),
+                         &Context->Idents.get("__NSConstantStringImpl"));
     QualType FieldTypes[4];
 
     // struct objc_object *receiver;
@@ -3629,7 +3628,7 @@ bool RewriteModernObjC::IsTagDefinedInsideClass(ObjCContainerDecl *IDecl,
 /// It handles elaborated types, as well as enum types in the process.
 bool RewriteModernObjC::RewriteObjCFieldDeclType(QualType &Type,
                                                  std::string &Result) {
-  if (Type->getAs<TypedefType>()) {
+  if (isa<TypedefType>(Type)) {
     Result += "\t";
     return false;
   }
@@ -3724,7 +3723,7 @@ void RewriteModernObjC::RewriteObjCFieldDecl(FieldDecl *fieldDecl,
 void RewriteModernObjC::RewriteLocallyDefinedNamedAggregates(FieldDecl *fieldDecl,
                                              std::string &Result) {
   QualType Type = fieldDecl->getType();
-  if (Type->getAs<TypedefType>())
+  if (isa<TypedefType>(Type))
     return;
   if (Type->isArrayType())
     Type = Context->getBaseElementType(Type);
@@ -3782,9 +3781,10 @@ QualType RewriteModernObjC::SynthesizeBitfieldGroupStructType(
                               SmallVectorImpl<ObjCIvarDecl *> &IVars) {
   std::string StructTagName;
   ObjCIvarBitfieldGroupType(IV, StructTagName);
-  RecordDecl *RD = RecordDecl::Create(
-      *Context, TagTypeKind::Struct, Context->getTranslationUnitDecl(),
-      SourceLocation(), SourceLocation(), &Context->Idents.get(StructTagName));
+  RecordDecl *RD = RecordDecl::Create(*Context, TTK_Struct,
+                                      Context->getTranslationUnitDecl(),
+                                      SourceLocation(), SourceLocation(),
+                                      &Context->Idents.get(StructTagName));
   for (unsigned i=0, e = IVars.size(); i < e; i++) {
     ObjCIvarDecl *Ivar = IVars[i];
     RD->addDecl(FieldDecl::Create(*Context, RD, SourceLocation(), SourceLocation(),
@@ -4587,7 +4587,7 @@ Stmt *RewriteModernObjC::SynthesizeBlockCall(CallExpr *Exp, const Expr *BlockExp
   const FunctionProtoType *FTP = dyn_cast<FunctionProtoType>(FT);
   // FTP will be null for closures that don't take arguments.
 
-  RecordDecl *RD = RecordDecl::Create(*Context, TagTypeKind::Struct, TUDecl,
+  RecordDecl *RD = RecordDecl::Create(*Context, TTK_Struct, TUDecl,
                                       SourceLocation(), SourceLocation(),
                                       &Context->Idents.get("__block_impl"));
   QualType PtrBlock = Context->getPointerType(Context->getTagDeclType(RD));
@@ -5346,9 +5346,9 @@ Stmt *RewriteModernObjC::SynthBlockInitExpr(BlockExpr *Exp,
       RewriteByRefString(RecName, Name, ND, true);
       IdentifierInfo *II = &Context->Idents.get(RecName.c_str()
                                                 + sizeof("struct"));
-      RecordDecl *RD =
-          RecordDecl::Create(*Context, TagTypeKind::Struct, TUDecl,
-                             SourceLocation(), SourceLocation(), II);
+      RecordDecl *RD = RecordDecl::Create(*Context, TTK_Struct, TUDecl,
+                                          SourceLocation(), SourceLocation(),
+                                          II);
       assert(RD && "SynthBlockInitExpr(): Can't find RecordDecl");
       QualType castT = Context->getPointerType(Context->getTagDeclType(RD));
 
@@ -5356,15 +5356,16 @@ Stmt *RewriteModernObjC::SynthBlockInitExpr(BlockExpr *Exp,
       Exp = new (Context) DeclRefExpr(*Context, FD, false, FD->getType(),
                                       VK_LValue, SourceLocation());
       bool isNestedCapturedVar = false;
-      for (const auto &CI : block->captures()) {
-        const VarDecl *variable = CI.getVariable();
-        if (variable == ND && CI.isNested()) {
-          assert(CI.isByRef() &&
-                 "SynthBlockInitExpr - captured block variable is not byref");
-          isNestedCapturedVar = true;
-          break;
+      if (block)
+        for (const auto &CI : block->captures()) {
+          const VarDecl *variable = CI.getVariable();
+          if (variable == ND && CI.isNested()) {
+            assert (CI.isByRef() &&
+                    "SynthBlockInitExpr - captured block variable is not byref");
+            isNestedCapturedVar = true;
+            break;
+          }
         }
-      }
       // captured nested byref variable has its address passed. Do not take
       // its address again.
       if (!isNestedCapturedVar)
@@ -6722,7 +6723,7 @@ static void Write_IvarOffsetVar(RewriteModernObjC &RewriteObj,
                                 std::string &Result,
                                 ArrayRef<ObjCIvarDecl *> Ivars,
                                 ObjCInterfaceDecl *CDecl) {
-  // FIXME. visibility of offset symbols may have to be set; for Darwin
+  // FIXME. visibilty of offset symbols may have to be set; for Darwin
   // this is what happens:
   /**
    if (Ivar->getAccessControl() == ObjCIvarDecl::Private ||
@@ -6854,7 +6855,7 @@ void RewriteModernObjC::RewriteObjCProtocolMetaData(ObjCProtocolDecl *PDecl,
   std::vector<ObjCMethodDecl *> InstanceMethods, ClassMethods;
   std::vector<ObjCMethodDecl *> OptInstanceMethods, OptClassMethods;
   for (auto *MD : PDecl->instance_methods()) {
-    if (MD->getImplementationControl() == ObjCImplementationControl::Optional) {
+    if (MD->getImplementationControl() == ObjCMethodDecl::Optional) {
       OptInstanceMethods.push_back(MD);
     } else {
       InstanceMethods.push_back(MD);
@@ -6862,7 +6863,7 @@ void RewriteModernObjC::RewriteObjCProtocolMetaData(ObjCProtocolDecl *PDecl,
   }
 
   for (auto *MD : PDecl->class_methods()) {
-    if (MD->getImplementationControl() == ObjCImplementationControl::Optional) {
+    if (MD->getImplementationControl() == ObjCMethodDecl::Optional) {
       OptClassMethods.push_back(MD);
     } else {
       ClassMethods.push_back(MD);
@@ -7495,7 +7496,7 @@ Stmt *RewriteModernObjC::RewriteObjCIvarRefExpr(ObjCIvarRefExpr *IV) {
       if (D->isBitField())
         IvarT = GetGroupRecordTypeForObjCIvarBitfield(D);
 
-      if (!IvarT->getAs<TypedefType>() && IvarT->isRecordType()) {
+      if (!isa<TypedefType>(IvarT) && IvarT->isRecordType()) {
         RecordDecl *RD = IvarT->castAs<RecordType>()->getDecl();
         RD = RD->getDefinition();
         if (RD && !RD->getDeclName().getAsIdentifierInfo()) {
@@ -7507,8 +7508,8 @@ Stmt *RewriteModernObjC::RewriteObjCIvarRefExpr(ObjCIvarRefExpr *IV) {
           std::string RecName = std::string(CDecl->getName());
           RecName += "_IMPL";
           RecordDecl *RD = RecordDecl::Create(
-              *Context, TagTypeKind::Struct, TUDecl, SourceLocation(),
-              SourceLocation(), &Context->Idents.get(RecName));
+              *Context, TTK_Struct, TUDecl, SourceLocation(), SourceLocation(),
+              &Context->Idents.get(RecName));
           QualType PtrStructIMPL = Context->getPointerType(Context->getTagDeclType(RD));
           unsigned UnsignedIntSize =
             static_cast<unsigned>(Context->getTypeSize(Context->UnsignedIntTy));

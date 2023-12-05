@@ -24,7 +24,6 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/FoldingSet.h"
-#include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Allocator.h"
 #include <cassert>
 
@@ -49,7 +48,6 @@ public:
     assert(isValidTypeForSymbol(r->getValueType()));
   }
 
-  LLVM_ATTRIBUTE_RETURNS_NONNULL
   const TypedValueRegion* getRegion() const { return R; }
 
   static void Profile(llvm::FoldingSetNodeID& profile, const TypedValueRegion* R) {
@@ -97,10 +95,8 @@ public:
     assert(isValidTypeForSymbol(t));
   }
 
-  /// It might return null.
   const Stmt *getStmt() const { return S; }
   unsigned getCount() const { return Count; }
-  /// It might return null.
   const void *getTag() const { return SymbolTag; }
 
   QualType getType() const override;
@@ -144,9 +140,7 @@ public:
     assert(isValidTypeForSymbol(r->getValueType()));
   }
 
-  LLVM_ATTRIBUTE_RETURNS_NONNULL
   SymbolRef getParentSymbol() const { return parentSymbol; }
-  LLVM_ATTRIBUTE_RETURNS_NONNULL
   const TypedValueRegion *getRegion() const { return R; }
 
   QualType getType() const override;
@@ -185,7 +179,6 @@ public:
     assert(r);
   }
 
-  LLVM_ATTRIBUTE_RETURNS_NONNULL
   const SubRegion *getRegion() const { return R; }
 
   QualType getType() const override;
@@ -233,37 +226,29 @@ public:
       assert(tag);
     }
 
-    LLVM_ATTRIBUTE_RETURNS_NONNULL
-    const MemRegion *getRegion() const { return R; }
+  const MemRegion *getRegion() const { return R; }
+  const Stmt *getStmt() const { return S; }
+  const LocationContext *getLocationContext() const { return LCtx; }
+  unsigned getCount() const { return Count; }
+  const void *getTag() const { return Tag; }
 
-    LLVM_ATTRIBUTE_RETURNS_NONNULL
-    const Stmt *getStmt() const { return S; }
+  QualType getType() const override;
 
-    LLVM_ATTRIBUTE_RETURNS_NONNULL
-    const LocationContext *getLocationContext() const { return LCtx; }
+  StringRef getKindStr() const override;
 
-    unsigned getCount() const { return Count; }
+  void dumpToStream(raw_ostream &os) const override;
 
-    LLVM_ATTRIBUTE_RETURNS_NONNULL
-    const void *getTag() const { return Tag; }
-
-    QualType getType() const override;
-
-    StringRef getKindStr() const override;
-
-    void dumpToStream(raw_ostream &os) const override;
-
-    static void Profile(llvm::FoldingSetNodeID &profile, const MemRegion *R,
-                        const Stmt *S, QualType T, const LocationContext *LCtx,
-                        unsigned Count, const void *Tag) {
-      profile.AddInteger((unsigned)SymbolMetadataKind);
-      profile.AddPointer(R);
-      profile.AddPointer(S);
-      profile.Add(T);
-      profile.AddPointer(LCtx);
-      profile.AddInteger(Count);
-      profile.AddPointer(Tag);
-    }
+  static void Profile(llvm::FoldingSetNodeID& profile, const MemRegion *R,
+                      const Stmt *S, QualType T, const LocationContext *LCtx,
+                      unsigned Count, const void *Tag) {
+    profile.AddInteger((unsigned) SymbolMetadataKind);
+    profile.AddPointer(R);
+    profile.AddPointer(S);
+    profile.Add(T);
+    profile.AddPointer(LCtx);
+    profile.AddInteger(Count);
+    profile.AddPointer(Tag);
+  }
 
   void Profile(llvm::FoldingSetNodeID& profile) override {
     Profile(profile, R, S, T, LCtx, Count, Tag);
@@ -302,7 +287,6 @@ public:
 
   QualType getType() const override { return ToTy; }
 
-  LLVM_ATTRIBUTE_RETURNS_NONNULL
   const SymExpr *getOperand() const { return Operand; }
 
   void dumpToStream(raw_ostream &os) const override;
@@ -322,55 +306,6 @@ public:
   // Implement isa<T> support.
   static bool classof(const SymExpr *SE) {
     return SE->getKind() == SymbolCastKind;
-  }
-};
-
-/// Represents a symbolic expression involving a unary operator.
-class UnarySymExpr : public SymExpr {
-  const SymExpr *Operand;
-  UnaryOperator::Opcode Op;
-  QualType T;
-
-public:
-  UnarySymExpr(const SymExpr *In, UnaryOperator::Opcode Op, QualType T)
-      : SymExpr(UnarySymExprKind), Operand(In), Op(Op), T(T) {
-    // Note, some unary operators are modeled as a binary operator. E.g. ++x is
-    // modeled as x + 1.
-    assert((Op == UO_Minus || Op == UO_Not) && "non-supported unary expression");
-    // Unary expressions are results of arithmetic. Pointer arithmetic is not
-    // handled by unary expressions, but it is instead handled by applying
-    // sub-regions to regions.
-    assert(isValidTypeForSymbol(T) && "non-valid type for unary symbol");
-    assert(!Loc::isLocType(T) && "unary symbol should be nonloc");
-  }
-
-  unsigned computeComplexity() const override {
-    if (Complexity == 0)
-      Complexity = 1 + Operand->computeComplexity();
-    return Complexity;
-  }
-
-  const SymExpr *getOperand() const { return Operand; }
-  UnaryOperator::Opcode getOpcode() const { return Op; }
-  QualType getType() const override { return T; }
-
-  void dumpToStream(raw_ostream &os) const override;
-
-  static void Profile(llvm::FoldingSetNodeID &ID, const SymExpr *In,
-                      UnaryOperator::Opcode Op, QualType T) {
-    ID.AddInteger((unsigned)UnarySymExprKind);
-    ID.AddPointer(In);
-    ID.AddInteger(Op);
-    ID.Add(T);
-  }
-
-  void Profile(llvm::FoldingSetNodeID &ID) override {
-    Profile(ID, Operand, Op, T);
-  }
-
-  // Implement isa<T> support.
-  static bool classof(const SymExpr *SE) {
-    return SE->getKind() == UnarySymExprKind;
   }
 };
 
@@ -551,9 +486,6 @@ public:
   const SymSymExpr *getSymSymExpr(const SymExpr *lhs, BinaryOperator::Opcode op,
                                   const SymExpr *rhs, QualType t);
 
-  const UnarySymExpr *getUnarySymExpr(const SymExpr *operand,
-                                      UnaryOperator::Opcode op, QualType t);
-
   QualType getType(const SymExpr *SE) const {
     return SE->getType();
   }
@@ -583,12 +515,7 @@ class SymbolReaper {
   SymbolMapTy TheLiving;
   SymbolSetTy MetadataInUse;
 
-  RegionSetTy LiveRegionRoots;
-  // The lazily copied regions are locations for which a program
-  // can access the value stored at that location, but not its address.
-  // These regions are constructed as a set of regions referred to by
-  // lazyCompoundVal.
-  RegionSetTy LazilyCopiedRegionRoots;
+  RegionSetTy RegionRoots;
 
   const StackFrameContext *LCtx;
   const Stmt *Loc;
@@ -608,7 +535,6 @@ public:
                SymbolManager &symmgr, StoreManager &storeMgr)
       : LCtx(Ctx), Loc(s), SymMgr(symmgr), reapedStore(nullptr, storeMgr) {}
 
-  /// It might return null.
   const LocationContext *getLocationContext() const { return LCtx; }
 
   bool isLive(SymbolRef sym);
@@ -632,9 +558,10 @@ public:
   /// symbol marking has occurred, i.e. in the MarkLiveSymbols callback.
   void markInUse(SymbolRef sym);
 
-  llvm::iterator_range<RegionSetTy::const_iterator> regions() const {
-    return LiveRegionRoots;
-  }
+  using region_iterator = RegionSetTy::const_iterator;
+
+  region_iterator region_begin() const { return RegionRoots.begin(); }
+  region_iterator region_end() const { return RegionRoots.end(); }
 
   /// Returns whether or not a symbol has been confirmed dead.
   ///
@@ -645,7 +572,6 @@ public:
   }
 
   void markLive(const MemRegion *region);
-  void markLazilyCopied(const MemRegion *region);
   void markElementIndicesLive(const MemRegion *region);
 
   /// Set to the value of the symbolic store after
@@ -653,12 +579,6 @@ public:
   void setReapedStore(StoreRef st) { reapedStore = st; }
 
 private:
-  bool isLazilyCopiedRegion(const MemRegion *region) const;
-  // A readable region is a region that live or lazily copied.
-  // Any symbols that refer to values in regions are alive if the region
-  // is readable.
-  bool isReadableRegion(const MemRegion *region);
-
   /// Mark the symbols dependent on the input symbol as live.
   void markDependentsLive(SymbolRef sym);
 };
@@ -671,11 +591,6 @@ public:
   SymbolVisitor() = default;
   SymbolVisitor(const SymbolVisitor &) = default;
   SymbolVisitor(SymbolVisitor &&) {}
-
-  // The copy and move assignment operator is defined as deleted pending further
-  // motivation.
-  SymbolVisitor &operator=(const SymbolVisitor &) = delete;
-  SymbolVisitor &operator=(SymbolVisitor &&) = delete;
 
   /// A visitor method invoked by ProgramStateManager::scanReachableSymbols.
   ///

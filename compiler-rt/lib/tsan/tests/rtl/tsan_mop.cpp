@@ -15,48 +15,48 @@
 #include <stddef.h>
 #include <stdint.h>
 
-TEST_F(ThreadSanitizer, SimpleWrite) {
+TEST(ThreadSanitizer, SimpleWrite) {
   ScopedThread t;
   MemLoc l;
   t.Write1(l);
 }
 
-TEST_F(ThreadSanitizer, SimpleWriteWrite) {
+TEST(ThreadSanitizer, SimpleWriteWrite) {
   ScopedThread t1, t2;
   MemLoc l1, l2;
   t1.Write1(l1);
   t2.Write1(l2);
 }
 
-TEST_F(ThreadSanitizer, WriteWriteRace) {
+TEST(ThreadSanitizer, WriteWriteRace) {
   ScopedThread t1, t2;
   MemLoc l;
   t1.Write1(l);
   t2.Write1(l, true);
 }
 
-TEST_F(ThreadSanitizer, ReadWriteRace) {
+TEST(ThreadSanitizer, ReadWriteRace) {
   ScopedThread t1, t2;
   MemLoc l;
   t1.Read1(l);
   t2.Write1(l, true);
 }
 
-TEST_F(ThreadSanitizer, WriteReadRace) {
+TEST(ThreadSanitizer, WriteReadRace) {
   ScopedThread t1, t2;
   MemLoc l;
   t1.Write1(l);
   t2.Read1(l, true);
 }
 
-TEST_F(ThreadSanitizer, ReadReadNoRace) {
+TEST(ThreadSanitizer, ReadReadNoRace) {
   ScopedThread t1, t2;
   MemLoc l;
   t1.Read1(l);
   t2.Read1(l);
 }
 
-TEST_F(ThreadSanitizer, WriteThenRead) {
+TEST(ThreadSanitizer, WriteThenRead) {
   MemLoc l;
   ScopedThread t1, t2;
   t1.Write1(l);
@@ -64,7 +64,7 @@ TEST_F(ThreadSanitizer, WriteThenRead) {
   t2.Read1(l, true);
 }
 
-TEST_F(ThreadSanitizer, WriteThenLockedRead) {
+TEST(ThreadSanitizer, WriteThenLockedRead) {
   UserMutex m(UserMutex::RW);
   MainThread t0;
   t0.Create(m);
@@ -83,7 +83,7 @@ TEST_F(ThreadSanitizer, WriteThenLockedRead) {
   t0.Destroy(m);
 }
 
-TEST_F(ThreadSanitizer, LockedWriteThenRead) {
+TEST(ThreadSanitizer, LockedWriteThenRead) {
   UserMutex m(UserMutex::RW);
   MainThread t0;
   t0.Create(m);
@@ -103,7 +103,7 @@ TEST_F(ThreadSanitizer, LockedWriteThenRead) {
 }
 
 
-TEST_F(ThreadSanitizer, RaceWithOffset) {
+TEST(ThreadSanitizer, RaceWithOffset) {
   ScopedThread t1, t2;
   {
     MemLoc l;
@@ -137,7 +137,7 @@ TEST_F(ThreadSanitizer, RaceWithOffset) {
   }
 }
 
-TEST_F(ThreadSanitizer, RaceWithOffset2) {
+TEST(ThreadSanitizer, RaceWithOffset2) {
   ScopedThread t1, t2;
   {
     MemLoc l;
@@ -151,7 +151,7 @@ TEST_F(ThreadSanitizer, RaceWithOffset2) {
   }
 }
 
-TEST_F(ThreadSanitizer, NoRaceWithOffset) {
+TEST(ThreadSanitizer, NoRaceWithOffset) {
   ScopedThread t1, t2;
   {
     MemLoc l;
@@ -166,14 +166,14 @@ TEST_F(ThreadSanitizer, NoRaceWithOffset) {
   }
 }
 
-TEST_F(ThreadSanitizer, RaceWithDeadThread) {
+TEST(ThreadSanitizer, RaceWithDeadThread) {
   MemLoc l;
   ScopedThread t;
   ScopedThread().Write1(l);
   t.Write1(l, true);
 }
 
-TEST_F(ThreadSanitizer, BenignRaceOnVptr) {
+TEST(ThreadSanitizer, BenignRaceOnVptr) {
   void *vptr_storage;
   MemLoc vptr(&vptr_storage), val;
   vptr_storage = val.loc();
@@ -182,7 +182,7 @@ TEST_F(ThreadSanitizer, BenignRaceOnVptr) {
   t2.Read8(vptr);
 }
 
-TEST_F(ThreadSanitizer, HarmfulRaceOnVptr) {
+TEST(ThreadSanitizer, HarmfulRaceOnVptr) {
   void *vptr_storage;
   MemLoc vptr(&vptr_storage), val1, val2;
   vptr_storage = val1.loc();
@@ -203,7 +203,7 @@ static void bar() {
   (void)x2;
 }
 
-TEST_F(ThreadSanitizer, ReportDeadThread) {
+TEST(ThreadSanitizer, ReportDeadThread) {
   MemLoc l;
   ScopedThread t1;
   {
@@ -223,7 +223,7 @@ int ClassWithStatic::Data[4];
 
 static void foobarbaz() {}
 
-TEST_F(ThreadSanitizer, ReportRace) {
+TEST(ThreadSanitizer, ReportRace) {
   ScopedThread t1;
   MainThread().Access(&ClassWithStatic::Data, true, 4, false);
   t1.Call(&foobarbaz);

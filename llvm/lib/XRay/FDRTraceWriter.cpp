@@ -57,7 +57,7 @@ Error writeMetadata(support::endian::Writer &OS, Values &&... Ds) {
 } // namespace
 
 FDRTraceWriter::FDRTraceWriter(raw_ostream &O, const XRayFileHeader &H)
-    : OS(O, llvm::endianness::native) {
+    : OS(O, support::endianness::native) {
   // We need to re-construct a header, by writing the fields we care about for
   // traces, in the format that the runtime would have written.
   uint32_t BitField =
@@ -74,7 +74,7 @@ FDRTraceWriter::FDRTraceWriter(raw_ostream &O, const XRayFileHeader &H)
   OS.write(FreeFormBytes);
 }
 
-FDRTraceWriter::~FDRTraceWriter() = default;
+FDRTraceWriter::~FDRTraceWriter() {}
 
 Error FDRTraceWriter::visit(BufferExtents &R) {
   return writeMetadata<7u>(OS, R.size());

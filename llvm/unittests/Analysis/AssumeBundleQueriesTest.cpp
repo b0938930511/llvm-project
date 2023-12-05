@@ -22,6 +22,7 @@ using namespace llvm;
 
 namespace llvm {
 extern cl::opt<bool> ShouldPreserveAllAttributes;
+extern cl::opt<bool> EnableKnowledgeRetention;
 } // namespace llvm
 
 static void RunTest(
@@ -231,8 +232,7 @@ static bool FindExactlyAttributes(RetainedKnowledgeMap &Map, Value *WasOn,
        }) {
     bool ShouldHaveAttr = Reg.match(Attr, &Matches) && Matches[0] == Attr;
 
-    if (ShouldHaveAttr != (Map.contains(RetainedKnowledgeKey{
-                              WasOn, Attribute::getAttrKindFromName(Attr)})))
+    if (ShouldHaveAttr != (Map.find(RetainedKnowledgeKey{WasOn, Attribute::getAttrKindFromName(Attr)}) != Map.end()))
       return false;
   }
   return true;
@@ -407,6 +407,7 @@ static void RunRandTest(uint64_t Seed, int Size, int MinCount, int MaxCount,
   LLVMContext C;
   SMDiagnostic Err;
 
+  std::random_device dev;
   std::mt19937 Rng(Seed);
   std::uniform_int_distribution<int> DistCount(MinCount, MaxCount);
   std::uniform_int_distribution<unsigned> DistValue(0, MaxValue);
@@ -419,7 +420,7 @@ static void RunRandTest(uint64_t Seed, int Size, int MinCount, int MaxCount,
 
   std::vector<Type *> TypeArgs;
   for (int i = 0; i < (Size * 2); i++)
-    TypeArgs.push_back(PointerType::getUnqual(C));
+    TypeArgs.push_back(Type::getInt32PtrTy(C));
   FunctionType *FuncType =
       FunctionType::get(Type::getVoidTy(C), TypeArgs, false);
 
@@ -428,11 +429,11 @@ static void RunRandTest(uint64_t Seed, int Size, int MinCount, int MaxCount,
   BasicBlock *BB = BasicBlock::Create(C);
   BB->insertInto(F);
   Instruction *Ret = ReturnInst::Create(C);
-  Ret->insertInto(BB, BB->begin());
+  BB->getInstList().insert(BB->begin(), Ret);
   Function *FnAssume = Intrinsic::getDeclaration(Mod.get(), Intrinsic::assume);
 
   std::vector<Argument *> ShuffledArgs;
-  BitVector HasArg;
+  std::vector<bool> HasArg;
   for (auto &Arg : F->args()) {
     ShuffledArgs.push_back(&Arg);
     HasArg.push_back(false);
@@ -517,7 +518,8 @@ TEST(AssumeQueryAPI, AssumptionCache) {
   BasicBlock::iterator First = F->begin()->begin();
   BasicBlock::iterator Second = F->begin()->begin();
   Second++;
-  AssumptionCache AC(*F);
+  AssumptionCacheTracker ACT;
+  AssumptionCache &AC = ACT.getAssumptionCache(*F);
   auto AR = AC.assumptionsFor(F->getArg(3));
   ASSERT_EQ(AR.size(), 0u);
   AR = AC.assumptionsFor(F->getArg(1));

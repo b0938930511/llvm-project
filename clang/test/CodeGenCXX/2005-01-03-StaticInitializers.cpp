@@ -1,9 +1,9 @@
-// RUN: %clang_cc1 -triple=x86_64-linux-gnu -emit-llvm %s -o - | FileCheck %s
-// RUN: %clang_cc1 -triple=i386-linux-gnu -emit-llvm %s -o - | FileCheck %s
+// RUN: %clang_cc1 -emit-llvm %s -o - | FileCheck %s
+// REQUIRES: LP64
 
 struct S {
   int  A[2];
 };
 
-// CHECK: @XX = global i32 4, align 4
+// CHECK-NOT: llvm.global_ctor
 int XX = (int)(long)&(((struct S*)0)->A[1]);

@@ -353,7 +353,7 @@ namespace Redeclaration {
 
   void test(Derived d) {
     d.foo(); // don't crash
-    d.bar(); // basic correctness check
+    d.bar(); // sanity check
 
     Base &b = d;
     b.foo(); // don't crash

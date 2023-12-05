@@ -75,15 +75,8 @@ extern int PollyChunkSize;
 Value *createLoop(Value *LowerBound, Value *UpperBound, Value *Stride,
                   PollyIRBuilder &Builder, LoopInfo &LI, DominatorTree &DT,
                   BasicBlock *&ExitBlock, ICmpInst::Predicate Predicate,
-                  ScopAnnotator *Annotator = nullptr, bool Parallel = false,
+                  ScopAnnotator *Annotator = NULL, bool Parallel = false,
                   bool UseGuard = true, bool LoopVectDisabled = false);
-
-/// Create a DebugLoc representing generated instructions.
-///
-/// The IR verifier requires !dbg metadata to be set in some situations. For
-/// instance, if an (inlinable) function has debug info, all its call site must
-/// have debug info as well.
-llvm::DebugLoc createDebugLocForGeneratedCode(Function *F);
 
 /// The ParallelLoopGenerator allows to create parallelized loops
 ///
@@ -133,9 +126,7 @@ public:
       : Builder(Builder), LI(LI), DT(DT),
         LongType(
             Type::getIntNTy(Builder.getContext(), DL.getPointerSizeInBits())),
-        M(Builder.GetInsertBlock()->getParent()->getParent()),
-        DLGenerated(createDebugLocForGeneratedCode(
-            Builder.GetInsertBlock()->getParent())) {}
+        M(Builder.GetInsertBlock()->getParent()->getParent()) {}
 
   virtual ~ParallelLoopGenerator() {}
 
@@ -175,13 +166,6 @@ protected:
 
   /// The current module
   Module *M;
-
-  /// Debug location for generated code without direct link to any specific
-  /// line.
-  ///
-  /// We only set the DebugLoc where the IR Verifier requires us to. Otherwise,
-  /// absent debug location for optimized code should be fine.
-  llvm::DebugLoc DLGenerated;
 
 public:
   /// Create a struct for all @p Values and store them in there.

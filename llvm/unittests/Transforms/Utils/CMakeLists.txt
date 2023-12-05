@@ -5,8 +5,6 @@ set(LLVM_LINK_COMPONENTS
   Core
   Support
   TransformUtils
-  Passes
-  Vectorize
   )
 
 add_llvm_unittest(UtilsTests
@@ -15,7 +13,6 @@ add_llvm_unittest(UtilsTests
   CallPromotionUtilsTest.cpp
   CloningTest.cpp
   CodeExtractorTest.cpp
-  CodeLayoutTest.cpp
   CodeMoverUtilsTest.cpp
   DebugifyTest.cpp
   FunctionComparatorTest.cpp
@@ -23,7 +20,6 @@ add_llvm_unittest(UtilsTests
   LocalTest.cpp
   LoopRotationUtilsTest.cpp
   LoopUtilsTest.cpp
-  MemTransferLowering.cpp
   ModuleUtilsTest.cpp
   ScalarEvolutionExpanderTest.cpp
   SizeOptsTest.cpp
@@ -31,7 +27,4 @@ add_llvm_unittest(UtilsTests
   UnrollLoopTest.cpp
   ValueMapperTest.cpp
   VFABIUtils.cpp
-  ProfDataUtilTest.cpp
   )
-
-set_property(TARGET UtilsTests PROPERTY FOLDER "Tests/UnitTests/TransformsTests")

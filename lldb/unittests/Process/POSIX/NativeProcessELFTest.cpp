@@ -33,13 +33,17 @@ public:
 std::unique_ptr<llvm::MemoryBuffer> CreateAuxvData(
     MockProcessELF &process,
     llvm::ArrayRef<std::pair<AuxVector::EntryType, uint32_t>> auxv_data) {
-  DataEncoder encoder(process.GetByteOrder(), process.GetAddressByteSize());
+  auto addr_size = process.GetAddressByteSize();
+  DataBufferSP buffer_sp(
+      new DataBufferHeap(auxv_data.size() * addr_size * 2, 0));
+  DataEncoder encoder(buffer_sp, process.GetByteOrder(), addr_size);
+  uint32_t offset = 0;
   for (auto &pair : auxv_data) {
-    encoder.AppendAddress(pair.first);
-    encoder.AppendAddress(pair.second);
+    offset = encoder.PutAddress(offset, pair.first);
+    offset = encoder.PutAddress(offset, pair.second);
   }
   return llvm::MemoryBuffer::getMemBufferCopy(
-      llvm::toStringRef(encoder.GetData()), "");
+      llvm::toStringRef(buffer_sp->GetData()), "");
 }
 
 } // namespace

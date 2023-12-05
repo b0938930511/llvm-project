@@ -31,7 +31,6 @@
 #include "X86Subtarget.h"
 #include "llvm/CodeGen/IndirectThunks.h"
 #include "llvm/CodeGen/MachineFunction.h"
-#include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineModuleInfo.h"
 #include "llvm/CodeGen/Passes.h"
@@ -61,28 +60,23 @@ static const char R11LVIThunkName[] = "__llvm_lvi_thunk_r11";
 namespace {
 struct RetpolineThunkInserter : ThunkInserter<RetpolineThunkInserter> {
   const char *getThunkPrefix() { return RetpolineNamePrefix; }
-  bool mayUseThunk(const MachineFunction &MF, bool InsertedThunks) {
-    if (InsertedThunks)
-      return false;
+  bool mayUseThunk(const MachineFunction &MF) {
     const auto &STI = MF.getSubtarget<X86Subtarget>();
     return (STI.useRetpolineIndirectCalls() ||
             STI.useRetpolineIndirectBranches()) &&
            !STI.useRetpolineExternalThunk();
   }
-  bool insertThunks(MachineModuleInfo &MMI, MachineFunction &MF);
+  void insertThunks(MachineModuleInfo &MMI);
   void populateThunk(MachineFunction &MF);
 };
 
 struct LVIThunkInserter : ThunkInserter<LVIThunkInserter> {
   const char *getThunkPrefix() { return LVIThunkNamePrefix; }
-  bool mayUseThunk(const MachineFunction &MF, bool InsertedThunks) {
-    if (InsertedThunks)
-      return false;
+  bool mayUseThunk(const MachineFunction &MF) {
     return MF.getSubtarget<X86Subtarget>().useLVIControlFlowIntegrity();
   }
-  bool insertThunks(MachineModuleInfo &MMI, MachineFunction &MF) {
+  void insertThunks(MachineModuleInfo &MMI) {
     createThunkFunction(MMI, R11LVIThunkName);
-    return true;
   }
   void populateThunk(MachineFunction &MF) {
     assert (MF.size() == 1);
@@ -137,15 +131,13 @@ private:
 
 } // end anonymous namespace
 
-bool RetpolineThunkInserter::insertThunks(MachineModuleInfo &MMI,
-                                          MachineFunction &MF) {
+void RetpolineThunkInserter::insertThunks(MachineModuleInfo &MMI) {
   if (MMI.getTarget().getTargetTriple().getArch() == Triple::x86_64)
     createThunkFunction(MMI, R11RetpolineName);
   else
     for (StringRef Name : {EAXRetpolineName, ECXRetpolineName, EDXRetpolineName,
                            EDIRetpolineName})
       createThunkFunction(MMI, Name);
-  return true;
 }
 
 void RetpolineThunkInserter::populateThunk(MachineFunction &MF) {
@@ -220,7 +212,7 @@ void RetpolineThunkInserter::populateThunk(MachineFunction &MF) {
   MF.push_back(CallTarget);
 
   const unsigned CallOpc = Is64Bit ? X86::CALL64pcrel32 : X86::CALLpcrel32;
-  const unsigned RetOpc = Is64Bit ? X86::RET64 : X86::RET32;
+  const unsigned RetOpc = Is64Bit ? X86::RETQ : X86::RETL;
 
   Entry->addLiveIn(ThunkReg);
   BuildMI(Entry, DebugLoc(), TII->get(CallOpc)).addSym(TargetSym);
@@ -241,11 +233,11 @@ void RetpolineThunkInserter::populateThunk(MachineFunction &MF) {
   BuildMI(CaptureSpec, DebugLoc(), TII->get(X86::PAUSE));
   BuildMI(CaptureSpec, DebugLoc(), TII->get(X86::LFENCE));
   BuildMI(CaptureSpec, DebugLoc(), TII->get(X86::JMP_1)).addMBB(CaptureSpec);
-  CaptureSpec->setMachineBlockAddressTaken();
+  CaptureSpec->setHasAddressTaken();
   CaptureSpec->addSuccessor(CaptureSpec);
 
   CallTarget->addLiveIn(ThunkReg);
-  CallTarget->setMachineBlockAddressTaken();
+  CallTarget->setHasAddressTaken();
   CallTarget->setAlignment(Align(16));
 
   // Insert return address clobber

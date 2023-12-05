@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
+// UNSUPPORTED: libcpp-no-concepts
 
 // template<class T>
 // concept unsigned_integral = // see below
@@ -15,7 +16,6 @@
 #include <type_traits>
 
 #include "arithmetic.h"
-#include "test_macros.h"
 
 template <typename T>
 constexpr bool CheckUnsignedIntegralQualifiers() {
@@ -68,7 +68,7 @@ static_assert(CheckUnsignedIntegralQualifiers<char32_t>() ==
               !std::is_signed_v<char32_t>);
 
 // extended integers
-#ifndef TEST_HAS_NO_INT128
+#ifndef _LIBCPP_HAS_NO_INT128
 static_assert(CheckUnsignedIntegralQualifiers<__uint128_t>());
 static_assert(!CheckUnsignedIntegralQualifiers<__int128_t>());
 #endif

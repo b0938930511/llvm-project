@@ -28,13 +28,13 @@ body: |
 
   bb.1.less:
     ; CHECK:      $eax = MOV32r0
-    ; CHECK-NEXT: RET64 killed $eax
+    ; CHECK-NEXT: RETQ killed $eax
     $eax = MOV32r0 implicit-def $eflags
-    RET64 killed $eax
+    RETQ killed $eax
 
   bb.2.exit:
     ; CHECK:      $eax = COPY killed $edi
-    ; CHECK-NEXT: RET64 killed $eax
+    ; CHECK-NEXT: RETQ killed $eax
     $eax = COPY killed $edi
-    RET64 killed $eax
+    RETQ killed $eax
 ...

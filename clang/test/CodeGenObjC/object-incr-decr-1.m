@@ -6,7 +6,7 @@
 }
 @end
 
-Foo* foo(void)
+Foo* foo()
 {
   Foo *f;
   

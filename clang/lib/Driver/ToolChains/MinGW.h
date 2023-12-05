@@ -20,7 +20,7 @@ namespace clang {
 namespace driver {
 namespace tools {
 
-/// Directly call GNU Binutils assembler and linker
+/// MinGW -- Directly call GNU Binutils assembler and linker
 namespace MinGW {
 class LLVM_LIBRARY_VISIBILITY Assembler : public Tool {
 public:
@@ -34,7 +34,7 @@ public:
                     const char *LinkingOutput) const override;
 };
 
-class LLVM_LIBRARY_VISIBILITY Linker final : public Tool {
+class LLVM_LIBRARY_VISIBILITY Linker : public Tool {
 public:
   Linker(const ToolChain &TC) : Tool("MinGW::Linker", "linker", TC) {}
 
@@ -60,15 +60,12 @@ public:
   MinGW(const Driver &D, const llvm::Triple &Triple,
         const llvm::opt::ArgList &Args);
 
-  static void fixTripleArch(const Driver &D, llvm::Triple &Triple,
-                            const llvm::opt::ArgList &Args);
-
   bool HasNativeLLVMSupport() const override;
 
-  UnwindTableLevel
-  getDefaultUnwindTableLevel(const llvm::opt::ArgList &Args) const override;
+  bool IsIntegratedAssemblerDefault() const override;
+  bool IsUnwindTablesDefault(const llvm::opt::ArgList &Args) const override;
   bool isPICDefault() const override;
-  bool isPIEDefault(const llvm::opt::ArgList &Args) const override;
+  bool isPIEDefault() const override;
   bool isPICDefaultForced() const override;
 
   SanitizerMask getSupportedSanitizers() const override;
@@ -79,10 +76,6 @@ public:
   void
   AddClangSystemIncludeArgs(const llvm::opt::ArgList &DriverArgs,
                             llvm::opt::ArgStringList &CC1Args) const override;
-  void
-  addClangTargetOptions(const llvm::opt::ArgList &DriverArgs,
-                        llvm::opt::ArgStringList &CC1Args,
-                        Action::OffloadKind DeviceOffloadKind) const override;
   void AddClangCXXStdlibIncludeArgs(
       const llvm::opt::ArgList &DriverArgs,
       llvm::opt::ArgStringList &CC1Args) const override;
@@ -93,8 +86,6 @@ public:
                          llvm::opt::ArgStringList &CC1Args) const override;
 
   void printVerboseInfo(raw_ostream &OS) const override;
-
-  unsigned GetDefaultDwarfVersion() const override { return 4; }
 
 protected:
   Tool *getTool(Action::ActionClass AC) const override;
@@ -107,13 +98,13 @@ private:
 
   std::string Base;
   std::string GccLibDir;
-  clang::driver::toolchains::Generic_GCC::GCCVersion GccVer;
   std::string Ver;
-  std::string SubdirName;
-  std::string TripleDirName;
+  std::string Arch;
   mutable std::unique_ptr<tools::gcc::Preprocessor> Preprocessor;
   mutable std::unique_ptr<tools::gcc::Compiler> Compiler;
-  void findGccLibDir(const llvm::Triple &LiteralTriple);
+  void findGccLibDir();
+  llvm::ErrorOr<std::string> findGcc();
+  llvm::ErrorOr<std::string> findClangRelativeSysroot();
 
   bool NativeLLVMSupport;
 };

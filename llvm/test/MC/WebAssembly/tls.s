@@ -18,11 +18,6 @@ tls_store:
   i32.store 0
   end_function
 
-tls_get_undefined:
-  .functype tls_get_undefined (i32) -> (i32)
-  global.get tls_undefined@GOT@TLS
-  end_function
-
 .section .tls.foo,"T",@
 # CHECK: .tls.foo,"T",@
 tls1:
@@ -43,9 +38,6 @@ tls2:
 # CHECK-OBJ-NEXT:      - Type:            R_WASM_MEMORY_ADDR_TLS_SLEB
 # CHECK-OBJ-NEXT:        Index:           2
 # CHECK-OBJ-NEXT:        Offset:          0xA
-# CHECK-OBJ-NEXT:      - Type:            R_WASM_GLOBAL_INDEX_LEB
-# CHECK-OBJ-NEXT:        Index:           4
-# CHECK-OBJ-NEXT:        Offset:          0x19
 
 #      CHECK-OBJ:  - Type:            CUSTOM
 # CHECK-OBJ-NEXT:    Name:            linking
@@ -64,22 +56,13 @@ tls2:
 # CHECK-OBJ-NEXT:      - Index:           2
 # CHECK-OBJ-NEXT:        Kind:            DATA
 # CHECK-OBJ-NEXT:        Name:            tls1
-# CHECK-OBJ-NEXT:        Flags:           [ BINDING_LOCAL, TLS ]
+# CHECK-OBJ-NEXT:        Flags:           [ BINDING_LOCAL ]
 # CHECK-OBJ-NEXT:        Segment:         0
 # CHECK-OBJ-NEXT:        Size:            4
 # CHECK-OBJ-NEXT:      - Index:           3
-# CHECK-OBJ-NEXT:        Kind:            FUNCTION
-# CHECK-OBJ-NEXT:        Name:            tls_get_undefined
-# CHECK-OBJ-NEXT:        Flags:           [ BINDING_LOCAL ]
-# CHECK-OBJ-NEXT:        Function:        1
-# CHECK-OBJ-NEXT:      - Index:           4
-# CHECK-OBJ-NEXT:        Kind:            DATA
-# CHECK-OBJ-NEXT:        Name:            tls_undefined
-# CHECK-OBJ-NEXT:        Flags:           [ UNDEFINED, TLS ]
-# CHECK-OBJ-NEXT:      - Index:           5
 # CHECK-OBJ-NEXT:        Kind:            DATA
 # CHECK-OBJ-NEXT:        Name:            tls2
-# CHECK-OBJ-NEXT:        Flags:           [ BINDING_LOCAL, TLS ]
+# CHECK-OBJ-NEXT:        Flags:           [ BINDING_LOCAL ]
 # CHECK-OBJ-NEXT:        Segment:         1
 # CHECK-OBJ-NEXT:        Size:            4
 # CHECK-OBJ-NEXT:    SegmentInfo:

@@ -15,7 +15,7 @@
 #define SANITIZER_SYMBOLIZER_MAC_H
 
 #include "sanitizer_platform.h"
-#if SANITIZER_APPLE
+#if SANITIZER_MAC
 
 #include "sanitizer_symbolizer_internal.h"
 
@@ -35,6 +35,7 @@ class AtosSymbolizer final : public SymbolizerTool {
 
   bool SymbolizePC(uptr addr, SymbolizedStack *stack) override;
   bool SymbolizeData(uptr addr, DataInfo *info) override;
+  void LateInitialize() override;
 
  private:
   AtosSymbolizerProcess *process_;
@@ -42,6 +43,6 @@ class AtosSymbolizer final : public SymbolizerTool {
 
 } // namespace __sanitizer
 
-#endif  // SANITIZER_APPLE
+#endif  // SANITIZER_MAC
 
 #endif // SANITIZER_SYMBOLIZER_MAC_H

@@ -6,10 +6,10 @@
 
 // FOO: foo:
 // FOO-NOT: foo:
-inline int foo(void) { return 0; }
-extern inline int foo(void);
+inline int foo() { return 0; }
+extern inline int foo();
 
 // BAR: bar:
 // BAR-NOT: bar:
-int bar(void) { return 0; }
-extern int bar(void);
+int bar() { return 0; }
+extern int bar();

@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// UNSUPPORTED: no-threads
+// UNSUPPORTED: libcpp-has-no-threads
 // UNSUPPORTED: c++03
 
 // <future>
@@ -35,7 +35,10 @@ void func(std::packaged_task<double(int, char)>)
 {
 }
 
-void func2(std::packaged_task<double(int, char)> p) { p(3, 97); }
+void func2(std::packaged_task<double(int, char)> p)
+{
+    p(3, 'a');
+}
 
 int main(int, char**)
 {

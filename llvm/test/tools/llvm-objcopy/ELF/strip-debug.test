@@ -98,7 +98,6 @@ Sections:
   - Name:            .debugfoo
     Type:            SHT_PROGBITS
     Content:         "00000000"
-  ## .zdebug is no longer recognized as a debug section.
   - Name:            .zdebugfoo
     Type:            SHT_PROGBITS
     Content:         "00000000"
@@ -120,9 +119,8 @@ Symbols:
   - Name:    filesymbol
     Type:    STT_FILE
 
-# CHECK: SectionHeaderCount: 6
+# CHECK: SectionHeaderCount: 5
 
-# CHECK: Name: .zdebugfoo
 # CHECK: Name: .text
 # CHECK: Name: .symtab
 # CHECK: Name: .strtab

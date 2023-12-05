@@ -14,12 +14,10 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "Utils/WebAssemblyTypeUtilities.h"
 #include "WebAssembly.h"
 #include "WebAssemblySubtarget.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/Pass.h"
-#include <set>
 
 using namespace llvm;
 
@@ -30,6 +28,8 @@ class WebAssemblyLowerRefTypesIntPtrConv final : public FunctionPass {
   StringRef getPassName() const override {
     return "WebAssembly Lower RefTypes Int-Ptr Conversions";
   }
+
+  static bool isRefType(Type *T);
 
   bool runOnFunction(Function &MF) override;
 
@@ -45,6 +45,11 @@ INITIALIZE_PASS(WebAssemblyLowerRefTypesIntPtrConv, DEBUG_TYPE,
 
 FunctionPass *llvm::createWebAssemblyLowerRefTypesIntPtrConv() {
   return new WebAssemblyLowerRefTypesIntPtrConv();
+}
+
+bool WebAssemblyLowerRefTypesIntPtrConv::isRefType(Type *T) {
+  return WebAssemblyTargetLowering::isFuncrefType(T) ||
+         WebAssemblyTargetLowering::isExternrefType(T);
 }
 
 bool WebAssemblyLowerRefTypesIntPtrConv::runOnFunction(Function &F) {
@@ -63,9 +68,8 @@ bool WebAssemblyLowerRefTypesIntPtrConv::runOnFunction(Function &F) {
   for (inst_iterator I = inst_begin(F), E = inst_end(F); I != E; ++I) {
     PtrToIntInst *PTI = dyn_cast<PtrToIntInst>(&*I);
     IntToPtrInst *ITP = dyn_cast<IntToPtrInst>(&*I);
-    if (!(PTI && WebAssembly::isWebAssemblyReferenceType(
-                     PTI->getPointerOperand()->getType())) &&
-        !(ITP && WebAssembly::isWebAssemblyReferenceType(ITP->getDestTy())))
+    if (!(PTI && isRefType(PTI->getPointerOperand()->getType())) &&
+        !(ITP && isRefType(ITP->getDestTy())))
       continue;
 
     UndefValue *U = UndefValue::get(I->getType());

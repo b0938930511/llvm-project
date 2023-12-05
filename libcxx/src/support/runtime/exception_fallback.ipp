@@ -11,8 +11,9 @@
 
 namespace std {
 
-static constinit std::terminate_handler  __terminate_handler = nullptr;
-static constinit std::unexpected_handler __unexpected_handler = nullptr;
+_LIBCPP_SAFE_STATIC static std::terminate_handler  __terminate_handler;
+_LIBCPP_SAFE_STATIC static std::unexpected_handler __unexpected_handler;
+
 
 // libcxxrt provides implementations of these functions itself.
 unexpected_handler
@@ -25,6 +26,7 @@ unexpected_handler
 get_unexpected() noexcept
 {
   return __libcpp_atomic_load(&__unexpected_handler);
+
 }
 
 _LIBCPP_NORETURN
@@ -51,15 +53,15 @@ _LIBCPP_NORETURN
 void
 terminate() noexcept
 {
-#ifndef _LIBCPP_HAS_NO_EXCEPTIONS
+#ifndef _LIBCPP_NO_EXCEPTIONS
     try
     {
-#endif // _LIBCPP_HAS_NO_EXCEPTIONS
+#endif // _LIBCPP_NO_EXCEPTIONS
         (*get_terminate())();
         // handler should not return
         fprintf(stderr, "terminate_handler unexpectedly returned\n");
         ::abort();
-#ifndef _LIBCPP_HAS_NO_EXCEPTIONS
+#ifndef _LIBCPP_NO_EXCEPTIONS
     }
     catch (...)
     {
@@ -67,7 +69,7 @@ terminate() noexcept
         fprintf(stderr, "terminate_handler unexpectedly threw an exception\n");
         ::abort();
     }
-#endif // _LIBCPP_HAS_NO_EXCEPTIONS
+#endif // _LIBCPP_NO_EXCEPTIONS
 }
 
 bool uncaught_exception() noexcept { return uncaught_exceptions() > 0; }

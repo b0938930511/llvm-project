@@ -87,8 +87,7 @@ static llvm::Error parseDataBuffer(const char *DataBuf, size_t DataSize,
       continue;
     }
     DataPtr += sizeof(Header);
-    uint64_t Count =
-        llvm::support::endian::read64(DataPtr, llvm::endianness::native);
+    uint64_t Count = llvm::support::endian::read64(DataPtr, support::native);
     DataPtr += sizeof(Count);
 
     struct perf_branch_entry Entry;

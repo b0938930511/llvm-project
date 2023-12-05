@@ -3,7 +3,7 @@
 
 extern int printf(const char*, ...);
 
-int main(void)
+int main()
 {
     @try {
         @throw @"foo";

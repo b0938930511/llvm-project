@@ -1,4 +1,5 @@
-! RUN: %python %S/test_errors.py %s %flang_fc1
+! RUN: %S/test_errors.sh %s %t %flang_fc1
+! REQUIRES: shell
 ! Tests valid and invalid usage of forward references to procedures
 ! in specification expressions.
 module m
@@ -8,16 +9,10 @@ module m
   interface ifn3
     module procedure if3
   end interface
-  !ERROR: Automatic data object 'a' may not appear in a module
+  !ERROR: Automatic data object 'a' may not appear in the specification part of a module
   real :: a(if1(1))
-  !ERROR: Automatic data object 'b' may not appear in a module
+  !ERROR: No specific procedure of generic 'ifn2' matches the actual arguments
   real :: b(ifn2(1))
-  !ERROR: Automatic data object 'c' may not appear in COMMON block /blk/
-  real :: c(if1(1))
-  !ERROR: Automatic data object 'd' may not appear in COMMON block //
-  real :: d(ifn2(1))
-  common /blk/c
-  common d
  contains
   subroutine t1(n)
     integer :: iarr(if1(n))

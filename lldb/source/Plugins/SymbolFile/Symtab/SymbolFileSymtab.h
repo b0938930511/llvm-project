@@ -10,13 +10,12 @@
 #define LLDB_SOURCE_PLUGINS_SYMBOLFILE_SYMTAB_SYMBOLFILESYMTAB_H
 
 #include <map>
-#include <optional>
 #include <vector>
 
 #include "lldb/Symbol/SymbolFile.h"
 #include "lldb/Symbol/Symtab.h"
 
-class SymbolFileSymtab : public lldb_private::SymbolFileCommon {
+class SymbolFileSymtab : public lldb_private::SymbolFile {
   /// LLVM RTTI support.
   static char ID;
 
@@ -24,7 +23,7 @@ public:
   /// LLVM RTTI support.
   /// \{
   bool isA(const void *ClassID) const override {
-    return ClassID == &ID || SymbolFileCommon::isA(ClassID);
+    return ClassID == &ID || SymbolFile::isA(ClassID);
   }
   static bool classof(const SymbolFile *obj) { return obj->isA(&ID); }
   /// \}
@@ -37,9 +36,9 @@ public:
 
   static void Terminate();
 
-  static llvm::StringRef GetPluginNameStatic() { return "symtab"; }
+  static lldb_private::ConstString GetPluginNameStatic();
 
-  static llvm::StringRef GetPluginDescriptionStatic();
+  static const char *GetPluginDescriptionStatic();
 
   static lldb_private::SymbolFile *
   CreateInstance(lldb::ObjectFileSP objfile_sp);
@@ -71,7 +70,7 @@ public:
   ParseVariablesForContext(const lldb_private::SymbolContext &sc) override;
 
   lldb_private::Type *ResolveTypeUID(lldb::user_id_t type_uid) override;
-  std::optional<ArrayInfo> GetDynamicArrayInfoForUID(
+  llvm::Optional<ArrayInfo> GetDynamicArrayInfoForUID(
       lldb::user_id_t type_uid,
       const lldb_private::ExecutionContext *exe_ctx) override;
 
@@ -86,18 +85,23 @@ public:
                 lldb_private::TypeList &type_list) override;
 
   // PluginInterface protocol
-  llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
+  lldb_private::ConstString GetPluginName() override;
+
+  uint32_t GetPluginVersion() override;
 
 protected:
   uint32_t CalculateNumCompileUnits() override;
 
   lldb::CompUnitSP ParseCompileUnitAtIndex(uint32_t index) override;
 
+  typedef std::map<lldb_private::ConstString, lldb::TypeSP> TypeMap;
+
   lldb_private::Symtab::IndexCollection m_source_indexes;
   lldb_private::Symtab::IndexCollection m_func_indexes;
   lldb_private::Symtab::IndexCollection m_code_indexes;
   lldb_private::Symtab::IndexCollection m_data_indexes;
   lldb_private::Symtab::NameToIndexMap m_objc_class_name_to_index;
+  TypeMap m_objc_class_types;
 };
 
 #endif // LLDB_SOURCE_PLUGINS_SYMBOLFILE_SYMTAB_SYMBOLFILESYMTAB_H

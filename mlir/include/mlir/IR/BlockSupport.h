@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef MLIR_IR_BLOCKSUPPORT_H
-#define MLIR_IR_BLOCKSUPPORT_H
+#ifndef MLIR_IR_BLOCK_SUPPORT_H
+#define MLIR_IR_BLOCK_SUPPORT_H
 
 #include "mlir/IR/Value.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -52,6 +52,8 @@ class PredecessorIterator final
   static Block *unwrap(BlockOperand &value);
 
 public:
+  using reference = Block *;
+
   /// Initializes the operand type iterator to the specified operand iterator.
   PredecessorIterator(ValueUseIterator<BlockOperand> it)
       : llvm::mapped_iterator<ValueUseIterator<BlockOperand>,
@@ -106,10 +108,11 @@ class BlockRange final
           Block *, Block *, Block *> {
 public:
   using RangeBaseT::RangeBaseT;
-  BlockRange(ArrayRef<Block *> blocks = std::nullopt);
+  BlockRange(ArrayRef<Block *> blocks = llvm::None);
   BlockRange(SuccessorRange successors);
-  template <typename Arg, typename = std::enable_if_t<std::is_constructible<
-                              ArrayRef<Block *>, Arg>::value>>
+  template <typename Arg,
+            typename = typename std::enable_if_t<
+                std::is_constructible<ArrayRef<Block *>, Arg>::value>>
   BlockRange(Arg &&arg)
       : BlockRange(ArrayRef<Block *>(std::forward<Arg>(arg))) {}
   BlockRange(std::initializer_list<Block *> blocks)
@@ -148,7 +151,7 @@ public:
                                                                 &filter) {}
 
   /// Allow implicit conversion to the underlying iterator.
-  operator const IteratorT &() const { return this->wrapped(); }
+  operator IteratorT() const { return this->wrapped(); }
 };
 
 /// This class provides iteration over the held operations of a block for a
@@ -160,16 +163,18 @@ class op_iterator
   static OpT unwrap(Operation &op) { return cast<OpT>(op); }
 
 public:
+  using reference = OpT;
+
   /// Initializes the iterator to the specified filter iterator.
   op_iterator(op_filter_iterator<OpT, IteratorT> it)
       : llvm::mapped_iterator<op_filter_iterator<OpT, IteratorT>,
                               OpT (*)(Operation &)>(it, &unwrap) {}
 
   /// Allow implicit conversion to the underlying block iterator.
-  operator const IteratorT &() const { return this->wrapped(); }
+  operator IteratorT() const { return this->wrapped(); }
 };
-} // namespace detail
-} // namespace mlir
+} // end namespace detail
+} // end namespace mlir
 
 namespace llvm {
 
@@ -220,10 +225,9 @@ protected:
   static pointer getValuePtr(node_type *N);
   static const_pointer getValuePtr(const node_type *N);
 };
-} // namespace ilist_detail
+} // end namespace ilist_detail
 
-template <>
-struct ilist_traits<::mlir::Operation> {
+template <> struct ilist_traits<::mlir::Operation> {
   using Operation = ::mlir::Operation;
   using op_iterator = simple_ilist<Operation>::iterator;
 
@@ -255,6 +259,6 @@ private:
   mlir::Region *getParentRegion();
 };
 
-} // namespace llvm
+} // end namespace llvm
 
-#endif // MLIR_IR_BLOCKSUPPORT_H
+#endif // MLIR_IR_BLOCK_SUPPORT_H

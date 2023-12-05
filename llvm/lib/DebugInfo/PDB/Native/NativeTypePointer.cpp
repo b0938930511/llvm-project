@@ -7,9 +7,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/DebugInfo/PDB/Native/NativeTypePointer.h"
-#include "llvm/DebugInfo/PDB/Native/NativeSession.h"
 
-#include "llvm/DebugInfo/CodeView/CodeView.h"
+#include "llvm/DebugInfo/CodeView/TypeDeserializer.h"
 
 #include <cassert>
 
@@ -30,7 +29,7 @@ NativeTypePointer::NativeTypePointer(NativeSession &Session, SymIndexId Id,
     : NativeRawSymbol(Session, PDB_SymType::PointerType, Id), TI(TI),
       Record(std::move(Record)) {}
 
-NativeTypePointer::~NativeTypePointer() = default;
+NativeTypePointer::~NativeTypePointer() {}
 
 void NativeTypePointer::dump(raw_ostream &OS, int Indent,
                              PdbSymbolIdField ShowIdFields,

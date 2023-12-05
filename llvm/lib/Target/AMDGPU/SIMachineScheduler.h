@@ -25,8 +25,6 @@ namespace llvm {
 
 class SIInstrInfo;
 class SIRegisterInfo;
-class SIScheduleDAGMI;
-class SIScheduleBlockCreator;
 
 enum SIScheduleCandReason {
   NoCand,
@@ -50,6 +48,9 @@ struct SISchedulerCandidate {
   void setRepeat(SIScheduleCandReason R) { RepeatReasonSet |= (1 << R); }
 };
 
+class SIScheduleDAGMI;
+class SIScheduleBlockCreator;
+
 enum SIScheduleBlockLinkKind {
   NoData,
   Data
@@ -72,7 +73,7 @@ class SIScheduleBlock {
   // store the live virtual and real registers.
   // We do care only of SGPR32 and VGPR32 and do track only virtual registers.
   // Pressure of additional registers required inside the block.
-  std::vector<unsigned> InternalAdditionalPressure;
+  std::vector<unsigned> InternalAdditionnalPressure;
   // Pressure of input and output registers
   std::vector<unsigned> LiveInPressure;
   std::vector<unsigned> LiveOutPressure;
@@ -153,8 +154,8 @@ public:
 
   // Needs the block to be scheduled inside
   // TODO: find a way to compute it.
-  std::vector<unsigned> &getInternalAdditionalRegUsage() {
-    return InternalAdditionalPressure;
+  std::vector<unsigned> &getInternalAdditionnalRegUsage() {
+    return InternalAdditionnalPressure;
   }
 
   std::set<unsigned> &getInRegs() { return LiveInRegs; }

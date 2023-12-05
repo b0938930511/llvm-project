@@ -128,11 +128,7 @@ static bool getSymbolOffsetImpl(const MCAsmLayout &Layout, const MCSymbol &S,
   const MCSymbolRefExpr *A = Target.getSymA();
   if (A) {
     uint64_t ValA;
-    // FIXME: On most platforms, `Target`'s component symbols are labels from
-    // having been simplified during evaluation, but on Mach-O they can be
-    // variables due to PR19203. This, and the line below for `B` can be
-    // restored to call `getLabelOffset` when PR19203 is fixed.
-    if (!getSymbolOffsetImpl(Layout, A->getSymbol(), ReportError, ValA))
+    if (!getLabelOffset(Layout, A->getSymbol(), ReportError, ValA))
       return false;
     Offset += ValA;
   }
@@ -140,7 +136,7 @@ static bool getSymbolOffsetImpl(const MCAsmLayout &Layout, const MCSymbol &S,
   const MCSymbolRefExpr *B = Target.getSymB();
   if (B) {
     uint64_t ValB;
-    if (!getSymbolOffsetImpl(Layout, B->getSymbol(), ReportError, ValB))
+    if (!getLabelOffset(Layout, B->getSymbol(), ReportError, ValB))
       return false;
     Offset -= ValB;
   }
@@ -376,7 +372,7 @@ LLVM_DUMP_METHOD void MCFragment::dump() const {
     if (AF->hasEmitNops())
       OS << " (emit nops)";
     OS << "\n       ";
-    OS << " Alignment:" << AF->getAlignment().value()
+    OS << " Alignment:" << AF->getAlignment()
        << " Value:" << AF->getValue() << " ValueSize:" << AF->getValueSize()
        << " MaxBytesToEmit:" << AF->getMaxBytesToEmit() << ">";
     break;

@@ -8,7 +8,7 @@ typedef struct objc_object {
 
 extern int printf(const char *, ...);
 
-int main(void) {
+int main() {
   @try {
   } 
   @finally {
@@ -30,7 +30,7 @@ int main(void) {
   return 0;
 }
 
-void test2_try_with_implicit_finally(void) {
+void test2_try_with_implicit_finally() {
     @try {
         return;
     } @catch (id e) {
@@ -38,9 +38,9 @@ void test2_try_with_implicit_finally(void) {
     }
 }
 
-void FINALLY(void);
-void TRY(void);
-void CATCH(void);
+void FINALLY();
+void TRY();
+void CATCH();
 
 @interface NSException
 @end

@@ -1,16 +1,16 @@
 ; RUN: verify-uselistorder < %s
 
 ; Global referencing ifunc.
-@ptr_foo = global ptr @foo_ifunc
+@ptr_foo = global void ()* @foo_ifunc
 
 ; Alias for ifunc.
-@alias_foo = alias void (), ptr @foo_ifunc
+@alias_foo = alias void (), void ()* @foo_ifunc
 
-@foo_ifunc = ifunc void (), ptr @foo_resolver
+@foo_ifunc = ifunc void (), i8* ()* @foo_resolver
 
-define ptr @foo_resolver() {
+define i8* @foo_resolver() {
 entry:
-  ret ptr null
+  ret i8* null
 }
 
 ; Function referencing ifunc.
@@ -21,16 +21,17 @@ entry:
 }
 
 ; Global referencing function.
-@ptr_bar = global ptr @bar
+@ptr_bar = global void ()* @bar
 
 ; Alias for function.
-@alias_bar = alias void (), ptr @bar
+@alias_bar = alias void (), void ()* @bar
 
-@bar_ifunc = ifunc void (), ptr @bar_resolver
+@bar_ifunc = ifunc void (), i8* ()* @bar2_ifunc
+@bar2_ifunc = ifunc i8* (), i8* ()* @bar_resolver
 
-define ptr @bar_resolver() {
+define i8* @bar_resolver() {
 entry:
-  ret ptr null
+  ret i8* null
 }
 
 ; Function referencing bar.

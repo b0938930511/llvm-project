@@ -21,7 +21,6 @@
 
 class RNBContext {
 public:
-  using IgnoredExceptions = std::vector<exception_mask_t>;
   enum {
     event_proc_state_changed = 0x001,
     event_proc_thread_running = 0x002, // Sticky
@@ -119,13 +118,10 @@ public:
   void SetDetachOnError(bool detach) { m_detach_on_error = detach; }
   bool GetDetachOnError() { return m_detach_on_error; }
 
-  bool AddIgnoredException(const char *exception_name);
-  
-  void AddDefaultIgnoredExceptions();
-
-  const IgnoredExceptions &GetIgnoredExceptions() {
-    return m_ignored_exceptions;
+  void SetUnmaskSignals(bool unmask_signals) {
+    m_unmask_signals = unmask_signals;
   }
+  bool GetUnmaskSignals() { return m_unmask_signals; }
 
 protected:
   // Classes that inherit from RNBContext can see and modify these
@@ -148,7 +144,7 @@ protected:
   std::string m_working_directory;
   std::string m_process_event;
   bool m_detach_on_error = false;
-  IgnoredExceptions m_ignored_exceptions;
+  bool m_unmask_signals = false;
 
   void StartProcessStatusThread();
   void StopProcessStatusThread();

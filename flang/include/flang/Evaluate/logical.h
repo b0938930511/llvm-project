@@ -17,7 +17,6 @@ namespace Fortran::evaluate::value {
 template <int BITS, bool IS_LIKE_C = true> class Logical {
 public:
   static constexpr int bits{BITS};
-  using Word = Integer<bits>;
 
   // Module ISO_C_BINDING kind C_BOOL is LOGICAL(KIND=1) and must have
   // C's bit representation (.TRUE. -> 1, .FALSE. -> 0).
@@ -27,17 +26,10 @@ public:
   template <int B, bool C>
   constexpr Logical(Logical<B, C> x) : word_{Represent(x.IsTrue())} {}
   constexpr Logical(bool truth) : word_{Represent(truth)} {}
-  // A raw word, for DATA initialization
-  constexpr Logical(Word &&w) : word_{std::move(w)} {}
 
   template <int B, bool C> constexpr Logical &operator=(Logical<B, C> x) {
     word_ = Represent(x.IsTrue());
     return *this;
-  }
-
-  Word word() const { return word_; }
-  bool IsCanonical() const {
-    return word_ == canonicalFalse || word_ == canonicalTrue;
   }
 
   // Fortran actually has only .EQV. & .NEQV. relational operations
@@ -94,11 +86,13 @@ public:
   }
 
 private:
-  static constexpr Word canonicalTrue{IsLikeC ? 1 : -std::uint64_t{1}};
+  using Word = Integer<bits>;
+  static constexpr Word canonicalTrue{IsLikeC ? -std::uint64_t{1} : 1};
   static constexpr Word canonicalFalse{0};
   static constexpr Word Represent(bool x) {
     return x ? canonicalTrue : canonicalFalse;
   }
+  constexpr Logical(const Word &w) : word_{w} {}
   Word word_;
 };
 

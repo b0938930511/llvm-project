@@ -2,6 +2,7 @@
 // RUN: %clang_cc1 -fsyntax-only -fobjc-runtime=macosx-fragile -verify -x objective-c++ -Wno-c99-designator -Wno-objc-root-class %s
 // RUN: %clang_cc1 -fsyntax-only -fobjc-runtime=macosx-fragile -verify -x objective-c++ -Wno-c99-designator -Wno-objc-root-class -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -fobjc-runtime=macosx-fragile -verify -x objective-c++ -Wno-c99-designator -Wno-objc-root-class -std=c++11 %s
+// rdar://5707001
 
 @interface NSNumber;
 - () METH;
@@ -12,7 +13,7 @@ struct SomeStruct {
   int x, y, z, q;
 };
 
-void test1(void) {
+void test1() {
 	id objects[] = {[NSNumber METH]};
 }
 
@@ -25,7 +26,8 @@ void test3(NSNumber *x) {
 }
 
 
-void test4(void) {
+// rdar://5977581
+void test4() {
   unsigned x[] = {[NSNumber METH2]+2};
 }
 
@@ -49,6 +51,7 @@ void test5(NSNumber *x) {
   };
 }
 
+// rdar://7370882
 @interface SemicolonsAppDelegate 
 {
   id i;

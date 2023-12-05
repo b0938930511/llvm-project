@@ -20,9 +20,9 @@ static __sanitizer::atomic_uintptr_t caller_pcs[kMaxCallerPcs];
 // that "too many errors" has already been reported.
 static __sanitizer::atomic_uint32_t caller_pcs_sz;
 
-__attribute__((noinline)) static bool report_this_error(uintptr_t caller) {
-  if (caller == 0)
-    return false;
+__attribute__((noinline)) static bool report_this_error(void *caller_p) {
+  uintptr_t caller = reinterpret_cast<uintptr_t>(caller_p);
+  if (caller == 0) return false;
   while (true) {
     unsigned sz = __sanitizer::atomic_load_relaxed(&caller_pcs_sz);
     if (sz > kMaxCallerPcs) return false;  // early exit
@@ -51,19 +51,6 @@ __attribute__((noinline)) static bool report_this_error(uintptr_t caller) {
   }
 }
 
-__attribute__((noinline)) static void decorate_msg(char *buf,
-                                                   uintptr_t caller) {
-  // print the address by nibbles
-  for (unsigned shift = sizeof(uintptr_t) * 8; shift;) {
-    shift -= 4;
-    unsigned nibble = (caller >> shift) & 0xf;
-    *(buf++) = nibble < 10 ? nibble + '0' : nibble - 10 + 'a';
-  }
-  // finish the message
-  buf[0] = '\n';
-  buf[1] = '\0';
-}
-
 #if defined(__ANDROID__)
 extern "C" __attribute__((weak)) void android_set_abort_message(const char *);
 static void abort_with_message(const char *msg) {
@@ -89,28 +76,18 @@ void NORETURN CheckFailed(const char *file, int, const char *cond, u64, u64) {
 
 #define INTERFACE extern "C" __attribute__((visibility("default")))
 
-// How many chars we need to reserve to print an address.
-constexpr unsigned kAddrBuf = SANITIZER_WORDSIZE / 4;
-#define MSG_TMPL(msg) "ubsan: " msg " by 0x"
-#define MSG_TMPL_END(buf, msg) (buf + sizeof(MSG_TMPL(msg)) - 1)
-// Reserve an additional byte for '\n'.
-#define MSG_BUF_LEN(msg) (sizeof(MSG_TMPL(msg)) + kAddrBuf + 1)
-
+// FIXME: add caller pc to the error message (possibly as "ubsan: error-type
+// @1234ABCD").
 #define HANDLER_RECOVER(name, msg)                               \
   INTERFACE void __ubsan_handle_##name##_minimal() {             \
-    uintptr_t caller = GET_CALLER_PC();                  \
-    if (!report_this_error(caller)) return;                      \
-    char msg_buf[MSG_BUF_LEN(msg)] = MSG_TMPL(msg);              \
-    decorate_msg(MSG_TMPL_END(msg_buf, msg), caller);            \
-    message(msg_buf);                                            \
+    if (!report_this_error(__builtin_return_address(0))) return; \
+    message("ubsan: " msg "\n");                                 \
   }
 
 #define HANDLER_NORECOVER(name, msg)                             \
   INTERFACE void __ubsan_handle_##name##_minimal_abort() {       \
-    char msg_buf[MSG_BUF_LEN(msg)] = MSG_TMPL(msg);              \
-    decorate_msg(MSG_TMPL_END(msg_buf, msg), GET_CALLER_PC());   \
-    message(msg_buf);                                            \
-    abort_with_message(msg_buf);                                 \
+    message("ubsan: " msg "\n");                                 \
+    abort_with_message("ubsan: " msg);                           \
   }
 
 #define HANDLER(name, msg)                                       \

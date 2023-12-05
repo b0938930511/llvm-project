@@ -48,10 +48,10 @@ bool llvm::objcarc::CanAlterRefCount(const Instruction *Inst, const Value *Ptr,
   const auto *Call = cast<CallBase>(Inst);
 
   // See if AliasAnalysis can help us with the call.
-  MemoryEffects ME = PA.getAA()->getMemoryEffects(Call);
-  if (ME.onlyReadsMemory())
+  FunctionModRefBehavior MRB = PA.getAA()->getModRefBehavior(Call);
+  if (AliasAnalysis::onlyReadsMemory(MRB))
     return false;
-  if (ME.onlyAccessesArgPointees()) {
+  if (AliasAnalysis::onlyAccessesArgPointees(MRB)) {
     for (const Value *Op : Call->args()) {
       if (IsPotentialRetainableObjPtr(Op, *PA.getAA()) && PA.related(Ptr, Op))
         return true;
@@ -94,9 +94,11 @@ bool llvm::objcarc::CanUse(const Instruction *Inst, const Value *Ptr,
       return false;
   } else if (const auto *CS = dyn_cast<CallBase>(Inst)) {
     // For calls, just check the arguments (and not the callee operand).
-    for (const Value *Op : CS->args())
+    for (auto OI = CS->arg_begin(), OE = CS->arg_end(); OI != OE; ++OI) {
+      const Value *Op = *OI;
       if (IsPotentialRetainableObjPtr(Op, *PA.getAA()) && PA.related(Ptr, Op))
         return true;
+    }
     return false;
   } else if (const StoreInst *SI = dyn_cast<StoreInst>(Inst)) {
     // Special-case stores, because we don't care about the stored value, just
@@ -194,6 +196,9 @@ llvm::objcarc::Depends(DependenceKind Flavor, Instruction *Inst,
       return CanInterruptRV(Class);
     }
   }
+
+  case RetainRVDep:
+    return CanInterruptRV(GetBasicARCInstKind(Inst));
   }
 
   llvm_unreachable("Invalid dependence flavor");

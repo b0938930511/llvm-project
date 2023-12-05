@@ -32,7 +32,7 @@
 # NO-WEAK-OVERRIDE-EMPTY:
 
 ## Check that common symbols take precedence over weak dylib symbols, but do not
-## generate an overriding weak binding.
+## generate an overridding weak binding.
 # RUN: %lld -L%t -lfoo %t/common.o -o %t/common -lSystem
 # RUN: llvm-objdump --macho --weak-bind %t/common | FileCheck %s --check-prefix=NO-WEAK-OVERRIDE
 # RUN: llvm-objdump --syms %t/common | FileCheck %s --check-prefix=COMMON

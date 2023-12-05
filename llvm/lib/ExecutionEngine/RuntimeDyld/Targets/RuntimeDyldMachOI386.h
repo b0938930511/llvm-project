@@ -10,6 +10,7 @@
 #define LLVM_LIB_EXECUTIONENGINE_RUNTIMEDYLD_TARGETS_RUNTIMEDYLDMACHOI386_H
 
 #include "../RuntimeDyldMachO.h"
+#include <string>
 
 #define DEBUG_TYPE "dyld"
 
@@ -27,7 +28,7 @@ public:
 
   unsigned getMaxStubSize() const override { return 0; }
 
-  Align getStubAlignment() override { return Align(1); }
+  unsigned getStubAlignment() override { return 1; }
 
   Expected<relocation_iterator>
   processRelocationRef(unsigned SectionID, relocation_iterator RelI,

@@ -3,13 +3,13 @@
 
 // CHECK-NOT: foo
 
-void bar(void) {
+void bar() {
 }
 
-inline void __attribute__((__always_inline__)) foo(void) {
+inline void __attribute__((__always_inline__)) foo() {
   bar();
 }
 
-void i_want_bar(void) {
+void i_want_bar() {
   foo();
 }

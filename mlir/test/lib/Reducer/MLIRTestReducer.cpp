@@ -18,12 +18,10 @@ using namespace mlir;
 
 namespace {
 
-/// This pass looks for the presence of an operation with the name
+/// This pass looks for for the presence of an operation with the name
 /// "crashOp" in the input MLIR file and crashes the mlir-opt tool if the
 /// operation is found.
 struct TestReducer : public PassWrapper<TestReducer, OperationPass<>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TestReducer)
-
   StringRef getArgument() const final { return "test-mlir-reducer"; }
   StringRef getDescription() const final {
     return "Tests MLIR Reduce tool by generating failures";
@@ -31,7 +29,7 @@ struct TestReducer : public PassWrapper<TestReducer, OperationPass<>> {
   void runOnOperation() override;
 };
 
-} // namespace
+} // end anonymous namespace
 
 void TestReducer::runOnOperation() {
   getOperation()->walk([&](Operation *op) {

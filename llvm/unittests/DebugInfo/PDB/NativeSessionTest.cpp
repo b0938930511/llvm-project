@@ -7,12 +7,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/DebugInfo/PDB/Native/NativeSession.h"
-#include "llvm/DebugInfo/PDB/ConcreteSymbolEnumerator.h"
 #include "llvm/DebugInfo/PDB/IPDBSession.h"
 #include "llvm/DebugInfo/PDB/PDB.h"
 #include "llvm/DebugInfo/PDB/PDBSymbolFunc.h"
 #include "llvm/DebugInfo/PDB/PDBSymbolPublicSymbol.h"
-#include "llvm/DebugInfo/PDB/PDBSymbolTypeFunctionSig.h"
 #include "llvm/Support/Path.h"
 
 #include "llvm/Testing/Support/Error.h"

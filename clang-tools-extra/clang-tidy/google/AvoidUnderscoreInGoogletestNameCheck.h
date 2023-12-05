@@ -11,13 +11,16 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::google::readability {
+namespace clang {
+namespace tidy {
+namespace google {
+namespace readability {
 
 // Check for underscores in the names of googletest tests, per
-// https://google.github.io/googletest/faq.html#why-should-test-suite-names-and-test-names-not-contain-underscore
+// https://github.com/google/googletest/blob/master/docs/faq.md#why-should-test-suite-names-and-test-names-not-contain-underscore
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/google/readability-avoid-underscore-in-googletest-name.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/google-readability-avoid-underscore-in-googletest-name.html
 class AvoidUnderscoreInGoogletestNameCheck : public ClangTidyCheck {
 public:
   using ClangTidyCheck::ClangTidyCheck;
@@ -26,6 +29,9 @@ public:
                            Preprocessor *ModuleExpanderPP) override;
 };
 
-} // namespace clang::tidy::google::readability
+} // namespace readability
+} // namespace google
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_GOOGLE_AVOIDUNDERSCOREINGOOGLETESTNAMECHECK_H

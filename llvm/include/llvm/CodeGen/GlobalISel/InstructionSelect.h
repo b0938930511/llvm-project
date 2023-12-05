@@ -13,10 +13,8 @@
 #ifndef LLVM_CODEGEN_GLOBALISEL_INSTRUCTIONSELECT_H
 #define LLVM_CODEGEN_GLOBALISEL_INSTRUCTIONSELECT_H
 
-#include "llvm/ADT/StringRef.h"
-#include "llvm/CodeGen/MachineFunction.h"
+#include "llvm/CodeGen/GlobalISel/InstructionSelector.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
-#include "llvm/Support/CodeGen.h"
 
 namespace llvm {
 
@@ -49,7 +47,7 @@ public:
         MachineFunctionProperties::Property::Selected);
   }
 
-  InstructionSelect(CodeGenOptLevel OL);
+  InstructionSelect(CodeGenOpt::Level OL);
   InstructionSelect();
 
   bool runOnMachineFunction(MachineFunction &MF) override;
@@ -58,7 +56,7 @@ protected:
   BlockFrequencyInfo *BFI = nullptr;
   ProfileSummaryInfo *PSI = nullptr;
 
-  CodeGenOptLevel OptLevel = CodeGenOptLevel::None;
+  CodeGenOpt::Level OptLevel = CodeGenOpt::None;
 };
 } // End namespace llvm.
 

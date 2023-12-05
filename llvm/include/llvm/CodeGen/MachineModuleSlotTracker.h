@@ -22,7 +22,7 @@ class Module;
 class MachineModuleSlotTracker : public ModuleSlotTracker {
   const Function &TheFunction;
   const MachineModuleInfo &TheMMI;
-  unsigned MDNStartSlot = 0, MDNEndSlot = 0;
+  unsigned MDNStartSlot, MDNEndSlot;
 
   void processMachineFunctionMetadata(AbstractSlotTrackerStorage *AST,
                                       const MachineFunction &MF);

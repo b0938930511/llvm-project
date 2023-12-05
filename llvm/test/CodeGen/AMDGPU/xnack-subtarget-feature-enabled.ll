@@ -4,7 +4,6 @@
 ; RUN: llc -march=amdgcn -mcpu=gfx900 -debug-only=amdgpu-subtarget -o - %s 2>&1 | FileCheck --check-prefix=ON %s
 ; RUN: llc -march=amdgcn -mcpu=gfx906 -debug-only=amdgpu-subtarget -o - %s 2>&1 | FileCheck --check-prefix=ON %s
 ; RUN: llc -march=amdgcn -mcpu=gfx1010 -debug-only=amdgpu-subtarget -o - %s 2>&1 | FileCheck --check-prefix=ON %s
-; RUN: llc -march=amdgcn -mcpu=gfx1100 -debug-only=amdgpu-subtarget -o - %s 2>&1 | FileCheck --check-prefix=WARN %s
 
 ; REQUIRES: asserts
 

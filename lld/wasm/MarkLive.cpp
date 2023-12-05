@@ -30,7 +30,8 @@
 using namespace llvm;
 using namespace llvm::wasm;
 
-namespace lld::wasm {
+namespace lld {
+namespace wasm {
 
 namespace {
 
@@ -89,7 +90,7 @@ void MarkLive::run() {
     enqueue(symtab->find(config->entry));
 
   // We need to preserve any no-strip or exported symbol
-  for (Symbol *sym : symtab->symbols())
+  for (Symbol *sym : symtab->getSymbols())
     if (sym->isNoStrip() || sym->isExported())
       enqueue(sym);
 
@@ -204,4 +205,5 @@ bool MarkLive::isCallCtorsLive() {
   return false;
 }
 
-} // namespace lld::wasm
+} // namespace wasm
+} // namespace lld

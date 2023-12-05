@@ -6,7 +6,8 @@
 ; CHECK-LABEL: foo
 define void @foo() {
 
-  ; CHECK: st [[PTRREG:X|Y|Z]], r1
+  ; CHECK:      ldi [[SRC:r[0-9]+]], 0
+  ; CHECK-NEXT: st [[PTRREG:X|Y|Z]], [[SRC]]
   store i8 0, i8* undef, align 4
   ret void
 }

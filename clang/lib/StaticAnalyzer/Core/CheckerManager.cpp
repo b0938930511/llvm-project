@@ -26,9 +26,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/FormatVariadic.h"
 #include <cassert>
-#include <optional>
 #include <vector>
 
 using namespace clang;
@@ -36,7 +34,10 @@ using namespace ento;
 
 bool CheckerManager::hasPathSensitiveCheckers() const {
   const auto IfAnyAreNonEmpty = [](const auto &... Callbacks) -> bool {
-    return (!Callbacks.empty() || ...);
+    bool Result = false;
+    // FIXME: Use fold expressions in C++17.
+    LLVM_ATTRIBUTE_UNUSED int Unused[]{0, (Result |= !Callbacks.empty())...};
+    return Result;
   };
   return IfAnyAreNonEmpty(
       StmtCheckers, PreObjCMessageCheckers, ObjCMessageNilCheckers,
@@ -654,7 +655,7 @@ void CheckerManager::runCheckersForEvalCall(ExplodedNodeSet &Dst,
                                             ExprEngine &Eng,
                                             const EvalCallOptions &CallOpts) {
   for (auto *const Pred : Src) {
-    std::optional<CheckerNameRef> evaluatorChecker;
+    bool anyEvaluated = false;
 
     ExplodedNodeSet checkDst;
     NodeBuilder B(Pred, checkDst, Eng.getBuilderContext());
@@ -673,26 +674,10 @@ void CheckerManager::runCheckersForEvalCall(ExplodedNodeSet &Dst,
         CheckerContext C(B, Eng, Pred, L);
         evaluated = EvalCallChecker(Call, C);
       }
-#ifndef NDEBUG
-      if (evaluated && evaluatorChecker) {
-        const auto toString = [](const CallEvent &Call) -> std::string {
-          std::string Buf;
-          llvm::raw_string_ostream OS(Buf);
-          Call.dump(OS);
-          OS.flush();
-          return Buf;
-        };
-        std::string AssertionMessage = llvm::formatv(
-            "The '{0}' call has been already evaluated by the {1} checker, "
-            "while the {2} checker also tried to evaluate the same call. At "
-            "most one checker supposed to evaluate a call.",
-            toString(Call), evaluatorChecker->getName(),
-            EvalCallChecker.Checker->getCheckerName());
-        llvm_unreachable(AssertionMessage.c_str());
-      }
-#endif
+      assert(!(evaluated && anyEvaluated)
+             && "There are more than one checkers evaluating the call");
       if (evaluated) {
-        evaluatorChecker = EvalCallChecker.Checker->getCheckerName();
+        anyEvaluated = true;
         Dst.insert(checkDst);
 #ifdef NDEBUG
         break; // on release don't check that no other checker also evals.
@@ -701,7 +686,7 @@ void CheckerManager::runCheckersForEvalCall(ExplodedNodeSet &Dst,
     }
 
     // If none of the checkers evaluated the call, ask ExprEngine to handle it.
-    if (!evaluatorChecker) {
+    if (!anyEvaluated) {
       NodeBuilder B(Pred, Dst, Eng.getBuilderContext());
       Eng.defaultEvalCall(B, Pred, Call, CallOpts);
     }

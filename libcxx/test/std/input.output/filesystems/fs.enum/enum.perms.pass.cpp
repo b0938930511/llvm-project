@@ -6,19 +6,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-// UNSUPPORTED: c++03, c++11, c++14
+// UNSUPPORTED: c++03
 
 // <filesystem>
 
 // enum class perms;
 
-#include <filesystem>
+#include "filesystem_include.h"
 #include <type_traits>
 #include <cassert>
+#include <sys/stat.h>
 
 #include "test_macros.h"
 #include "check_bitmask_types.h"
-namespace fs = std::filesystem;
+
 
 constexpr fs::perms ME(int val) { return static_cast<fs::perms>(val); }
 

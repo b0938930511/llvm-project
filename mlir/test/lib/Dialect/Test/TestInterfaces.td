@@ -12,42 +12,28 @@
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaceBase.td"
 
-// A set of type interfaces used to test interface inheritance.
-def TestBaseTypeInterfacePrintTypeA : TypeInterface<"TestBaseTypeInterfacePrintTypeA"> {
-  let cppNamespace = "::test";
+// A type interface used to test the ODS generation of type interfaces.
+def TestTypeInterface : TypeInterface<"TestTypeInterface"> {
+  let cppNamespace = "::mlir::test";
   let methods = [
     InterfaceMethod<"Prints the type name.",
-      "void", "printTypeA", (ins "::mlir::Location":$loc), [{
+      "void", "printTypeA", (ins "Location":$loc), [{
         emitRemark(loc) << $_type << " - TestA";
       }]
-    >
-  ];
-}
-def TestBaseTypeInterfacePrintTypeB
-  : TypeInterface<"TestBaseTypeInterfacePrintTypeB", [TestBaseTypeInterfacePrintTypeA]> {
-  let cppNamespace = "::test";
-  let methods = [
+    >,
     InterfaceMethod<"Prints the type name.",
-      "void", "printTypeB", (ins "::mlir::Location":$loc),
+      "void", "printTypeB", (ins "Location":$loc),
       [{}], /*defaultImplementation=*/[{
         emitRemark(loc) << $_type << " - TestB";
       }]
-    >
-  ];
-}
-
-// A type interface used to test the ODS generation of type interfaces.
-def TestTypeInterface
-  : TypeInterface<"TestTypeInterface", [TestBaseTypeInterfacePrintTypeB]> {
-  let cppNamespace = "::test";
-  let methods = [
+    >,
     InterfaceMethod<"Prints the type name.",
-      "void", "printTypeC", (ins "::mlir::Location":$loc)
+      "void", "printTypeC", (ins "Location":$loc)
     >,
     // It should be possible to use the interface type name as result type
     // as well as in the implementation.
     InterfaceMethod<"Prints the type name and returns the type as interface.",
-      "TestTypeInterface", "printTypeRet", (ins "::mlir::Location":$loc),
+      "TestTypeInterface", "printTypeRet", (ins "Location":$loc),
       [{}], /*defaultImplementation=*/[{
         emitRemark(loc) << $_type << " - TestRet";
         return $_type;
@@ -56,13 +42,13 @@ def TestTypeInterface
   ];
   let extraClassDeclaration = [{
     /// Prints the type name.
-    void printTypeD(::mlir::Location loc) const {
+    void printTypeD(Location loc) const {
       emitRemark(loc) << *this << " - TestD";
     }
   }];
   let extraTraitClassDeclaration = [{
     /// Prints the type name.
-    void printTypeE(::mlir::Location loc) const {
+    void printTypeE(Location loc) const {
       emitRemark(loc) << $_type << " - TestE";
     }
   }];
@@ -127,51 +113,11 @@ def TestEffectOpInterface
 }
 
 class TestEffect<string effectName>
-    : SideEffect<TestEffectOpInterface, effectName, DefaultResource, 0,
-                 PartialEffect>;
+    : SideEffect<TestEffectOpInterface, effectName, DefaultResource>;
 
 class TestEffects<list<TestEffect> effects = []>
    : SideEffectsTraitBase<TestEffectOpInterface, effects>;
 
 def TestConcreteEffect : TestEffect<"TestEffects::Concrete">;
-
-def TestOptionallyImplementedOpInterface
-    : OpInterface<"TestOptionallyImplementedOpInterface"> {
-  let cppNamespace = "::mlir";
-
-  let methods = [
-    InterfaceMethod<"", "bool", "getImplementsInterface", (ins)>,
-  ];
-
-  let extraClassOf = [{
-    return $_op.getImplementsInterface();
-  }];
-}
-
-def TestOptionallyImplementedAttrInterface
-    : AttrInterface<"TestOptionallyImplementedAttrInterface"> {
-  let cppNamespace = "::mlir";
-
-  let methods = [
-    InterfaceMethod<"", "bool", "getImplementsInterface", (ins)>,
-  ];
-
-  let extraClassOf = [{
-    return $_attr.getImplementsInterface();
-  }];
-}
-
-def TestOptionallyImplementedTypeInterface
-    : TypeInterface<"TestOptionallyImplementedTypeInterface"> {
-  let cppNamespace = "::mlir";
-
-  let methods = [
-    InterfaceMethod<"", "bool", "getImplementsInterface", (ins)>,
-  ];
-
-  let extraClassOf = [{
-    return $_type.getImplementsInterface();
-  }];
-}
 
 #endif // MLIR_TEST_DIALECT_TEST_INTERFACES

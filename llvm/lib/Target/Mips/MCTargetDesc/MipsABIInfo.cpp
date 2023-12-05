@@ -7,9 +7,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "MipsABIInfo.h"
-#include "Mips.h"
+#include "MipsRegisterInfo.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/CodeGen/LowLevelType.h"
 #include "llvm/MC/MCTargetOptions.h"
 #include "llvm/Support/CommandLine.h"
 
@@ -32,17 +31,17 @@ static const MCPhysReg Mips64IntRegs[8] = {
 
 ArrayRef<MCPhysReg> MipsABIInfo::GetByValArgRegs() const {
   if (IsO32())
-    return ArrayRef(O32IntRegs);
+    return makeArrayRef(O32IntRegs);
   if (IsN32() || IsN64())
-    return ArrayRef(Mips64IntRegs);
+    return makeArrayRef(Mips64IntRegs);
   llvm_unreachable("Unhandled ABI");
 }
 
 ArrayRef<MCPhysReg> MipsABIInfo::GetVarArgRegs() const {
   if (IsO32())
-    return ArrayRef(O32IntRegs);
+    return makeArrayRef(O32IntRegs);
   if (IsN32() || IsN64())
-    return ArrayRef(Mips64IntRegs);
+    return makeArrayRef(Mips64IntRegs);
   llvm_unreachable("Unhandled ABI");
 }
 

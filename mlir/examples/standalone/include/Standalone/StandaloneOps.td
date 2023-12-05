@@ -9,11 +9,10 @@
 #ifndef STANDALONE_OPS
 #define STANDALONE_OPS
 
-include "Standalone/StandaloneTypes.td"
-include "mlir/Interfaces/InferTypeOpInterface.td"
+include "StandaloneDialect.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
-def Standalone_FooOp : Standalone_Op<"foo", [Pure,
+def Standalone_FooOp : Standalone_Op<"foo", [NoSideEffect,
                                              SameOperandsAndResultType]> {
     let summary = "Illustrates how to define an operation.";
     let description = [{
@@ -26,7 +25,7 @@ def Standalone_FooOp : Standalone_Op<"foo", [Pure,
         Example:
 
         ```mlir
-        %0 = arith.constant 2 : i32
+        %0 = constant 2 : i32
         // Apply the foo operation to %0
         %1 = standalone.foo %0 : i32
         ```

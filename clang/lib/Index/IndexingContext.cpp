@@ -76,7 +76,8 @@ bool IndexingContext::handleReference(const NamedDecl *D, SourceLocation Loc,
                                       const DeclContext *DC,
                                       SymbolRoleSet Roles,
                                       ArrayRef<SymbolRelation> Relations,
-                                      const Expr *RefE) {
+                                      const Expr *RefE,
+                                      const Decl *RefD) {
   if (!shouldIndexFunctionLocalSymbols() && isFunctionLocalSymbol(D))
     return true;
 
@@ -85,8 +86,9 @@ bool IndexingContext::handleReference(const NamedDecl *D, SourceLocation Loc,
        isa<TemplateTemplateParmDecl>(D))) {
     return true;
   }
+
   return handleDeclOccurrence(D, Loc, /*IsRef=*/true, Parent, Roles, Relations,
-                              RefE, nullptr, DC);
+                              RefE, RefD, DC);
 }
 
 static void reportModuleReferences(const Module *Mod,
@@ -257,9 +259,12 @@ static bool isDeclADefinition(const Decl *D, const DeclContext *ContainerDC, AST
   if (auto MD = dyn_cast<ObjCMethodDecl>(D))
     return MD->isThisDeclarationADefinition() || isa<ObjCImplDecl>(ContainerDC);
 
-  if (isa<TypedefNameDecl>(D) || isa<EnumConstantDecl>(D) ||
-      isa<FieldDecl>(D) || isa<MSPropertyDecl>(D) || isa<ObjCImplDecl>(D) ||
-      isa<ObjCPropertyImplDecl>(D) || isa<ConceptDecl>(D))
+  if (isa<TypedefNameDecl>(D) ||
+      isa<EnumConstantDecl>(D) ||
+      isa<FieldDecl>(D) ||
+      isa<MSPropertyDecl>(D) ||
+      isa<ObjCImplDecl>(D) ||
+      isa<ObjCPropertyImplDecl>(D))
     return true;
 
   return false;

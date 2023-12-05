@@ -11,13 +11,15 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::cppcoreguidelines {
+namespace clang {
+namespace tidy {
+namespace cppcoreguidelines {
 
 /// Finds member initializations in the constructor body which can be placed
 /// into the initialization list instead.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/cppcoreguidelines/prefer-member-initializer.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/cppcoreguidelines-prefer-member-initializer.html
 class PreferMemberInitializerCheck : public ClangTidyCheck {
 public:
   PreferMemberInitializerCheck(StringRef Name, ClangTidyContext *Context);
@@ -32,6 +34,8 @@ public:
   const bool UseAssignment;
 };
 
-} // namespace clang::tidy::cppcoreguidelines
+} // namespace cppcoreguidelines
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_CPPCOREGUIDELINES_PREFERMEMBERINITIALIZERCHECK_H

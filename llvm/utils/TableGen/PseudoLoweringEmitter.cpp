@@ -109,8 +109,7 @@ addDagOperandMapping(Record *Rec, DagInit *Dag, CodeGenInstruction &Insn,
       OperandMap[BaseIdx + i].Data.Imm = II->getValue();
       ++OpsAdded;
     } else if (auto *BI = dyn_cast<BitsInit>(Dag->getArg(i))) {
-      auto *II =
-          cast<IntInit>(BI->convertInitializerTo(IntRecTy::get(Records)));
+      auto *II = cast<IntInit>(BI->convertInitializerTo(IntRecTy::get()));
       OperandMap[BaseIdx + i].Kind = OpData::Imm;
       OperandMap[BaseIdx + i].Data.Imm = II->getValue();
       ++OpsAdded;
@@ -300,7 +299,8 @@ void PseudoLoweringEmitter::emitLoweringEmitter(raw_ostream &o) {
 
 void PseudoLoweringEmitter::run(raw_ostream &o) {
   StringRef Classes[] = {"PseudoInstExpansion", "Instruction"};
-  std::vector<Record *> Insts = Records.getAllDerivedDefinitions(Classes);
+  std::vector<Record *> Insts =
+      Records.getAllDerivedDefinitions(makeArrayRef(Classes));
 
   // Process the pseudo expansion definitions, validating them as we do so.
   Records.startTimer("Process definitions");
@@ -313,5 +313,10 @@ void PseudoLoweringEmitter::run(raw_ostream &o) {
   emitLoweringEmitter(o);
 }
 
-static TableGen::Emitter::OptClass<PseudoLoweringEmitter>
-    X("gen-pseudo-lowering", "Generate pseudo instruction lowering");
+namespace llvm {
+
+void EmitPseudoLowering(RecordKeeper &RK, raw_ostream &OS) {
+  PseudoLoweringEmitter(RK).run(OS);
+}
+
+} // End llvm namespace

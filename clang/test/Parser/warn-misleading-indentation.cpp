@@ -227,7 +227,7 @@ void s(int num) {
 // expected-warning@-2 {{misleading indentation; statement is not part of the previous 'if'}}
 #endif
 }
-int a4(void)
+int a4()
 {
 	if (0)
 		return 1;
@@ -238,7 +238,7 @@ int a4(void)
 #endif 
 }
 
-int a5(void)
+int a5()
 {
 	if (0)
 		return 1;
@@ -249,7 +249,7 @@ int a5(void)
 #endif
 }
 
-int a6(void)
+int a6()
 {
 	if (0)
 		return 1;

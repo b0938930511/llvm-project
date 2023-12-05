@@ -36,545 +36,545 @@ unsigned u;
 
 // CHECK-LABEL: @sleft_sasai(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i16, ptr @sa, align 2
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i16, i16* @sa, align 2
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = trunc i32 [[TMP1]] to i16
 // CHECK-NEXT:    [[TMP3:%.*]] = shl i16 [[TMP0]], [[TMP2]]
-// CHECK-NEXT:    store i16 [[TMP3]], ptr @sa, align 2
+// CHECK-NEXT:    store i16 [[TMP3]], i16* @sa, align 2
 // CHECK-NEXT:    ret void
 //
-void sleft_sasai(void) {
+void sleft_sasai() {
   sa = sa << i;
 }
 
 // CHECK-LABEL: @sleft_aai(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr @a, align 4
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i32, i32* @a, align 4
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = shl i32 [[TMP0]], [[TMP1]]
-// CHECK-NEXT:    store i32 [[TMP2]], ptr @a, align 4
+// CHECK-NEXT:    store i32 [[TMP2]], i32* @a, align 4
 // CHECK-NEXT:    ret void
 //
-void sleft_aai(void) {
+void sleft_aai() {
   a = a << i;
 }
 
 // CHECK-LABEL: @sleft_lalai(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i64, ptr @la, align 8
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i64, i64* @la, align 8
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = zext i32 [[TMP1]] to i64
 // CHECK-NEXT:    [[TMP3:%.*]] = shl i64 [[TMP0]], [[TMP2]]
-// CHECK-NEXT:    store i64 [[TMP3]], ptr @la, align 8
+// CHECK-NEXT:    store i64 [[TMP3]], i64* @la, align 8
 // CHECK-NEXT:    ret void
 //
-void sleft_lalai(void) {
+void sleft_lalai() {
   la = la << i;
 }
 
 // CHECK-LABEL: @sleft_sfsfi(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i8, ptr @sf, align 1
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i8, i8* @sf, align 1
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = trunc i32 [[TMP1]] to i8
 // CHECK-NEXT:    [[TMP3:%.*]] = shl i8 [[TMP0]], [[TMP2]]
-// CHECK-NEXT:    store i8 [[TMP3]], ptr @sf, align 1
+// CHECK-NEXT:    store i8 [[TMP3]], i8* @sf, align 1
 // CHECK-NEXT:    ret void
 //
-void sleft_sfsfi(void) {
+void sleft_sfsfi() {
   sf = sf << i;
 }
 
 // CHECK-LABEL: @sleft_ffi(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i16, ptr @f, align 2
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i16, i16* @f, align 2
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = trunc i32 [[TMP1]] to i16
 // CHECK-NEXT:    [[TMP3:%.*]] = shl i16 [[TMP0]], [[TMP2]]
-// CHECK-NEXT:    store i16 [[TMP3]], ptr @f, align 2
+// CHECK-NEXT:    store i16 [[TMP3]], i16* @f, align 2
 // CHECK-NEXT:    ret void
 //
-void sleft_ffi(void) {
+void sleft_ffi() {
   f = f << i;
 }
 
 // CHECK-LABEL: @sleft_lflfi(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr @lf, align 4
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i32, i32* @lf, align 4
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = shl i32 [[TMP0]], [[TMP1]]
-// CHECK-NEXT:    store i32 [[TMP2]], ptr @lf, align 4
+// CHECK-NEXT:    store i32 [[TMP2]], i32* @lf, align 4
 // CHECK-NEXT:    ret void
 //
-void sleft_lflfi(void) {
+void sleft_lflfi() {
   lf = lf << i;
 }
 
 // CHECK-LABEL: @sleft_aau(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr @a, align 4
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @u, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i32, i32* @a, align 4
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @u, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = shl i32 [[TMP0]], [[TMP1]]
-// CHECK-NEXT:    store i32 [[TMP2]], ptr @a, align 4
+// CHECK-NEXT:    store i32 [[TMP2]], i32* @a, align 4
 // CHECK-NEXT:    ret void
 //
-void sleft_aau(void) {
+void sleft_aau() {
   a = a << u;
 }
 
 // CHECK-LABEL: @sleft_ffu(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i16, ptr @f, align 2
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @u, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i16, i16* @f, align 2
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @u, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = trunc i32 [[TMP1]] to i16
 // CHECK-NEXT:    [[TMP3:%.*]] = shl i16 [[TMP0]], [[TMP2]]
-// CHECK-NEXT:    store i16 [[TMP3]], ptr @f, align 2
+// CHECK-NEXT:    store i16 [[TMP3]], i16* @f, align 2
 // CHECK-NEXT:    ret void
 //
-void sleft_ffu(void) {
+void sleft_ffu() {
   f = f << u;
 }
 
 
 // CHECK-LABEL: @uleft_usausai(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i16, ptr @usa, align 2
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i16, i16* @usa, align 2
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = trunc i32 [[TMP1]] to i16
 // CHECK-NEXT:    [[TMP3:%.*]] = shl i16 [[TMP0]], [[TMP2]]
-// CHECK-NEXT:    store i16 [[TMP3]], ptr @usa, align 2
+// CHECK-NEXT:    store i16 [[TMP3]], i16* @usa, align 2
 // CHECK-NEXT:    ret void
 //
-void uleft_usausai(void) {
+void uleft_usausai() {
   usa = usa << i;
 }
 
 // CHECK-LABEL: @uleft_uauai(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr @ua, align 4
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i32, i32* @ua, align 4
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = shl i32 [[TMP0]], [[TMP1]]
-// CHECK-NEXT:    store i32 [[TMP2]], ptr @ua, align 4
+// CHECK-NEXT:    store i32 [[TMP2]], i32* @ua, align 4
 // CHECK-NEXT:    ret void
 //
-void uleft_uauai(void) {
+void uleft_uauai() {
   ua = ua << i;
 }
 
 // CHECK-LABEL: @uleft_ulaulai(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i64, ptr @ula, align 8
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i64, i64* @ula, align 8
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = zext i32 [[TMP1]] to i64
 // CHECK-NEXT:    [[TMP3:%.*]] = shl i64 [[TMP0]], [[TMP2]]
-// CHECK-NEXT:    store i64 [[TMP3]], ptr @ula, align 8
+// CHECK-NEXT:    store i64 [[TMP3]], i64* @ula, align 8
 // CHECK-NEXT:    ret void
 //
-void uleft_ulaulai(void) {
+void uleft_ulaulai() {
   ula = ula << i;
 }
 
 // CHECK-LABEL: @uleft_usfusfi(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i8, ptr @usf, align 1
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i8, i8* @usf, align 1
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = trunc i32 [[TMP1]] to i8
 // CHECK-NEXT:    [[TMP3:%.*]] = shl i8 [[TMP0]], [[TMP2]]
-// CHECK-NEXT:    store i8 [[TMP3]], ptr @usf, align 1
+// CHECK-NEXT:    store i8 [[TMP3]], i8* @usf, align 1
 // CHECK-NEXT:    ret void
 //
-void uleft_usfusfi(void) {
+void uleft_usfusfi() {
   usf = usf << i;
 }
 
 // CHECK-LABEL: @uleft_ufufi(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i16, ptr @uf, align 2
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i16, i16* @uf, align 2
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = trunc i32 [[TMP1]] to i16
 // CHECK-NEXT:    [[TMP3:%.*]] = shl i16 [[TMP0]], [[TMP2]]
-// CHECK-NEXT:    store i16 [[TMP3]], ptr @uf, align 2
+// CHECK-NEXT:    store i16 [[TMP3]], i16* @uf, align 2
 // CHECK-NEXT:    ret void
 //
-void uleft_ufufi(void) {
+void uleft_ufufi() {
   uf = uf << i;
 }
 
 // CHECK-LABEL: @uleft_ulfulfi(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr @ulf, align 4
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i32, i32* @ulf, align 4
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = shl i32 [[TMP0]], [[TMP1]]
-// CHECK-NEXT:    store i32 [[TMP2]], ptr @ulf, align 4
+// CHECK-NEXT:    store i32 [[TMP2]], i32* @ulf, align 4
 // CHECK-NEXT:    ret void
 //
-void uleft_ulfulfi(void) {
+void uleft_ulfulfi() {
   ulf = ulf << i;
 }
 
 // CHECK-LABEL: @uleft_uauau(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr @ua, align 4
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @u, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i32, i32* @ua, align 4
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @u, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = shl i32 [[TMP0]], [[TMP1]]
-// CHECK-NEXT:    store i32 [[TMP2]], ptr @ua, align 4
+// CHECK-NEXT:    store i32 [[TMP2]], i32* @ua, align 4
 // CHECK-NEXT:    ret void
 //
-void uleft_uauau(void) {
+void uleft_uauau() {
   ua = ua << u;
 }
 
 // CHECK-LABEL: @uleft_ufufu(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i16, ptr @uf, align 2
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @u, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i16, i16* @uf, align 2
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @u, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = trunc i32 [[TMP1]] to i16
 // CHECK-NEXT:    [[TMP3:%.*]] = shl i16 [[TMP0]], [[TMP2]]
-// CHECK-NEXT:    store i16 [[TMP3]], ptr @uf, align 2
+// CHECK-NEXT:    store i16 [[TMP3]], i16* @uf, align 2
 // CHECK-NEXT:    ret void
 //
-void uleft_ufufu(void) {
+void uleft_ufufu() {
   uf = uf << u;
 }
 
 
 // CHECK-LABEL: @sright_sasai(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i16, ptr @sa, align 2
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i16, i16* @sa, align 2
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = trunc i32 [[TMP1]] to i16
 // CHECK-NEXT:    [[TMP3:%.*]] = ashr i16 [[TMP0]], [[TMP2]]
-// CHECK-NEXT:    store i16 [[TMP3]], ptr @sa, align 2
+// CHECK-NEXT:    store i16 [[TMP3]], i16* @sa, align 2
 // CHECK-NEXT:    ret void
 //
-void sright_sasai(void) {
+void sright_sasai() {
   sa = sa >> i;
 }
 
 // CHECK-LABEL: @sright_aai(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr @a, align 4
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i32, i32* @a, align 4
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = ashr i32 [[TMP0]], [[TMP1]]
-// CHECK-NEXT:    store i32 [[TMP2]], ptr @a, align 4
+// CHECK-NEXT:    store i32 [[TMP2]], i32* @a, align 4
 // CHECK-NEXT:    ret void
 //
-void sright_aai(void) {
+void sright_aai() {
   a = a >> i;
 }
 
 // CHECK-LABEL: @sright_lalai(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i64, ptr @la, align 8
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i64, i64* @la, align 8
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = zext i32 [[TMP1]] to i64
 // CHECK-NEXT:    [[TMP3:%.*]] = ashr i64 [[TMP0]], [[TMP2]]
-// CHECK-NEXT:    store i64 [[TMP3]], ptr @la, align 8
+// CHECK-NEXT:    store i64 [[TMP3]], i64* @la, align 8
 // CHECK-NEXT:    ret void
 //
-void sright_lalai(void) {
+void sright_lalai() {
   la = la >> i;
 }
 
 // CHECK-LABEL: @sright_sfsfi(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i8, ptr @sf, align 1
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i8, i8* @sf, align 1
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = trunc i32 [[TMP1]] to i8
 // CHECK-NEXT:    [[TMP3:%.*]] = ashr i8 [[TMP0]], [[TMP2]]
-// CHECK-NEXT:    store i8 [[TMP3]], ptr @sf, align 1
+// CHECK-NEXT:    store i8 [[TMP3]], i8* @sf, align 1
 // CHECK-NEXT:    ret void
 //
-void sright_sfsfi(void) {
+void sright_sfsfi() {
   sf = sf >> i;
 }
 
 // CHECK-LABEL: @sright_ffi(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i16, ptr @f, align 2
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i16, i16* @f, align 2
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = trunc i32 [[TMP1]] to i16
 // CHECK-NEXT:    [[TMP3:%.*]] = ashr i16 [[TMP0]], [[TMP2]]
-// CHECK-NEXT:    store i16 [[TMP3]], ptr @f, align 2
+// CHECK-NEXT:    store i16 [[TMP3]], i16* @f, align 2
 // CHECK-NEXT:    ret void
 //
-void sright_ffi(void) {
+void sright_ffi() {
   f = f >> i;
 }
 
 // CHECK-LABEL: @sright_lflfi(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr @lf, align 4
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i32, i32* @lf, align 4
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = ashr i32 [[TMP0]], [[TMP1]]
-// CHECK-NEXT:    store i32 [[TMP2]], ptr @lf, align 4
+// CHECK-NEXT:    store i32 [[TMP2]], i32* @lf, align 4
 // CHECK-NEXT:    ret void
 //
-void sright_lflfi(void) {
+void sright_lflfi() {
   lf = lf >> i;
 }
 
 // CHECK-LABEL: @sright_aau(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr @a, align 4
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @u, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i32, i32* @a, align 4
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @u, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = ashr i32 [[TMP0]], [[TMP1]]
-// CHECK-NEXT:    store i32 [[TMP2]], ptr @a, align 4
+// CHECK-NEXT:    store i32 [[TMP2]], i32* @a, align 4
 // CHECK-NEXT:    ret void
 //
-void sright_aau(void) {
+void sright_aau() {
   a = a >> u;
 }
 
 // CHECK-LABEL: @sright_ffu(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i16, ptr @f, align 2
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @u, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i16, i16* @f, align 2
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @u, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = trunc i32 [[TMP1]] to i16
 // CHECK-NEXT:    [[TMP3:%.*]] = ashr i16 [[TMP0]], [[TMP2]]
-// CHECK-NEXT:    store i16 [[TMP3]], ptr @f, align 2
+// CHECK-NEXT:    store i16 [[TMP3]], i16* @f, align 2
 // CHECK-NEXT:    ret void
 //
-void sright_ffu(void) {
+void sright_ffu() {
   f = f >> u;
 }
 
 
 // CHECK-LABEL: @uright_usausai(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i16, ptr @usa, align 2
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i16, i16* @usa, align 2
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = trunc i32 [[TMP1]] to i16
 // CHECK-NEXT:    [[TMP3:%.*]] = lshr i16 [[TMP0]], [[TMP2]]
-// CHECK-NEXT:    store i16 [[TMP3]], ptr @usa, align 2
+// CHECK-NEXT:    store i16 [[TMP3]], i16* @usa, align 2
 // CHECK-NEXT:    ret void
 //
-void uright_usausai(void) {
+void uright_usausai() {
   usa = usa >> i;
 }
 
 // CHECK-LABEL: @uright_uauai(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr @ua, align 4
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i32, i32* @ua, align 4
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = lshr i32 [[TMP0]], [[TMP1]]
-// CHECK-NEXT:    store i32 [[TMP2]], ptr @ua, align 4
+// CHECK-NEXT:    store i32 [[TMP2]], i32* @ua, align 4
 // CHECK-NEXT:    ret void
 //
-void uright_uauai(void) {
+void uright_uauai() {
   ua = ua >> i;
 }
 
 // CHECK-LABEL: @uright_ulaulai(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i64, ptr @ula, align 8
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i64, i64* @ula, align 8
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = zext i32 [[TMP1]] to i64
 // CHECK-NEXT:    [[TMP3:%.*]] = lshr i64 [[TMP0]], [[TMP2]]
-// CHECK-NEXT:    store i64 [[TMP3]], ptr @ula, align 8
+// CHECK-NEXT:    store i64 [[TMP3]], i64* @ula, align 8
 // CHECK-NEXT:    ret void
 //
-void uright_ulaulai(void) {
+void uright_ulaulai() {
   ula = ula >> i;
 }
 
 // CHECK-LABEL: @uright_usfusfi(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i8, ptr @usf, align 1
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i8, i8* @usf, align 1
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = trunc i32 [[TMP1]] to i8
 // CHECK-NEXT:    [[TMP3:%.*]] = lshr i8 [[TMP0]], [[TMP2]]
-// CHECK-NEXT:    store i8 [[TMP3]], ptr @usf, align 1
+// CHECK-NEXT:    store i8 [[TMP3]], i8* @usf, align 1
 // CHECK-NEXT:    ret void
 //
-void uright_usfusfi(void) {
+void uright_usfusfi() {
   usf = usf >> i;
 }
 
 // CHECK-LABEL: @uright_ufufi(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i16, ptr @uf, align 2
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i16, i16* @uf, align 2
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = trunc i32 [[TMP1]] to i16
 // CHECK-NEXT:    [[TMP3:%.*]] = lshr i16 [[TMP0]], [[TMP2]]
-// CHECK-NEXT:    store i16 [[TMP3]], ptr @uf, align 2
+// CHECK-NEXT:    store i16 [[TMP3]], i16* @uf, align 2
 // CHECK-NEXT:    ret void
 //
-void uright_ufufi(void) {
+void uright_ufufi() {
   uf = uf >> i;
 }
 
 // CHECK-LABEL: @uright_ulfulfi(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr @ulf, align 4
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i32, i32* @ulf, align 4
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = lshr i32 [[TMP0]], [[TMP1]]
-// CHECK-NEXT:    store i32 [[TMP2]], ptr @ulf, align 4
+// CHECK-NEXT:    store i32 [[TMP2]], i32* @ulf, align 4
 // CHECK-NEXT:    ret void
 //
-void uright_ulfulfi(void) {
+void uright_ulfulfi() {
   ulf = ulf >> i;
 }
 
 // CHECK-LABEL: @uright_uauau(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr @ua, align 4
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @u, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i32, i32* @ua, align 4
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @u, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = lshr i32 [[TMP0]], [[TMP1]]
-// CHECK-NEXT:    store i32 [[TMP2]], ptr @ua, align 4
+// CHECK-NEXT:    store i32 [[TMP2]], i32* @ua, align 4
 // CHECK-NEXT:    ret void
 //
-void uright_uauau(void) {
+void uright_uauau() {
   ua = ua >> u;
 }
 
 // CHECK-LABEL: @uright_ufufu(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i16, ptr @uf, align 2
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @u, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i16, i16* @uf, align 2
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @u, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = trunc i32 [[TMP1]] to i16
 // CHECK-NEXT:    [[TMP3:%.*]] = lshr i16 [[TMP0]], [[TMP2]]
-// CHECK-NEXT:    store i16 [[TMP3]], ptr @uf, align 2
+// CHECK-NEXT:    store i16 [[TMP3]], i16* @uf, align 2
 // CHECK-NEXT:    ret void
 //
-void uright_ufufu(void) {
+void uright_ufufu() {
   uf = uf >> u;
 }
 
 
 // CHECK-LABEL: @satleft_sassasi(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i16, ptr @sa_sat, align 2
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i16, i16* @sa_sat, align 2
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = trunc i32 [[TMP1]] to i16
 // CHECK-NEXT:    [[TMP3:%.*]] = call i16 @llvm.sshl.sat.i16(i16 [[TMP0]], i16 [[TMP2]])
-// CHECK-NEXT:    store i16 [[TMP3]], ptr @sa_sat, align 2
+// CHECK-NEXT:    store i16 [[TMP3]], i16* @sa_sat, align 2
 // CHECK-NEXT:    ret void
 //
-void satleft_sassasi(void) {
+void satleft_sassasi() {
   sa_sat = sa_sat << i;
 }
 
 // CHECK-LABEL: @satleft_asasi(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr @a_sat, align 4
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i32, i32* @a_sat, align 4
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = call i32 @llvm.sshl.sat.i32(i32 [[TMP0]], i32 [[TMP1]])
-// CHECK-NEXT:    store i32 [[TMP2]], ptr @a_sat, align 4
+// CHECK-NEXT:    store i32 [[TMP2]], i32* @a_sat, align 4
 // CHECK-NEXT:    ret void
 //
-void satleft_asasi(void) {
+void satleft_asasi() {
   a_sat = a_sat << i;
 }
 
 // CHECK-LABEL: @satleft_sfssfsi(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i8, ptr @sf_sat, align 1
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i8, i8* @sf_sat, align 1
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = trunc i32 [[TMP1]] to i8
 // CHECK-NEXT:    [[TMP3:%.*]] = call i8 @llvm.sshl.sat.i8(i8 [[TMP0]], i8 [[TMP2]])
-// CHECK-NEXT:    store i8 [[TMP3]], ptr @sf_sat, align 1
+// CHECK-NEXT:    store i8 [[TMP3]], i8* @sf_sat, align 1
 // CHECK-NEXT:    ret void
 //
-void satleft_sfssfsi(void) {
+void satleft_sfssfsi() {
   sf_sat = sf_sat << i;
 }
 
 // CHECK-LABEL: @satleft_fsfsi(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = load i16, ptr @f_sat, align 2
-// CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load i16, i16* @f_sat, align 2
+// CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // CHECK-NEXT:    [[TMP2:%.*]] = trunc i32 [[TMP1]] to i16
 // CHECK-NEXT:    [[TMP3:%.*]] = call i16 @llvm.sshl.sat.i16(i16 [[TMP0]], i16 [[TMP2]])
-// CHECK-NEXT:    store i16 [[TMP3]], ptr @f_sat, align 2
+// CHECK-NEXT:    store i16 [[TMP3]], i16* @f_sat, align 2
 // CHECK-NEXT:    ret void
 //
-void satleft_fsfsi(void) {
+void satleft_fsfsi() {
   f_sat = f_sat << i;
 }
 
 // SIGNED-LABEL: @satleft_usasusasi(
 // SIGNED-NEXT:  entry:
-// SIGNED-NEXT:    [[TMP0:%.*]] = load i16, ptr @usa_sat, align 2
-// SIGNED-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// SIGNED-NEXT:    [[TMP0:%.*]] = load i16, i16* @usa_sat, align 2
+// SIGNED-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // SIGNED-NEXT:    [[TMP2:%.*]] = trunc i32 [[TMP1]] to i16
 // SIGNED-NEXT:    [[TMP3:%.*]] = call i16 @llvm.ushl.sat.i16(i16 [[TMP0]], i16 [[TMP2]])
-// SIGNED-NEXT:    store i16 [[TMP3]], ptr @usa_sat, align 2
+// SIGNED-NEXT:    store i16 [[TMP3]], i16* @usa_sat, align 2
 // SIGNED-NEXT:    ret void
 //
 // UNSIGNED-LABEL: @satleft_usasusasi(
 // UNSIGNED-NEXT:  entry:
-// UNSIGNED-NEXT:    [[TMP0:%.*]] = load i16, ptr @usa_sat, align 2
-// UNSIGNED-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// UNSIGNED-NEXT:    [[TMP0:%.*]] = load i16, i16* @usa_sat, align 2
+// UNSIGNED-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // UNSIGNED-NEXT:    [[TMP2:%.*]] = trunc i32 [[TMP1]] to i16
 // UNSIGNED-NEXT:    [[TMP3:%.*]] = call i16 @llvm.sshl.sat.i16(i16 [[TMP0]], i16 [[TMP2]])
-// UNSIGNED-NEXT:    store i16 [[TMP3]], ptr @usa_sat, align 2
+// UNSIGNED-NEXT:    store i16 [[TMP3]], i16* @usa_sat, align 2
 // UNSIGNED-NEXT:    ret void
 //
-void satleft_usasusasi(void) {
+void satleft_usasusasi() {
   usa_sat = usa_sat << i;
 }
 
 // SIGNED-LABEL: @satleft_uasuasi(
 // SIGNED-NEXT:  entry:
-// SIGNED-NEXT:    [[TMP0:%.*]] = load i32, ptr @ua_sat, align 4
-// SIGNED-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// SIGNED-NEXT:    [[TMP0:%.*]] = load i32, i32* @ua_sat, align 4
+// SIGNED-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // SIGNED-NEXT:    [[TMP2:%.*]] = call i32 @llvm.ushl.sat.i32(i32 [[TMP0]], i32 [[TMP1]])
-// SIGNED-NEXT:    store i32 [[TMP2]], ptr @ua_sat, align 4
+// SIGNED-NEXT:    store i32 [[TMP2]], i32* @ua_sat, align 4
 // SIGNED-NEXT:    ret void
 //
 // UNSIGNED-LABEL: @satleft_uasuasi(
 // UNSIGNED-NEXT:  entry:
-// UNSIGNED-NEXT:    [[TMP0:%.*]] = load i32, ptr @ua_sat, align 4
-// UNSIGNED-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// UNSIGNED-NEXT:    [[TMP0:%.*]] = load i32, i32* @ua_sat, align 4
+// UNSIGNED-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // UNSIGNED-NEXT:    [[TMP2:%.*]] = call i32 @llvm.sshl.sat.i32(i32 [[TMP0]], i32 [[TMP1]])
-// UNSIGNED-NEXT:    store i32 [[TMP2]], ptr @ua_sat, align 4
+// UNSIGNED-NEXT:    store i32 [[TMP2]], i32* @ua_sat, align 4
 // UNSIGNED-NEXT:    ret void
 //
-void satleft_uasuasi(void) {
+void satleft_uasuasi() {
   ua_sat = ua_sat << i;
 }
 
 // SIGNED-LABEL: @satleft_usfsusfsi(
 // SIGNED-NEXT:  entry:
-// SIGNED-NEXT:    [[TMP0:%.*]] = load i8, ptr @usf_sat, align 1
-// SIGNED-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// SIGNED-NEXT:    [[TMP0:%.*]] = load i8, i8* @usf_sat, align 1
+// SIGNED-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // SIGNED-NEXT:    [[TMP2:%.*]] = trunc i32 [[TMP1]] to i8
 // SIGNED-NEXT:    [[TMP3:%.*]] = call i8 @llvm.ushl.sat.i8(i8 [[TMP0]], i8 [[TMP2]])
-// SIGNED-NEXT:    store i8 [[TMP3]], ptr @usf_sat, align 1
+// SIGNED-NEXT:    store i8 [[TMP3]], i8* @usf_sat, align 1
 // SIGNED-NEXT:    ret void
 //
 // UNSIGNED-LABEL: @satleft_usfsusfsi(
 // UNSIGNED-NEXT:  entry:
-// UNSIGNED-NEXT:    [[TMP0:%.*]] = load i8, ptr @usf_sat, align 1
-// UNSIGNED-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// UNSIGNED-NEXT:    [[TMP0:%.*]] = load i8, i8* @usf_sat, align 1
+// UNSIGNED-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // UNSIGNED-NEXT:    [[TMP2:%.*]] = trunc i32 [[TMP1]] to i8
 // UNSIGNED-NEXT:    [[TMP3:%.*]] = call i8 @llvm.sshl.sat.i8(i8 [[TMP0]], i8 [[TMP2]])
-// UNSIGNED-NEXT:    store i8 [[TMP3]], ptr @usf_sat, align 1
+// UNSIGNED-NEXT:    store i8 [[TMP3]], i8* @usf_sat, align 1
 // UNSIGNED-NEXT:    ret void
 //
-void satleft_usfsusfsi(void) {
+void satleft_usfsusfsi() {
   usf_sat = usf_sat << i;
 }
 
 // SIGNED-LABEL: @satleft_ufsufsi(
 // SIGNED-NEXT:  entry:
-// SIGNED-NEXT:    [[TMP0:%.*]] = load i16, ptr @uf_sat, align 2
-// SIGNED-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// SIGNED-NEXT:    [[TMP0:%.*]] = load i16, i16* @uf_sat, align 2
+// SIGNED-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // SIGNED-NEXT:    [[TMP2:%.*]] = trunc i32 [[TMP1]] to i16
 // SIGNED-NEXT:    [[TMP3:%.*]] = call i16 @llvm.ushl.sat.i16(i16 [[TMP0]], i16 [[TMP2]])
-// SIGNED-NEXT:    store i16 [[TMP3]], ptr @uf_sat, align 2
+// SIGNED-NEXT:    store i16 [[TMP3]], i16* @uf_sat, align 2
 // SIGNED-NEXT:    ret void
 //
 // UNSIGNED-LABEL: @satleft_ufsufsi(
 // UNSIGNED-NEXT:  entry:
-// UNSIGNED-NEXT:    [[TMP0:%.*]] = load i16, ptr @uf_sat, align 2
-// UNSIGNED-NEXT:    [[TMP1:%.*]] = load i32, ptr @i, align 4
+// UNSIGNED-NEXT:    [[TMP0:%.*]] = load i16, i16* @uf_sat, align 2
+// UNSIGNED-NEXT:    [[TMP1:%.*]] = load i32, i32* @i, align 4
 // UNSIGNED-NEXT:    [[TMP2:%.*]] = trunc i32 [[TMP1]] to i16
 // UNSIGNED-NEXT:    [[TMP3:%.*]] = call i16 @llvm.sshl.sat.i16(i16 [[TMP0]], i16 [[TMP2]])
-// UNSIGNED-NEXT:    store i16 [[TMP3]], ptr @uf_sat, align 2
+// UNSIGNED-NEXT:    store i16 [[TMP3]], i16* @uf_sat, align 2
 // UNSIGNED-NEXT:    ret void
 //
-void satleft_ufsufsi(void) {
+void satleft_ufsufsi() {
   uf_sat = uf_sat << i;
 }

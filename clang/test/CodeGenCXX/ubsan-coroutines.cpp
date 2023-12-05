@@ -1,8 +1,10 @@
 // This test merely verifies that emitting the object file does not cause a
 // crash when the LLVM coroutines passes are run.
-// RUN: %clang_cc1 -emit-obj -std=c++2a -fsanitize=null %s -o %t.o
+// PR42867: Disable this test for the new PM since the passes that lower the
+// llvm.coro.* intrinsics have not yet been ported.
+// RUN: %clang_cc1 -fno-experimental-new-pass-manager -emit-obj -std=c++2a -fsanitize=null %s -o %t.o
 
-namespace std {
+namespace std::experimental {
 template <typename R, typename... T> struct coroutine_traits {
   using promise_type = typename R::promise_type;
 };
@@ -18,11 +20,11 @@ template <class Promise> struct coroutine_handle : coroutine_handle<void> {
   coroutine_handle() = default;
   static coroutine_handle from_address(void *) noexcept;
 };
-} // namespace std
+}
 
 struct suspend_always {
   bool await_ready() noexcept;
-  void await_suspend(std::coroutine_handle<>) noexcept;
+  void await_suspend(std::experimental::coroutine_handle<>) noexcept;
   void await_resume() noexcept;
 };
 
@@ -39,7 +41,7 @@ struct task {
 struct awaitable {
   task await() { (void)co_await *this; }
   bool await_ready() { return false; }
-  bool await_suspend(std::coroutine_handle<> awaiter) { return false; }
+  bool await_suspend(std::experimental::coroutine_handle<> awaiter) { return false; }
   bool await_resume() { return false; }
 };
 

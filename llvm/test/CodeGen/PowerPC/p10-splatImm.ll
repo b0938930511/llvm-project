@@ -249,6 +249,7 @@ define dso_local float @testFloatScalar() local_unnamed_addr {
 ; CHECK-LABEL: testFloatScalar:
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    xxspltidp vs1, 1135290941
+; CHECK-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
 ; CHECK-NEXT:    blr
 
 entry:
@@ -269,6 +270,7 @@ define dso_local double @testDoubleRepresentableScalar() local_unnamed_addr {
 ; CHECK-LABEL: testDoubleRepresentableScalar:
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    xxspltidp vs1, 1135290941
+; CHECK-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
 ; CHECK-NEXT:    blr
 
 entry:

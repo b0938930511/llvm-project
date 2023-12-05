@@ -40,13 +40,12 @@ public:
     return failure();
   }
 };
-} // namespace
+} // end namespace
 
 void mlir::registerAMXDialectTranslation(DialectRegistry &registry) {
   registry.insert<amx::AMXDialect>();
-  registry.addExtension(+[](MLIRContext *ctx, amx::AMXDialect *dialect) {
-    dialect->addInterfaces<AMXDialectLLVMIRTranslationInterface>();
-  });
+  registry.addDialectInterface<amx::AMXDialect,
+                               AMXDialectLLVMIRTranslationInterface>();
 }
 
 void mlir::registerAMXDialectTranslation(MLIRContext &context) {

@@ -6,5 +6,5 @@ umlal:
 umlal r0, r1, r2, r3
 
 @ CHECK-LABEL: umlal
-@ CHECK: fbe2 0103   umlal r0, r1, r2, r3
+@ CHECK: e2 fb 03 01 umlal r0, r1, r2, r3
 

@@ -2632,8 +2632,7 @@ bool DNBArchImplX86_64::SetRegisterValue(uint32_t set, uint32_t reg,
                &value->value.uint8, 16);
         memcpy(&m_state.context.fpu.avx.__fpu_ymmh0 + (reg - fpu_ymm0),
                (&value->value.uint8) + 16, 16);
-        success = true;
-        break;
+        return true;
       case fpu_k0:
       case fpu_k1:
       case fpu_k2:
@@ -2644,8 +2643,7 @@ bool DNBArchImplX86_64::SetRegisterValue(uint32_t set, uint32_t reg,
       case fpu_k7:
         memcpy(&m_state.context.fpu.avx512f.__fpu_k0 + (reg - fpu_k0),
                &value->value.uint8, 8);
-        success = true;
-        break;
+        return true;
       case fpu_zmm0:
       case fpu_zmm1:
       case fpu_zmm2:
@@ -2668,8 +2666,7 @@ bool DNBArchImplX86_64::SetRegisterValue(uint32_t set, uint32_t reg,
                &value->value.uint8 + 16, 16);
         memcpy(&m_state.context.fpu.avx512f.__fpu_zmmh0 + (reg - fpu_zmm0),
                &value->value.uint8 + 32, 32);
-        success = true;
-        break;
+        return true;
       case fpu_zmm16:
       case fpu_zmm17:
       case fpu_zmm18:
@@ -2688,8 +2685,7 @@ bool DNBArchImplX86_64::SetRegisterValue(uint32_t set, uint32_t reg,
       case fpu_zmm31:
         memcpy(&m_state.context.fpu.avx512f.__fpu_zmm16 + (reg - fpu_zmm16),
                &value->value.uint8, 64);
-        success = true;
-        break;
+        return true;
       }
       break;
 

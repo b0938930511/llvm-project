@@ -19,7 +19,6 @@
 #include "asan_mapping.h"
 #include "asan_report.h"
 #include "asan_thread.h"
-#include "sanitizer_common/sanitizer_stackdepot.h"
 
 namespace {
 using namespace __asan;
@@ -55,11 +54,11 @@ uptr AsanGetStack(uptr addr, uptr *trace, u32 size, u32 *thread_id,
   StackTrace stack(nullptr, 0);
   if (alloc_stack) {
     if (chunk.AllocTid() == kInvalidTid) return 0;
-    stack = StackDepotGet(chunk.GetAllocStackId());
+    stack = chunk.GetAllocStack();
     if (thread_id) *thread_id = chunk.AllocTid();
   } else {
     if (chunk.FreeTid() == kInvalidTid) return 0;
-    stack = StackDepotGet(chunk.GetFreeStackId());
+    stack = chunk.GetFreeStack();
     if (thread_id) *thread_id = chunk.FreeTid();
   }
 
@@ -141,7 +140,7 @@ uptr __asan_get_free_stack(uptr addr, uptr *trace, uptr size, u32 *thread_id) {
 SANITIZER_INTERFACE_ATTRIBUTE
 void __asan_get_shadow_mapping(uptr *shadow_scale, uptr *shadow_offset) {
   if (shadow_scale)
-    *shadow_scale = ASAN_SHADOW_SCALE;
+    *shadow_scale = SHADOW_SCALE;
   if (shadow_offset)
-    *shadow_offset = ASAN_SHADOW_OFFSET;
+    *shadow_offset = SHADOW_OFFSET;
 }

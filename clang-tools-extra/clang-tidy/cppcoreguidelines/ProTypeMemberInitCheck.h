@@ -10,9 +10,10 @@
 #define LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_CPPCOREGUIDELINES_PRO_TYPE_MEMBER_INIT_H
 
 #include "../ClangTidyCheck.h"
-#include "llvm/ADT/DenseSet.h"
 
-namespace clang::tidy::cppcoreguidelines {
+namespace clang {
+namespace tidy {
+namespace cppcoreguidelines {
 
 /// Implements C++ Core Guidelines Type.6.
 ///
@@ -25,7 +26,7 @@ namespace clang::tidy::cppcoreguidelines {
 /// will result in false positives.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/cppcoreguidelines/pro-type-member-init.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/cppcoreguidelines-pro-type-member-init.html
 /// TODO: See if 'fixes' for false positives are optimized away by the compiler.
 /// TODO: For classes with multiple constructors, make sure that we don't offer
 ///     multiple in-class initializer fixits for the same  member.
@@ -71,12 +72,10 @@ private:
   // instead of brace initialization. Only effective in C++11 mode. Default is
   // false.
   bool UseAssignment;
-
-  // Record the member variables that have been initialized to prevent repeated
-  // initialization.
-  llvm::DenseSet<const FieldDecl *> HasRecordClassMemberSet;
 };
 
-} // namespace clang::tidy::cppcoreguidelines
+} // namespace cppcoreguidelines
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_CPPCOREGUIDELINES_PRO_TYPE_MEMBER_INIT_H

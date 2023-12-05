@@ -15,7 +15,6 @@
 #include <condition_variable>
 #include <future>
 #include <mutex>
-#include <optional>
 #include <thread>
 
 using namespace llvm;
@@ -178,13 +177,13 @@ struct VerifyingConsumer {
   }
 
   // Not locking - caller has to lock Mtx.
-  std::optional<bool> result() const {
+  llvm::Optional<bool> result() const {
     if (ExpectedInitial.empty() && ExpectedNonInitial.empty() &&
         UnexpectedInitial.empty() && UnexpectedNonInitial.empty())
       return true;
     if (!UnexpectedInitial.empty() || !UnexpectedNonInitial.empty())
       return false;
-    return std::nullopt;
+    return llvm::None;
   }
 
   // This method is used by tests.
@@ -195,7 +194,7 @@ struct VerifyingConsumer {
       if (result())
         return *result();
 
-      ResultIsReady.wait(L, [this]() { return result().has_value(); });
+      ResultIsReady.wait(L, [this]() { return result().hasValue(); });
     }
     return false; // Just to make compiler happy.
   }
@@ -259,12 +258,12 @@ void checkEventualResultWithTimeout(VerifyingConsumer &TestConsumer) {
               std::future_status::ready)
       << "The expected result state wasn't reached before the time-out.";
   std::unique_lock<std::mutex> L(TestConsumer.Mtx);
-  EXPECT_TRUE(TestConsumer.result().has_value());
-  if (TestConsumer.result()) {
+  EXPECT_TRUE(TestConsumer.result().hasValue());
+  if (TestConsumer.result().hasValue()) {
     EXPECT_TRUE(*TestConsumer.result());
   }
-  if ((TestConsumer.result() && !*TestConsumer.result()) ||
-      !TestConsumer.result())
+  if ((TestConsumer.result().hasValue() && !TestConsumer.result().getValue()) ||
+      !TestConsumer.result().hasValue())
     TestConsumer.printUnmetExpectations(llvm::outs());
 }
 } // namespace

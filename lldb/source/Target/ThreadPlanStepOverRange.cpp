@@ -17,7 +17,6 @@
 #include "lldb/Target/Thread.h"
 #include "lldb/Target/ThreadPlanStepOut.h"
 #include "lldb/Target/ThreadPlanStepThrough.h"
-#include "lldb/Utility/LLDBLog.h"
 #include "lldb/Utility/Log.h"
 #include "lldb/Utility/Stream.h"
 
@@ -125,7 +124,7 @@ bool ThreadPlanStepOverRange::IsEquivalentContext(
 }
 
 bool ThreadPlanStepOverRange::ShouldStop(Event *event_ptr) {
-  Log *log = GetLog(LLDBLog::Step);
+  Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_STEP));
   Thread &thread = GetThread();
 
   if (log) {
@@ -342,7 +341,7 @@ bool ThreadPlanStepOverRange::DoPlanExplainsStop(Event *event_ptr) {
   // breakpoint. Note, unlike the step in range plan, we don't mark ourselves
   // complete if we hit an unexplained breakpoint/crash.
 
-  Log *log = GetLog(LLDBLog::Step);
+  Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_STEP));
   StopInfoSP stop_info_sp = GetPrivateStopInfo();
   bool return_value;
 
@@ -376,7 +375,7 @@ bool ThreadPlanStepOverRange::DoWillResume(lldb::StateType resume_state,
       // step over that.
       bool in_inlined_stack = thread.DecrementCurrentInlinedDepth();
       if (in_inlined_stack) {
-        Log *log = GetLog(LLDBLog::Step);
+        Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_STEP));
         LLDB_LOGF(log,
                   "ThreadPlanStepInRange::DoWillResume: adjusting range to "
                   "the frame at inlined depth %d.",

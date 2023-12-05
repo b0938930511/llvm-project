@@ -17,7 +17,9 @@ using namespace clang;
 using namespace clang::ast_matchers;
 using namespace clang::ast_matchers::internal;
 
-namespace clang::tidy::modernize {
+namespace clang {
+namespace tidy {
+namespace modernize {
 namespace {
 
 const char IteratorDeclStmtId[] = "iterator_decl";
@@ -447,4 +449,6 @@ void UseAutoCheck::check(const MatchFinder::MatchResult &Result) {
   }
 }
 
-} // namespace clang::tidy::modernize
+} // namespace modernize
+} // namespace tidy
+} // namespace clang

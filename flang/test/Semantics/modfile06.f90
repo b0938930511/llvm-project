@@ -1,4 +1,5 @@
-! RUN: %python %S/test_modfile.py %s %flang_fc1
+! RUN: %S/test_modfile.sh %s %t %flang_fc1
+! REQUIRES: shell
 ! Check modfile generation for external interface
 module m
   interface

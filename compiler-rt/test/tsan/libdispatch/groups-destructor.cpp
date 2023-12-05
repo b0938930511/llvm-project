@@ -3,21 +3,21 @@
 
 #include <dispatch/dispatch.h>
 
-#include <atomic>
-#include <cstdio>
 #include <memory>
+#include <stdatomic.h>
+#include <cstdio>
 
-std::atomic<long> destructor_counter(0);
+_Atomic(long) destructor_counter = 0;
 
 struct MyStruct {
   virtual ~MyStruct() {
     usleep(10000);
-    std::atomic_fetch_add_explicit(&destructor_counter, 1, std::memory_order_relaxed);
+    atomic_fetch_add_explicit(&destructor_counter, 1, memory_order_relaxed);
   }
 };
 
 int main(int argc, const char *argv[]) {
-  std::fprintf(stderr, "Hello world.\n");
+  fprintf(stderr, "Hello world.\n");
 
   dispatch_queue_t q = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
   dispatch_group_t g = dispatch_group_create();
@@ -33,10 +33,10 @@ int main(int argc, const char *argv[]) {
   dispatch_group_wait(g, DISPATCH_TIME_FOREVER);
 
   if (destructor_counter != 100) {
-    std::abort();
+    abort();
   }
 
-  std::fprintf(stderr, "Done.\n");
+  fprintf(stderr, "Done.\n");
 }
 
 // CHECK: Hello world.

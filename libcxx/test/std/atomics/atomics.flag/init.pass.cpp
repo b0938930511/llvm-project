@@ -5,7 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-
+//
+// UNSUPPORTED: libcpp-has-no-threads
 // XFAIL: c++03
 
 // <atomic>

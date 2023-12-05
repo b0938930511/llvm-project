@@ -3,7 +3,7 @@
 
 int printf(const char *, ...);
 typedef int *pint;
-int main(void) {
+int main() {
    int a[5] = {0};
    pint p = a;
    p++;

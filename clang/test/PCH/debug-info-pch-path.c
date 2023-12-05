@@ -1,7 +1,3 @@
-// Unsupported on AIX because we don't support the requisite "__clangast"
-// section in XCOFF yet.
-// UNSUPPORTED: target={{.*}}-aix{{.*}}
-
 // RUN: rm -rf %t
 // RUN: mkdir %t
 // RUN: cd %t

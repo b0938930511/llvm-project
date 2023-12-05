@@ -59,7 +59,7 @@ void taintTracking(int x) {
   int tty = xy.y; // expected-warning + {{tainted}}
 }
 
-void BitwiseOp(int in, char inn, int zz) {
+void BitwiseOp(int in, char inn) {
   // Taint on bitwise operations, integer to integer cast.
   int m;
   int x = 0;
@@ -67,12 +67,11 @@ void BitwiseOp(int in, char inn, int zz) {
   int y = (in << (x << in)) * 5;// expected-warning + {{tainted}}
   // The next line tests integer to integer cast.
   int z = y & inn; // expected-warning + {{tainted}}
-  if (y == zz) { // expected-warning + {{tainted}}
+  if (y == 5) // expected-warning + {{tainted}}
     m = z | z;// expected-warning + {{tainted}}
-  }
   else
     m = inn;
-  int mm = m; // expected-warning 1 {{tainted}}
+  int mm = m; // expected-warning + {{tainted}}
 }
 
 // Test getenv.
@@ -109,7 +108,7 @@ int fscanfTest(void) {
 }
 
 // Check if we propagate taint from stdin when it's used in an assignment.
-void stdinTest1(void) {
+void stdinTest1() {
   int i;
   fscanf(stdin, "%d", &i);
   int j = i; // expected-warning + {{tainted}}
@@ -122,7 +121,7 @@ void stdinTest2(FILE *pIn) {
   fscanf(pp, "%d", &ii);
   int jj = ii;// expected-warning + {{tainted}}
 
-  fscanf(p, "%d", &ii);// expected-warning + {{tainted}}
+  fscanf(p, "%d", &ii);
   int jj2 = ii;// expected-warning + {{tainted}}
 
   ii = 3;
@@ -133,7 +132,7 @@ void stdinTest2(FILE *pIn) {
   int jj4 = ii;// no warning
 }
 
-void stdinTest3(void) {
+void stdinTest3() {
   FILE **ppp = &stdin;
   int iii;
   fscanf(*ppp, "%d", &iii);
@@ -141,8 +140,8 @@ void stdinTest3(void) {
 }
 
 // Test that stdin does not get invalidated by calls.
-void foo(void);
-void stdinTest4(void) {
+void foo();
+void stdinTest4() {
   int i;
   fscanf(stdin, "%d", &i);
   foo();
@@ -150,7 +149,7 @@ void stdinTest4(void) {
 }
 
 int getw(FILE *);
-void getwTest(void) {
+void getwTest() {
   int i = getw(stdin); // expected-warning + {{tainted}}
 }
 
@@ -176,7 +175,7 @@ int atoi(const char *nptr);
 long atol(const char *nptr);
 long long atoll(const char *nptr);
 
-void atoiTest(void) {
+void atoiTest() {
   char s[80];
   scanf("%s", s);
   int d = atoi(s); // expected-warning + {{tainted}}
@@ -192,7 +191,7 @@ void atoiTest(void) {
 
 char *pointer1;
 void *pointer2;
-void noCrashTest(void) {
+void noCrashTest() {
   if (!*pointer1) {
     __builtin___memcpy_chk(pointer2, pointer1, 0, 0); // no-crash
   }

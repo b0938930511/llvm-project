@@ -21,7 +21,6 @@
 #include "lldb/Target/Target.h"
 #include "lldb/Utility/ArchSpec.h"
 #include "lldb/Utility/FileSpec.h"
-#include "lldb/Utility/LLDBLog.h"
 #include "lldb/Utility/Log.h"
 #include "lldb/Utility/Status.h"
 #include "lldb/Utility/StreamString.h"
@@ -59,7 +58,7 @@ void PlatformRemoteAppleTV::Terminate() {
 
 PlatformSP PlatformRemoteAppleTV::CreateInstance(bool force,
                                                  const ArchSpec *arch) {
-  Log *log = GetLog(LLDBLog::Platform);
+  Log *log(GetLogIfAllCategoriesSet(LIBLLDB_LOG_PLATFORM));
   if (log) {
     const char *arch_name;
     if (arch && arch->GetArchitectureName())
@@ -129,29 +128,99 @@ PlatformSP PlatformRemoteAppleTV::CreateInstance(bool force,
   return lldb::PlatformSP();
 }
 
-llvm::StringRef PlatformRemoteAppleTV::GetDescriptionStatic() {
+lldb_private::ConstString PlatformRemoteAppleTV::GetPluginNameStatic() {
+  static ConstString g_name("remote-tvos");
+  return g_name;
+}
+
+const char *PlatformRemoteAppleTV::GetDescriptionStatic() {
   return "Remote Apple TV platform plug-in.";
 }
 
-std::vector<ArchSpec> PlatformRemoteAppleTV::GetSupportedArchitectures(
-    const ArchSpec &process_host_arch) {
+bool PlatformRemoteAppleTV::GetSupportedArchitectureAtIndex(uint32_t idx,
+                                                            ArchSpec &arch) {
   ArchSpec system_arch(GetSystemArchitecture());
 
   const ArchSpec::Core system_core = system_arch.GetCore();
   switch (system_core) {
   default:
+    switch (idx) {
+    case 0:
+      arch.SetTriple("arm64-apple-tvos");
+      return true;
+    case 1:
+      arch.SetTriple("armv7s-apple-tvos");
+      return true;
+    case 2:
+      arch.SetTriple("armv7-apple-tvos");
+      return true;
+    case 3:
+      arch.SetTriple("thumbv7s-apple-tvos");
+      return true;
+    case 4:
+      arch.SetTriple("thumbv7-apple-tvos");
+      return true;
+    default:
+      break;
+    }
+    break;
+
   case ArchSpec::eCore_arm_arm64:
-    return {ArchSpec("arm64-apple-tvos"), ArchSpec("armv7s-apple-tvos"),
-            ArchSpec("armv7-apple-tvos"), ArchSpec("thumbv7s-apple-tvos"),
-            ArchSpec("thumbv7-apple-tvos")};
+    switch (idx) {
+    case 0:
+      arch.SetTriple("arm64-apple-tvos");
+      return true;
+    case 1:
+      arch.SetTriple("armv7s-apple-tvos");
+      return true;
+    case 2:
+      arch.SetTriple("armv7-apple-tvos");
+      return true;
+    case 3:
+      arch.SetTriple("thumbv7s-apple-tvos");
+      return true;
+    case 4:
+      arch.SetTriple("thumbv7-apple-tvos");
+      return true;
+    default:
+      break;
+    }
+    break;
 
   case ArchSpec::eCore_arm_armv7s:
-    return {ArchSpec("armv7s-apple-tvos"), ArchSpec("armv7-apple-tvos"),
-            ArchSpec("thumbv7s-apple-tvos"), ArchSpec("thumbv7-apple-tvos")};
+    switch (idx) {
+    case 0:
+      arch.SetTriple("armv7s-apple-tvos");
+      return true;
+    case 1:
+      arch.SetTriple("armv7-apple-tvos");
+      return true;
+    case 2:
+      arch.SetTriple("thumbv7s-apple-tvos");
+      return true;
+    case 3:
+      arch.SetTriple("thumbv7-apple-tvos");
+      return true;
+    default:
+      break;
+    }
+    break;
 
   case ArchSpec::eCore_arm_armv7:
-    return {ArchSpec("armv7-apple-tvos"), ArchSpec("thumbv7-apple-tvos")};
+    switch (idx) {
+    case 0:
+      arch.SetTriple("armv7-apple-tvos");
+      return true;
+    case 1:
+      arch.SetTriple("thumbv7-apple-tvos");
+      return true;
+    default:
+      break;
+    }
+    break;
   }
+  arch.Clear();
+  return false;
 }
 
 llvm::StringRef PlatformRemoteAppleTV::GetDeviceSupportDirectoryName() {

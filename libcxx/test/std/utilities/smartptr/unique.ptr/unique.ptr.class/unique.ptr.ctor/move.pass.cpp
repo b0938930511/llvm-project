@@ -38,12 +38,12 @@
 //    'sink' should accept the unique_ptr by value. (C-1,2,4)
 
 template <class VT>
-TEST_CONSTEXPR_CXX23 std::unique_ptr<VT> source1() {
+std::unique_ptr<VT> source1() {
   return std::unique_ptr<VT>(newValue<VT>(1));
 }
 
 template <class VT>
-TEST_CONSTEXPR_CXX23 std::unique_ptr<VT, Deleter<VT> > source2() {
+std::unique_ptr<VT, Deleter<VT> > source2() {
   return std::unique_ptr<VT, Deleter<VT> >(newValue<VT>(1), Deleter<VT>(5));
 }
 
@@ -54,12 +54,12 @@ std::unique_ptr<VT, NCDeleter<VT>&> source3() {
 }
 
 template <class VT>
-TEST_CONSTEXPR_CXX23 void sink1(std::unique_ptr<VT> p) {
+void sink1(std::unique_ptr<VT> p) {
   assert(p.get() != nullptr);
 }
 
 template <class VT>
-TEST_CONSTEXPR_CXX23 void sink2(std::unique_ptr<VT, Deleter<VT> > p) {
+void sink2(std::unique_ptr<VT, Deleter<VT> > p) {
   assert(p.get() != nullptr);
   assert(p.get_deleter().state() == 5);
 }
@@ -72,7 +72,7 @@ void sink3(std::unique_ptr<VT, NCDeleter<VT>&> p) {
 }
 
 template <class ValueT>
-TEST_CONSTEXPR_CXX23 void test_sfinae() {
+void test_sfinae() {
   typedef std::unique_ptr<ValueT> U;
   { // Ensure unique_ptr is non-copyable
     static_assert((!std::is_constructible<U, U const&>::value), "");
@@ -81,7 +81,7 @@ TEST_CONSTEXPR_CXX23 void test_sfinae() {
 }
 
 template <bool IsArray>
-TEST_CONSTEXPR_CXX23 void test_basic() {
+void test_basic() {
   typedef typename std::conditional<!IsArray, A, A[]>::type VT;
   const int expect_alive = IsArray ? 5 : 1;
   {
@@ -91,11 +91,9 @@ TEST_CONSTEXPR_CXX23 void test_basic() {
     APtr s2 = std::move(s);
     assert(s2.get() == p);
     assert(s.get() == 0);
-    if (!TEST_IS_CONSTANT_EVALUATED)
-      assert(A::count == expect_alive);
+    assert(A::count == expect_alive);
   }
-  if (!TEST_IS_CONSTANT_EVALUATED)
-    assert(A::count == 0);
+  assert(A::count == 0);
   {
     typedef Deleter<VT> MoveDel;
     typedef std::unique_ptr<VT, MoveDel> APtr;
@@ -107,13 +105,11 @@ TEST_CONSTEXPR_CXX23 void test_basic() {
     APtr s2 = std::move(s);
     assert(s2.get() == p);
     assert(s.get() == 0);
-    if (!TEST_IS_CONSTANT_EVALUATED)
-      assert(A::count == expect_alive);
+    assert(A::count == expect_alive);
     assert(s2.get_deleter().state() == 5);
     assert(s.get_deleter().state() == 0);
   }
-  if (!TEST_IS_CONSTANT_EVALUATED)
-    assert(A::count == 0);
+  assert(A::count == 0);
   {
     typedef NCDeleter<VT> NonCopyDel;
     typedef std::unique_ptr<VT, NonCopyDel&> APtr;
@@ -124,28 +120,25 @@ TEST_CONSTEXPR_CXX23 void test_basic() {
     APtr s2 = std::move(s);
     assert(s2.get() == p);
     assert(s.get() == 0);
-    if (!TEST_IS_CONSTANT_EVALUATED)
-      assert(A::count == expect_alive);
+    assert(A::count == expect_alive);
     d.set_state(6);
     assert(s2.get_deleter().state() == d.state());
     assert(s.get_deleter().state() == d.state());
   }
-  if (!TEST_IS_CONSTANT_EVALUATED)
-    assert(A::count == 0);
+  assert(A::count == 0);
   {
     sink1<VT>(source1<VT>());
-    if (!TEST_IS_CONSTANT_EVALUATED)
-      assert(A::count == 0);
-    sink2<VT>(source2<VT>());
-    if (!TEST_IS_CONSTANT_EVALUATED)
-      assert(A::count == 0);
-  }
-  if (!TEST_IS_CONSTANT_EVALUATED)
     assert(A::count == 0);
+    sink2<VT>(source2<VT>());
+    assert(A::count == 0);
+    sink3<VT>(source3<VT>());
+    assert(A::count == 0);
+  }
+  assert(A::count == 0);
 }
 
 template <class VT>
-TEST_CONSTEXPR_CXX23 void test_noexcept() {
+void test_noexcept() {
 #if TEST_STD_VER >= 11
   {
     typedef std::unique_ptr<VT> U;
@@ -166,7 +159,7 @@ TEST_CONSTEXPR_CXX23 void test_noexcept() {
 #endif
 }
 
-TEST_CONSTEXPR_CXX23 bool test() {
+int main(int, char**) {
   {
     test_basic</*IsArray*/ false>();
     test_sfinae<int>();
@@ -177,24 +170,6 @@ TEST_CONSTEXPR_CXX23 bool test() {
     test_sfinae<int[]>();
     test_noexcept<int[]>();
   }
-
-  return true;
-}
-
-template <bool IsArray>
-void test_sink3() {
-  typedef typename std::conditional<!IsArray, A, A[]>::type VT;
-  sink3<VT>(source3<VT>());
-  assert(A::count == 0);
-}
-
-int main(int, char**) {
-  test_sink3</*IsArray*/ false>();
-  test_sink3</*IsArray*/ true>();
-  test();
-#if TEST_STD_VER >= 23
-  static_assert(test());
-#endif
 
   return 0;
 }

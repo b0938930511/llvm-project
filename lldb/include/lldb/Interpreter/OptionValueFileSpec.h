@@ -35,10 +35,6 @@ public:
   void DumpValue(const ExecutionContext *exe_ctx, Stream &strm,
                  uint32_t dump_mask) override;
 
-  llvm::json::Value ToJSON(const ExecutionContext *exe_ctx) override {
-    return m_current_value.GetPath();
-  }
-
   Status
   SetValueFromString(llvm::StringRef value,
                      VarSetOperationType op = eVarSetOperationAssign) override;
@@ -79,7 +75,7 @@ protected:
   FileSpec m_default_value;
   lldb::DataBufferSP m_data_sp;
   llvm::sys::TimePoint<> m_data_mod_time;
-  uint32_t m_completion_mask = lldb::eDiskFileCompletion;
+  uint32_t m_completion_mask = CommandCompletions::eDiskFileCompletion;
   bool m_resolve;
 };
 

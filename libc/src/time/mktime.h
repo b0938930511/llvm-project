@@ -9,12 +9,15 @@
 #ifndef LLVM_LIBC_SRC_TIME_MKTIME_H
 #define LLVM_LIBC_SRC_TIME_MKTIME_H
 
+#include "src/time/mktime.h"
 #include <time.h>
 
-namespace LIBC_NAMESPACE {
+namespace __llvm_libc {
 
 time_t mktime(struct tm *t1);
 
-} // namespace LIBC_NAMESPACE
+} // namespace __llvm_libc
 
 #endif // LLVM_LIBC_SRC_TIME_MKTIME_H
+
+#include "include/time.h"

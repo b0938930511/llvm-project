@@ -142,7 +142,7 @@ bool AnalysisDeclContext::isBodyAutosynthesizedFromModelFile() const {
 
 /// Returns true if \param VD is an Objective-C implicit 'self' parameter.
 static bool isSelfDecl(const VarDecl *VD) {
-  return isa_and_nonnull<ImplicitParamDecl>(VD) && VD->getName() == "self";
+  return isa<ImplicitParamDecl>(VD) && VD->getName() == "self";
 }
 
 const ImplicitParamDecl *AnalysisDeclContext::getSelfDecl() const {
@@ -169,8 +169,8 @@ const ImplicitParamDecl *AnalysisDeclContext::getSelfDecl() const {
     if (!LC.capturesVariable())
       continue;
 
-    ValueDecl *VD = LC.getCapturedVar();
-    if (isSelfDecl(dyn_cast<VarDecl>(VD)))
+    VarDecl *VD = LC.getCapturedVar();
+    if (isSelfDecl(VD))
       return dyn_cast<ImplicitParamDecl>(VD);
   }
 
@@ -231,7 +231,8 @@ CFG *AnalysisDeclContext::getCFG() {
 
 CFG *AnalysisDeclContext::getUnoptimizedCFG() {
   if (!builtCompleteCFG) {
-    SaveAndRestore NotPrune(cfgBuildOptions.PruneTriviallyFalseEdges, false);
+    SaveAndRestore<bool> NotPrune(cfgBuildOptions.PruneTriviallyFalseEdges,
+                                  false);
     completeCFG =
         CFG::buildCFG(D, getBody(), &D->getASTContext(), cfgBuildOptions);
     // Even when the cfg is not successfully built, we don't
@@ -351,7 +352,7 @@ std::string AnalysisDeclContext::getFunctionName(const Decl *D) {
       for (const auto &P : FD->parameters()) {
         if (P != *FD->param_begin())
           OS << ", ";
-        OS << P->getType();
+        OS << P->getType().getAsString();
       }
       OS << ')';
     }
@@ -386,7 +387,7 @@ std::string AnalysisDeclContext::getFunctionName(const Decl *D) {
     OS << ' ' << OMD->getSelector().getAsString() << ']';
   }
 
-  return Str;
+  return OS.str();
 }
 
 LocationContextManager &AnalysisDeclContext::getLocationContextManager() {

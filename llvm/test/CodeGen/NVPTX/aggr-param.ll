@@ -1,5 +1,4 @@
-; RUN: llc < %s -march=nvptx64 -mcpu=sm_20 | FileCheck %s
-; RUN: %if ptxas %{ llc < %s -march=nvptx64 -mcpu=sm_20 | %ptxas-verify %}
+; RUN: llc < %s -march=nvptx -mcpu=sm_20 | FileCheck %s
 
 ; Make sure aggregate param types get emitted properly.
 

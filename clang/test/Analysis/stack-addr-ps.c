@@ -1,6 +1,6 @@
-// RUN: %clang_analyze_cc1 -analyzer-checker=core -fblocks -verify %s
+// RUN: %clang_analyze_cc1 -analyzer-checker=core -analyzer-store=region -fblocks -verify %s
 
-int* f1(void) {
+int* f1() {
   int x = 0;
   return &x; // expected-warning{{Address of stack memory associated with local variable 'x' returned}} expected-warning{{address of stack memory associated with local variable 'x' returned}}
 }
@@ -33,7 +33,7 @@ void* compound_literal(int x, int y) {
   return p; // expected-warning{{Address of stack memory}}
 }
 
-void* alloca_test(void) {
+void* alloca_test() {
   void* p = __builtin_alloca(10);
   return p; // expected-warning{{Address of stack memory}}
 }
@@ -74,12 +74,14 @@ ComparatorBlock test_return_block_neg(void) {
   return b; // no-warning
 }
 
-int *rdar_7523821_f2(void) {
+// <rdar://problem/7523821>
+int *rdar_7523821_f2() {
   int a[3];
   return a; // expected-warning 2 {{ddress of stack memory associated with local variable 'a' returned}}
 };
 
 // Handle blocks that have no captures or are otherwise declared 'static'.
+// <rdar://problem/10348049>
 typedef int (^RDar10348049)(int value);
 RDar10348049 test_rdar10348049(void) {
   static RDar10348049 b = ^int(int x) {
@@ -91,7 +93,7 @@ RDar10348049 test_rdar10348049(void) {
 void testRegister(register const char *reg) {
     if (reg) (void)reg[0];
 }
-void callTestRegister(void) {
+void callTestRegister() {
     char buf[20];
     testRegister(buf); // no-warning
 }

@@ -40,7 +40,7 @@ void testLong(LongEnum input) {
 // GNU C allows forward declaring enums.
 extern enum forward_declared *fwd;
 
-void forward_enum(void) {
+void forward_enum() {
   printf("%u", fwd); // expected-warning{{format specifies type 'unsigned int' but the argument has type 'enum forward_declared *}}
   printf("%p", fwd);
 

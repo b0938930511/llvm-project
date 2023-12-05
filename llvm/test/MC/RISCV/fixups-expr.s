@@ -1,24 +1,20 @@
 # RUN: llvm-mc -filetype=obj -triple=riscv32 -mattr=+relax %s \
 # RUN:     | llvm-readobj -r - | FileCheck -check-prefix RELAX %s
 # RUN: llvm-mc -filetype=obj -triple=riscv32 -mattr=-relax %s \
-# RUN:     | llvm-readobj -r - | FileCheck -check-prefix NORELAX %s
+# RUN:     | llvm-readobj -r - | FileCheck -check-prefix RELAX %s
 
 # RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+relax %s \
 # RUN:     | llvm-readobj -r - | FileCheck -check-prefix RELAX %s
 # RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=-relax %s \
-# RUN:     | llvm-readobj -r - | FileCheck -check-prefix NORELAX %s
+# RUN:     | llvm-readobj -r - | FileCheck -check-prefix RELAX %s
 
-# NORELAX:      Relocations [
-# NORELAX-NEXT:   .rela.text {
-# NORELAX-NEXT:     R_RISCV_CALL_PLT
-# NORELAX-NEXT:   }
-# NORELAX-NEXT: ]
+# Check that subtraction expressions are emitted as two relocations always.
 
 .globl G1
 .globl G2
 .L1:
 G1:
-  call extern
+addi a0, a0, 0
 .L2:
 G2:
 

@@ -16,19 +16,19 @@ struct Point {
   float x, y, z;
 };
 
-struct Point *get_origin(void);
+struct Point *get_origin();
 
-void test_point(void) {
+void test_point() {
   (void)get_origin->x; // expected-error {{base of member reference is a function; perhaps you meant to call it with no arguments?}}
 }
 
 // These errors require C11.
 #if __STDC_VERSION__ > 199901L
-void noreturn_1(void) _Noreturn; // expected-error {{must precede function declarator}}
-void noreturn_1(void) {
+void noreturn_1() _Noreturn; // expected-error {{must precede function declarator}}
+void noreturn_1() {
   return; // expected-warning {{should not return}}
 }
-void noreturn_2(void) _Noreturn { // expected-error {{must precede function declarator}}
+void noreturn_2() _Noreturn { // expected-error {{must precede function declarator}}
   return; // expected-warning {{should not return}}
 }
 #endif

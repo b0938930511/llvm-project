@@ -22,17 +22,19 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Option/ArgList.h"
-#include "llvm/TargetParser/Host.h"
+#include "llvm/Support/Host.h"
 using namespace clang;
 using namespace llvm::opt;
 
-std::unique_ptr<CompilerInvocation>
-clang::createInvocation(ArrayRef<const char *> ArgList,
-                        CreateInvocationOptions Opts) {
-  assert(!ArgList.empty());
-  auto Diags = Opts.Diags
-                   ? std::move(Opts.Diags)
-                   : CompilerInstance::createDiagnostics(new DiagnosticOptions);
+std::unique_ptr<CompilerInvocation> clang::createInvocationFromCommandLine(
+    ArrayRef<const char *> ArgList, IntrusiveRefCntPtr<DiagnosticsEngine> Diags,
+    IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS, bool ShouldRecoverOnErorrs,
+    std::vector<std::string> *CC1Args) {
+  if (!Diags.get()) {
+    // No diagnostics engine was provided, so create our own diagnostics object
+    // with the default options.
+    Diags = CompilerInstance::createDiagnostics(new DiagnosticOptions);
+  }
 
   SmallVector<const char *, 16> Args(ArgList.begin(), ArgList.end());
 
@@ -44,17 +46,13 @@ clang::createInvocation(ArrayRef<const char *> ArgList,
 
   // FIXME: We shouldn't have to pass in the path info.
   driver::Driver TheDriver(Args[0], llvm::sys::getDefaultTargetTriple(), *Diags,
-                           "clang LLVM compiler", Opts.VFS);
+                           "clang LLVM compiler", VFS);
 
   // Don't check that inputs exist, they may have been remapped.
   TheDriver.setCheckInputsExist(false);
-  TheDriver.setProbePrecompiled(Opts.ProbePrecompiled);
 
   std::unique_ptr<driver::Compilation> C(TheDriver.BuildCompilation(Args));
   if (!C)
-    return nullptr;
-
-  if (C->getArgs().hasArg(driver::options::OPT_fdriver_only))
     return nullptr;
 
   // Just print the cc1 options if -### was present.
@@ -81,29 +79,27 @@ clang::createInvocation(ArrayRef<const char *> ArgList,
       }
     }
   }
-
-  bool PickFirstOfMany = OffloadCompilation || Opts.RecoverOnError;
-  if (Jobs.size() == 0 || (Jobs.size() > 1 && !PickFirstOfMany)) {
+  if (Jobs.size() == 0 || !isa<driver::Command>(*Jobs.begin()) ||
+      (Jobs.size() > 1 && !OffloadCompilation)) {
     SmallString<256> Msg;
     llvm::raw_svector_ostream OS(Msg);
     Jobs.Print(OS, "; ", true);
     Diags->Report(diag::err_fe_expected_compiler_job) << OS.str();
     return nullptr;
   }
-  auto Cmd = llvm::find_if(Jobs, [](const driver::Command &Cmd) {
-    return StringRef(Cmd.getCreator().getName()) == "clang";
-  });
-  if (Cmd == Jobs.end()) {
+
+  const driver::Command &Cmd = cast<driver::Command>(*Jobs.begin());
+  if (StringRef(Cmd.getCreator().getName()) != "clang") {
     Diags->Report(diag::err_fe_expected_clang_command);
     return nullptr;
   }
 
-  const ArgStringList &CCArgs = Cmd->getArguments();
-  if (Opts.CC1Args)
-    *Opts.CC1Args = {CCArgs.begin(), CCArgs.end()};
+  const ArgStringList &CCArgs = Cmd.getArguments();
+  if (CC1Args)
+    *CC1Args = {CCArgs.begin(), CCArgs.end()};
   auto CI = std::make_unique<CompilerInvocation>();
   if (!CompilerInvocation::CreateFromArgs(*CI, CCArgs, *Diags, Args[0]) &&
-      !Opts.RecoverOnError)
+      !ShouldRecoverOnErorrs)
     return nullptr;
   return CI;
 }

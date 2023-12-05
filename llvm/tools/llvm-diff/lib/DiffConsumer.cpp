@@ -134,12 +134,6 @@ void DiffConsumer::indent() {
   while (N--) out << ' ';
 }
 
-void DiffConsumer::reset() {
-  contexts.clear();
-  Differences = false;
-  Indent = 0;
-}
-
 bool DiffConsumer::hadDifferences() const {
   return Differences;
 }

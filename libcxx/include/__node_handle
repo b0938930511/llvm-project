@@ -10,62 +10,13 @@
 #ifndef _LIBCPP___NODE_HANDLE
 #define _LIBCPP___NODE_HANDLE
 
-/*
-
-template<unspecified>
-class node-handle {
-public:
-  using value_type     = see below;     // not present for map containers
-  using key_type       = see below;     // not present for set containers
-  using mapped_type    = see below;     // not present for set containers
-  using allocator_type = see below;
-
-private:
-  using container_node_type = unspecified;                  // exposition only
-  using ator_traits = allocator_traits<allocator_type>;     // exposition only
-
-  typename ator_traits::template
-    rebind_traits<container_node_type>::pointer ptr_;       // exposition only
-  optional<allocator_type> alloc_;                          // exposition only
-
-public:
-  // [container.node.cons], constructors, copy, and assignment
-  constexpr node-handle() noexcept : ptr_(), alloc_() {}
-  node-handle(node-handle&&) noexcept;
-  node-handle& operator=(node-handle&&);
-
-  // [container.node.dtor], destructor
-  ~node-handle();
-
-  // [container.node.observers], observers
-  value_type& value() const;            // not present for map containers
-  key_type& key() const;                // not present for set containers
-  mapped_type& mapped() const;          // not present for set containers
-
-  allocator_type get_allocator() const;
-  explicit operator bool() const noexcept;
-  [[nodiscard]] bool empty() const noexcept; // nodiscard since C++20
-
-  // [container.node.modifiers], modifiers
-  void swap(node-handle&)
-    noexcept(ator_traits::propagate_on_container_swap::value ||
-             ator_traits::is_always_equal::value);
-
-  friend void swap(node-handle& x, node-handle& y) noexcept(noexcept(x.swap(y))) {
-    x.swap(y);
-  }
-};
-
-*/
-
-#include <__assert>
 #include <__config>
-#include <__memory/allocator_traits.h>
-#include <__memory/pointer_traits.h>
+#include <__debug>
+#include <memory>
 #include <optional>
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
-#  pragma GCC system_header
+#pragma GCC system_header
 #endif
 
 _LIBCPP_PUSH_MACROS
@@ -73,7 +24,7 @@ _LIBCPP_PUSH_MACROS
 
 _LIBCPP_BEGIN_NAMESPACE_STD
 
-#if _LIBCPP_STD_VER >= 17
+#if _LIBCPP_STD_VER > 14
 
 // Specialized in __tree & __hash_table for their _NodeType.
 template <class _NodeType, class _Alloc>
@@ -94,8 +45,8 @@ class _LIBCPP_TEMPLATE_VIS __basic_node_handle
         _NodeType, __basic_node_handle<_NodeType, _Alloc, _MapOrSetSpecifics>>;
 
     typedef allocator_traits<_Alloc> __alloc_traits;
-    typedef __rebind_pointer_t<typename __alloc_traits::void_pointer,
-                                      _NodeType>
+    typedef typename __rebind_pointer<typename __alloc_traits::void_pointer,
+                                      _NodeType>::type
         __node_pointer_type;
 
 public:
@@ -105,14 +56,14 @@ private:
     __node_pointer_type __ptr_ = nullptr;
     optional<allocator_type> __alloc_;
 
-    _LIBCPP_HIDE_FROM_ABI
+    _LIBCPP_INLINE_VISIBILITY
     void __release_ptr()
     {
         __ptr_ = nullptr;
         __alloc_ = _VSTD::nullopt;
     }
 
-    _LIBCPP_HIDE_FROM_ABI
+    _LIBCPP_INLINE_VISIBILITY
     void __destroy_node_pointer()
     {
         if (__ptr_ != nullptr)
@@ -126,7 +77,7 @@ private:
         }
     }
 
-    _LIBCPP_HIDE_FROM_ABI
+    _LIBCPP_INLINE_VISIBILITY
     __basic_node_handle(__node_pointer_type __ptr,
                         allocator_type const& __alloc)
             : __ptr_(__ptr), __alloc_(__alloc)
@@ -134,10 +85,10 @@ private:
     }
 
 public:
-    _LIBCPP_HIDE_FROM_ABI
+    _LIBCPP_INLINE_VISIBILITY
     __basic_node_handle() = default;
 
-    _LIBCPP_HIDE_FROM_ABI
+    _LIBCPP_INLINE_VISIBILITY
     __basic_node_handle(__basic_node_handle&& __other) noexcept
             : __ptr_(__other.__ptr_),
               __alloc_(_VSTD::move(__other.__alloc_))
@@ -146,10 +97,10 @@ public:
         __other.__alloc_ = _VSTD::nullopt;
     }
 
-    _LIBCPP_HIDE_FROM_ABI
+    _LIBCPP_INLINE_VISIBILITY
     __basic_node_handle& operator=(__basic_node_handle&& __other)
     {
-        _LIBCPP_ASSERT_COMPATIBLE_ALLOCATOR(
+        _LIBCPP_ASSERT(
             __alloc_ == _VSTD::nullopt ||
             __alloc_traits::propagate_on_container_move_assignment::value ||
             __alloc_ == __other.__alloc_,
@@ -169,16 +120,16 @@ public:
         return *this;
     }
 
-    _LIBCPP_HIDE_FROM_ABI
+    _LIBCPP_INLINE_VISIBILITY
     allocator_type get_allocator() const { return *__alloc_; }
 
-    _LIBCPP_HIDE_FROM_ABI
+    _LIBCPP_INLINE_VISIBILITY
     explicit operator bool() const { return __ptr_ != nullptr; }
 
-    _LIBCPP_NODISCARD_AFTER_CXX17 _LIBCPP_HIDE_FROM_ABI
+    _LIBCPP_NODISCARD_AFTER_CXX17 _LIBCPP_INLINE_VISIBILITY
     bool empty() const { return __ptr_ == nullptr; }
 
-    _LIBCPP_HIDE_FROM_ABI
+    _LIBCPP_INLINE_VISIBILITY
     void swap(__basic_node_handle& __other) noexcept(
         __alloc_traits::propagate_on_container_swap::value ||
         __alloc_traits::is_always_equal::value)
@@ -190,11 +141,11 @@ public:
             swap(__alloc_, __other.__alloc_);
     }
 
-    _LIBCPP_HIDE_FROM_ABI
+    _LIBCPP_INLINE_VISIBILITY
     friend void swap(__basic_node_handle& __a, __basic_node_handle& __b)
         noexcept(noexcept(__a.swap(__b))) { __a.swap(__b); }
 
-    _LIBCPP_HIDE_FROM_ABI
+    _LIBCPP_INLINE_VISIBILITY
     ~__basic_node_handle()
     {
         __destroy_node_pointer();
@@ -206,10 +157,10 @@ struct __set_node_handle_specifics
 {
     typedef typename _NodeType::__node_value_type value_type;
 
-    _LIBCPP_HIDE_FROM_ABI
+    _LIBCPP_INLINE_VISIBILITY
     value_type& value() const
     {
-        return static_cast<_Derived const*>(this)->__ptr_->__get_value();
+        return static_cast<_Derived const*>(this)->__ptr_->__value_;
     }
 };
 
@@ -219,18 +170,18 @@ struct __map_node_handle_specifics
     typedef typename _NodeType::__node_value_type::key_type key_type;
     typedef typename _NodeType::__node_value_type::mapped_type mapped_type;
 
-    _LIBCPP_HIDE_FROM_ABI
+    _LIBCPP_INLINE_VISIBILITY
     key_type& key() const
     {
         return static_cast<_Derived const*>(this)->
-            __ptr_->__get_value().__ref().first;
+            __ptr_->__value_.__ref().first;
     }
 
-    _LIBCPP_HIDE_FROM_ABI
+    _LIBCPP_INLINE_VISIBILITY
     mapped_type& mapped() const
     {
         return static_cast<_Derived const*>(this)->
-            __ptr_->__get_value().__ref().second;
+            __ptr_->__value_.__ref().second;
     }
 };
 
@@ -250,10 +201,9 @@ struct _LIBCPP_TEMPLATE_VIS __insert_return_type
     _NodeType node;
 };
 
-#endif // _LIBCPP_STD_VER >= 17
+#endif // _LIBCPP_STD_VER > 14
 
 _LIBCPP_END_NAMESPACE_STD
-
 _LIBCPP_POP_MACROS
 
 #endif  // _LIBCPP___NODE_HANDLE

@@ -1,4 +1,4 @@
-; RUN:  opt < %s -passes=adce
+; RUN:  opt < %s -adce
 
 define i32 @"main"(i32 %argc) {
 	br label %2

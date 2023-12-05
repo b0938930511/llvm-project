@@ -1,4 +1,5 @@
-! RUN: %python %S/test_errors.py %s %flang_fc1
+! RUN: %S/test_errors.sh %s %t %flang_fc1
+! REQUIRES: shell
 ! Test USE statements that use same module multiple times mixed with rename
 ! clauses and ONLY clauses
 module m1
@@ -34,69 +35,63 @@ program testUse1
   !ERROR: 'a' is use-associated from module 'm2' and cannot be re-declared
   integer :: a = 2
 end
-subroutine testUse2
+program testUse2
   use m1,only : a ! This forces the use association of m1's "a" as local "a"
   use m1,z=>a ! This rename doesn't affect the previous forced USE association
   !ERROR: 'a' is use-associated from module 'm1' and cannot be re-declared
   integer :: a = 2
 end
-subroutine testUse3
+program testUse3
   use m1 ! By itself, this would use associate m1's "a" with a local "a"
   use m1,z=>a ! This rename of m1'a "a" removes the previous use association
   integer :: a = 2
 end
-subroutine testUse4
+program testUse4
   use m1,only : a ! Use associate m1's "a" with local "a"
   use m1,z=>a ! Also use associate m1's "a" with local "z", also pulls in "b"
   !ERROR: 'b' is use-associated from module 'm1' and cannot be re-declared
   integer :: b = 2
 end
-subroutine testUse5
+program testUse5
   use m1,z=>a ! The rename prevents creation of a local "a"
   use m1 ! Does not create a local "a" because of the previous rename
   integer :: a = 2
 end
-subroutine testUse6
+program testUse6
   use m1, z => a ! Hides m1's "a"
   use m1, y => b ! Hides m1's "b"
   integer :: a = 4 ! OK
   integer :: b = 5 ! OK
 end
-subroutine testUse7
+program testUse7
   use m3,t1=>t2,t2=>t1 ! Looks weird but all is good
   type(t1) x
   type(t2) y
   x%t2_value = a
   y%t1_value = z
 end
-subroutine testUse8
+program testUse8
   use m4 ! This USE associates all of m1
   !ERROR: 'a' is use-associated from module 'm4' and cannot be re-declared
   integer :: a = 2
 end
-subroutine testUse9
+program testUse9
   use m5
   integer :: a = 2
 end
-subroutine testUse10
+program testUse10
   use m4
   use m4, z=>a ! This rename erases the USE assocated "a" from m1
   integer :: a = 2
 end
-subroutine testUse11
+program testUse11
   use m6
   use m6, z=>a ! This rename erases the USE assocated "a" from m1
   integer :: a = 2
 end
-subroutine testUse12
+program testUse12
   use m4 ! This USE associates "a" from m1
   use m1, z=>a ! This renames the "a" from m1, but not the one through m4
   !ERROR: 'a' is use-associated from module 'm4' and cannot be re-declared
   integer :: a = 2
-end
-subroutine testUse13
-  use m1, a => a
-  use m1, z => a ! should not erase 'a', it was renamed
-  !ERROR: 'a' is use-associated from module 'm1' and cannot be re-declared
-  integer :: a = 13
 end

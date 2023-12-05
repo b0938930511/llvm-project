@@ -8,14 +8,12 @@
 define i32 @t1(i32 %x) nounwind readnone ssp {
 ; X32-LABEL: t1:
 ; X32:       # %bb.0:
-; X32-NEXT:    xorl %eax, %eax
 ; X32-NEXT:    cmpl $1, {{[0-9]+}}(%esp)
 ; X32-NEXT:    sbbl %eax, %eax
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: t1:
 ; X64:       # %bb.0:
-; X64-NEXT:    xorl %eax, %eax
 ; X64-NEXT:    cmpl $1, %edi
 ; X64-NEXT:    sbbl %eax, %eax
 ; X64-NEXT:    retq
@@ -27,14 +25,12 @@ define i32 @t1(i32 %x) nounwind readnone ssp {
 define i32 @t2(i32 %x) nounwind readnone ssp {
 ; X32-LABEL: t2:
 ; X32:       # %bb.0:
-; X32-NEXT:    xorl %eax, %eax
 ; X32-NEXT:    cmpl $1, {{[0-9]+}}(%esp)
 ; X32-NEXT:    sbbl %eax, %eax
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: t2:
 ; X64:       # %bb.0:
-; X64-NEXT:    xorl %eax, %eax
 ; X64-NEXT:    cmpl $1, %edi
 ; X64-NEXT:    sbbl %eax, %eax
 ; X64-NEXT:    retq
@@ -47,7 +43,6 @@ define i32 @t3(i32 %x, i64 %y) nounwind readonly {
 ; X32-LABEL: t3:
 ; X32:       # %bb.0: # %entry
 ; X32-NEXT:    movl {{[0-9]+}}(%esp), %eax
-; X32-NEXT:    xorl %ecx, %ecx
 ; X32-NEXT:    cmpl $1, {{[0-9]+}}(%esp)
 ; X32-NEXT:    sbbl %ecx, %ecx
 ; X32-NEXT:    cmpl %ecx, {{[0-9]+}}(%esp)
@@ -92,7 +87,6 @@ define i32 @t4(i64 %x) nounwind readnone ssp {
 ;
 ; X64-LABEL: t4:
 ; X64:       # %bb.0:
-; X64-NEXT:    xorl %eax, %eax
 ; X64-NEXT:    cmpq $1, %rdi
 ; X64-NEXT:    sbbl %eax, %eax
 ; X64-NEXT:    retq
@@ -104,7 +98,6 @@ define i32 @t4(i64 %x) nounwind readnone ssp {
 define i64 @t5(i32 %x) nounwind readnone ssp {
 ; X32-LABEL: t5:
 ; X32:       # %bb.0:
-; X32-NEXT:    xorl %eax, %eax
 ; X32-NEXT:    cmpl $1, {{[0-9]+}}(%esp)
 ; X32-NEXT:    sbbl %eax, %eax
 ; X32-NEXT:    movl %eax, %edx
@@ -112,7 +105,6 @@ define i64 @t5(i32 %x) nounwind readnone ssp {
 ;
 ; X64-LABEL: t5:
 ; X64:       # %bb.0:
-; X64-NEXT:    xorl %eax, %eax
 ; X64-NEXT:    cmpl $1, %edi
 ; X64-NEXT:    sbbq %rax, %rax
 ; X64-NEXT:    retq

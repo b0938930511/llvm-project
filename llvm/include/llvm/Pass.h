@@ -28,9 +28,6 @@
 #ifndef LLVM_PASS_H
 #define LLVM_PASS_H
 
-#ifdef EXPENSIVE_CHECKS
-#include <cstdint>
-#endif
 #include <string>
 
 namespace llvm {
@@ -231,16 +228,6 @@ public:
   template <typename AnalysisType>
   AnalysisType &getAnalysisID(AnalysisID PI, Function &F,
                               bool *Changed = nullptr);
-
-#ifdef EXPENSIVE_CHECKS
-  /// Hash a module in order to detect when a module (or more specific) pass has
-  /// modified it.
-  uint64_t structuralHash(Module &M) const;
-
-  /// Hash a function in order to detect when a function (or more specific) pass
-  /// has modified it.
-  virtual uint64_t structuralHash(Function &F) const;
-#endif
 };
 
 //===----------------------------------------------------------------------===//

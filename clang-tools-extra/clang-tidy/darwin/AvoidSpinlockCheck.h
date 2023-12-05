@@ -11,13 +11,15 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::darwin {
+namespace clang {
+namespace tidy {
+namespace darwin {
 
 /// Finds usages of OSSpinlock, which is deprecated due to potential livelock
 /// problems.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/darwin/avoid-spinlock.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/darwin-avoid-spinlock.html
 class AvoidSpinlockCheck : public ClangTidyCheck {
  public:
   AvoidSpinlockCheck(StringRef Name, ClangTidyContext *Context)
@@ -26,6 +28,8 @@ class AvoidSpinlockCheck : public ClangTidyCheck {
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
 };
 
-} // namespace clang::tidy::darwin
+}  // namespace darwin
+}  // namespace tidy
+}  // namespace clang
 
 #endif  // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_DARWIN_AVOIDSPINLOCKCHECK_H

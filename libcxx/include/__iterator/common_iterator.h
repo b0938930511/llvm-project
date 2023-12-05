@@ -10,28 +10,19 @@
 #ifndef _LIBCPP___ITERATOR_COMMON_ITERATOR_H
 #define _LIBCPP___ITERATOR_COMMON_ITERATOR_H
 
-#include <__assert>
-#include <__concepts/assignable.h>
-#include <__concepts/constructible.h>
-#include <__concepts/convertible_to.h>
-#include <__concepts/copyable.h>
-#include <__concepts/derived_from.h>
-#include <__concepts/equality_comparable.h>
-#include <__concepts/same_as.h>
 #include <__config>
+#include <__debug>
 #include <__iterator/concepts.h>
 #include <__iterator/incrementable_traits.h>
 #include <__iterator/iter_move.h>
 #include <__iterator/iter_swap.h>
 #include <__iterator/iterator_traits.h>
 #include <__iterator/readable_traits.h>
-#include <__memory/addressof.h>
-#include <__type_traits/is_pointer.h>
-#include <__utility/declval.h>
+#include <concepts>
 #include <variant>
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
-#  pragma GCC system_header
+#pragma GCC system_header
 #endif
 
 _LIBCPP_PUSH_MACROS
@@ -39,47 +30,55 @@ _LIBCPP_PUSH_MACROS
 
 _LIBCPP_BEGIN_NAMESPACE_STD
 
-#if _LIBCPP_STD_VER >= 20
-
-template<class _Iter>
-concept __can_use_postfix_proxy =
-  constructible_from<iter_value_t<_Iter>, iter_reference_t<_Iter>> &&
-  move_constructible<iter_value_t<_Iter>>;
+#if !defined(_LIBCPP_HAS_NO_RANGES)
 
 template<input_or_output_iterator _Iter, sentinel_for<_Iter> _Sent>
   requires (!same_as<_Iter, _Sent> && copyable<_Iter>)
 class common_iterator {
-  struct __proxy {
-    _LIBCPP_HIDE_FROM_ABI constexpr const iter_value_t<_Iter>* operator->() const noexcept {
-      return _VSTD::addressof(__value_);
+  class __proxy {
+    friend common_iterator;
+
+    iter_value_t<_Iter> __value;
+    // We can move __x because the only caller verifies that __x is not a reference.
+    constexpr __proxy(iter_reference_t<_Iter>&& __x)
+      : __value(_VSTD::move(__x)) {}
+
+  public:
+    const iter_value_t<_Iter>* operator->() const {
+      return _VSTD::addressof(__value);
     }
-    iter_value_t<_Iter> __value_;
   };
 
-  struct __postfix_proxy {
-    _LIBCPP_HIDE_FROM_ABI constexpr const iter_value_t<_Iter>& operator*() const noexcept {
-      return __value_;
-    }
-    iter_value_t<_Iter> __value_;
-  };
+  class __postfix_proxy {
+    friend common_iterator;
 
-  variant<_Iter, _Sent> __hold_;
-  template<input_or_output_iterator _OtherIter, sentinel_for<_OtherIter> _OtherSent>
-    requires (!same_as<_OtherIter, _OtherSent> && copyable<_OtherIter>)
-  friend class common_iterator;
+    iter_value_t<_Iter> __value;
+    constexpr __postfix_proxy(iter_reference_t<_Iter>&& __x)
+      : __value(_VSTD::forward<iter_reference_t<_Iter>>(__x)) {}
+
+  public:
+    constexpr static bool __valid_for_iter =
+      constructible_from<iter_value_t<_Iter>, iter_reference_t<_Iter>> &&
+      move_constructible<iter_value_t<_Iter>>;
+
+    const iter_value_t<_Iter>& operator*() const {
+      return __value;
+    }
+  };
 
 public:
-  _LIBCPP_HIDE_FROM_ABI common_iterator() requires default_initializable<_Iter> = default;
+  variant<_Iter, _Sent> __hold_;
 
-  _LIBCPP_HIDE_FROM_ABI constexpr common_iterator(_Iter __i) : __hold_(in_place_type<_Iter>, _VSTD::move(__i)) {}
-  _LIBCPP_HIDE_FROM_ABI constexpr common_iterator(_Sent __s) : __hold_(in_place_type<_Sent>, _VSTD::move(__s)) {}
+  common_iterator() requires default_initializable<_Iter> = default;
+
+  constexpr common_iterator(_Iter __i) : __hold_(in_place_type<_Iter>, _VSTD::move(__i)) {}
+  constexpr common_iterator(_Sent __s) : __hold_(in_place_type<_Sent>, _VSTD::move(__s)) {}
 
   template<class _I2, class _S2>
     requires convertible_to<const _I2&, _Iter> && convertible_to<const _S2&, _Sent>
-  _LIBCPP_HIDE_FROM_ABI constexpr common_iterator(const common_iterator<_I2, _S2>& __other)
+  constexpr common_iterator(const common_iterator<_I2, _S2>& __other)
     : __hold_([&]() -> variant<_Iter, _Sent> {
-      _LIBCPP_ASSERT_UNCATEGORIZED(!__other.__hold_.valueless_by_exception(),
-                                   "Attempted to construct from a valueless common_iterator");
+      _LIBCPP_ASSERT(!__other.__hold_.valueless_by_exception(), "Constructed from valueless iterator.");
       if (__other.__hold_.index() == 0)
         return variant<_Iter, _Sent>{in_place_index<0>, _VSTD::__unchecked_get<0>(__other.__hold_)};
       return variant<_Iter, _Sent>{in_place_index<1>, _VSTD::__unchecked_get<1>(__other.__hold_)};
@@ -88,9 +87,8 @@ public:
   template<class _I2, class _S2>
     requires convertible_to<const _I2&, _Iter> && convertible_to<const _S2&, _Sent> &&
              assignable_from<_Iter&, const _I2&> && assignable_from<_Sent&, const _S2&>
-  _LIBCPP_HIDE_FROM_ABI common_iterator& operator=(const common_iterator<_I2, _S2>& __other) {
-    _LIBCPP_ASSERT_UNCATEGORIZED(!__other.__hold_.valueless_by_exception(),
-                                 "Attempted to assign from a valueless common_iterator");
+  common_iterator& operator=(const common_iterator<_I2, _S2>& __other) {
+    _LIBCPP_ASSERT(!__other.__hold_.valueless_by_exception(), "Assigned from valueless iterator.");
 
     auto __idx = __hold_.index();
     auto __other_idx = __other.__hold_.index();
@@ -110,58 +108,60 @@ public:
     return *this;
   }
 
-  _LIBCPP_HIDE_FROM_ABI constexpr decltype(auto) operator*()
+  decltype(auto) operator*()
   {
-    _LIBCPP_ASSERT_UNCATEGORIZED(std::holds_alternative<_Iter>(__hold_),
-                                 "Attempted to dereference a non-dereferenceable common_iterator");
+    _LIBCPP_ASSERT(holds_alternative<_Iter>(__hold_),
+                   "Cannot dereference sentinel. Common iterator not holding an iterator.");
     return *_VSTD::__unchecked_get<_Iter>(__hold_);
   }
 
-  _LIBCPP_HIDE_FROM_ABI constexpr decltype(auto) operator*() const
+  decltype(auto) operator*() const
     requires __dereferenceable<const _Iter>
   {
-    _LIBCPP_ASSERT_UNCATEGORIZED(std::holds_alternative<_Iter>(__hold_),
-                                 "Attempted to dereference a non-dereferenceable common_iterator");
+    _LIBCPP_ASSERT(holds_alternative<_Iter>(__hold_),
+                   "Cannot dereference sentinel. Common iterator not holding an iterator.");
     return *_VSTD::__unchecked_get<_Iter>(__hold_);
   }
 
   template<class _I2 = _Iter>
-  _LIBCPP_HIDE_FROM_ABI decltype(auto) operator->() const
+  decltype(auto) operator->() const
     requires indirectly_readable<const _I2> &&
     (requires(const _I2& __i) { __i.operator->(); } ||
      is_reference_v<iter_reference_t<_I2>> ||
      constructible_from<iter_value_t<_I2>, iter_reference_t<_I2>>)
   {
-    _LIBCPP_ASSERT_UNCATEGORIZED(std::holds_alternative<_Iter>(__hold_),
-                                 "Attempted to dereference a non-dereferenceable common_iterator");
+    _LIBCPP_ASSERT(holds_alternative<_Iter>(__hold_),
+                   "Cannot dereference sentinel. Common iterator not holding an iterator.");
+
     if constexpr (is_pointer_v<_Iter> || requires(const _Iter& __i) { __i.operator->(); })    {
       return _VSTD::__unchecked_get<_Iter>(__hold_);
     } else if constexpr (is_reference_v<iter_reference_t<_Iter>>) {
       auto&& __tmp = *_VSTD::__unchecked_get<_Iter>(__hold_);
       return _VSTD::addressof(__tmp);
     } else {
-      return __proxy{*_VSTD::__unchecked_get<_Iter>(__hold_)};
+      return __proxy(*_VSTD::__unchecked_get<_Iter>(__hold_));
     }
   }
 
-  _LIBCPP_HIDE_FROM_ABI common_iterator& operator++() {
-    _LIBCPP_ASSERT_UNCATEGORIZED(std::holds_alternative<_Iter>(__hold_),
-                                 "Attempted to increment a non-dereferenceable common_iterator");
+  common_iterator& operator++() {
+    _LIBCPP_ASSERT(holds_alternative<_Iter>(__hold_),
+                   "Cannot increment sentinel. Common iterator not holding an iterator.");
     ++_VSTD::__unchecked_get<_Iter>(__hold_); return *this;
   }
 
-  _LIBCPP_HIDE_FROM_ABI decltype(auto) operator++(int) {
-    _LIBCPP_ASSERT_UNCATEGORIZED(std::holds_alternative<_Iter>(__hold_),
-                                 "Attempted to increment a non-dereferenceable common_iterator");
+  decltype(auto) operator++(int) {
+    _LIBCPP_ASSERT(holds_alternative<_Iter>(__hold_),
+                   "Cannot increment sentinel. Common iterator not holding an iterator.");
+
     if constexpr (forward_iterator<_Iter>) {
       auto __tmp = *this;
       ++*this;
       return __tmp;
-    } else if constexpr (requires (_Iter& __i) { { *__i++ } -> __can_reference; } ||
-                         !__can_use_postfix_proxy<_Iter>) {
+    } else if constexpr (requires (_Iter& __i) { { *__i++ } -> __referenceable; } ||
+                         !__postfix_proxy::__valid_for_iter) {
       return _VSTD::__unchecked_get<_Iter>(__hold_)++;
     } else {
-      auto __p = __postfix_proxy{**this};
+      __postfix_proxy __p(**this);
       ++*this;
       return __p;
     }
@@ -169,12 +169,10 @@ public:
 
   template<class _I2, sentinel_for<_Iter> _S2>
     requires sentinel_for<_Sent, _I2>
-  _LIBCPP_HIDE_FROM_ABI
-  friend constexpr bool operator==(const common_iterator& __x, const common_iterator<_I2, _S2>& __y) {
-    _LIBCPP_ASSERT_UNCATEGORIZED(!__x.__hold_.valueless_by_exception(),
-                                 "Attempted to compare a valueless common_iterator");
-    _LIBCPP_ASSERT_UNCATEGORIZED(!__y.__hold_.valueless_by_exception(),
-                                 "Attempted to compare a valueless common_iterator");
+  friend bool operator==(const common_iterator& __x, const common_iterator<_I2, _S2>& __y) {
+    _LIBCPP_ASSERT(!__x.__hold_.valueless_by_exception() &&
+                   !__y.__hold_.valueless_by_exception(),
+                   "One or both common_iterators are valueless. (Cannot compare valueless iterators.)");
 
     auto __x_index = __x.__hold_.index();
     auto __y_index = __y.__hold_.index();
@@ -190,12 +188,10 @@ public:
 
   template<class _I2, sentinel_for<_Iter> _S2>
     requires sentinel_for<_Sent, _I2> && equality_comparable_with<_Iter, _I2>
-  _LIBCPP_HIDE_FROM_ABI
-  friend constexpr bool operator==(const common_iterator& __x, const common_iterator<_I2, _S2>& __y) {
-    _LIBCPP_ASSERT_UNCATEGORIZED(!__x.__hold_.valueless_by_exception(),
-                                 "Attempted to compare a valueless common_iterator");
-    _LIBCPP_ASSERT_UNCATEGORIZED(!__y.__hold_.valueless_by_exception(),
-                                 "Attempted to compare a valueless common_iterator");
+  friend bool operator==(const common_iterator& __x, const common_iterator<_I2, _S2>& __y) {
+    _LIBCPP_ASSERT(!__x.__hold_.valueless_by_exception() &&
+                   !__y.__hold_.valueless_by_exception(),
+                   "One or both common_iterators are valueless. (Cannot compare valueless iterators.)");
 
     auto __x_index = __x.__hold_.index();
     auto __y_index = __y.__hold_.index();
@@ -214,12 +210,10 @@ public:
 
   template<sized_sentinel_for<_Iter> _I2, sized_sentinel_for<_Iter> _S2>
     requires sized_sentinel_for<_Sent, _I2>
-  _LIBCPP_HIDE_FROM_ABI
-  friend constexpr iter_difference_t<_I2> operator-(const common_iterator& __x, const common_iterator<_I2, _S2>& __y) {
-    _LIBCPP_ASSERT_UNCATEGORIZED(!__x.__hold_.valueless_by_exception(),
-                                 "Attempted to subtract from a valueless common_iterator");
-    _LIBCPP_ASSERT_UNCATEGORIZED(!__y.__hold_.valueless_by_exception(),
-                                 "Attempted to subtract a valueless common_iterator");
+  friend iter_difference_t<_I2> operator-(const common_iterator& __x, const common_iterator<_I2, _S2>& __y) {
+    _LIBCPP_ASSERT(!__x.__hold_.valueless_by_exception() &&
+                   !__y.__hold_.valueless_by_exception(),
+                   "One or both common_iterators are valueless. (Cannot subtract valueless iterators.)");
 
     auto __x_index = __x.__hold_.index();
     auto __y_index = __y.__hold_.index();
@@ -236,24 +230,24 @@ public:
     return _VSTD::__unchecked_get<_Sent>(__x.__hold_) - _VSTD::__unchecked_get<_I2>(__y.__hold_);
   }
 
-  _LIBCPP_HIDE_FROM_ABI friend constexpr iter_rvalue_reference_t<_Iter> iter_move(const common_iterator& __i)
-    noexcept(noexcept(ranges::iter_move(std::declval<const _Iter&>())))
+  friend iter_rvalue_reference_t<_Iter> iter_move(const common_iterator& __i)
+    noexcept(noexcept(ranges::iter_move(declval<const _Iter&>())))
       requires input_iterator<_Iter>
   {
-    _LIBCPP_ASSERT_UNCATEGORIZED(std::holds_alternative<_Iter>(__i.__hold_),
-                                 "Attempted to iter_move a non-dereferenceable common_iterator");
+    _LIBCPP_ASSERT(holds_alternative<_Iter>(__i.__hold_),
+                   "Cannot iter_move a sentinel. Common iterator not holding an iterator.");
     return ranges::iter_move( _VSTD::__unchecked_get<_Iter>(__i.__hold_));
   }
 
   template<indirectly_swappable<_Iter> _I2, class _S2>
-  _LIBCPP_HIDE_FROM_ABI friend constexpr void iter_swap(const common_iterator& __x, const common_iterator<_I2, _S2>& __y)
-      noexcept(noexcept(ranges::iter_swap(std::declval<const _Iter&>(), std::declval<const _I2&>())))
+  friend void iter_swap(const common_iterator& __x, const common_iterator<_I2, _S2>& __y)
+      noexcept(noexcept(ranges::iter_swap(declval<const _Iter&>(), declval<const _I2&>())))
   {
-    _LIBCPP_ASSERT_UNCATEGORIZED(std::holds_alternative<_Iter>(__x.__hold_),
-                                 "Attempted to iter_swap a non-dereferenceable common_iterator");
-    _LIBCPP_ASSERT_UNCATEGORIZED(std::holds_alternative<_I2>(__y.__hold_),
-                                 "Attempted to iter_swap a non-dereferenceable common_iterator");
-    return ranges::iter_swap(_VSTD::__unchecked_get<_Iter>(__x.__hold_), _VSTD::__unchecked_get<_I2>(__y.__hold_));
+    _LIBCPP_ASSERT(holds_alternative<_Iter>(__x.__hold_),
+                   "Cannot swap __y with a sentinel. Common iterator (__x) not holding an iterator.");
+    _LIBCPP_ASSERT(holds_alternative<_Iter>(__y.__hold_),
+                   "Cannot swap __x with a sentinel. Common iterator (__y) not holding an iterator.");
+    return ranges::iter_swap( _VSTD::__unchecked_get<_Iter>(__x.__hold_),  _VSTD::__unchecked_get<_Iter>(__y.__hold_));
   }
 };
 
@@ -280,10 +274,10 @@ struct __arrow_type_or_void {
 template<class _Iter, class _Sent>
   requires __common_iter_has_ptr_op<_Iter, _Sent>
 struct __arrow_type_or_void<_Iter, _Sent> {
-    using type = decltype(std::declval<const common_iterator<_Iter, _Sent>&>().operator->());
+    using type = decltype(declval<const common_iterator<_Iter, _Sent>>().operator->());
 };
 
-template<input_iterator _Iter, class _Sent>
+template<class _Iter, class _Sent>
 struct iterator_traits<common_iterator<_Iter, _Sent>> {
   using iterator_concept = _If<forward_iterator<_Iter>,
                                forward_iterator_tag,
@@ -297,7 +291,8 @@ struct iterator_traits<common_iterator<_Iter, _Sent>> {
   using reference = iter_reference_t<_Iter>;
 };
 
-#endif // _LIBCPP_STD_VER >= 20
+
+#endif // !defined(_LIBCPP_HAS_NO_RANGES)
 
 _LIBCPP_END_NAMESPACE_STD
 

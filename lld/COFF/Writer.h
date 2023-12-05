@@ -16,11 +16,11 @@
 #include <cstdint>
 #include <vector>
 
-namespace lld::coff {
+namespace lld {
+namespace coff {
 static const int pageSize = 4096;
-class COFFLinkerContext;
 
-void writeResult(COFFLinkerContext &ctx);
+void writeResult();
 
 class PartialSection {
 public:
@@ -45,10 +45,13 @@ public:
   void insertChunkAtStart(Chunk *c);
   void merge(OutputSection *other);
   void setPermissions(uint32_t c);
-  uint64_t getRVA() const { return header.VirtualAddress; }
-  uint64_t getFileOff() const { return header.PointerToRawData; }
-  void writeHeaderTo(uint8_t *buf, bool isDebug);
+  uint64_t getRVA() { return header.VirtualAddress; }
+  uint64_t getFileOff() { return header.PointerToRawData; }
+  void writeHeaderTo(uint8_t *buf);
   void addContributingPartialSection(PartialSection *sec);
+
+  // Clear the output sections static container.
+  static void clear();
 
   // Returns the size of this section in an executable memory image.
   // This may be smaller than the raw size (the raw size is multiple
@@ -63,12 +66,6 @@ public:
   // Set offset into the string table storing this section name.
   // Used only when the name is longer than 8 bytes.
   void setStringTableOff(uint32_t v) { stringTableOff = v; }
-
-  bool isCodeSection() const {
-    return (header.Characteristics & llvm::COFF::IMAGE_SCN_CNT_CODE) &&
-           (header.Characteristics & llvm::COFF::IMAGE_SCN_MEM_READ) &&
-           (header.Characteristics & llvm::COFF::IMAGE_SCN_MEM_EXECUTE);
-  }
 
   // N.B. The section index is one based.
   uint32_t sectionIndex = 0;
@@ -85,6 +82,7 @@ private:
   uint32_t stringTableOff = 0;
 };
 
-} // namespace lld::coff
+} // namespace coff
+} // namespace lld
 
 #endif

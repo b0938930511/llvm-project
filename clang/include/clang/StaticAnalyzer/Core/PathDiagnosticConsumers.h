@@ -20,6 +20,7 @@
 
 namespace clang {
 
+class AnalyzerOptions;
 class MacroExpansionContext;
 class Preprocessor;
 

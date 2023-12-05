@@ -7,13 +7,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "Config.h"
+#include "TestTU.h"
 #include "TweakTesting.h"
-#include "support/Context.h"
-#include "llvm/ADT/StringMap.h"
-#include "llvm/ADT/StringRef.h"
+#include "gmock/gmock-matchers.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include <string>
-#include <utility>
 
 namespace clang {
 namespace clangd {
@@ -34,7 +32,7 @@ namespace one {
 void oo() {}
 template<typename TT> class tt {};
 namespace two {
-enum ee { ee_enum_value };
+enum ee {};
 void ff() {}
 class cc {
 public:
@@ -68,15 +66,11 @@ public:
   EXPECT_UNAVAILABLE(Header + "void fun() { ::ban::fo^o(); }");
   EXPECT_AVAILABLE(Header + "void fun() { banana::fo^o(); }");
 
+  // Do not offer code action on typo-corrections.
+  EXPECT_UNAVAILABLE(Header + "/*error-ok*/c^c C;");
+
   // NestedNameSpecifier, but no namespace.
   EXPECT_UNAVAILABLE(Header + "class Foo {}; class F^oo foo;");
-
-  // Nested macro case.
-  EXPECT_AVAILABLE(R"cpp(
-  #define ID2(X) X
-  #define ID(Y, X) Y;ID2(X)
-  namespace ns { struct Foo{}; }
-  ID(int xyz, ns::F^oo) f;)cpp");
 
   // Check that we do not trigger in header files.
   FileName = "test.h";
@@ -86,35 +80,21 @@ public:
   EXPECT_UNAVAILABLE(Header + "void fun() { one::two::f^f(); }");
 }
 
-TEST_F(AddUsingTest, Crash1072) {
-  // Used to crash when traversing catch(...)
-  // https://github.com/clangd/clangd/issues/1072
-  const char *Code = R"cpp(
-  namespace ns { class A; }
-  ns::^A *err;
-  void catchall() {
-    try {} catch(...) {}
-  }
-  )cpp";
-  EXPECT_AVAILABLE(Code);
-}
-
 TEST_F(AddUsingTest, Apply) {
   FileName = "test.cpp";
   struct {
     llvm::StringRef TestSource;
     llvm::StringRef ExpectedSource;
-  } Cases[]{
-      {
-          // Function, no other using, namespace.
-          R"cpp(
+  } Cases[]{{
+                // Function, no other using, namespace.
+                R"cpp(
 #include "test.hpp"
 namespace {
 void fun() {
-  ^one::two::ff();
+  ^o^n^e^:^:^t^w^o^:^:^f^f();
 }
 })cpp",
-          R"cpp(
+                R"cpp(
 #include "test.hpp"
 namespace {using one::two::ff;
 
@@ -122,17 +102,17 @@ void fun() {
   ff();
 }
 })cpp",
-      },
-      // Type, no other using, namespace.
-      {
-          R"cpp(
+            },
+            // Type, no other using, namespace.
+            {
+                R"cpp(
 #include "test.hpp"
 namespace {
 void fun() {
-  ::one::t^wo::cc inst;
+  ::on^e::t^wo::c^c inst;
 }
 })cpp",
-          R"cpp(
+                R"cpp(
 #include "test.hpp"
 namespace {using ::one::two::cc;
 
@@ -140,16 +120,16 @@ void fun() {
   cc inst;
 }
 })cpp",
-      },
-      // Type, no other using, no namespace.
-      {
-          R"cpp(
+            },
+            // Type, no other using, no namespace.
+            {
+                R"cpp(
 #include "test.hpp"
 
 void fun() {
-  one::two::e^e inst;
+  on^e::t^wo::e^e inst;
 })cpp",
-          R"cpp(
+                R"cpp(
 #include "test.hpp"
 
 using one::two::ee;
@@ -157,9 +137,9 @@ using one::two::ee;
 void fun() {
   ee inst;
 })cpp"},
-      // Function, other usings.
-      {
-          R"cpp(
+            // Function, other usings.
+            {
+                R"cpp(
 #include "test.hpp"
 
 using one::two::cc;
@@ -170,7 +150,7 @@ void fun() {
   one::two::f^f();
 }
 })cpp",
-          R"cpp(
+                R"cpp(
 #include "test.hpp"
 
 using one::two::cc;
@@ -181,10 +161,10 @@ void fun() {
   ff();
 }
 })cpp",
-      },
-      // Function, other usings inside namespace.
-      {
-          R"cpp(
+            },
+            // Function, other usings inside namespace.
+            {
+                R"cpp(
 #include "test.hpp"
 
 using one::two::cc;
@@ -194,10 +174,10 @@ namespace {
 using one::two::ff;
 
 void fun() {
-  o^ne::oo();
+  o^ne::o^o();
 }
 })cpp",
-          R"cpp(
+                R"cpp(
 #include "test.hpp"
 
 using one::two::cc;
@@ -210,9 +190,9 @@ void fun() {
   oo();
 }
 })cpp"},
-      // Using comes after cursor.
-      {
-          R"cpp(
+            // Using comes after cursor.
+            {
+                R"cpp(
 #include "test.hpp"
 
 namespace {
@@ -224,7 +204,7 @@ void fun() {
 using one::two::cc;
 
 })cpp",
-          R"cpp(
+                R"cpp(
 #include "test.hpp"
 
 namespace {using one::two::ff;
@@ -237,14 +217,14 @@ void fun() {
 using one::two::cc;
 
 })cpp"},
-      // Pointer type.
-      {R"cpp(
+            // Pointer type.
+            {R"cpp(
 #include "test.hpp"
 
 void fun() {
   one::two::c^c *p;
 })cpp",
-       R"cpp(
+             R"cpp(
 #include "test.hpp"
 
 using one::two::cc;
@@ -252,8 +232,8 @@ using one::two::cc;
 void fun() {
   cc *p;
 })cpp"},
-      // Namespace declared via macro.
-      {R"cpp(
+            // Namespace declared via macro.
+            {R"cpp(
 #include "test.hpp"
 #define NS_BEGIN(name) namespace name {
 
@@ -263,7 +243,7 @@ void fun() {
   one::two::f^f();
 }
 })cpp",
-       R"cpp(
+             R"cpp(
 #include "test.hpp"
 #define NS_BEGIN(name) namespace name {
 
@@ -275,15 +255,15 @@ void fun() {
   ff();
 }
 })cpp"},
-      // Inside macro argument.
-      {R"cpp(
+            // Inside macro argument.
+            {R"cpp(
 #include "test.hpp"
 #define CALL(name) name()
 
 void fun() {
   CALL(one::t^wo::ff);
 })cpp",
-       R"cpp(
+             R"cpp(
 #include "test.hpp"
 #define CALL(name) name()
 
@@ -292,15 +272,15 @@ using one::two::ff;
 void fun() {
   CALL(ff);
 })cpp"},
-      // Parent namespace != lexical parent namespace
-      {R"cpp(
+            // Parent namespace != lexical parent namespace
+            {R"cpp(
 #include "test.hpp"
 namespace foo { void fun(); }
 
 void foo::fun() {
   one::two::f^f();
 })cpp",
-       R"cpp(
+             R"cpp(
 #include "test.hpp"
 using one::two::ff;
 
@@ -309,8 +289,8 @@ namespace foo { void fun(); }
 void foo::fun() {
   ff();
 })cpp"},
-      // If all other using are fully qualified, add ::
-      {R"cpp(
+            // If all other using are fully qualified, add ::
+            {R"cpp(
 #include "test.hpp"
 
 using ::one::two::cc;
@@ -319,7 +299,7 @@ using ::one::two::ee;
 void fun() {
   one::two::f^f();
 })cpp",
-       R"cpp(
+             R"cpp(
 #include "test.hpp"
 
 using ::one::two::cc;
@@ -328,8 +308,8 @@ using ::one::two::ff;using ::one::two::ee;
 void fun() {
   ff();
 })cpp"},
-      // Make sure we don't add :: if it's already there
-      {R"cpp(
+            // Make sure we don't add :: if it's already there
+            {R"cpp(
 #include "test.hpp"
 
 using ::one::two::cc;
@@ -338,7 +318,7 @@ using ::one::two::ee;
 void fun() {
   ::one::two::f^f();
 })cpp",
-       R"cpp(
+             R"cpp(
 #include "test.hpp"
 
 using ::one::two::cc;
@@ -347,8 +327,8 @@ using ::one::two::ff;using ::one::two::ee;
 void fun() {
   ff();
 })cpp"},
-      // If even one using doesn't start with ::, do not add it
-      {R"cpp(
+            // If even one using doesn't start with ::, do not add it
+            {R"cpp(
 #include "test.hpp"
 
 using ::one::two::cc;
@@ -357,7 +337,7 @@ using one::two::ee;
 void fun() {
   one::two::f^f();
 })cpp",
-       R"cpp(
+             R"cpp(
 #include "test.hpp"
 
 using ::one::two::cc;
@@ -366,14 +346,14 @@ using one::two::ff;using one::two::ee;
 void fun() {
   ff();
 })cpp"},
-      // using alias; insert using for the spelled name.
-      {R"cpp(
+            // using alias; insert using for the spelled name.
+            {R"cpp(
 #include "test.hpp"
 
 void fun() {
   one::u^u u;
 })cpp",
-       R"cpp(
+             R"cpp(
 #include "test.hpp"
 
 using one::uu;
@@ -381,29 +361,29 @@ using one::uu;
 void fun() {
   uu u;
 })cpp"},
-      // using namespace.
-      {R"cpp(
+            // using namespace.
+            {R"cpp(
 #include "test.hpp"
 using namespace one;
 namespace {
 two::c^c C;
 })cpp",
-       R"cpp(
+             R"cpp(
 #include "test.hpp"
 using namespace one;
 namespace {using two::cc;
 
 cc C;
 })cpp"},
-      // Type defined in main file, make sure using is after that.
-      {R"cpp(
+            // Type defined in main file, make sure using is after that.
+            {R"cpp(
 namespace xx {
   struct yy {};
 }
 
 x^x::yy X;
 )cpp",
-       R"cpp(
+             R"cpp(
 namespace xx {
   struct yy {};
 }
@@ -412,8 +392,8 @@ using xx::yy;
 
 yy X;
 )cpp"},
-      // Type defined in main file via "using", insert after that.
-      {R"cpp(
+            // Type defined in main file via "using", insert after that.
+            {R"cpp(
 #include "test.hpp"
 
 namespace xx {
@@ -422,7 +402,7 @@ namespace xx {
 
 x^x::yy X;
 )cpp",
-       R"cpp(
+             R"cpp(
 #include "test.hpp"
 
 namespace xx {
@@ -433,8 +413,8 @@ using xx::yy;
 
 yy X;
 )cpp"},
-      // Using must come after function definition.
-      {R"cpp(
+            // Using must come after function definition.
+            {R"cpp(
 namespace xx {
   void yy();
 }
@@ -443,7 +423,7 @@ void fun() {
   x^x::yy();
 }
 )cpp",
-       R"cpp(
+             R"cpp(
 namespace xx {
   void yy();
 }
@@ -454,85 +434,21 @@ void fun() {
   yy();
 }
 )cpp"},
-      // Existing using with non-namespace part.
-      {R"cpp(
+            // Existing using with non-namespace part.
+            {R"cpp(
 #include "test.hpp"
 using one::two::ee::ee_one;
 one::t^wo::cc c;
 )cpp",
-       R"cpp(
+             R"cpp(
 #include "test.hpp"
 using one::two::cc;using one::two::ee::ee_one;
 cc c;
-)cpp"},
-      // Template (like std::vector).
-      {R"cpp(
-#include "test.hpp"
-one::v^ec<int> foo;
-)cpp",
-       R"cpp(
-#include "test.hpp"
-using one::vec;
-
-vec<int> foo;
-)cpp"},
-      // Typo correction.
-      {R"cpp(
-// error-ok
-#include "test.hpp"
-c^c C;
-)cpp",
-       R"cpp(
-// error-ok
-#include "test.hpp"
-using one::two::cc;
-
-cc C;
-)cpp"},
-      {R"cpp(
-// error-ok
-#include "test.hpp"
-void foo() {
-  switch(one::two::ee{}) { case two::ee_^one:break; }
-}
-)cpp",
-       R"cpp(
-// error-ok
-#include "test.hpp"
-using one::two::ee_one;
-
-void foo() {
-  switch(one::two::ee{}) { case ee_one:break; }
-}
-)cpp"},
-      {R"cpp(
-#include "test.hpp"
-void foo() {
-  one::f^unc_temp<int>();
-})cpp",
-       R"cpp(
-#include "test.hpp"
-using one::func_temp;
-
-void foo() {
-  func_temp<int>();
-})cpp"},
-      {R"cpp(
-#include "test.hpp"
-void foo() {
-  one::va^r_temp<int>;
-})cpp",
-       R"cpp(
-#include "test.hpp"
-using one::var_temp;
-
-void foo() {
-  var_temp<int>;
-})cpp"},
-  };
+)cpp"}};
   llvm::StringMap<std::string> EditedFiles;
   for (const auto &Case : Cases) {
-    ExtraFiles["test.hpp"] = R"cpp(
+    for (const auto &SubCase : expandCases(Case.TestSource)) {
+      ExtraFiles["test.hpp"] = R"cpp(
 namespace one {
 void oo() {}
 namespace two {
@@ -545,13 +461,9 @@ public:
 };
 }
 using uu = two::cc;
-template<typename T> struct vec {};
-template <typename T> void func_temp();
-template <typename T> T var_temp();
 })cpp";
-    // Typo correction is disabled in msvc-compatibility mode.
-    ExtraArgs.push_back("-fno-ms-compatibility");
-    EXPECT_EQ(apply(Case.TestSource, &EditedFiles), Case.ExpectedSource);
+      EXPECT_EQ(apply(SubCase, &EditedFiles), Case.ExpectedSource);
+    }
   }
 }
 

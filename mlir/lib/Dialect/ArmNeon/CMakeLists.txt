@@ -1,4 +1,4 @@
-add_mlir_dialect_library(MLIRArmNeonDialect
+add_mlir_dialect_library(MLIRArmNeon
   IR/ArmNeonDialect.cpp
 
   ADDITIONAL_HEADER_DIRS

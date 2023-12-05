@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "lldb/Host/windows/ConnectionGenericFileWindows.h"
-#include "lldb/Utility/LLDBLog.h"
 #include "lldb/Utility/Log.h"
 #include "lldb/Utility/Status.h"
 #include "lldb/Utility/Timeout.h"
@@ -91,7 +90,7 @@ bool ConnectionGenericFile::IsConnected() const {
 
 lldb::ConnectionStatus ConnectionGenericFile::Connect(llvm::StringRef path,
                                                       Status *error_ptr) {
-  Log *log = GetLog(LLDBLog::Connection);
+  Log *log(lldb_private::GetLogIfAnyCategoriesSet(LIBLLDB_LOG_CONNECTION));
   LLDB_LOGF(log, "%p ConnectionGenericFile::Connect (url = '%s')",
             static_cast<void *>(this), path.str().c_str());
 
@@ -133,7 +132,7 @@ lldb::ConnectionStatus ConnectionGenericFile::Connect(llvm::StringRef path,
 }
 
 lldb::ConnectionStatus ConnectionGenericFile::Disconnect(Status *error_ptr) {
-  Log *log = GetLog(LLDBLog::Connection);
+  Log *log(lldb_private::GetLogIfAnyCategoriesSet(LIBLLDB_LOG_CONNECTION));
   LLDB_LOGF(log, "%p ConnectionGenericFile::Disconnect ()",
             static_cast<void *>(this));
 
@@ -188,8 +187,9 @@ size_t ConnectionGenericFile::Read(void *dst, size_t dst_len,
               ? std::chrono::duration_cast<std::chrono::milliseconds>(*timeout)
                     .count()
               : INFINITE;
-      DWORD wait_result = ::WaitForMultipleObjects(
-          std::size(m_event_handles), m_event_handles, FALSE, milliseconds);
+      DWORD wait_result =
+          ::WaitForMultipleObjects(llvm::array_lengthof(m_event_handles),
+                                   m_event_handles, FALSE, milliseconds);
       // All of the events are manual reset events, so make sure we reset them
       // to non-signalled.
       switch (wait_result) {
@@ -244,7 +244,7 @@ finish:
   ResetEvent(m_event_handles[kBytesAvailableEvent]);
 
   IncrementFilePointer(return_info.GetBytes());
-  Log *log = GetLog(LLDBLog::Connection);
+  Log *log(lldb_private::GetLogIfAnyCategoriesSet(LIBLLDB_LOG_CONNECTION));
   LLDB_LOGF(log,
             "%p ConnectionGenericFile::Read()  handle = %p, dst = %p, "
             "dst_len = %zu) => %zu, error = %s",
@@ -293,7 +293,7 @@ finish:
     *error_ptr = return_info.GetError();
 
   IncrementFilePointer(return_info.GetBytes());
-  Log *log = GetLog(LLDBLog::Connection);
+  Log *log(lldb_private::GetLogIfAnyCategoriesSet(LIBLLDB_LOG_CONNECTION));
   LLDB_LOGF(log,
             "%p ConnectionGenericFile::Write()  handle = %p, src = %p, "
             "src_len = %zu) => %zu, error = %s",

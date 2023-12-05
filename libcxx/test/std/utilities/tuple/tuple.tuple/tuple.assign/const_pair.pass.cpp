@@ -22,11 +22,9 @@
 #include <utility>
 
 struct NothrowCopyAssignable {
-    NothrowCopyAssignable(NothrowCopyAssignable const&) = delete;
     NothrowCopyAssignable& operator=(NothrowCopyAssignable const&) noexcept { return *this; }
 };
 struct PotentiallyThrowingCopyAssignable {
-    PotentiallyThrowingCopyAssignable(PotentiallyThrowingCopyAssignable const&) = delete;
     PotentiallyThrowingCopyAssignable& operator=(PotentiallyThrowingCopyAssignable const&) { return *this; }
 };
 

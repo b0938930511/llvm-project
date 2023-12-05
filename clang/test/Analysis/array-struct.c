@@ -1,4 +1,4 @@
-// RUN: %clang_analyze_cc1 -analyzer-checker=core,alpha.core.CastToStruct -verify %s
+// RUN: %clang_analyze_cc1 -analyzer-checker=core,alpha.core.CastToStruct -analyzer-store=region -verify %s
 
 struct s {
   int data;
@@ -28,19 +28,19 @@ void f(void) {
 
 // StringLiteral in lvalue context and pointer to array type.
 // p: ElementRegion, q: StringRegion
-void f2(void) {
+void f2() {
   char *p = "/usr/local";
   char (*q)[4];
   q = &"abc";
 }
 
 // Typedef'ed struct definition.
-void f3(void) {
+void f3() {
   STYPE s;
 }
 
 // Initialize array with InitExprList.
-void f4(void) {
+void f4() {
   int a[] = { 1, 2, 3};
   int b[3] = { 1, 2 };
   struct s c[] = {{1,{1}}};
@@ -48,13 +48,13 @@ void f4(void) {
 
 // Struct variable in lvalue context.
 // Assign UnknownVal to the whole struct.
-void f5(void) {
+void f5() {
   struct s data;
   g1(&data);
 }
 
 // AllocaRegion test.
-void f6(void) {
+void f6() {
   char *p;
   p = __builtin_alloca(10); 
   g(p);
@@ -70,30 +70,30 @@ struct s2;
 void g2(struct s2 *p);
 
 // Incomplete struct pointer used as function argument.
-void f7(void) {
+void f7() {
   struct s2 *p = __builtin_alloca(10);
   g2(p);
 }
 
 // sizeof() is unsigned while -1 is signed in array index.
-void f8(void) {
+void f8() {
   int a[10];
   a[sizeof(a)/sizeof(int) - 1] = 1; // no-warning
 }
 
 // Initialization of struct array elements.
-void f9(void) {
+void f9() {
   struct s a[10];
 }
 
 // Initializing array with string literal.
-void f10(void) {
+void f10() {
   char a1[4] = "abc";
   char a3[6] = "abc";
 }
 
 // Retrieve the default value of element/field region.
-void f11(void) {
+void f11() {
   struct s a;
   g1(&a);
   if (a.data == 0) // no-warning
@@ -129,25 +129,25 @@ struct s3 {
 static struct s3 opt;
 
 // Test if the embedded array is retrieved correctly.
-void f14(void) {
+void f14() {
   struct s3 my_opt = opt;
 }
 
 void bar(int*);
 
-struct s3 gets3(void) {
+struct s3 gets3() {
   struct s3 s;
   return s;
 }
 
-void accessArrayFieldNoCrash(void) {
+void accessArrayFieldNoCrash() {
   bar(gets3().a);
   bar((gets3().a));
   bar(((gets3().a)));  
 }
 
 // Test if the array is correctly invalidated.
-void f15(void) {
+void f15() {
   int a[10];
   bar(a);
   if (a[1]) // no-warning
@@ -167,7 +167,7 @@ void f16(struct s3 *p) {
 void inv(struct s1 *);
 
 // Invalidate the struct field.
-void f17(void) {
+void f17() {
   struct s1 t;
   int x;
   inv(&t);
@@ -177,7 +177,7 @@ void f17(void) {
 
 void read(char*);
 
-void f18(void) {
+void f18() {
   char *q;
   char *p = (char *) __builtin_alloca(10);
   read(p);

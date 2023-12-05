@@ -1,7 +1,8 @@
+
 ! RUN: not %flang_fc1 -fdebug-unparse-with-symbols %s 2>&1 | FileCheck %s
 ! CHECK: Label '30' is not a branch target
 ! CHECK: Control flow use of '30'
-! CHECK: warning: Label '10' is in a construct that should not be used as a branch target here
+! CHECK: Label '10' is not in scope
 ! CHECK: Label '20' was not found
 ! CHECK: Label '60' was not found
 

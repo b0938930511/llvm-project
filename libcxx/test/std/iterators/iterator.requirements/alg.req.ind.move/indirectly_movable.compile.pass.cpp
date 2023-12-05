@@ -7,44 +7,29 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
+// UNSUPPORTED: libcpp-no-concepts
+// UNSUPPORTED: gcc-10
 
 // template<class In, class Out>
 // concept indirectly_movable;
 
 #include <iterator>
 
-#include "MoveOnly.h"
 #include "test_macros.h"
 
-// Can move between pointers.
-static_assert( std::indirectly_movable<int*, int*>);
-static_assert( std::indirectly_movable<const int*, int*>);
-static_assert(!std::indirectly_movable<int*, const int*>);
-static_assert( std::indirectly_movable<const int*, int*>);
+struct IndirectlyMovableWithInt {
+  int& operator*() const;
+};
 
-// Can move from a pointer into an array but arrays aren't considered indirectly movable-from.
-static_assert( std::indirectly_movable<int*, int[2]>);
-static_assert(!std::indirectly_movable<int[2], int*>);
-static_assert(!std::indirectly_movable<int[2], int[2]>);
-static_assert(!std::indirectly_movable<int(&)[2], int(&)[2]>);
+struct Empty {};
 
-// Can't move between non-pointer types.
-static_assert(!std::indirectly_movable<int*, int>);
-static_assert(!std::indirectly_movable<int, int*>);
-static_assert(!std::indirectly_movable<int, int>);
-
-// Check some less common types.
-static_assert(!std::indirectly_movable<void*, void*>);
-static_assert(!std::indirectly_movable<int*, void*>);
-static_assert(!std::indirectly_movable<int(), int()>);
-static_assert(!std::indirectly_movable<int*, int()>);
-static_assert(!std::indirectly_movable<void, void>);
-
-// Can move move-only objects.
-static_assert( std::indirectly_movable<MoveOnly*, MoveOnly*>);
-static_assert(!std::indirectly_movable<MoveOnly*, const MoveOnly*>);
-static_assert(!std::indirectly_movable<const MoveOnly*, const MoveOnly*>);
-static_assert(!std::indirectly_movable<const MoveOnly*, MoveOnly*>);
+struct MoveOnly {
+  MoveOnly(MoveOnly&&) = default;
+  MoveOnly(MoveOnly const&) = delete;
+  MoveOnly& operator=(MoveOnly&&) = default;
+  MoveOnly& operator=(MoveOnly const&) = delete;
+  MoveOnly() = default;
+};
 
 template<class T>
 struct PointerTo {
@@ -52,11 +37,23 @@ struct PointerTo {
   T& operator*() const;
 };
 
-// Can copy through a dereferenceable class.
-static_assert( std::indirectly_movable<int*, PointerTo<int>>);
-static_assert(!std::indirectly_movable<int*, PointerTo<const int>>);
-static_assert( std::indirectly_copyable<PointerTo<int>, PointerTo<int>>);
-static_assert(!std::indirectly_copyable<PointerTo<int>, PointerTo<const int>>);
-static_assert( std::indirectly_movable<MoveOnly*, PointerTo<MoveOnly>>);
-static_assert( std::indirectly_movable<PointerTo<MoveOnly>, MoveOnly*>);
+static_assert( std::indirectly_movable<int*, int*>);
+static_assert( std::indirectly_movable<const int*, int *>);
+static_assert(!std::indirectly_movable<int*, const int *>);
+static_assert(!std::indirectly_movable<const int*, const int *>);
+static_assert( std::indirectly_movable<int*, int[2]>);
+static_assert(!std::indirectly_movable<int[2], int*>);
+static_assert(!std::indirectly_movable<int[2], int[2]>);
+static_assert(!std::indirectly_movable<int(&)[2], int(&)[2]>);
+static_assert(!std::indirectly_movable<int, int*>);
+static_assert(!std::indirectly_movable<int, int>);
+static_assert( std::indirectly_movable<Empty*, Empty*>);
+static_assert( std::indirectly_movable<int*, IndirectlyMovableWithInt>);
+static_assert(!std::indirectly_movable<Empty*, IndirectlyMovableWithInt>);
+static_assert( std::indirectly_movable<int*, IndirectlyMovableWithInt>);
+static_assert( std::indirectly_movable<MoveOnly*, MoveOnly*>);
+static_assert(!std::indirectly_movable<MoveOnly*, const MoveOnly*>);
+static_assert(!std::indirectly_movable<const MoveOnly*, const MoveOnly*>);
+static_assert(!std::indirectly_movable<const MoveOnly*, MoveOnly*>);
 static_assert( std::indirectly_movable<PointerTo<MoveOnly>, PointerTo<MoveOnly>>);
+static_assert( std::indirectly_movable<MoveOnly*, PointerTo<MoveOnly>>);

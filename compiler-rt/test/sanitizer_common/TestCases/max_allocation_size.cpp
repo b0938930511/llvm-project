@@ -35,16 +35,9 @@
 // RUN:   | FileCheck %s --check-prefix=CHECK-nnCRASH
 // RUN: %env_tool_opts=max_allocation_size_mb=2:allocator_may_return_null=1 \
 // RUN:   %run %t new-nothrow 2>&1 | FileCheck %s --check-prefix=CHECK-NULL
-// RUN: %env_tool_opts=max_allocation_size_mb=2:allocator_may_return_null=0 \
-// RUN:   not %run %t strndup 2>&1 | FileCheck %s --check-prefix=CHECK-sCRASH
-// RUN: %env_tool_opts=max_allocation_size_mb=2:allocator_may_return_null=1 \
-// RUN:   %run %t strndup 2>&1 | FileCheck %s --check-prefix=CHECK-NULL
 
 // win32 is disabled due to failing errno tests.
-// UNSUPPORTED: ubsan, target={{.*windows-msvc.*}}
-
-// Symbolizer needs to allocated memory when reporting.
-// UNSUPPORTED: internal_symbolizer
+// UNSUPPORTED: ubsan, windows-msvc
 
 #include <assert.h>
 #include <errno.h>
@@ -53,8 +46,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-constexpr size_t MaxAllocationSize = size_t{2} << 20;
 
 static void *allocate(const char *Action, size_t Size) {
   if (!strcmp(Action, "malloc"))
@@ -74,21 +65,12 @@ static void *allocate(const char *Action, size_t Size) {
     return ::operator new(Size);
   if (!strcmp(Action, "new-nothrow"))
     return ::operator new(Size, std::nothrow);
-  if (!strcmp(Action, "strndup")) {
-    static char pstr[MaxAllocationSize + 1] = {'a'};
-    for (size_t i = 0; i < MaxAllocationSize + 1; i++)
-      pstr[i] = 'a';
-    if (Size == MaxAllocationSize)
-      pstr[MaxAllocationSize - 1] = '\0';
-    return strndup(pstr, Size);
-  }
   assert(0);
 }
 
 static void deallocate(const char *Action, void *Ptr) {
   if (!strcmp(Action, "malloc") || !strcmp(Action, "calloc") ||
-      !strcmp(Action, "realloc") || !strcmp(Action, "realloc-after-malloc") ||
-      !strcmp(Action, "strndup"))
+      !strcmp(Action, "realloc") || !strcmp(Action, "realloc-after-malloc"))
     return free(Ptr);
   if (!strcmp(Action, "new"))
     return ::operator delete(Ptr);
@@ -101,6 +83,8 @@ int main(int Argc, char **Argv) {
   assert(Argc == 2);
   const char *Action = Argv[1];
   fprintf(stderr, "%s:\n", Action);
+
+  constexpr size_t MaxAllocationSize = size_t{2} << 20;
 
   // Should succeed when max_allocation_size_mb is set.
   void *volatile P = allocate(Action, MaxAllocationSize);
@@ -136,10 +120,8 @@ int main(int Argc, char **Argv) {
 // CHECK-nCRASH-OOM: {{SUMMARY: .*Sanitizer: out-of-memory}}
 // CHECK-nnCRASH: new-nothrow:
 // CHECK-nnCRASH: {{SUMMARY: .*Sanitizer: allocation-size-too-big}}
-// CHECK-sCRASH: strndup:
-// CHECK-sCRASH: {{SUMMARY: .*Sanitizer: allocation-size-too-big}}
 
-// CHECK-NULL: {{malloc|calloc|calloc-overflow|realloc|realloc-after-malloc|new-nothrow|strndup}}
+// CHECK-NULL: {{malloc|calloc|calloc-overflow|realloc|realloc-after-malloc|new-nothrow}}
 // CHECK-NULL: errno: 12, P: 0
 //
 // CHECK-NOTNULL-NOT: P: 0

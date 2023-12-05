@@ -8,7 +8,7 @@
 @compatibility_alias alias INTF;
 
 
-int foo (void)
+int foo ()
 {
 	INTF *pi;
 	INTF<P2,P1> *pi2;

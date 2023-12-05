@@ -14,7 +14,9 @@
 #define LLVM_CLANG_AST_INTERP_INTERPFRAME_H
 
 #include "Frame.h"
+#include "Pointer.h"
 #include "Program.h"
+#include "State.h"
 #include <cstdint>
 #include <vector>
 
@@ -22,7 +24,6 @@ namespace clang {
 namespace interp {
 class Function;
 class InterpState;
-class Pointer;
 
 /// Frame storing local variables.
 class InterpFrame final : public Frame {
@@ -31,14 +32,8 @@ public:
   InterpFrame *Caller;
 
   /// Creates a new frame for a method call.
-  InterpFrame(InterpState &S, const Function *Func, InterpFrame *Caller,
-              CodePtr RetPC);
-
-  /// Creates a new frame with the values that make sense.
-  /// I.e., the caller is the current frame of S,
-  /// the This() pointer is the current Pointer on the top of S's stack,
-  /// and the RVO pointer is before that.
-  InterpFrame(InterpState &S, const Function *Func, CodePtr RetPC);
+  InterpFrame(InterpState &S, Function *Func, InterpFrame *Caller,
+              CodePtr RetPC, Pointer &&This);
 
   /// Destroys the frame, killing all live pointers to stack slots.
   ~InterpFrame();
@@ -50,39 +45,38 @@ public:
   void popArgs();
 
   /// Describes the frame with arguments for diagnostic purposes.
-  void describe(llvm::raw_ostream &OS) const override;
+  void describe(llvm::raw_ostream &OS) override;
 
   /// Returns the parent frame object.
   Frame *getCaller() const override;
 
   /// Returns the location of the call to the frame.
-  SourceRange getCallRange() const override;
+  SourceLocation getCallLocation() const override;
 
   /// Returns the caller.
   const FunctionDecl *getCallee() const override;
 
   /// Returns the current function.
-  const Function *getFunction() const { return Func; }
+  Function *getFunction() const { return Func; }
 
   /// Returns the offset on the stack at which the frame starts.
   size_t getFrameOffset() const { return FrameOffset; }
 
   /// Returns the value of a local variable.
-  template <typename T> const T &getLocal(unsigned Offset) const {
+  template <typename T> const T &getLocal(unsigned Offset) {
     return localRef<T>(Offset);
   }
 
   /// Mutates a local variable.
   template <typename T> void setLocal(unsigned Offset, const T &Value) {
     localRef<T>(Offset) = Value;
-    localInlineDesc(Offset)->IsInitialized = true;
   }
 
   /// Returns a pointer to a local variables.
-  Pointer getLocalPointer(unsigned Offset) const;
+  Pointer getLocalPointer(unsigned Offset);
 
   /// Returns the value of an argument.
-  template <typename T> const T &getParam(unsigned Offset) const {
+  template <typename T> const T &getParam(unsigned Offset) {
     auto Pt = Params.find(Offset);
     if (Pt == Params.end()) {
       return stackRef<T>(Offset);
@@ -102,9 +96,6 @@ public:
   /// Returns the 'this' pointer.
   const Pointer &getThis() const { return This; }
 
-  /// Returns the RVO pointer, if the Function has one.
-  const Pointer &getRVOPtr() const { return RVOPtr; }
-
   /// Checks if the frame is a root frame - return should quit the interpreter.
   bool isRoot() const { return !Func; }
 
@@ -118,43 +109,30 @@ public:
   virtual SourceInfo getSource(CodePtr PC) const;
   const Expr *getExpr(CodePtr PC) const;
   SourceLocation getLocation(CodePtr PC) const;
-  SourceRange getRange(CodePtr PC) const;
-
-  unsigned getDepth() const { return Depth; }
 
 private:
   /// Returns an original argument from the stack.
-  template <typename T> const T &stackRef(unsigned Offset) const {
-    assert(Args);
+  template <typename T> const T &stackRef(unsigned Offset) {
     return *reinterpret_cast<const T *>(Args - ArgSize + Offset);
   }
 
   /// Returns an offset to a local.
-  template <typename T> T &localRef(unsigned Offset) const {
-    return getLocalPointer(Offset).deref<T>();
+  template <typename T> T &localRef(unsigned Offset) {
+    return *reinterpret_cast<T *>(Locals.get() + Offset);
   }
 
   /// Returns a pointer to a local's block.
-  Block *localBlock(unsigned Offset) const {
-    return reinterpret_cast<Block *>(Locals.get() + Offset - sizeof(Block));
-  }
-
-  /// Returns the inline descriptor of the local.
-  InlineDescriptor *localInlineDesc(unsigned Offset) const {
-    return reinterpret_cast<InlineDescriptor *>(Locals.get() + Offset);
+  void *localBlock(unsigned Offset) {
+    return Locals.get() + Offset - sizeof(Block);
   }
 
 private:
   /// Reference to the interpreter state.
   InterpState &S;
-  /// Depth of this frame.
-  unsigned Depth;
   /// Reference to the function being executed.
-  const Function *Func;
+  Function *Func;
   /// Current object pointer for methods.
   Pointer This;
-  /// Pointer the non-primitive return value gets constructed in.
-  Pointer RVOPtr;
   /// Return address.
   CodePtr RetPC;
   /// The size of all the arguments.

@@ -11,13 +11,15 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::abseil {
+namespace clang {
+namespace tidy {
+namespace abseil {
 
 /// Flags uses of absl::StrCat to append to a string. Suggests absl::StrAppend
 /// should be used instead. 
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/abseil/str-cat-append.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/abseil-str-cat-append.html
 class StrCatAppendCheck : public ClangTidyCheck {
 public:
   StrCatAppendCheck(StringRef Name, ClangTidyContext *Context)
@@ -29,6 +31,8 @@ public:
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
 };
 
-} // namespace clang::tidy::abseil
+} // namespace abseil
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_ABSEIL_STRCATAPPENDCHECK_H

@@ -14,7 +14,7 @@ int bar;
 int bar;
 # 2 "a.c" 2
 
-int main(void) {
+int main() {
  bar = 0;
  return 0;
 }

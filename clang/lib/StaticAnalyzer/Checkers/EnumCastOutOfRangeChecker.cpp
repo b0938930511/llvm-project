@@ -22,7 +22,6 @@
 #include "clang/StaticAnalyzer/Checkers/BuiltinCheckerRegistration.h"
 #include "clang/StaticAnalyzer/Core/BugReporter/BugType.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CheckerContext.h"
-#include <optional>
 
 using namespace clang;
 using namespace ento;
@@ -58,9 +57,8 @@ public:
 // Being conservative, it does not warn if there is slight possibility the
 // value can be matching.
 class EnumCastOutOfRangeChecker : public Checker<check::PreStmt<CastExpr>> {
-  mutable std::unique_ptr<BugType> EnumValueCastOutOfRange;
-  void reportWarning(CheckerContext &C, const CastExpr *CE,
-                     const EnumDecl *E) const;
+  mutable std::unique_ptr<BuiltinBug> EnumValueCastOutOfRange;
+  void reportWarning(CheckerContext &C) const;
 
 public:
   void checkPreStmt(const CastExpr *CE, CheckerContext &C) const;
@@ -73,38 +71,21 @@ EnumValueVector getDeclValuesForEnum(const EnumDecl *ED) {
   EnumValueVector DeclValues(
       std::distance(ED->enumerator_begin(), ED->enumerator_end()));
   llvm::transform(ED->enumerators(), DeclValues.begin(),
-                  [](const EnumConstantDecl *D) { return D->getInitVal(); });
+                 [](const EnumConstantDecl *D) { return D->getInitVal(); });
   return DeclValues;
 }
 } // namespace
 
-void EnumCastOutOfRangeChecker::reportWarning(CheckerContext &C,
-                                              const CastExpr *CE,
-                                              const EnumDecl *E) const {
-  assert(E && "valid EnumDecl* is expected");
+void EnumCastOutOfRangeChecker::reportWarning(CheckerContext &C) const {
   if (const ExplodedNode *N = C.generateNonFatalErrorNode()) {
     if (!EnumValueCastOutOfRange)
       EnumValueCastOutOfRange.reset(
-          new BugType(this, "Enum cast out of range"));
-
-    llvm::SmallString<128> Msg{"The value provided to the cast expression is "
-                               "not in the valid range of values for "};
-    StringRef EnumName{E->getName()};
-    if (EnumName.empty()) {
-      Msg += "the enum";
-    } else {
-      Msg += '\'';
-      Msg += EnumName;
-      Msg += '\'';
-    }
-
-    auto BR = std::make_unique<PathSensitiveBugReport>(*EnumValueCastOutOfRange,
-                                                       Msg, N);
-    bugreporter::trackExpressionValue(N, CE->getSubExpr(), *BR);
-    BR->addNote("enum declared here",
-                PathDiagnosticLocation::create(E, C.getSourceManager()),
-                {E->getSourceRange()});
-    C.emitReport(std::move(BR));
+          new BuiltinBug(this, "Enum cast out of range",
+                         "The value provided to the cast expression is not in "
+                         "the valid range of values for the enum"));
+    C.emitReport(std::make_unique<PathSensitiveBugReport>(
+        *EnumValueCastOutOfRange, EnumValueCastOutOfRange->getDescription(),
+        N));
   }
 }
 
@@ -113,10 +94,10 @@ void EnumCastOutOfRangeChecker::checkPreStmt(const CastExpr *CE,
 
   // Only perform enum range check on casts where such checks are valid.  For
   // all other cast kinds (where enum range checks are unnecessary or invalid),
-  // just return immediately.  TODO: The set of casts allowed for enum range
-  // checking may be incomplete.  Better to add a missing cast kind to enable a
-  // missing check than to generate false negatives and have to remove those
-  // later.
+  // just return immediately.  TODO: The set of casts whitelisted for enum
+  // range checking may be incomplete.  Better to add a missing cast kind to
+  // enable a missing check than to generate false negatives and have to remove
+  // those later.
   switch (CE->getCastKind()) {
   case CK_IntegralCast:
     break;
@@ -127,7 +108,7 @@ void EnumCastOutOfRangeChecker::checkPreStmt(const CastExpr *CE,
   }
 
   // Get the value of the expression to cast.
-  const std::optional<DefinedOrUnknownSVal> ValueToCast =
+  const llvm::Optional<DefinedOrUnknownSVal> ValueToCast =
       C.getSVal(CE->getSubExpr()).getAs<DefinedOrUnknownSVal>();
 
   // If the value cannot be reasoned about (not even a DefinedOrUnknownSVal),
@@ -147,22 +128,14 @@ void EnumCastOutOfRangeChecker::checkPreStmt(const CastExpr *CE,
   const EnumDecl *ED = T->castAs<EnumType>()->getDecl();
 
   EnumValueVector DeclValues = getDeclValuesForEnum(ED);
-
-  // If the declarator list is empty, bail out.
-  // Every initialization an enum with a fixed underlying type but without any
-  // enumerators would produce a warning if we were to continue at this point.
-  // The most notable example is std::byte in the C++17 standard library.
-  if (DeclValues.size() == 0)
-    return;
-
   // Check if any of the enum values possibly match.
-  bool PossibleValueMatch =
-      llvm::any_of(DeclValues, ConstraintBasedEQEvaluator(C, *ValueToCast));
+  bool PossibleValueMatch = llvm::any_of(
+      DeclValues, ConstraintBasedEQEvaluator(C, *ValueToCast));
 
   // If there is no value that can possibly match any of the enum values, then
   // warn.
   if (!PossibleValueMatch)
-    reportWarning(C, CE, ED);
+    reportWarning(C);
 }
 
 void ento::registerEnumCastOutOfRangeChecker(CheckerManager &mgr) {

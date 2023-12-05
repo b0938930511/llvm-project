@@ -18,12 +18,7 @@
 ///  msgpack::Reader MPReader(input);
 ///  msgpack::Object Obj;
 ///
-///  while (true) {
-///    Expected<bool> ReadObj = MPReader.read(&Obj);
-///    if (!ReadObj)
-///      // Handle error...
-///    if (!ReadObj.get())
-///      break; // Reached end of input
+///  while (MPReader.read(Obj)) {
 ///    switch (Obj.Kind) {
 ///    case msgpack::Type::Int:
 //       // Use Obj.Int
@@ -39,7 +34,8 @@
 #define LLVM_BINARYFORMAT_MSGPACKREADER_H
 
 #include "llvm/Support/Error.h"
-#include "llvm/Support/MemoryBufferRef.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/raw_ostream.h"
 #include <cstdint>
 
 namespace llvm {

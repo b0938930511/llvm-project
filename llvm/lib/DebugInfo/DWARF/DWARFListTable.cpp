@@ -8,7 +8,6 @@
 
 #include "llvm/DebugInfo/DWARF/DWARFListTable.h"
 #include "llvm/BinaryFormat/Dwarf.h"
-#include "llvm/DebugInfo/DWARF/DWARFContext.h"
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Format.h"
@@ -55,10 +54,11 @@ Error DWARFListTableHeader::extract(DWARFDataExtractor Data,
                        "unrecognised %s table version %" PRIu16
                        " in table at offset 0x%" PRIx64,
                        SectionName.data(), HeaderData.Version, HeaderOffset);
-  if (Error SizeErr = DWARFContext::checkAddressSizeSupported(
-          HeaderData.AddrSize, errc::not_supported,
-          "%s table at offset 0x%" PRIx64, SectionName.data(), HeaderOffset))
-    return SizeErr;
+  if (HeaderData.AddrSize != 4 && HeaderData.AddrSize != 8)
+    return createStringError(errc::not_supported,
+                       "%s table at offset 0x%" PRIx64
+                       " has unsupported address size %" PRIu8,
+                       SectionName.data(), HeaderOffset, HeaderData.AddrSize);
   if (HeaderData.SegSize != 0)
     return createStringError(errc::not_supported,
                        "%s table at offset 0x%" PRIx64

@@ -4,6 +4,6 @@
 
 // CHECK-NOT: error:
 
-int foo(void) {
+int foo() {
   return x;
 }

@@ -16,6 +16,7 @@
 #ifndef LLVM_ANALYSIS_PROFILE_GEN_ANALYSIS_H
 #define LLVM_ANALYSIS_PROFILE_GEN_ANALYSIS_H
 
+#include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/ProfileData/InstrProf.h"
 #include <memory>
 #include <vector>
@@ -24,7 +25,6 @@ namespace llvm {
 
 class Function;
 class Instruction;
-class TargetLibraryInfo;
 class Value;
 
 /// Utility analysis that determines what values are worth profiling.

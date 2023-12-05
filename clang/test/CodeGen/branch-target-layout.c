@@ -9,9 +9,9 @@
 // Note that the frontend inverts branches to simplify the condition, so the
 // order of a branch instruction's labels cannot be used as a source order bias.
 
-void calla(void);
-void callb(void);
-void callc(void);
+void calla();
+void callb();
+void callc();
 
 // CHECK: @test1
 // CHECK: @calla

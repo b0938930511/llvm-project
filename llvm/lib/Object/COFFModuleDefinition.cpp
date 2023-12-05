@@ -17,10 +17,12 @@
 #include "llvm/Object/COFFModuleDefinition.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Object/COFF.h"
 #include "llvm/Object/COFFImportFile.h"
 #include "llvm/Object/Error.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace llvm::COFF;
 using namespace llvm;
@@ -76,6 +78,11 @@ static bool isDecorated(StringRef Sym, bool MingwDef) {
   // to be added.
   return Sym.startswith("@") || Sym.contains("@@") || Sym.startswith("?") ||
          (!MingwDef && Sym.contains('@'));
+}
+
+static Error createError(const Twine &Err) {
+  return make_error<StringError>(StringRef(Err.str()),
+                                 object_error::parse_failed);
 }
 
 class Lexer {
@@ -138,11 +145,8 @@ private:
 
 class Parser {
 public:
-  explicit Parser(StringRef S, MachineTypes M, bool B, bool AU)
-      : Lex(S), Machine(M), MingwDef(B), AddUnderscores(AU) {
-    if (Machine != IMAGE_FILE_MACHINE_I386)
-      AddUnderscores = false;
-  }
+  explicit Parser(StringRef S, MachineTypes M, bool B)
+      : Lex(S), Machine(M), MingwDef(B) {}
 
   Expected<COFFModuleDefinition> parse() {
     do {
@@ -237,7 +241,7 @@ private:
       unget();
     }
 
-    if (AddUnderscores) {
+    if (Machine == IMAGE_FILE_MACHINE_I386) {
       if (!isDecorated(E.Name, MingwDef))
         E.Name = (std::string("_").append(E.Name));
       if (!E.ExtName.empty() && !isDecorated(E.ExtName, MingwDef))
@@ -282,7 +286,7 @@ private:
       if (Tok.K == EqualEqual) {
         read();
         E.AliasTarget = std::string(Tok.Value);
-        if (AddUnderscores && !isDecorated(E.AliasTarget, MingwDef))
+        if (Machine == IMAGE_FILE_MACHINE_I386 && !isDecorated(E.AliasTarget, MingwDef))
           E.AliasTarget = std::string("_").append(E.AliasTarget);
         continue;
       }
@@ -352,14 +356,12 @@ private:
   MachineTypes Machine;
   COFFModuleDefinition Info;
   bool MingwDef;
-  bool AddUnderscores;
 };
 
 Expected<COFFModuleDefinition> parseCOFFModuleDefinition(MemoryBufferRef MB,
                                                          MachineTypes Machine,
-                                                         bool MingwDef,
-                                                         bool AddUnderscores) {
-  return Parser(MB.getBuffer(), Machine, MingwDef, AddUnderscores).parse();
+                                                         bool MingwDef) {
+  return Parser(MB.getBuffer(), Machine, MingwDef).parse();
 }
 
 } // namespace object

@@ -13,9 +13,9 @@
 #ifndef LLVM_CODEGEN_TARGETCALLINGCONV_H
 #define LLVM_CODEGEN_TARGETCALLINGCONV_H
 
-#include "llvm/CodeGen/MachineValueType.h"
 #include "llvm/CodeGen/ValueTypes.h"
 #include "llvm/Support/Alignment.h"
+#include "llvm/Support/MachineValueType.h"
 #include "llvm/Support/MathExtras.h"
 #include <cassert>
 #include <climits>
@@ -46,17 +46,16 @@ namespace ISD {
     unsigned IsHvaStart : 1;   ///< HVA structure start
     unsigned IsSecArgPass : 1; ///< Second argument
     unsigned MemAlign : 4;     ///< Log 2 of alignment when arg is passed in memory
-                               ///< (including byval/byref). The max alignment is
-                               ///< verified in IR verification.
+                               ///< (including byval/byref)
     unsigned OrigAlign : 5;    ///< Log 2 of original alignment
     unsigned IsInConsecutiveRegsLast : 1;
     unsigned IsInConsecutiveRegs : 1;
     unsigned IsCopyElisionCandidate : 1; ///< Argument copy elision candidate
     unsigned IsPointer : 1;
 
-    unsigned ByValOrByRefSize = 0; ///< Byval or byref struct size
+    unsigned ByValOrByRefSize; ///< Byval or byref struct size
 
-    unsigned PointerAddrSpace = 0; ///< Address space of pointer argument
+    unsigned PointerAddrSpace; ///< Address space of pointer argument
 
   public:
     ArgFlagsTy()
@@ -66,7 +65,8 @@ namespace ISD {
           IsSwiftError(0), IsCFGuardTarget(0), IsHva(0), IsHvaStart(0),
           IsSecArgPass(0), MemAlign(0), OrigAlign(0),
           IsInConsecutiveRegsLast(0), IsInConsecutiveRegs(0),
-          IsCopyElisionCandidate(0), IsPointer(0) {
+          IsCopyElisionCandidate(0), IsPointer(0), ByValOrByRefSize(0),
+          PointerAddrSpace(0) {
       static_assert(sizeof(*this) == 3 * sizeof(unsigned), "flags are too big");
     }
 
@@ -247,11 +247,11 @@ namespace ISD {
     unsigned PartOffset;
 
     OutputArg() = default;
-    OutputArg(ArgFlagsTy flags, MVT vt, EVT argvt, bool isfixed,
+    OutputArg(ArgFlagsTy flags, EVT vt, EVT argvt, bool isfixed,
               unsigned origIdx, unsigned partOffs)
-        : Flags(flags), IsFixed(isfixed), OrigArgIndex(origIdx),
-          PartOffset(partOffs) {
-      VT = vt;
+      : Flags(flags), IsFixed(isfixed), OrigArgIndex(origIdx),
+        PartOffset(partOffs) {
+      VT = vt.getSimpleVT();
       ArgVT = argvt;
     }
   };

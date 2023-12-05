@@ -15,64 +15,30 @@
 #include "State.h"
 #include "Types.h"
 
-using namespace ompx;
+using namespace _OMP;
 
-#pragma omp begin declare target device_type(nohost)
+struct DeviceEnvironmentTy {
+  int32_t DebugLevel;
+};
 
-// Weak definitions will be overridden by CGOpenmpRuntimeGPU if enabled.
-[[gnu::weak]] extern const uint32_t __omp_rtl_debug_kind = 0;
-[[gnu::weak]] extern const uint32_t __omp_rtl_assume_no_thread_state = 0;
-[[gnu::weak]] extern const uint32_t __omp_rtl_assume_no_nested_parallelism = 0;
+#pragma omp declare target
 
-// This variable should be visibile to the plugin so we override the default
-// hidden visibility.
-[[gnu::used, gnu::retain, gnu::weak,
-  gnu::visibility("protected")]] DeviceEnvironmentTy
-    CONSTANT(__omp_rtl_device_environment);
+// TOOD: We want to change the name as soon as the old runtime is gone.
+DeviceEnvironmentTy CONSTANT(omptarget_device_environment)
+    __attribute__((used));
 
-uint32_t config::getDebugKind() {
-  return __omp_rtl_debug_kind & __omp_rtl_device_environment.DeviceDebugKind;
+int32_t config::getDebugLevel() {
+  // TODO: Implement libomptarget initialization of DeviceEnvironmentTy
+  return 0;
 }
 
 uint32_t config::getNumDevices() {
-  return __omp_rtl_device_environment.NumDevices;
+  // TODO: Implement libomptarget initialization of DeviceEnvironmentTy
+  return 1;
 }
 
-uint32_t config::getDeviceNum() {
-  return __omp_rtl_device_environment.DeviceNum;
-}
-
-uint64_t config::getDynamicMemorySize() {
-  return __omp_rtl_device_environment.DynamicMemSize;
-}
-
-uint64_t config::getClockFrequency() {
-  return __omp_rtl_device_environment.ClockFrequency;
-}
-
-void *config::getIndirectCallTablePtr() {
-  return reinterpret_cast<void *>(
-      __omp_rtl_device_environment.IndirectCallTable);
-}
-
-uint64_t config::getHardwareParallelism() {
-  return __omp_rtl_device_environment.HardwareParallelism;
-}
-
-uint64_t config::getIndirectCallTableSize() {
-  return __omp_rtl_device_environment.IndirectCallTableSize;
-}
-
-bool config::isDebugMode(DeviceDebugKind Kind) {
-  return config::getDebugKind() & uint32_t(Kind);
-}
-
-bool config::mayUseThreadStates() { return !__omp_rtl_assume_no_thread_state; }
-
-bool config::mayUseNestedParallelism() {
-  if (__omp_rtl_assume_no_nested_parallelism)
-    return false;
-  return state::getKernelEnvironment().Configuration.MayUseNestedParallelism;
+bool config::isDebugMode(config::DebugLevel Level) {
+  return config::getDebugLevel() > Level;
 }
 
 #pragma omp end declare target

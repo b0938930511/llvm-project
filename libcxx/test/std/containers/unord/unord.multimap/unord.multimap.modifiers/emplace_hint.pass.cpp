@@ -20,7 +20,6 @@
 
 #include <unordered_map>
 #include <cassert>
-#include <iterator>
 
 #include "../../../Emplaceable.h"
 #include "min_allocator.h"
@@ -43,18 +42,18 @@ int main(int, char**)
         assert(c.size() == 2);
         assert(r->first == 3);
         assert(r->second == Emplaceable(5, 6));
-        LIBCPP_ASSERT(r == std::next(c.begin()));
+        LIBCPP_ASSERT(r == next(c.begin()));
 
         r = c.emplace_hint(r, std::piecewise_construct, std::forward_as_tuple(3),
                                                         std::forward_as_tuple(6, 7));
         assert(c.size() == 3);
         assert(r->first == 3);
         assert(r->second == Emplaceable(6, 7));
-        LIBCPP_ASSERT(r == std::next(c.begin()));
+        LIBCPP_ASSERT(r == next(c.begin()));
         r = c.begin();
         assert(r->first == 3);
         LIBCPP_ASSERT(r->second == Emplaceable());
-        r = std::next(r, 2);
+        r = next(r, 2);
         assert(r->first == 3);
         LIBCPP_ASSERT(r->second == Emplaceable(5, 6));
     }
@@ -74,18 +73,18 @@ int main(int, char**)
         assert(c.size() == 2);
         assert(r->first == 3);
         assert(r->second == Emplaceable(5, 6));
-        LIBCPP_ASSERT(r == std::next(c.begin()));
+        LIBCPP_ASSERT(r == next(c.begin()));
 
         r = c.emplace_hint(r, std::piecewise_construct, std::forward_as_tuple(3),
                                                         std::forward_as_tuple(6, 7));
         assert(c.size() == 3);
         assert(r->first == 3);
         assert(r->second == Emplaceable(6, 7));
-        LIBCPP_ASSERT(r == std::next(c.begin()));
+        LIBCPP_ASSERT(r == next(c.begin()));
         r = c.begin();
         assert(r->first == 3);
         LIBCPP_ASSERT(r->second == Emplaceable());
-        r = std::next(r, 2);
+        r = next(r, 2);
         assert(r->first == 3);
         LIBCPP_ASSERT(r->second == Emplaceable(5, 6));
     }

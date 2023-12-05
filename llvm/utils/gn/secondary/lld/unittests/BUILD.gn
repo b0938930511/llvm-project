@@ -1,8 +1,7 @@
 group("unittests") {
   deps = [
-    "AsLibAll:LLDAsLibAllTests",
-    "AsLibELF:LLDAsLibELFTests",
+    "DriverTests",
+    "MachOTests:MachOOldTests",
   ]
   testonly = true
 }
-

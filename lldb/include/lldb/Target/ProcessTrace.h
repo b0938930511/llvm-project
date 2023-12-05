@@ -23,9 +23,9 @@ public:
 
   static void Terminate();
 
-  static llvm::StringRef GetPluginNameStatic() { return "trace"; }
+  static ConstString GetPluginNameStatic();
 
-  static llvm::StringRef GetPluginDescriptionStatic();
+  static const char *GetPluginDescriptionStatic();
 
   ProcessTrace(lldb::TargetSP target_sp, lldb::ListenerSP listener_sp);
 
@@ -40,7 +40,9 @@ public:
 
   SystemRuntime *GetSystemRuntime() override { return nullptr; }
 
-  llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
+  ConstString GetPluginName() override;
+
+  uint32_t GetPluginVersion() override;
 
   Status DoDestroy() override;
 
@@ -48,8 +50,9 @@ public:
 
   Status WillResume() override {
     Status error;
-    error.SetErrorStringWithFormatv(
-        "error: {0} does not support resuming processes", GetPluginName());
+    error.SetErrorStringWithFormat(
+        "error: %s does not support resuming processes",
+        GetPluginName().GetCString());
     return error;
   }
 

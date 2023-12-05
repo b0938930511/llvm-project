@@ -23,10 +23,7 @@
 // RUN: not cat %t.log.*
 
 // FIXME: log_path is not supported on Windows yet.
-// XFAIL: target={{.*windows-msvc.*}}
-
-// Issue #41838
-// XFAIL: sparc-target-arch && target={{.*solaris.*}}
+// XFAIL: windows-msvc
 
 #include <stdio.h>
 #include <stdlib.h>

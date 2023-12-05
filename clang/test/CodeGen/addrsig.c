@@ -11,10 +11,10 @@
 
 extern const int g1[], g2[];
 
-const int *f1(void) {
+const int *f1() {
   return g1;
 }
 
-int f2(void) {
+int f2() {
   return g2[0];
 }

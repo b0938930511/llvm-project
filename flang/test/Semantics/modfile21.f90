@@ -1,4 +1,5 @@
-! RUN: %python %S/test_modfile.py %s %flang_fc1
+! RUN: %S/test_modfile.sh %s %t %flang_fc1
+! REQUIRES: shell
 module m
   logical b
   bind(C) :: /cb2/
@@ -29,7 +30,7 @@ end
 !  common/cb/x,y,z
 !  bind(c, name="CB")::/cb/
 !  common/cb2/a,b,c
-!  bind(c)::/cb2/
+!  bind(c, name="cb2")::/cb2/
 !  common/b/cb
 !  common//t,w,u,v
 !end

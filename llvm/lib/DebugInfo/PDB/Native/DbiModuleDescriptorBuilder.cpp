@@ -10,10 +10,12 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/BinaryFormat/COFF.h"
-#include "llvm/DebugInfo/CodeView/CodeView.h"
 #include "llvm/DebugInfo/CodeView/DebugSubsectionRecord.h"
 #include "llvm/DebugInfo/MSF/MSFBuilder.h"
+#include "llvm/DebugInfo/MSF/MSFCommon.h"
 #include "llvm/DebugInfo/MSF/MappedBlockStream.h"
+#include "llvm/DebugInfo/PDB/Native/DbiModuleDescriptor.h"
+#include "llvm/DebugInfo/PDB/Native/GSIStreamBuilder.h"
 #include "llvm/DebugInfo/PDB/Native/RawConstants.h"
 #include "llvm/DebugInfo/PDB/Native/RawError.h"
 #include "llvm/Support/BinaryStreamWriter.h"
@@ -22,12 +24,6 @@ using namespace llvm;
 using namespace llvm::codeview;
 using namespace llvm::msf;
 using namespace llvm::pdb;
-
-namespace llvm {
-namespace codeview {
-class DebugSubsection;
-}
-} // namespace llvm
 
 static uint32_t calculateDiSymbolStreamSize(uint32_t SymbolByteSize,
                                             uint32_t C13Size) {
@@ -48,7 +44,7 @@ DbiModuleDescriptorBuilder::DbiModuleDescriptorBuilder(StringRef ModuleName,
   Layout.Mod = ModIndex;
 }
 
-DbiModuleDescriptorBuilder::~DbiModuleDescriptorBuilder() = default;
+DbiModuleDescriptorBuilder::~DbiModuleDescriptorBuilder() {}
 
 uint16_t DbiModuleDescriptorBuilder::getStreamIndex() const {
   return Layout.ModDiStream;

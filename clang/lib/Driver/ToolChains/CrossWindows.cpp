@@ -94,8 +94,7 @@ void tools::CrossWindows::Linker::ConstructJob(
   CmdArgs.push_back("-m");
   switch (TC.getArch()) {
   default:
-    D.Diag(diag::err_target_unknown_triple) << TC.getEffectiveTriple().str();
-    break;
+    llvm_unreachable("unsupported architecture");
   case llvm::Triple::arm:
   case llvm::Triple::thumb:
     // FIXME: this is incorrect for WinCE
@@ -186,7 +185,7 @@ void tools::CrossWindows::Linker::ConstructJob(
     }
   }
 
-  if (TC.getSanitizerArgs(Args).needsAsanRt()) {
+  if (TC.getSanitizerArgs().needsAsanRt()) {
     // TODO handle /MT[d] /MD[d]
     if (Args.hasArg(options::OPT_shared)) {
       CmdArgs.push_back(TC.getCompilerRTArgString(Args, "asan_dll_thunk"));
@@ -214,18 +213,17 @@ CrossWindowsToolChain::CrossWindowsToolChain(const Driver &D,
                                              const llvm::opt::ArgList &Args)
     : Generic_GCC(D, T, Args) {}
 
-ToolChain::UnwindTableLevel
-CrossWindowsToolChain::getDefaultUnwindTableLevel(const ArgList &Args) const {
+bool CrossWindowsToolChain::IsUnwindTablesDefault(const ArgList &Args) const {
   // FIXME: all non-x86 targets need unwind tables, however, LLVM currently does
   // not know how to emit them.
-  return getArch() == llvm::Triple::x86_64 ? UnwindTableLevel::Asynchronous : UnwindTableLevel::None;
+  return getArch() == llvm::Triple::x86_64;
 }
 
 bool CrossWindowsToolChain::isPICDefault() const {
   return getArch() == llvm::Triple::x86_64;
 }
 
-bool CrossWindowsToolChain::isPIEDefault(const llvm::opt::ArgList &Args) const {
+bool CrossWindowsToolChain::isPIEDefault() const {
   return getArch() == llvm::Triple::x86_64;
 }
 
@@ -275,11 +273,8 @@ AddClangCXXStdlibIncludeArgs(const llvm::opt::ArgList &DriverArgs,
 void CrossWindowsToolChain::
 AddCXXStdlibLibArgs(const llvm::opt::ArgList &Args,
                     llvm::opt::ArgStringList &CmdArgs) const {
-  if (GetCXXStdlibType(Args) == ToolChain::CST_Libcxx) {
+  if (GetCXXStdlibType(Args) == ToolChain::CST_Libcxx)
     CmdArgs.push_back("-lc++");
-    if (Args.hasArg(options::OPT_fexperimental_library))
-      CmdArgs.push_back("-lc++experimental");
-  }
 }
 
 clang::SanitizerMask CrossWindowsToolChain::getSupportedSanitizers() const {

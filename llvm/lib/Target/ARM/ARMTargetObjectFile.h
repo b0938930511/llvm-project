@@ -11,21 +11,17 @@
 
 #include "llvm/CodeGen/TargetLoweringObjectFileImpl.h"
 #include "llvm/MC/MCExpr.h"
-#include "llvm/MC/MCRegister.h"
 
 namespace llvm {
 
 class ARMElfTargetObjectFile : public TargetLoweringObjectFileELF {
 public:
-  ARMElfTargetObjectFile() {
+  ARMElfTargetObjectFile()
+      : TargetLoweringObjectFileELF() {
     PLTRelativeVariantKind = MCSymbolRefExpr::VK_ARM_PREL31;
   }
 
   void Initialize(MCContext &Ctx, const TargetMachine &TM) override;
-
-  MCRegister getStaticBase() const override;
-
-  const MCExpr *getIndirectSymViaRWPI(const MCSymbol *Sym) const override;
 
   const MCExpr *getTTypeGlobalReference(const GlobalValue *GV,
                                         unsigned Encoding,

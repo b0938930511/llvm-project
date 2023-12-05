@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// UNSUPPORTED: no-localization
+// UNSUPPORTED: libcpp-has-no-localization
 
 // <system_error>
 

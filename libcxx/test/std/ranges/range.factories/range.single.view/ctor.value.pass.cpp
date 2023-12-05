@@ -7,13 +7,15 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
+// UNSUPPORTED: libcpp-no-concepts
+// UNSUPPORTED: gcc-10
+// UNSUPPORTED: libcpp-has-no-incomplete-ranges
 
 // constexpr explicit single_view(const T& t);
 // constexpr explicit single_view(T&& t);
 
-#include <cassert>
 #include <ranges>
-#include <utility>
+#include <cassert>
 
 #include "test_macros.h"
 

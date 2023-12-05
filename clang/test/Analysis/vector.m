@@ -2,8 +2,8 @@
 
 typedef int __attribute__((ext_vector_type(2))) V;
 
-void clang_analyzer_warnIfReached(void);
-void clang_analyzer_numTimesReached(void);
+void clang_analyzer_warnIfReached();
+void clang_analyzer_numTimesReached();
 void clang_analyzer_eval(int);
 
 int flag;
@@ -28,7 +28,7 @@ V dont_crash_and_dont_split_state(V x, V y) {
   return z;
 }
 
-void test_read(void) {
+void test_read() {
   V x;
   x[0] = 0;
   x[1] = 1;
@@ -36,14 +36,14 @@ void test_read(void) {
   clang_analyzer_eval(x[0] == 0); // expected-warning{{TRUE}}
 }
 
-V return_vector(void) {
+V return_vector() {
   V z;
   z[0] = 0;
   z[1] = 0;
   return z;
 }
 
-int test_vector_access(void) {
+int test_vector_access() {
   return return_vector()[0]; // no-crash no-warning
 }
 

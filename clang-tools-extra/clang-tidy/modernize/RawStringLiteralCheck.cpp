@@ -13,7 +13,9 @@
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::modernize {
+namespace clang {
+namespace tidy {
+namespace modernize {
 
 namespace {
 
@@ -23,7 +25,7 @@ bool containsEscapes(StringRef HayStack, StringRef Escapes) {
     return false;
 
   while (BackSlash != StringRef::npos) {
-    if (!Escapes.contains(HayStack[BackSlash + 1]))
+    if (Escapes.find(HayStack[BackSlash + 1]) == StringRef::npos)
       return false;
     BackSlash = HayStack.find('\\', BackSlash + 2);
   }
@@ -42,7 +44,7 @@ bool containsEscapedCharacters(const MatchFinder::MatchResult &Result,
                                const StringLiteral *Literal,
                                const CharsBitSet &DisallowedChars) {
   // FIXME: Handle L"", u8"", u"" and U"" literals.
-  if (!Literal->isOrdinary())
+  if (!Literal->isAscii())
     return false;
 
   for (const unsigned char C : Literal->getBytes())
@@ -105,7 +107,7 @@ RawStringLiteralCheck::RawStringLiteralCheck(StringRef Name,
     DisallowedChars.set(C);
 
   // Non-ASCII are disallowed too.
-  for (unsigned int C = 0x80U; C <= 0xFFU; ++C)
+  for (unsigned int C = 0x80u; C <= 0xFFu; ++C)
     DisallowedChars.set(static_cast<unsigned char>(C));
 }
 
@@ -145,4 +147,6 @@ void RawStringLiteralCheck::replaceWithRawStringLiteral(
       << FixItHint::CreateReplacement(CharRange, Replacement);
 }
 
-} // namespace clang::tidy::modernize
+} // namespace modernize
+} // namespace tidy
+} // namespace clang

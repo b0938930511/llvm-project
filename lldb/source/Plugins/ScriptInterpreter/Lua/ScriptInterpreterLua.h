@@ -49,8 +49,6 @@ public:
                            StructuredData::ObjectSP *module_sp = nullptr,
                            FileSpec extra_search_dir = {}) override;
 
-  StructuredData::DictionarySP GetInterpreterInfo() override;
-
   // Static Functions
   static void Initialize();
 
@@ -58,9 +56,9 @@ public:
 
   static lldb::ScriptInterpreterSP CreateInstance(Debugger &debugger);
 
-  static llvm::StringRef GetPluginNameStatic() { return "script-lua"; }
+  static lldb_private::ConstString GetPluginNameStatic();
 
-  static llvm::StringRef GetPluginDescriptionStatic();
+  static const char *GetPluginDescriptionStatic();
 
   static bool BreakpointCallbackFunction(void *baton,
                                          StoppointCallbackContext *context,
@@ -72,7 +70,9 @@ public:
                                          lldb::user_id_t watch_id);
 
   // PluginInterface protocol
-  llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
+  lldb_private::ConstString GetPluginName() override;
+
+  uint32_t GetPluginVersion() override;
 
   Lua &GetLua();
 
@@ -88,12 +88,10 @@ public:
                                           CommandReturnObject &result) override;
 
   Status SetBreakpointCommandCallback(BreakpointOptions &bp_options,
-                                      const char *command_body_text,
-                                      bool is_callback) override;
+                                      const char *command_body_text) override;
 
   void SetWatchpointCommandCallback(WatchpointOptions *wp_options,
-                                    const char *command_body_text,
-                                    bool is_callback) override;
+                                    const char *command_body_text) override;
 
   Status SetBreakpointCommandCallbackFunction(
       BreakpointOptions &bp_options, const char *function_name,

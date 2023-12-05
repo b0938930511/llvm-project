@@ -9,13 +9,13 @@
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    ret void
 //
-void foo(void) {
+void foo() {
   static int i, j;
 }
 // CHECK-LABEL: @bar(
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    ret void
 //
-void bar(void) {
+void bar() {
   static int i, j;
 }

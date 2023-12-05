@@ -35,13 +35,13 @@
 @dynamic customGetterProperty;
 @end
 
-int test(void) {
+int test() {
   A *a = [[A alloc] init];
   a.c; // expected-error {{property 'c' is a class property; did you mean to access it with class 'A'}}
   return a.x + A.c;
 }
 
-void customSelectors(void) {
+void customSelectors() {
   A.customSetterProperty = 1;
   (void)A.customGetterProperty;
 }

@@ -11,13 +11,15 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::cert {
+namespace clang {
+namespace tidy {
+namespace cert {
 
 /// Modification of the std or posix namespace can result in undefined behavior.
 /// This check warns for such modifications.
 ///
 /// For the user-facing documentation see:
-/// https://clang.llvm.org/extra/clang-tidy/checks/cert/dcl58-cpp.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/cert-msc53-cpp.html
 class DontModifyStdNamespaceCheck : public ClangTidyCheck {
 public:
   DontModifyStdNamespaceCheck(StringRef Name, ClangTidyContext *Context)
@@ -29,6 +31,8 @@ public:
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
 };
 
-} // namespace clang::tidy::cert
+} // namespace cert
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_CERT_DONT_MODIFY_STD_NAMESPACE_H

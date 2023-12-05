@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// XFAIL: stdlib=apple-libc++ && target={{.+}}-apple-macosx10.{{9|10|11|12|13|14}}
+// XFAIL: use_system_cxx_lib && target={{.+}}-apple-macosx10.{{9|10|11|12|13|14}}
 
 // <istream>
 
@@ -55,7 +55,6 @@ int main(int, char**)
         assert(!is.fail());
         assert(is.gcount() == 0);
     }
-#ifndef TEST_HAS_NO_WIDE_CHARACTERS
     {
         testbuf<wchar_t> sb(L" 1\n2345\n6");
         std::wistream is(&sb);
@@ -69,7 +68,6 @@ int main(int, char**)
         assert(!is.fail());
         assert(is.gcount() == 0);
     }
-#endif
 #ifndef TEST_HAS_NO_EXCEPTIONS
     {
         testbuf<char> sb;
@@ -86,7 +84,6 @@ int main(int, char**)
         assert( is.eof());
         assert(!is.fail());
     }
-#ifndef TEST_HAS_NO_WIDE_CHARACTERS
     {
         testbuf<wchar_t> sb;
         std::basic_istream<wchar_t> is(&sb);
@@ -103,7 +100,6 @@ int main(int, char**)
         assert(!is.fail());
     }
 #endif
-#endif // TEST_HAS_NO_EXCEPTIONS
 
     return 0;
 }

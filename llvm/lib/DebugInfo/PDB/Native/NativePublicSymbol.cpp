@@ -9,7 +9,8 @@
 #include "llvm/DebugInfo/PDB/Native/NativePublicSymbol.h"
 
 #include "llvm/DebugInfo/CodeView/SymbolRecord.h"
-#include "llvm/DebugInfo/PDB/Native/NativeSession.h"
+#include "llvm/DebugInfo/PDB/Native/NativeTypeBuiltin.h"
+#include "llvm/DebugInfo/PDB/Native/NativeTypeEnum.h"
 
 using namespace llvm;
 using namespace llvm::codeview;
@@ -19,7 +20,7 @@ NativePublicSymbol::NativePublicSymbol(NativeSession &Session, SymIndexId Id,
                                        const codeview::PublicSym32 &Sym)
     : NativeRawSymbol(Session, PDB_SymType::PublicSymbol, Id), Sym(Sym) {}
 
-NativePublicSymbol::~NativePublicSymbol() = default;
+NativePublicSymbol::~NativePublicSymbol() {}
 
 void NativePublicSymbol::dump(raw_ostream &OS, int Indent,
                               PdbSymbolIdField ShowIdFields,

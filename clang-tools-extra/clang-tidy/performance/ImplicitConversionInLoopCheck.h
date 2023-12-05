@@ -11,7 +11,9 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::performance {
+namespace clang {
+namespace tidy {
+namespace performance {
 
 // Checks that in a for range loop, if the provided type is a reference, then
 // the underlying type is the one returned by the iterator (i.e. that there
@@ -27,10 +29,12 @@ public:
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
 
 private:
-  void reportAndFix(const ASTContext *Context, const VarDecl *VD,
+  void ReportAndFix(const ASTContext *Context, const VarDecl *VD,
                     const Expr *OperatorCall);
 };
 
-} // namespace clang::tidy::performance
+} // namespace performance
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_PERFORMANCE_IMPLICIT_CONVERSION_IN_LOOP_CHECK_H_

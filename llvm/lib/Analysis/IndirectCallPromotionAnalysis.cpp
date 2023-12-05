@@ -13,7 +13,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Analysis/IndirectCallPromotionAnalysis.h"
-#include "llvm/IR/Instruction.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Analysis/IndirectCallVisitor.h"
+#include "llvm/IR/InstIterator.h"
+#include "llvm/IR/InstVisitor.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/ProfileData/InstrProf.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -26,7 +31,7 @@ using namespace llvm;
 // The percent threshold for the direct-call target (this call site vs the
 // remaining call count) for it to be considered as the promotion target.
 static cl::opt<unsigned> ICPRemainingPercentThreshold(
-    "icp-remaining-percent-threshold", cl::init(30), cl::Hidden,
+    "icp-remaining-percent-threshold", cl::init(30), cl::Hidden, cl::ZeroOrMore,
     cl::desc("The percentage threshold against remaining unpromoted indirect "
              "call count for the promotion"));
 
@@ -34,14 +39,14 @@ static cl::opt<unsigned> ICPRemainingPercentThreshold(
 // total call count) for it to be considered as the promotion target.
 static cl::opt<unsigned>
     ICPTotalPercentThreshold("icp-total-percent-threshold", cl::init(5),
-                             cl::Hidden,
+                             cl::Hidden, cl::ZeroOrMore,
                              cl::desc("The percentage threshold against total "
                                       "count for the promotion"));
 
 // Set the maximum number of targets to promote for a single indirect-call
 // callsite.
 static cl::opt<unsigned>
-    MaxNumPromotions("icp-max-prom", cl::init(3), cl::Hidden,
+    MaxNumPromotions("icp-max-prom", cl::init(3), cl::Hidden, cl::ZeroOrMore,
                      cl::desc("Max number of promotions for a single indirect "
                               "call callsite"));
 

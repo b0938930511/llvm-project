@@ -1,3 +1,3 @@
-int f(void) {
+int f() {
   // Oops, no return.
 }

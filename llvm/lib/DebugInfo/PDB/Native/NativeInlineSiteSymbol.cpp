@@ -12,14 +12,8 @@
 #include "llvm/DebugInfo/CodeView/LazyRandomTypeCollection.h"
 #include "llvm/DebugInfo/CodeView/SymbolRecord.h"
 #include "llvm/DebugInfo/CodeView/TypeDeserializer.h"
-#include "llvm/DebugInfo/PDB/Native/ModuleDebugStream.h"
 #include "llvm/DebugInfo/PDB/Native/NativeEnumLineNumbers.h"
-#include "llvm/DebugInfo/PDB/Native/NativeLineNumber.h"
-#include "llvm/DebugInfo/PDB/Native/NativeSession.h"
-#include "llvm/DebugInfo/PDB/Native/PDBFile.h"
-#include "llvm/DebugInfo/PDB/Native/SymbolCache.h"
 #include "llvm/DebugInfo/PDB/Native/TpiStream.h"
-#include "llvm/DebugInfo/PDB/PDBExtras.h"
 
 using namespace llvm;
 using namespace llvm::codeview;
@@ -31,7 +25,7 @@ NativeInlineSiteSymbol::NativeInlineSiteSymbol(
     : NativeRawSymbol(Session, PDB_SymType::InlineSite, Id), Sym(Sym),
       ParentAddr(ParentAddr) {}
 
-NativeInlineSiteSymbol::~NativeInlineSiteSymbol() = default;
+NativeInlineSiteSymbol::~NativeInlineSiteSymbol() {}
 
 void NativeInlineSiteSymbol::dump(raw_ostream &OS, int Indent,
                                   PdbSymbolIdField ShowIdFields,
@@ -40,7 +34,7 @@ void NativeInlineSiteSymbol::dump(raw_ostream &OS, int Indent,
   dumpSymbolField(OS, "name", getName(), Indent);
 }
 
-static std::optional<InlineeSourceLine>
+static Optional<InlineeSourceLine>
 findInlineeByTypeIndex(TypeIndex Id, ModuleDebugStreamRef &ModS) {
   for (const auto &SS : ModS.getSubsectionsArray()) {
     if (SS.kind() != DebugSubsectionKind::InlineeLines)
@@ -57,7 +51,7 @@ findInlineeByTypeIndex(TypeIndex Id, ModuleDebugStreamRef &ModS) {
       if (Line.Header->Inlinee == Id)
         return Line;
   }
-  return std::nullopt;
+  return None;
 }
 
 std::string NativeInlineSiteSymbol::getName() const {
@@ -104,81 +98,29 @@ void NativeInlineSiteSymbol::getLineOffset(uint32_t OffsetInFunc,
   LineOffset = 0;
   FileOffset = 0;
   uint32_t CodeOffset = 0;
-  std::optional<uint32_t> CodeOffsetBase;
-  std::optional<uint32_t> CodeOffsetEnd;
-  std::optional<int32_t> CurLineOffset;
-  std::optional<int32_t> NextLineOffset;
-  std::optional<uint32_t> NextFileOffset;
-  auto UpdateCodeOffset = [&](uint32_t Delta) {
-    if (!CodeOffsetBase)
-      CodeOffsetBase = CodeOffset;
-    else if (!CodeOffsetEnd)
-      CodeOffsetEnd = *CodeOffsetBase + Delta;
-  };
-  auto UpdateLineOffset = [&](int32_t Delta) {
-    LineOffset += Delta;
-    if (!CodeOffsetBase || !CurLineOffset)
-      CurLineOffset = LineOffset;
-    else
-      NextLineOffset = LineOffset;
-  };
-  auto UpdateFileOffset = [&](uint32_t Offset) {
-    if (!CodeOffsetBase)
-      FileOffset = Offset;
-    else
-      NextFileOffset = Offset;
-  };
-  auto ValidateAndReset = [&]() {
-    // Current range is finished. Check if OffsetInFunc is in the range.
-    if (CodeOffsetBase && CodeOffsetEnd && CurLineOffset) {
-      if (CodeOffsetBase <= OffsetInFunc && OffsetInFunc < CodeOffsetEnd) {
-        LineOffset = *CurLineOffset;
-        return true;
-      }
-      // Set base, end, file offset and line offset for next range.
-      if (NextFileOffset)
-        FileOffset = *NextFileOffset;
-      if (NextLineOffset) {
-        CurLineOffset = NextLineOffset;
-        NextLineOffset = std::nullopt;
-      }
-      CodeOffsetBase = CodeOffsetEnd;
-      CodeOffsetEnd = NextFileOffset = std::nullopt;
-    }
-    return false;
-  };
   for (const auto &Annot : Sym.annotations()) {
     switch (Annot.OpCode) {
     case BinaryAnnotationsOpCode::CodeOffset:
     case BinaryAnnotationsOpCode::ChangeCodeOffset:
-    case BinaryAnnotationsOpCode::ChangeCodeOffsetBase:
-      CodeOffset += Annot.U1;
-      UpdateCodeOffset(Annot.U1);
-      break;
     case BinaryAnnotationsOpCode::ChangeCodeLength:
-      UpdateCodeOffset(Annot.U1);
+      CodeOffset += Annot.U1;
       break;
     case BinaryAnnotationsOpCode::ChangeCodeLengthAndCodeOffset:
       CodeOffset += Annot.U2;
-      UpdateCodeOffset(Annot.U2);
-      UpdateCodeOffset(Annot.U1);
       break;
     case BinaryAnnotationsOpCode::ChangeLineOffset:
-      UpdateLineOffset(Annot.S1);
-      break;
     case BinaryAnnotationsOpCode::ChangeCodeOffsetAndLineOffset:
       CodeOffset += Annot.U1;
-      UpdateCodeOffset(Annot.U1);
-      UpdateLineOffset(Annot.S1);
+      LineOffset += Annot.S1;
       break;
     case BinaryAnnotationsOpCode::ChangeFile:
-      UpdateFileOffset(Annot.U1);
+      FileOffset = Annot.U1;
       break;
     default:
       break;
     }
 
-    if (ValidateAndReset())
+    if (CodeOffset >= OffsetInFunc)
       return;
   }
 }
@@ -209,7 +151,7 @@ NativeInlineSiteSymbol::findInlineeLinesByVA(uint64_t VA,
   getLineOffset(VA - ParentAddr, SrcLineOffset, SrcFileOffset);
 
   // Get line info from inlinee line table.
-  std::optional<InlineeSourceLine> Inlinee =
+  Optional<InlineeSourceLine> Inlinee =
       findInlineeByTypeIndex(Sym.Inlinee, ModS.get());
 
   if (!Inlinee)

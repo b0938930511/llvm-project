@@ -7,11 +7,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "lldb/API/SBTypeSummary.h"
+#include "SBReproducerPrivate.h"
 #include "Utils.h"
 #include "lldb/API/SBStream.h"
 #include "lldb/API/SBValue.h"
 #include "lldb/DataFormatters/DataVisualization.h"
-#include "lldb/Utility/Instrumentation.h"
 
 #include "llvm/Support/Casting.h"
 
@@ -19,14 +19,15 @@ using namespace lldb;
 using namespace lldb_private;
 
 SBTypeSummaryOptions::SBTypeSummaryOptions() {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_CONSTRUCTOR_NO_ARGS(SBTypeSummaryOptions);
 
   m_opaque_up = std::make_unique<TypeSummaryOptions>();
 }
 
 SBTypeSummaryOptions::SBTypeSummaryOptions(
     const lldb::SBTypeSummaryOptions &rhs) {
-  LLDB_INSTRUMENT_VA(this, rhs);
+  LLDB_RECORD_CONSTRUCTOR(SBTypeSummaryOptions,
+                          (const lldb::SBTypeSummaryOptions &), rhs);
 
   m_opaque_up = clone(rhs.m_opaque_up);
 }
@@ -34,17 +35,18 @@ SBTypeSummaryOptions::SBTypeSummaryOptions(
 SBTypeSummaryOptions::~SBTypeSummaryOptions() = default;
 
 bool SBTypeSummaryOptions::IsValid() {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_NO_ARGS(bool, SBTypeSummaryOptions, IsValid);
   return this->operator bool();
 }
 SBTypeSummaryOptions::operator bool() const {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_CONST_NO_ARGS(bool, SBTypeSummaryOptions, operator bool);
 
   return m_opaque_up.get();
 }
 
 lldb::LanguageType SBTypeSummaryOptions::GetLanguage() {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_NO_ARGS(lldb::LanguageType, SBTypeSummaryOptions,
+                             GetLanguage);
 
   if (IsValid())
     return m_opaque_up->GetLanguage();
@@ -52,7 +54,8 @@ lldb::LanguageType SBTypeSummaryOptions::GetLanguage() {
 }
 
 lldb::TypeSummaryCapping SBTypeSummaryOptions::GetCapping() {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_NO_ARGS(lldb::TypeSummaryCapping, SBTypeSummaryOptions,
+                             GetCapping);
 
   if (IsValid())
     return m_opaque_up->GetCapping();
@@ -60,14 +63,16 @@ lldb::TypeSummaryCapping SBTypeSummaryOptions::GetCapping() {
 }
 
 void SBTypeSummaryOptions::SetLanguage(lldb::LanguageType l) {
-  LLDB_INSTRUMENT_VA(this, l);
+  LLDB_RECORD_METHOD(void, SBTypeSummaryOptions, SetLanguage,
+                     (lldb::LanguageType), l);
 
   if (IsValid())
     m_opaque_up->SetLanguage(l);
 }
 
 void SBTypeSummaryOptions::SetCapping(lldb::TypeSummaryCapping c) {
-  LLDB_INSTRUMENT_VA(this, c);
+  LLDB_RECORD_METHOD(void, SBTypeSummaryOptions, SetCapping,
+                     (lldb::TypeSummaryCapping), c);
 
   if (IsValid())
     m_opaque_up->SetCapping(c);
@@ -95,50 +100,72 @@ const lldb_private::TypeSummaryOptions &SBTypeSummaryOptions::ref() const {
 }
 
 SBTypeSummaryOptions::SBTypeSummaryOptions(
-    const lldb_private::TypeSummaryOptions &lldb_object)
-    : m_opaque_up(std::make_unique<TypeSummaryOptions>(lldb_object)) {
-  LLDB_INSTRUMENT_VA(this, lldb_object);
+    const lldb_private::TypeSummaryOptions *lldb_object_ptr) {
+  LLDB_RECORD_CONSTRUCTOR(SBTypeSummaryOptions,
+                          (const lldb_private::TypeSummaryOptions *),
+                          lldb_object_ptr);
+
+  SetOptions(lldb_object_ptr);
 }
 
-SBTypeSummary::SBTypeSummary() { LLDB_INSTRUMENT_VA(this); }
+void SBTypeSummaryOptions::SetOptions(
+    const lldb_private::TypeSummaryOptions *lldb_object_ptr) {
+  if (lldb_object_ptr)
+    m_opaque_up = std::make_unique<TypeSummaryOptions>(*lldb_object_ptr);
+  else
+    m_opaque_up = std::make_unique<TypeSummaryOptions>();
+}
+
+SBTypeSummary::SBTypeSummary() : m_opaque_sp() {
+  LLDB_RECORD_CONSTRUCTOR_NO_ARGS(SBTypeSummary);
+}
 
 SBTypeSummary SBTypeSummary::CreateWithSummaryString(const char *data,
                                                      uint32_t options) {
-  LLDB_INSTRUMENT_VA(data, options);
+  LLDB_RECORD_STATIC_METHOD(lldb::SBTypeSummary, SBTypeSummary,
+                            CreateWithSummaryString, (const char *, uint32_t),
+                            data, options);
 
   if (!data || data[0] == 0)
-    return SBTypeSummary();
+    return LLDB_RECORD_RESULT(SBTypeSummary());
 
-  return SBTypeSummary(
-      TypeSummaryImplSP(new StringSummaryFormat(options, data)));
+  return LLDB_RECORD_RESULT(
+      SBTypeSummary(TypeSummaryImplSP(new StringSummaryFormat(options, data))));
 }
 
 SBTypeSummary SBTypeSummary::CreateWithFunctionName(const char *data,
                                                     uint32_t options) {
-  LLDB_INSTRUMENT_VA(data, options);
+  LLDB_RECORD_STATIC_METHOD(lldb::SBTypeSummary, SBTypeSummary,
+                            CreateWithFunctionName, (const char *, uint32_t),
+                            data, options);
 
   if (!data || data[0] == 0)
-    return SBTypeSummary();
+    return LLDB_RECORD_RESULT(SBTypeSummary());
 
-  return SBTypeSummary(
-      TypeSummaryImplSP(new ScriptSummaryFormat(options, data)));
+  return LLDB_RECORD_RESULT(
+      SBTypeSummary(TypeSummaryImplSP(new ScriptSummaryFormat(options, data))));
 }
 
 SBTypeSummary SBTypeSummary::CreateWithScriptCode(const char *data,
                                                   uint32_t options) {
-  LLDB_INSTRUMENT_VA(data, options);
+  LLDB_RECORD_STATIC_METHOD(lldb::SBTypeSummary, SBTypeSummary,
+                            CreateWithScriptCode, (const char *, uint32_t),
+                            data, options);
 
   if (!data || data[0] == 0)
-    return SBTypeSummary();
+    return LLDB_RECORD_RESULT(SBTypeSummary());
 
-  return SBTypeSummary(
-      TypeSummaryImplSP(new ScriptSummaryFormat(options, "", data)));
+  return LLDB_RECORD_RESULT(SBTypeSummary(
+      TypeSummaryImplSP(new ScriptSummaryFormat(options, "", data))));
 }
 
 SBTypeSummary SBTypeSummary::CreateWithCallback(FormatCallback cb,
                                                 uint32_t options,
                                                 const char *description) {
-  LLDB_INSTRUMENT_VA(cb, options, description);
+  LLDB_RECORD_DUMMY(
+      lldb::SBTypeSummary, SBTypeSummary, CreateWithCallback,
+      (lldb::SBTypeSummary::FormatCallback, uint32_t, const char *), cb,
+      options, description);
 
   SBTypeSummary retval;
   if (cb) {
@@ -148,7 +175,7 @@ SBTypeSummary SBTypeSummary::CreateWithCallback(FormatCallback cb,
              const TypeSummaryOptions &opt) -> bool {
           SBStream stream;
           SBValue sb_value(valobj.GetSP());
-          SBTypeSummaryOptions options(opt);
+          SBTypeSummaryOptions options(&opt);
           if (!cb(sb_value, options, stream))
             return false;
           stm.Write(stream.GetData(), stream.GetSize());
@@ -162,23 +189,23 @@ SBTypeSummary SBTypeSummary::CreateWithCallback(FormatCallback cb,
 
 SBTypeSummary::SBTypeSummary(const lldb::SBTypeSummary &rhs)
     : m_opaque_sp(rhs.m_opaque_sp) {
-  LLDB_INSTRUMENT_VA(this, rhs);
+  LLDB_RECORD_CONSTRUCTOR(SBTypeSummary, (const lldb::SBTypeSummary &), rhs);
 }
 
 SBTypeSummary::~SBTypeSummary() = default;
 
 bool SBTypeSummary::IsValid() const {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_CONST_NO_ARGS(bool, SBTypeSummary, IsValid);
   return this->operator bool();
 }
 SBTypeSummary::operator bool() const {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_CONST_NO_ARGS(bool, SBTypeSummary, operator bool);
 
   return m_opaque_sp.get() != nullptr;
 }
 
 bool SBTypeSummary::IsFunctionCode() {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_NO_ARGS(bool, SBTypeSummary, IsFunctionCode);
 
   if (!IsValid())
     return false;
@@ -191,7 +218,7 @@ bool SBTypeSummary::IsFunctionCode() {
 }
 
 bool SBTypeSummary::IsFunctionName() {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_NO_ARGS(bool, SBTypeSummary, IsFunctionName);
 
   if (!IsValid())
     return false;
@@ -204,7 +231,7 @@ bool SBTypeSummary::IsFunctionName() {
 }
 
 bool SBTypeSummary::IsSummaryString() {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_NO_ARGS(bool, SBTypeSummary, IsSummaryString);
 
   if (!IsValid())
     return false;
@@ -213,7 +240,7 @@ bool SBTypeSummary::IsSummaryString() {
 }
 
 const char *SBTypeSummary::GetData() {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_NO_ARGS(const char *, SBTypeSummary, GetData);
 
   if (!IsValid())
     return nullptr;
@@ -222,16 +249,16 @@ const char *SBTypeSummary::GetData() {
     const char *fname = script_summary_ptr->GetFunctionName();
     const char *ftext = script_summary_ptr->GetPythonScript();
     if (ftext && *ftext)
-      return ConstString(ftext).GetCString();
-    return ConstString(fname).GetCString();
+      return ftext;
+    return fname;
   } else if (StringSummaryFormat *string_summary_ptr =
                  llvm::dyn_cast<StringSummaryFormat>(m_opaque_sp.get()))
-    return ConstString(string_summary_ptr->GetSummaryString()).GetCString();
+    return string_summary_ptr->GetSummaryString();
   return nullptr;
 }
 
 uint32_t SBTypeSummary::GetOptions() {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_NO_ARGS(uint32_t, SBTypeSummary, GetOptions);
 
   if (!IsValid())
     return lldb::eTypeOptionNone;
@@ -239,7 +266,7 @@ uint32_t SBTypeSummary::GetOptions() {
 }
 
 void SBTypeSummary::SetOptions(uint32_t value) {
-  LLDB_INSTRUMENT_VA(this, value);
+  LLDB_RECORD_METHOD(void, SBTypeSummary, SetOptions, (uint32_t), value);
 
   if (!CopyOnWrite_Impl())
     return;
@@ -247,7 +274,8 @@ void SBTypeSummary::SetOptions(uint32_t value) {
 }
 
 void SBTypeSummary::SetSummaryString(const char *data) {
-  LLDB_INSTRUMENT_VA(this, data);
+  LLDB_RECORD_METHOD(void, SBTypeSummary, SetSummaryString, (const char *),
+                     data);
 
   if (!IsValid())
     return;
@@ -259,7 +287,8 @@ void SBTypeSummary::SetSummaryString(const char *data) {
 }
 
 void SBTypeSummary::SetFunctionName(const char *data) {
-  LLDB_INSTRUMENT_VA(this, data);
+  LLDB_RECORD_METHOD(void, SBTypeSummary, SetFunctionName, (const char *),
+                     data);
 
   if (!IsValid())
     return;
@@ -271,7 +300,8 @@ void SBTypeSummary::SetFunctionName(const char *data) {
 }
 
 void SBTypeSummary::SetFunctionCode(const char *data) {
-  LLDB_INSTRUMENT_VA(this, data);
+  LLDB_RECORD_METHOD(void, SBTypeSummary, SetFunctionCode, (const char *),
+                     data);
 
   if (!IsValid())
     return;
@@ -284,7 +314,9 @@ void SBTypeSummary::SetFunctionCode(const char *data) {
 
 bool SBTypeSummary::GetDescription(lldb::SBStream &description,
                                    lldb::DescriptionLevel description_level) {
-  LLDB_INSTRUMENT_VA(this, description, description_level);
+  LLDB_RECORD_METHOD(bool, SBTypeSummary, GetDescription,
+                     (lldb::SBStream &, lldb::DescriptionLevel), description,
+                     description_level);
 
   if (!CopyOnWrite_Impl())
     return false;
@@ -295,7 +327,8 @@ bool SBTypeSummary::GetDescription(lldb::SBStream &description,
 }
 
 bool SBTypeSummary::DoesPrintValue(lldb::SBValue value) {
-  LLDB_INSTRUMENT_VA(this, value);
+  LLDB_RECORD_METHOD(bool, SBTypeSummary, DoesPrintValue, (lldb::SBValue),
+                     value);
 
   if (!IsValid())
     return false;
@@ -304,16 +337,19 @@ bool SBTypeSummary::DoesPrintValue(lldb::SBValue value) {
 }
 
 lldb::SBTypeSummary &SBTypeSummary::operator=(const lldb::SBTypeSummary &rhs) {
-  LLDB_INSTRUMENT_VA(this, rhs);
+  LLDB_RECORD_METHOD(lldb::SBTypeSummary &,
+                     SBTypeSummary, operator=,(const lldb::SBTypeSummary &),
+                     rhs);
 
   if (this != &rhs) {
     m_opaque_sp = rhs.m_opaque_sp;
   }
-  return *this;
+  return LLDB_RECORD_RESULT(*this);
 }
 
 bool SBTypeSummary::operator==(lldb::SBTypeSummary &rhs) {
-  LLDB_INSTRUMENT_VA(this, rhs);
+  LLDB_RECORD_METHOD(bool, SBTypeSummary, operator==,(lldb::SBTypeSummary &),
+                     rhs);
 
   if (!IsValid())
     return !rhs.IsValid();
@@ -321,7 +357,8 @@ bool SBTypeSummary::operator==(lldb::SBTypeSummary &rhs) {
 }
 
 bool SBTypeSummary::IsEqualTo(lldb::SBTypeSummary &rhs) {
-  LLDB_INSTRUMENT_VA(this, rhs);
+  LLDB_RECORD_METHOD(bool, SBTypeSummary, IsEqualTo, (lldb::SBTypeSummary &),
+                     rhs);
 
   if (IsValid()) {
     // valid and invalid are different
@@ -361,7 +398,8 @@ bool SBTypeSummary::IsEqualTo(lldb::SBTypeSummary &rhs) {
 }
 
 bool SBTypeSummary::operator!=(lldb::SBTypeSummary &rhs) {
-  LLDB_INSTRUMENT_VA(this, rhs);
+  LLDB_RECORD_METHOD(bool, SBTypeSummary, operator!=,(lldb::SBTypeSummary &),
+                     rhs);
 
   if (!IsValid())
     return !rhs.IsValid();
@@ -433,4 +471,66 @@ bool SBTypeSummary::ChangeSummaryType(bool want_script) {
   SetSP(new_sp);
 
   return true;
+}
+
+namespace lldb_private {
+namespace repro {
+
+template <>
+void RegisterMethods<SBTypeSummaryOptions>(Registry &R) {
+  LLDB_REGISTER_CONSTRUCTOR(SBTypeSummaryOptions, ());
+  LLDB_REGISTER_CONSTRUCTOR(SBTypeSummaryOptions,
+                            (const lldb::SBTypeSummaryOptions &));
+  LLDB_REGISTER_METHOD(bool, SBTypeSummaryOptions, IsValid, ());
+  LLDB_REGISTER_METHOD_CONST(bool, SBTypeSummaryOptions, operator bool, ());
+  LLDB_REGISTER_METHOD(lldb::LanguageType, SBTypeSummaryOptions, GetLanguage,
+                       ());
+  LLDB_REGISTER_METHOD(lldb::TypeSummaryCapping, SBTypeSummaryOptions,
+                       GetCapping, ());
+  LLDB_REGISTER_METHOD(void, SBTypeSummaryOptions, SetLanguage,
+                       (lldb::LanguageType));
+  LLDB_REGISTER_METHOD(void, SBTypeSummaryOptions, SetCapping,
+                       (lldb::TypeSummaryCapping));
+  LLDB_REGISTER_CONSTRUCTOR(SBTypeSummaryOptions,
+                            (const lldb_private::TypeSummaryOptions *));
+}
+
+template <>
+void RegisterMethods<SBTypeSummary>(Registry &R) {
+  LLDB_REGISTER_CONSTRUCTOR(SBTypeSummary, ());
+  LLDB_REGISTER_STATIC_METHOD(lldb::SBTypeSummary, SBTypeSummary,
+                              CreateWithSummaryString,
+                              (const char *, uint32_t));
+  LLDB_REGISTER_STATIC_METHOD(lldb::SBTypeSummary, SBTypeSummary,
+                              CreateWithFunctionName,
+                              (const char *, uint32_t));
+  LLDB_REGISTER_STATIC_METHOD(lldb::SBTypeSummary, SBTypeSummary,
+                              CreateWithScriptCode, (const char *, uint32_t));
+  LLDB_REGISTER_CONSTRUCTOR(SBTypeSummary, (const lldb::SBTypeSummary &));
+  LLDB_REGISTER_METHOD_CONST(bool, SBTypeSummary, IsValid, ());
+  LLDB_REGISTER_METHOD_CONST(bool, SBTypeSummary, operator bool, ());
+  LLDB_REGISTER_METHOD(bool, SBTypeSummary, IsFunctionCode, ());
+  LLDB_REGISTER_METHOD(bool, SBTypeSummary, IsFunctionName, ());
+  LLDB_REGISTER_METHOD(bool, SBTypeSummary, IsSummaryString, ());
+  LLDB_REGISTER_METHOD(const char *, SBTypeSummary, GetData, ());
+  LLDB_REGISTER_METHOD(uint32_t, SBTypeSummary, GetOptions, ());
+  LLDB_REGISTER_METHOD(void, SBTypeSummary, SetOptions, (uint32_t));
+  LLDB_REGISTER_METHOD(void, SBTypeSummary, SetSummaryString, (const char *));
+  LLDB_REGISTER_METHOD(void, SBTypeSummary, SetFunctionName, (const char *));
+  LLDB_REGISTER_METHOD(void, SBTypeSummary, SetFunctionCode, (const char *));
+  LLDB_REGISTER_METHOD(bool, SBTypeSummary, GetDescription,
+                       (lldb::SBStream &, lldb::DescriptionLevel));
+  LLDB_REGISTER_METHOD(bool, SBTypeSummary, DoesPrintValue, (lldb::SBValue));
+  LLDB_REGISTER_METHOD(
+      lldb::SBTypeSummary &,
+      SBTypeSummary, operator=,(const lldb::SBTypeSummary &));
+  LLDB_REGISTER_METHOD(bool,
+                       SBTypeSummary, operator==,(lldb::SBTypeSummary &));
+  LLDB_REGISTER_METHOD(bool, SBTypeSummary, IsEqualTo,
+                       (lldb::SBTypeSummary &));
+  LLDB_REGISTER_METHOD(bool,
+                       SBTypeSummary, operator!=,(lldb::SBTypeSummary &));
+}
+
+}
 }

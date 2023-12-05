@@ -24,7 +24,6 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include <optional>
 #include <string>
 #include <utility>
 
@@ -77,7 +76,7 @@ public:
 
   void Profile(FoldingSetNodeID &ID) const {
     if (isEnumAttribute())
-      Profile(ID, getKindAsEnum());
+      Profile(ID, getKindAsEnum(), static_cast<uint64_t>(0));
     else if (isIntAttribute())
       Profile(ID, getKindAsEnum(), getValueAsInt());
     else if (isStringAttribute())
@@ -86,16 +85,10 @@ public:
       Profile(ID, getKindAsEnum(), getValueAsType());
   }
 
-  static void Profile(FoldingSetNodeID &ID, Attribute::AttrKind Kind) {
-    assert(Attribute::isEnumAttrKind(Kind) && "Expected enum attribute");
-    ID.AddInteger(Kind);
-  }
-
   static void Profile(FoldingSetNodeID &ID, Attribute::AttrKind Kind,
                       uint64_t Val) {
-    assert(Attribute::isIntAttrKind(Kind) && "Expected int attribute");
     ID.AddInteger(Kind);
-    ID.AddInteger(Val);
+    if (Val) ID.AddInteger(Val);
   }
 
   static void Profile(FoldingSetNodeID &ID, StringRef Kind, StringRef Values) {
@@ -230,7 +223,7 @@ class AttributeSetNode final
 
   static AttributeSetNode *getSorted(LLVMContext &C,
                                      ArrayRef<Attribute> SortedAttrs);
-  std::optional<Attribute> findEnumAttribute(Attribute::AttrKind Kind) const;
+  Optional<Attribute> findEnumAttribute(Attribute::AttrKind Kind) const;
 
 public:
   // AttributesSetNode is uniqued, these should not be available.
@@ -259,14 +252,8 @@ public:
   MaybeAlign getStackAlignment() const;
   uint64_t getDereferenceableBytes() const;
   uint64_t getDereferenceableOrNullBytes() const;
-  std::optional<std::pair<unsigned, std::optional<unsigned>>> getAllocSizeArgs()
-      const;
-  unsigned getVScaleRangeMin() const;
-  std::optional<unsigned> getVScaleRangeMax() const;
-  UWTableKind getUWTableKind() const;
-  AllocFnKind getAllocKind() const;
-  MemoryEffects getMemoryEffects() const;
-  FPClassTest getNoFPClass() const;
+  std::pair<unsigned, Optional<unsigned>> getAllocSizeArgs() const;
+  std::pair<unsigned, unsigned> getVScaleRangeArgs() const;
   std::string getAsString(bool InAttrGrp) const;
   Type *getAttributeType(Attribute::AttrKind Kind) const;
 
@@ -276,7 +263,7 @@ public:
   iterator end() const { return begin() + NumAttrs; }
 
   void Profile(FoldingSetNodeID &ID) const {
-    Profile(ID, ArrayRef(begin(), end()));
+    Profile(ID, makeArrayRef(begin(), end()));
   }
 
   static void Profile(FoldingSetNodeID &ID, ArrayRef<Attribute> AttrList) {

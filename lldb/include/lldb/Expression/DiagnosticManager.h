@@ -114,8 +114,7 @@ public:
   }
 
   void AddDiagnostic(std::unique_ptr<Diagnostic> diagnostic) {
-    if (diagnostic)
-      m_diagnostics.push_back(std::move(diagnostic));
+    m_diagnostics.push_back(std::move(diagnostic));
   }
 
   size_t Printf(DiagnosticSeverity severity, const char *format, ...)

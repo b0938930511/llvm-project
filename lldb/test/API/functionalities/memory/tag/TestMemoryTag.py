@@ -11,6 +11,9 @@ import lldbsuite.test.lldbutil as lldbutil
 
 
 class MemoryTagTestCase(TestBase):
+
+    mydir = TestBase.compute_mydir(__file__)
+
     NO_DEBUG_INFO_TESTCASE = True
 
     def test_memory_tag_read_unsupported(self):
@@ -22,16 +25,13 @@ class MemoryTagTestCase(TestBase):
         exe = self.getBuildArtifact("a.out")
         self.runCmd("file " + exe, CURRENT_EXECUTABLE_SET)
 
-        lldbutil.run_break_set_by_file_and_line(
-            self,
-            "main.cpp",
-            line_number("main.cpp", "// Breakpoint here"),
-            num_expected_locations=1,
-        )
+        lldbutil.run_break_set_by_file_and_line(self, "main.cpp",
+                            line_number('main.cpp', '// Breakpoint here'),
+                                        num_expected_locations=1)
         self.runCmd("run", RUN_SUCCEEDED)
 
         # If you're on AArch64 you could have MTE but the remote process
-        # must also support it. If you're on any other architecture you
+        # must also support it. If you're on any other arhcitecture you
         # won't have any tagging at all. So the error message is different.
         if self.isAArch64():
             expected = "error: Process does not support memory tagging"

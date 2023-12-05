@@ -4,25 +4,25 @@
 #include <stdio.h>
 
 int *_Nonnull h() {
-  // CHECK: nullability-return by 0x{{[[:xdigit:]]+$}}
+  // CHECK: nullability-return
   return NULL;
 }
 
 __attribute__((returns_nonnull))
 int *i() {
-  // CHECK: nonnull-return by 0x{{[[:xdigit:]]+$}}
+  // CHECK: nonnull-return
   return NULL;
 }
 
 __attribute__((noinline))
 int f(int x, int y) {
-  // CHECK: mul-overflow by 0x{{[[:xdigit:]]+$}}
+  // CHECK: mul-overflow
   return x * y;
 }
 
 __attribute__((noinline))
 int g(int x, int y) {
-  // CHECK: mul-overflow by 0x{{[[:xdigit:]]+$}}
+  // CHECK: mul-overflow
   return x * (y + 1);
 }
 

@@ -28,7 +28,7 @@ class ARCInstrInfo : public ARCGenInstrInfo {
   virtual void anchor();
 
 public:
-  ARCInstrInfo(const ARCSubtarget &);
+  ARCInstrInfo();
 
   const ARCRegisterInfo &getRegisterInfo() const { return RI; }
 
@@ -57,28 +57,26 @@ public:
 
   unsigned insertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
                         MachineBasicBlock *FBB, ArrayRef<MachineOperand> Cond,
-                        const DebugLoc &,
+                        const DebugLoc &dl,
                         int *BytesAdded = nullptr) const override;
 
   unsigned removeBranch(MachineBasicBlock &MBB,
                         int *BytesRemoved = nullptr) const override;
 
   void copyPhysReg(MachineBasicBlock &MBB, MachineBasicBlock::iterator I,
-                   const DebugLoc &, MCRegister DestReg, MCRegister SrcReg,
+                   const DebugLoc &dl, MCRegister DestReg, MCRegister SrcReg,
                    bool KillSrc) const override;
 
   void storeRegToStackSlot(MachineBasicBlock &MBB,
                            MachineBasicBlock::iterator MI, Register SrcReg,
-                           bool IsKill, int FrameIndex,
+                           bool isKill, int FrameIndex,
                            const TargetRegisterClass *RC,
-                           const TargetRegisterInfo *TRI,
-                           Register VReg) const override;
+                           const TargetRegisterInfo *TRI) const override;
 
   void loadRegFromStackSlot(MachineBasicBlock &MBB,
                             MachineBasicBlock::iterator MI, Register DestReg,
                             int FrameIndex, const TargetRegisterClass *RC,
-                            const TargetRegisterInfo *TRI,
-                            Register VReg) const override;
+                            const TargetRegisterInfo *TRI) const override;
 
   bool
   reverseBranchCondition(SmallVectorImpl<MachineOperand> &Cond) const override;

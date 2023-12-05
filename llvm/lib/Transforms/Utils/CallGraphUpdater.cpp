@@ -14,16 +14,14 @@
 
 #include "llvm/Transforms/Utils/CallGraphUpdater.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Analysis/CallGraph.h"
-#include "llvm/Analysis/CallGraphSCCPass.h"
-#include "llvm/IR/Constants.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 
 using namespace llvm;
 
 bool CallGraphUpdater::finalize() {
   if (!DeadFunctionsInComdats.empty()) {
-    filterDeadComdatFunctions(DeadFunctionsInComdats);
+    filterDeadComdatFunctions(*DeadFunctionsInComdats.front()->getParent(),
+                              DeadFunctionsInComdats);
     DeadFunctions.append(DeadFunctionsInComdats.begin(),
                          DeadFunctionsInComdats.end());
   }
@@ -36,7 +34,7 @@ bool CallGraphUpdater::finalize() {
       CallGraphNode *DeadCGN = (*CG)[DeadFn];
       DeadCGN->removeAllCalledFunctions();
       CG->getExternalCallingNode()->removeAnyCallEdgeTo(DeadCGN);
-      DeadFn->replaceAllUsesWith(PoisonValue::get(DeadFn->getType()));
+      DeadFn->replaceAllUsesWith(UndefValue::get(DeadFn->getType()));
     }
 
     // Then remove the node and function from the module.
@@ -51,7 +49,7 @@ bool CallGraphUpdater::finalize() {
     // no call graph was provided.
     for (Function *DeadFn : DeadFunctions) {
       DeadFn->removeDeadConstantUsers();
-      DeadFn->replaceAllUsesWith(PoisonValue::get(DeadFn->getType()));
+      DeadFn->replaceAllUsesWith(UndefValue::get(DeadFn->getType()));
 
       if (LCG && !ReplacedFunctions.count(DeadFn)) {
         // Taken mostly from the inliner:
@@ -120,8 +118,6 @@ void CallGraphUpdater::removeFunction(Function &DeadFn) {
     DeadCGN->removeAllCalledFunctions();
     CGSCC->DeleteNode(DeadCGN);
   }
-  if (FAM)
-    FAM->clear(DeadFn, DeadFn.getName());
 }
 
 void CallGraphUpdater::replaceFunctionWith(Function &OldFn, Function &NewFn) {

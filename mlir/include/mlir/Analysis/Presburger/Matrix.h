@@ -7,15 +7,13 @@
 //===----------------------------------------------------------------------===//
 //
 // This is a simple 2D matrix class that supports reading, writing, resizing,
-// swapping rows, and swapping columns. It can hold integers (MPInt) or rational
-// numbers (Fraction).
+// swapping rows, and swapping columns.
 //
 //===----------------------------------------------------------------------===//
 
 #ifndef MLIR_ANALYSIS_PRESBURGER_MATRIX_H
 #define MLIR_ANALYSIS_PRESBURGER_MATRIX_H
 
-#include "mlir/Analysis/Presburger/Fraction.h"
 #include "mlir/Support/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/raw_ostream.h"
@@ -23,7 +21,6 @@
 #include <cassert>
 
 namespace mlir {
-namespace presburger {
 
 /// This is a class to represent a resizable matrix.
 ///
@@ -33,14 +30,7 @@ namespace presburger {
 /// (i, j) is stored at data[i*nReservedColumns + j]. The reserved but unused
 /// columns always have all zero values. The reserved rows are just reserved
 /// space in the underlying SmallVector's capacity.
-/// This class only works for the types MPInt and Fraction, since the method
-/// implementations are in the Matrix.cpp file. Only these two types have
-/// been explicitly instantiated there.
-template <typename T>
 class Matrix {
-  static_assert(std::is_same_v<T, MPInt> || std::is_same_v<T, Fraction>,
-                "T must be MPInt or Fraction.");
-
 public:
   Matrix() = delete;
 
@@ -57,21 +47,10 @@ public:
   static Matrix identity(unsigned dimension);
 
   /// Access the element at the specified row and column.
-  T &at(unsigned row, unsigned column) {
-    assert(row < nRows && "Row outside of range");
-    assert(column < nColumns && "Column outside of range");
-    return data[row * nReservedColumns + column];
-  }
-
-  T at(unsigned row, unsigned column) const {
-    assert(row < nRows && "Row outside of range");
-    assert(column < nColumns && "Column outside of range");
-    return data[row * nReservedColumns + column];
-  }
-
-  T &operator()(unsigned row, unsigned column) { return at(row, column); }
-
-  T operator()(unsigned row, unsigned column) const { return at(row, column); }
+  int64_t &at(unsigned row, unsigned column);
+  int64_t at(unsigned row, unsigned column) const;
+  int64_t &operator()(unsigned row, unsigned column);
+  int64_t operator()(unsigned row, unsigned column) const;
 
   /// Swap the given columns.
   void swapColumns(unsigned column, unsigned otherColumn);
@@ -79,25 +58,21 @@ public:
   /// Swap the given rows.
   void swapRows(unsigned row, unsigned otherRow);
 
-  unsigned getNumRows() const { return nRows; }
+  unsigned getNumRows() const;
 
-  unsigned getNumColumns() const { return nColumns; }
+  unsigned getNumColumns() const;
 
   /// Return the maximum number of rows/columns that can be added without
   /// incurring a reallocation.
   unsigned getNumReservedRows() const;
-  unsigned getNumReservedColumns() const { return nReservedColumns; }
+  unsigned getNumReservedColumns() const;
 
   /// Reserve enough space to resize to the specified number of rows without
   /// reallocations.
   void reserveRows(unsigned rows);
 
-  /// Get a [Mutable]ArrayRef corresponding to the specified row.
-  MutableArrayRef<T> getRow(unsigned row);
-  ArrayRef<T> getRow(unsigned row) const;
-
-  /// Set the specified row to `elems`.
-  void setRow(unsigned row, ArrayRef<T> elems);
+  /// Get an ArrayRef corresponding to the specified row.
+  ArrayRef<int64_t> getRow(unsigned row) const;
 
   /// Insert columns having positions pos, pos + 1, ... pos + count - 1.
   /// Columns that were at positions 0 to pos - 1 will stay where they are;
@@ -131,55 +106,22 @@ public:
 
   void copyRow(unsigned sourceRow, unsigned targetRow);
 
-  void fillRow(unsigned row, const T &value);
-  void fillRow(unsigned row, int64_t value) { fillRow(row, T(value)); }
-
   /// Add `scale` multiples of the source row to the target row.
-  void addToRow(unsigned sourceRow, unsigned targetRow, const T &scale);
-  void addToRow(unsigned sourceRow, unsigned targetRow, int64_t scale) {
-    addToRow(sourceRow, targetRow, T(scale));
-  }
-  /// Add `scale` multiples of the rowVec row to the specified row.
-  void addToRow(unsigned row, ArrayRef<T> rowVec, const T &scale);
+  void addToRow(unsigned sourceRow, unsigned targetRow, int64_t scale);
 
   /// Add `scale` multiples of the source column to the target column.
-  void addToColumn(unsigned sourceColumn, unsigned targetColumn,
-                   const T &scale);
-  void addToColumn(unsigned sourceColumn, unsigned targetColumn,
-                   int64_t scale) {
-    addToColumn(sourceColumn, targetColumn, T(scale));
-  }
+  void addToColumn(unsigned sourceColumn, unsigned targetColumn, int64_t scale);
 
   /// Negate the specified column.
   void negateColumn(unsigned column);
 
-  /// Negate the specified row.
-  void negateRow(unsigned row);
-
-  /// The given vector is interpreted as a row vector v. Post-multiply v with
-  /// this matrix, say M, and return vM.
-  SmallVector<T, 8> preMultiplyWithRow(ArrayRef<T> rowVec) const;
-
-  /// The given vector is interpreted as a column vector v. Pre-multiply v with
-  /// this matrix, say M, and return Mv.
-  SmallVector<T, 8> postMultiplyWithColumn(ArrayRef<T> colVec) const;
-
   /// Resize the matrix to the specified dimensions. If a dimension is smaller,
-  /// the values are truncated; if it is bigger, the new values are initialized
-  /// to zero.
-  ///
-  /// Due to the representation of the matrix, resizing vertically (adding rows)
-  /// is less expensive than increasing the number of columns beyond
-  /// nReservedColumns.
-  void resize(unsigned newNRows, unsigned newNColumns);
-  void resizeHorizontally(unsigned newNColumns);
+  /// the values are truncated; if it is bigger, the new values are default
+  /// initialized.
   void resizeVertically(unsigned newNRows);
 
   /// Add an extra row at the bottom of the matrix and return its position.
   unsigned appendExtraRow();
-  /// Same as above, but copy the given elements into the row. The length of
-  /// `elems` must be equal to the number of columns.
-  unsigned appendExtraRow(ArrayRef<T> elems);
 
   /// Print the matrix.
   void print(raw_ostream &os) const;
@@ -189,7 +131,7 @@ public:
   /// invariants satisfied.
   bool hasConsistentState() const;
 
-protected:
+private:
   /// The current number of rows, columns, and reserved columns. The underlying
   /// data vector is viewed as an nRows x nReservedColumns matrix, of which the
   /// first nColumns columns are currently in use, and the remaining are
@@ -198,76 +140,9 @@ protected:
 
   /// Stores the data. data.size() is equal to nRows * nReservedColumns.
   /// data.capacity() / nReservedColumns is the number of reserved rows.
-  SmallVector<T, 16> data;
+  SmallVector<int64_t, 64> data;
 };
 
-// An inherited class for integer matrices, with no new data attributes.
-// This is only used for the matrix-related methods which apply only
-// to integers (hermite normal form computation and row normalisation).
-class IntMatrix : public Matrix<MPInt> {
-public:
-  IntMatrix(unsigned rows, unsigned columns, unsigned reservedRows = 0,
-            unsigned reservedColumns = 0)
-      : Matrix<MPInt>(rows, columns, reservedRows, reservedColumns){};
-
-  IntMatrix(Matrix<MPInt> m) : Matrix<MPInt>(std::move(m)){};
-
-  /// Return the identity matrix of the specified dimension.
-  static IntMatrix identity(unsigned dimension);
-
-  /// Given the current matrix M, returns the matrices H, U such that H is the
-  /// column hermite normal form of M, i.e. H = M * U, where U is unimodular and
-  /// the matrix H has the following restrictions:
-  ///  - H is lower triangular.
-  ///  - The leading coefficient (the first non-zero entry from the top, called
-  ///    the pivot) of a non-zero column is always strictly below of the leading
-  ///    coefficient of the column before it; moreover, it is positive.
-  ///  - The elements to the right of the pivots are zero and the elements to
-  ///    the left of the pivots are nonnegative and strictly smaller than the
-  ///    pivot.
-  std::pair<IntMatrix, IntMatrix> computeHermiteNormalForm() const;
-
-  /// Divide the first `nCols` of the specified row by their GCD.
-  /// Returns the GCD of the first `nCols` of the specified row.
-  MPInt normalizeRow(unsigned row, unsigned nCols);
-  /// Divide the columns of the specified row by their GCD.
-  /// Returns the GCD of the columns of the specified row.
-  MPInt normalizeRow(unsigned row);
-
-  // Compute the determinant of the matrix (cubic time).
-  // Stores the integer inverse of the matrix in the pointer
-  // passed (if any). The pointer is unchanged if the inverse
-  // does not exist, which happens iff det = 0.
-  // For a matrix M, the integer inverse is the matrix M' such that
-  // M x M' = M'  M = det(M) x I.
-  // Assert-fails if the matrix is not square.
-  MPInt determinant(IntMatrix *inverse = nullptr) const;
-};
-
-// An inherited class for rational matrices, with no new data attributes.
-// This class is for functionality that only applies to matrices of fractions.
-class FracMatrix : public Matrix<Fraction> {
-public:
-  FracMatrix(unsigned rows, unsigned columns, unsigned reservedRows = 0,
-             unsigned reservedColumns = 0)
-      : Matrix<Fraction>(rows, columns, reservedRows, reservedColumns){};
-
-  FracMatrix(Matrix<Fraction> m) : Matrix<Fraction>(std::move(m)){};
-
-  explicit FracMatrix(IntMatrix m);
-
-  /// Return the identity matrix of the specified dimension.
-  static FracMatrix identity(unsigned dimension);
-
-  // Compute the determinant of the matrix (cubic time).
-  // Stores the inverse of the matrix in the pointer
-  // passed (if any). The pointer is unchanged if the inverse
-  // does not exist, which happens iff det = 0.
-  // Assert-fails if the matrix is not square.
-  Fraction determinant(FracMatrix *inverse = nullptr) const;
-};
-
-} // namespace presburger
 } // namespace mlir
 
 #endif // MLIR_ANALYSIS_PRESBURGER_MATRIX_H

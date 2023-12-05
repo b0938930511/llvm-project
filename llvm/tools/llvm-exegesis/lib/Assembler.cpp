@@ -9,7 +9,6 @@
 #include "Assembler.h"
 
 #include "SnippetRepetitor.h"
-#include "SubprocessMemory.h"
 #include "Target.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/CodeGen/FunctionLoweringInfo.h"
@@ -19,22 +18,13 @@
 #include "llvm/CodeGen/MachineModuleInfo.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/TargetInstrInfo.h"
-#include "llvm/CodeGen/TargetLowering.h"
 #include "llvm/CodeGen/TargetPassConfig.h"
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
-#include "llvm/ExecutionEngine/Orc/LLJIT.h"
-#include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/Instructions.h"
+#include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/MC/MCInstrInfo.h"
-#include "llvm/Object/SymbolSize.h"
 #include "llvm/Support/Alignment.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/raw_ostream.h"
-
-#ifdef HAVE_LIBPFM
-#include "perfmon/perf_event.h"
-#endif // HAVE_LIBPFM
 
 namespace llvm {
 namespace exegesis {
@@ -47,53 +37,14 @@ static const Align kFunctionAlignment(4096);
 // all registers could be setup correctly.
 static bool generateSnippetSetupCode(
     const ExegesisTarget &ET, const MCSubtargetInfo *const MSI,
-    ArrayRef<RegisterValue> RegisterInitialValues, BasicBlockFiller &BBF,
-    const BenchmarkKey &Key, bool GenerateMemoryInstructions) {
+    ArrayRef<RegisterValue> RegisterInitialValues, BasicBlockFiller &BBF) {
   bool IsSnippetSetupComplete = true;
-  if (GenerateMemoryInstructions) {
-    BBF.addInstructions(ET.generateMemoryInitialSetup());
-    for (const MemoryMapping &MM : Key.MemoryMappings) {
-      BBF.addInstructions(ET.generateMmap(
-          MM.Address, Key.MemoryValues.at(MM.MemoryValueName).SizeBytes,
-          ET.getAuxiliaryMemoryStartAddress() +
-              sizeof(int) * (Key.MemoryValues.at(MM.MemoryValueName).Index +
-                             SubprocessMemory::AuxiliaryMemoryOffset)));
-    }
-    BBF.addInstructions(ET.setStackRegisterToAuxMem());
-  }
-  Register StackPointerRegister = BBF.MF.getSubtarget()
-                                      .getTargetLowering()
-                                      ->getStackPointerRegisterToSaveRestore();
   for (const RegisterValue &RV : RegisterInitialValues) {
-    if (GenerateMemoryInstructions) {
-      // If we're generating memory instructions, don't load in the value for
-      // the register with the stack pointer as it will be used later to finish
-      // the setup.
-      if (RV.Register == StackPointerRegister)
-        continue;
-    }
     // Load a constant in the register.
     const auto SetRegisterCode = ET.setRegTo(*MSI, RV.Register, RV.Value);
     if (SetRegisterCode.empty())
       IsSnippetSetupComplete = false;
     BBF.addInstructions(SetRegisterCode);
-  }
-  if (GenerateMemoryInstructions) {
-#ifdef HAVE_LIBPFM
-    BBF.addInstructions(ET.configurePerfCounter(PERF_EVENT_IOC_RESET, true));
-#endif // HAVE_LIBPFM
-    for (const RegisterValue &RV : RegisterInitialValues) {
-      // Load in the stack register now as we're done using it elsewhere
-      // and need to set the value in preparation for executing the
-      // snippet.
-      if (RV.Register == StackPointerRegister)
-        continue;
-      const auto SetRegisterCode = ET.setRegTo(*MSI, RV.Register, RV.Value);
-      if (SetRegisterCode.empty())
-        IsSnippetSetupComplete = false;
-      BBF.addInstructions(SetRegisterCode);
-      break;
-    }
   }
   return IsSnippetSetupComplete;
 }
@@ -129,9 +80,10 @@ MachineFunction &createVoidVoidPtrMachineFunction(StringRef FunctionName,
   FunctionType *FunctionType =
       FunctionType::get(ReturnType, {MemParamType}, false);
   Function *const F = Function::Create(
-      FunctionType, GlobalValue::ExternalLinkage, FunctionName, Module);
-  BasicBlock *BB = BasicBlock::Create(Module->getContext(), "", F);
-  new UnreachableInst(Module->getContext(), BB);
+      FunctionType, GlobalValue::InternalLinkage, FunctionName, Module);
+  // Making sure we can create a MachineFunction out of this Function even if it
+  // contains no IR.
+  F->setIsMaterializable(true);
   return MMI->getOrCreateMachineFunction(*F);
 }
 
@@ -169,17 +121,7 @@ void BasicBlockFiller::addInstructions(ArrayRef<MCInst> Insts,
     addInstruction(Inst, DL);
 }
 
-void BasicBlockFiller::addReturn(const ExegesisTarget &ET,
-                                 bool SubprocessCleanup, const DebugLoc &DL) {
-  // Insert cleanup code
-  if (SubprocessCleanup) {
-#ifdef HAVE_LIBPFM
-    addInstructions(ET.configurePerfCounter(PERF_EVENT_IOC_DISABLE, false));
-#endif // HAVE_LIBPFM
-#ifdef __linux__
-    addInstructions(ET.generateExitSyscall(0));
-#endif // __linux__
-  }
+void BasicBlockFiller::addReturn(const DebugLoc &DL) {
   // Insert the return code.
   const TargetInstrInfo *TII = MF.getSubtarget().getInstrInfo();
   if (TII->getReturnOpcode() < TII->getNumOpcodes()) {
@@ -190,8 +132,8 @@ void BasicBlockFiller::addReturn(const ExegesisTarget &ET,
 
     FunctionLoweringInfo FuncInfo;
     FuncInfo.CanLowerReturn = true;
-    MF.getSubtarget().getCallLowering()->lowerReturn(MIB, nullptr, {}, FuncInfo,
-                                                     0);
+    MF.getSubtarget().getCallLowering()->lowerReturn(MIB, nullptr, {},
+                                                     FuncInfo);
   }
 }
 
@@ -211,7 +153,7 @@ ArrayRef<unsigned> FunctionFiller::getRegistersSetUp() const {
 }
 
 static std::unique_ptr<Module>
-createModule(const std::unique_ptr<LLVMContext> &Context, const DataLayout &DL) {
+createModule(const std::unique_ptr<LLVMContext> &Context, const DataLayout DL) {
   auto Mod = std::make_unique<Module>(ModuleID, *Context);
   Mod->setDataLayout(DL);
   return Mod;
@@ -222,9 +164,10 @@ BitVector getFunctionReservedRegs(const TargetMachine &TM) {
   std::unique_ptr<Module> Module = createModule(Context, TM.createDataLayout());
   // TODO: This only works for targets implementing LLVMTargetMachine.
   const LLVMTargetMachine &LLVMTM = static_cast<const LLVMTargetMachine &>(TM);
-  auto MMIWP = std::make_unique<MachineModuleInfoWrapperPass>(&LLVMTM);
+  std::unique_ptr<MachineModuleInfoWrapperPass> MMIWP =
+      std::make_unique<MachineModuleInfoWrapperPass>(&LLVMTM);
   MachineFunction &MF = createVoidVoidPtrMachineFunction(
-      FunctionID, Module.get(), &MMIWP->getMMI());
+      FunctionID, Module.get(), &MMIWP.get()->getMMI());
   // Saving reserved registers for client.
   return MF.getSubtarget().getRegisterInfo()->getReservedRegs(MF);
 }
@@ -233,9 +176,7 @@ Error assembleToStream(const ExegesisTarget &ET,
                        std::unique_ptr<LLVMTargetMachine> TM,
                        ArrayRef<unsigned> LiveIns,
                        ArrayRef<RegisterValue> RegisterInitialValues,
-                       const FillFunction &Fill, raw_pwrite_stream &AsmStream,
-                       const BenchmarkKey &Key,
-                       bool GenerateMemoryInstructions) {
+                       const FillFunction &Fill, raw_pwrite_stream &AsmStream) {
   auto Context = std::make_unique<LLVMContext>();
   std::unique_ptr<Module> Module =
       createModule(Context, TM->createDataLayout());
@@ -254,41 +195,20 @@ Error assembleToStream(const ExegesisTarget &ET,
   for (const unsigned Reg : LiveIns)
     MF.getRegInfo().addLiveIn(Reg);
 
-  if (GenerateMemoryInstructions) {
-    for (const unsigned Reg : ET.getArgumentRegisters())
-      MF.getRegInfo().addLiveIn(Reg);
-    // Add a live in for registers that need saving so that the machine verifier
-    // doesn't fail if the register is never defined.
-    for (const unsigned Reg : ET.getRegistersNeedSaving())
-      MF.getRegInfo().addLiveIn(Reg);
-  }
-
   std::vector<unsigned> RegistersSetUp;
   for (const auto &InitValue : RegisterInitialValues) {
     RegistersSetUp.push_back(InitValue.Register);
   }
   FunctionFiller Sink(MF, std::move(RegistersSetUp));
   auto Entry = Sink.getEntry();
-
   for (const unsigned Reg : LiveIns)
     Entry.MBB->addLiveIn(Reg);
 
-  if (GenerateMemoryInstructions) {
-    for (const unsigned Reg : ET.getArgumentRegisters())
-      Entry.MBB->addLiveIn(Reg);
-    // Add a live in for registers that need saving so that the machine verifier
-    // doesn't fail if the register is never defined.
-    for (const unsigned Reg : ET.getRegistersNeedSaving())
-      Entry.MBB->addLiveIn(Reg);
-  }
-
   const bool IsSnippetSetupComplete = generateSnippetSetupCode(
-      ET, TM->getMCSubtargetInfo(), RegisterInitialValues, Entry, Key,
-      GenerateMemoryInstructions);
+      ET, TM->getMCSubtargetInfo(), RegisterInitialValues, Entry);
 
   // If the snippet setup is not complete, we disable liveliness tracking. This
   // means that we won't know what values are in the registers.
-  // FIXME: this should probably be an assertion.
   if (!IsSnippetSetupComplete)
     Properties.reset(MachineFunctionProperties::Property::TracksLiveness);
 
@@ -323,8 +243,7 @@ Error assembleToStream(const ExegesisTarget &ET,
   TPC->setInitialized();
 
   // AsmPrinter is responsible for generating the assembly into AsmBuffer.
-  if (TM->addAsmPrinter(PM, AsmStream, nullptr, CodeGenFileType::ObjectFile,
-                        MCContext))
+  if (TM->addAsmPrinter(PM, AsmStream, nullptr, CGFT_ObjectFile, MCContext))
     return make_error<Failure>("Cannot add AsmPrinter passes");
 
   PM.run(*Module); // Run all the passes
@@ -348,80 +267,59 @@ object::OwningBinary<object::ObjectFile> getObjectFromFile(StringRef Filename) {
   return cantFail(object::ObjectFile::createObjectFile(Filename));
 }
 
-Expected<ExecutableFunction> ExecutableFunction::create(
+namespace {
+
+// Implementation of this class relies on the fact that a single object with a
+// single function will be loaded into memory.
+class TrackingSectionMemoryManager : public SectionMemoryManager {
+public:
+  explicit TrackingSectionMemoryManager(uintptr_t *CodeSize)
+      : CodeSize(CodeSize) {}
+
+  uint8_t *allocateCodeSection(uintptr_t Size, unsigned Alignment,
+                               unsigned SectionID,
+                               StringRef SectionName) override {
+    *CodeSize = Size;
+    return SectionMemoryManager::allocateCodeSection(Size, Alignment, SectionID,
+                                                     SectionName);
+  }
+
+private:
+  uintptr_t *const CodeSize = nullptr;
+};
+
+} // namespace
+
+ExecutableFunction::ExecutableFunction(
     std::unique_ptr<LLVMTargetMachine> TM,
-    object::OwningBinary<object::ObjectFile> &&ObjectFileHolder) {
+    object::OwningBinary<object::ObjectFile> &&ObjectFileHolder)
+    : Context(std::make_unique<LLVMContext>()) {
   assert(ObjectFileHolder.getBinary() && "cannot create object file");
-  std::unique_ptr<LLVMContext> Ctx = std::make_unique<LLVMContext>();
-
-  auto SymbolSizes = object::computeSymbolSizes(*ObjectFileHolder.getBinary());
-  // Get the size of the function that we want to call into (with the name of
-  // FunctionID). This should always be the third symbol returned by
-  // calculateSymbolSizes.
-  assert(SymbolSizes.size() == 3);
-  assert(cantFail(std::get<0>(SymbolSizes[2]).getName()) == FunctionID);
-  uintptr_t CodeSize = std::get<1>(SymbolSizes[2]);
-
-  auto EJITOrErr = orc::LLJITBuilder().create();
-  if (!EJITOrErr)
-    return EJITOrErr.takeError();
-
-  auto EJIT = std::move(*EJITOrErr);
-
-  if (auto ObjErr =
-          EJIT->addObjectFile(std::get<1>(ObjectFileHolder.takeBinary())))
-    return std::move(ObjErr);
-
-  auto FunctionAddressOrErr = EJIT->lookup(FunctionID);
-  if (!FunctionAddressOrErr)
-    return FunctionAddressOrErr.takeError();
-
-  const uint64_t FunctionAddress = FunctionAddressOrErr->getValue();
-
+  // Initializing the execution engine.
+  // We need to use the JIT EngineKind to be able to add an object file.
+  LLVMLinkInMCJIT();
+  uintptr_t CodeSize = 0;
+  std::string Error;
+  ExecEngine.reset(
+      EngineBuilder(createModule(Context, TM->createDataLayout()))
+          .setErrorStr(&Error)
+          .setMCPU(TM->getTargetCPU())
+          .setEngineKind(EngineKind::JIT)
+          .setMCJITMemoryManager(
+              std::make_unique<TrackingSectionMemoryManager>(&CodeSize))
+          .create(TM.release()));
+  if (!ExecEngine)
+    report_fatal_error(Error);
+  // Adding the generated object file containing the assembled function.
+  // The ExecutionEngine makes sure the object file is copied into an
+  // executable page.
+  ExecEngine->addObjectFile(std::move(ObjectFileHolder));
+  // Fetching function bytes.
+  const uint64_t FunctionAddress = ExecEngine->getFunctionAddress(FunctionID);
   assert(isAligned(kFunctionAlignment, FunctionAddress) &&
          "function is not properly aligned");
-
-  StringRef FBytes =
+  FunctionBytes =
       StringRef(reinterpret_cast<const char *>(FunctionAddress), CodeSize);
-  return ExecutableFunction(std::move(Ctx), std::move(EJIT), FBytes);
-}
-
-ExecutableFunction::ExecutableFunction(std::unique_ptr<LLVMContext> Ctx,
-                                       std::unique_ptr<orc::LLJIT> EJIT,
-                                       StringRef FB)
-    : FunctionBytes(FB), Context(std::move(Ctx)), ExecJIT(std::move(EJIT)) {}
-
-Error getBenchmarkFunctionBytes(const StringRef InputData,
-                                std::vector<uint8_t> &Bytes) {
-  const auto Holder = getObjectFromBuffer(InputData);
-  const auto *Obj = Holder.getBinary();
-  // See RuntimeDyldImpl::loadObjectImpl(Obj) for much more complete
-  // implementation.
-
-  // Find the only function in the object file.
-  SmallVector<object::SymbolRef, 1> Functions;
-  for (auto &Sym : Obj->symbols()) {
-    auto SymType = Sym.getType();
-    if (SymType && *SymType == object::SymbolRef::Type::ST_Function)
-      Functions.push_back(Sym);
-  }
-  if (Functions.size() != 1)
-    return make_error<Failure>("Exactly one function expected");
-
-  // Find the containing section - it is assumed to contain only this function.
-  auto SectionOrErr = Functions.front().getSection();
-  if (!SectionOrErr || *SectionOrErr == Obj->section_end())
-    return make_error<Failure>("Section not found");
-
-  auto Address = Functions.front().getAddress();
-  if (!Address || *Address != SectionOrErr.get()->getAddress())
-    return make_error<Failure>("Unexpected layout");
-
-  auto ContentsOrErr = SectionOrErr.get()->getContents();
-  if (!ContentsOrErr)
-    return ContentsOrErr.takeError();
-  Bytes.assign(ContentsOrErr->begin(), ContentsOrErr->end());
-  return Error::success();
 }
 
 } // namespace exegesis

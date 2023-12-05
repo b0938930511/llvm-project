@@ -6,10 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "lldb/Host/Config.h"
-#include "lldb/Host/XML.h"
+#include <stdlib.h> /* atof */
 
-#include "llvm/ADT/StringExtras.h"
+#include "lldb/Host/Config.h"
+#include "lldb/Host/StringConvert.h"
+#include "lldb/Host/XML.h"
 
 using namespace lldb;
 using namespace lldb_private;
@@ -132,31 +133,34 @@ XMLNode XMLNode::GetChild() const {
 #endif
 }
 
-std::string XMLNode::GetAttributeValue(const char *name,
-                                       const char *fail_value) const {
-  std::string attr_value;
+llvm::StringRef XMLNode::GetAttributeValue(const char *name,
+                                           const char *fail_value) const {
+  const char *attr_value = nullptr;
 #if LLDB_ENABLE_LIBXML2
-  if (IsValid()) {
-    xmlChar *value = xmlGetProp(m_node, (const xmlChar *)name);
-    if (value) {
-      attr_value = (const char *)value;
-      xmlFree(value);
-    }
-  } else {
-    if (fail_value)
-      attr_value = fail_value;
-  }
-#else
-  if (fail_value)
+
+  if (IsValid())
+    attr_value = (const char *)xmlGetProp(m_node, (const xmlChar *)name);
+  else
     attr_value = fail_value;
+#else
+  attr_value = fail_value;
 #endif
-  return attr_value;
+  if (attr_value)
+    return llvm::StringRef(attr_value);
+  else
+    return llvm::StringRef();
 }
 
 bool XMLNode::GetAttributeValueAsUnsigned(const char *name, uint64_t &value,
                                           uint64_t fail_value, int base) const {
-  value = fail_value;
-  return llvm::to_integer(GetAttributeValue(name, ""), value, base);
+#if LLDB_ENABLE_LIBXML2
+  llvm::StringRef str_value = GetAttributeValue(name, "");
+#else
+  llvm::StringRef str_value;
+#endif
+  bool success = false;
+  value = StringConvert::ToUInt64(str_value.data(), fail_value, base, &success);
+  return success;
 }
 
 void XMLNode::ForEachChildNode(NodeCallback const &callback) const {
@@ -298,17 +302,33 @@ bool XMLNode::GetElementText(std::string &text) const {
 
 bool XMLNode::GetElementTextAsUnsigned(uint64_t &value, uint64_t fail_value,
                                        int base) const {
-  std::string text;
-
-  value = fail_value;
-  return GetElementText(text) && llvm::to_integer(text, value, base);
+  bool success = false;
+#if LLDB_ENABLE_LIBXML2
+  if (IsValid()) {
+    std::string text;
+    if (GetElementText(text))
+      value = StringConvert::ToUInt64(text.c_str(), fail_value, base, &success);
+  }
+#endif
+  if (!success)
+    value = fail_value;
+  return success;
 }
 
 bool XMLNode::GetElementTextAsFloat(double &value, double fail_value) const {
-  std::string text;
-
-  value = fail_value;
-  return GetElementText(text) && llvm::to_float(text, value);
+  bool success = false;
+#if LLDB_ENABLE_LIBXML2
+  if (IsValid()) {
+    std::string text;
+    if (GetElementText(text)) {
+      value = atof(text.c_str());
+      success = true;
+    }
+  }
+#endif
+  if (!success)
+    value = fail_value;
+  return success;
 }
 
 bool XMLNode::NameIs(const char *name) const {
@@ -453,7 +473,9 @@ bool ApplePropertyList::ExtractStringFromValueNode(const XMLNode &node,
 
 #if LLDB_ENABLE_LIBXML2
 
-static StructuredData::ObjectSP CreatePlistValue(XMLNode node) {
+namespace {
+
+StructuredData::ObjectSP CreatePlistValue(XMLNode node) {
   llvm::StringRef element_name = node.GetName();
   if (element_name == "array") {
     std::shared_ptr<StructuredData::Array> array_sp(
@@ -492,7 +514,7 @@ static StructuredData::ObjectSP CreatePlistValue(XMLNode node) {
   } else if (element_name == "integer") {
     uint64_t value = 0;
     node.GetElementTextAsUnsigned(value, 0, 0);
-    return StructuredData::ObjectSP(new StructuredData::UnsignedInteger(value));
+    return StructuredData::ObjectSP(new StructuredData::Integer(value));
   } else if ((element_name == "string") || (element_name == "data") ||
              (element_name == "date")) {
     std::string text;
@@ -505,6 +527,7 @@ static StructuredData::ObjectSP CreatePlistValue(XMLNode node) {
     return StructuredData::ObjectSP(new StructuredData::Boolean(false));
   }
   return StructuredData::ObjectSP(new StructuredData::Null());
+}
 }
 #endif
 

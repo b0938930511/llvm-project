@@ -8,13 +8,12 @@
 
 // getauxval() used instead of sysconf() in GetPageSize() is defined starting
 // glbc version 2.16.
-// Does not work with 2.31 and above at it calls sysconf for SIGSTKSZ.
-#if __GLIBC_PREREQ(2, 16) && !__GLIBC_PREREQ(2, 31)
+#if __GLIBC_PREREQ(2, 16)
 extern "C" long sysconf(int name) {
-  fprintf(stderr, "sysconf wrapper called: %d\n", name);
+  fprintf(stderr, "sysconf wrapper called\n");
   return 0;
 }
-#endif
+#endif  // defined(__GLIBC_PREREQ) && __GLIBC_PREREQ(2, 16)
 
 int main() {
   // All we need to check is that the sysconf() interceptor defined above was

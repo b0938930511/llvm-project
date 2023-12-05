@@ -1,4 +1,4 @@
-// RUN: %libomp-c99-compile-and-run | %sort-threads | FileCheck %s
+// RUN: %libomp-compile-and-run | %sort-threads | FileCheck %s
 // REQUIRES: ompt
 // UNSUPPORTED: gcc-4, gcc-5, gcc-6, gcc-7
 #include "callback.h"
@@ -6,10 +6,11 @@
 
 int main() {
   int a[10][10];
+  int i, j;
 #pragma omp parallel num_threads(2)
 #pragma omp for ordered(2)
-  for (int i = 0; i < 2; i++)
-    for (int j = 0; j < 2; j++) {
+  for (i = 0; i < 2; i++)
+    for (j = 0; j < 2; j++) {
       a[i][j] = i + j + 1;
       printf("%d, %d\n", i, j);
 #pragma omp ordered depend(sink : i - 1, j) depend(sink : i, j - 1)

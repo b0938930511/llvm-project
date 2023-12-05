@@ -12,21 +12,8 @@
 
 namespace clang {
 
-// First feature in a pair requires the second one to be supported.
-static const std::pair<StringRef, StringRef> DependentFeaturesList[] = {
-    {"__opencl_c_read_write_images", "__opencl_c_images"},
-    {"__opencl_c_3d_image_writes", "__opencl_c_images"},
-    {"__opencl_c_pipes", "__opencl_c_generic_address_space"},
-    {"__opencl_c_device_enqueue", "__opencl_c_generic_address_space"},
-    {"__opencl_c_device_enqueue", "__opencl_c_program_scope_global_variables"}};
-
-// Extensions and equivalent feature pairs.
-static const std::pair<StringRef, StringRef> FeatureExtensionMap[] = {
-    {"cl_khr_fp64", "__opencl_c_fp64"},
-    {"cl_khr_3d_image_writes", "__opencl_c_3d_image_writes"}};
-
 bool OpenCLOptions::isKnown(llvm::StringRef Ext) const {
-  return OptMap.contains(Ext);
+  return OptMap.find(Ext) != OptMap.end();
 }
 
 bool OpenCLOptions::isAvailableOption(llvm::StringRef Ext,
@@ -121,32 +108,42 @@ void OpenCLOptions::disableAll() {
 
 bool OpenCLOptions::diagnoseUnsupportedFeatureDependencies(
     const TargetInfo &TI, DiagnosticsEngine &Diags) {
+  // Feature pairs. First feature in a pair requires the second one to be
+  // supported.
+  static const llvm::StringMap<llvm::StringRef> DependentFeaturesMap = {
+      {"__opencl_c_read_write_images", "__opencl_c_images"},
+      {"__opencl_c_3d_image_writes", "__opencl_c_images"},
+      {"__opencl_c_pipes", "__opencl_c_generic_address_space"}};
+
   auto OpenCLFeaturesMap = TI.getSupportedOpenCLOpts();
 
   bool IsValid = true;
-  for (auto &FeaturePair : DependentFeaturesList) {
-    auto Feature = FeaturePair.first;
-    auto Dep = FeaturePair.second;
-    if (TI.hasFeatureEnabled(OpenCLFeaturesMap, Feature) &&
-        !TI.hasFeatureEnabled(OpenCLFeaturesMap, Dep)) {
+  for (auto &FeaturePair : DependentFeaturesMap)
+    if (TI.hasFeatureEnabled(OpenCLFeaturesMap, FeaturePair.getKey()) &&
+        !TI.hasFeatureEnabled(OpenCLFeaturesMap, FeaturePair.getValue())) {
       IsValid = false;
-      Diags.Report(diag::err_opencl_feature_requires) << Feature << Dep;
+      Diags.Report(diag::err_opencl_feature_requires)
+          << FeaturePair.getKey() << FeaturePair.getValue();
     }
-  }
   return IsValid;
 }
 
 bool OpenCLOptions::diagnoseFeatureExtensionDifferences(
     const TargetInfo &TI, DiagnosticsEngine &Diags) {
+  // Extensions and equivalent feature pairs.
+  static const llvm::StringMap<llvm::StringRef> FeatureExtensionMap = {
+      {"cl_khr_fp64", "__opencl_c_fp64"},
+      {"cl_khr_3d_image_writes", "__opencl_c_3d_image_writes"}};
+
   auto OpenCLFeaturesMap = TI.getSupportedOpenCLOpts();
 
   bool IsValid = true;
   for (auto &ExtAndFeat : FeatureExtensionMap)
-    if (TI.hasFeatureEnabled(OpenCLFeaturesMap, ExtAndFeat.first) !=
-        TI.hasFeatureEnabled(OpenCLFeaturesMap, ExtAndFeat.second)) {
+    if (TI.hasFeatureEnabled(OpenCLFeaturesMap, ExtAndFeat.getKey()) !=
+        TI.hasFeatureEnabled(OpenCLFeaturesMap, ExtAndFeat.getValue())) {
       IsValid = false;
       Diags.Report(diag::err_opencl_extension_and_feature_differs)
-          << ExtAndFeat.first << ExtAndFeat.second;
+          << ExtAndFeat.getKey() << ExtAndFeat.getValue();
     }
   return IsValid;
 }

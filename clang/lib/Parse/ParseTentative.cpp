@@ -46,10 +46,7 @@ using namespace clang;
 ///           'using' 'namespace' '::'[opt] nested-name-specifier[opt]
 ///                 namespace-name ';'
 ///
-bool Parser::isCXXDeclarationStatement(
-    bool DisambiguatingWithExpression /*=false*/) {
-  assert(getLangOpts().CPlusPlus && "Must be called for C++ only.");
-
+bool Parser::isCXXDeclarationStatement() {
   switch (Tok.getKind()) {
     // asm-definition
   case tok::kw_asm:
@@ -62,51 +59,6 @@ bool Parser::isCXXDeclarationStatement(
   case tok::kw_static_assert:
   case tok::kw__Static_assert:
     return true;
-  case tok::coloncolon:
-  case tok::identifier: {
-    if (DisambiguatingWithExpression) {
-      RevertingTentativeParsingAction TPA(*this);
-      // Parse the C++ scope specifier.
-      CXXScopeSpec SS;
-      ParseOptionalCXXScopeSpecifier(SS, /*ObjectType=*/nullptr,
-                                     /*ObjectHasErrors=*/false,
-                                     /*EnteringContext=*/true);
-
-      switch (Tok.getKind()) {
-      case tok::identifier: {
-        IdentifierInfo *II = Tok.getIdentifierInfo();
-        bool isDeductionGuide = Actions.isDeductionGuideName(
-            getCurScope(), *II, Tok.getLocation(), SS, /*Template=*/nullptr);
-        if (Actions.isCurrentClassName(*II, getCurScope(), &SS) ||
-            isDeductionGuide) {
-          if (isConstructorDeclarator(/*Unqualified=*/SS.isEmpty(),
-                                      isDeductionGuide,
-                                      DeclSpec::FriendSpecified::No))
-            return true;
-        } else if (SS.isNotEmpty()) {
-          // If the scope is not empty, it could alternatively be something like
-          // a typedef or using declaration. That declaration might be private
-          // in the global context, which would be diagnosed by calling into
-          // isCXXSimpleDeclaration, but may actually be fine in the context of
-          // member functions and static variable definitions. Check if the next
-          // token is also an identifier and assume a declaration.
-          // We cannot check if the scopes match because the declarations could
-          // involve namespaces and friend declarations.
-          if (NextToken().is(tok::identifier))
-            return true;
-        }
-        break;
-      }
-      case tok::kw_operator:
-        return true;
-      case tok::tilde:
-        return true;
-      default:
-        break;
-      }
-    }
-  }
-    [[fallthrough]];
     // simple-declaration
   default:
     return isCXXSimpleDeclaration(/*AllowForRangeDecl=*/false);
@@ -159,8 +111,8 @@ bool Parser::isCXXSimpleDeclaration(bool AllowForRangeDecl) {
   // a case.
 
   bool InvalidAsDeclaration = false;
-  TPResult TPR = isCXXDeclarationSpecifier(
-      ImplicitTypenameContext::No, TPResult::False, &InvalidAsDeclaration);
+  TPResult TPR = isCXXDeclarationSpecifier(TPResult::False,
+                                           &InvalidAsDeclaration);
   if (TPR != TPResult::Ambiguous)
     return TPR != TPResult::False; // Returns true for TPResult::True or
                                    // TPResult::Error.
@@ -206,12 +158,10 @@ Parser::TPResult Parser::TryConsumeDeclarationSpecifier() {
       ConsumeToken();
       break;
     }
-    [[fallthrough]];
+    LLVM_FALLTHROUGH;
   case tok::kw_typeof:
   case tok::kw___attribute:
-#define TRANSFORM_TYPE_TRAIT_DEF(_, Trait) case tok::kw___##Trait:
-#include "clang/Basic/TransformTypeTraits.def"
-  {
+  case tok::kw___underlying_type: {
     ConsumeToken();
     if (Tok.isNot(tok::l_paren))
       return TPResult::Error;
@@ -253,7 +203,7 @@ Parser::TPResult Parser::TryConsumeDeclarationSpecifier() {
 
   case tok::annot_cxxscope:
     ConsumeAnnotationToken();
-    [[fallthrough]];
+    LLVM_FALLTHROUGH;
   default:
     ConsumeAnyToken();
 
@@ -274,7 +224,6 @@ Parser::TPResult Parser::TryConsumeDeclarationSpecifier() {
 ///    attribute-specifier-seqopt type-specifier-seq declarator
 ///
 Parser::TPResult Parser::TryParseSimpleDeclaration(bool AllowForRangeDecl) {
-  bool DeclSpecifierIsAuto = Tok.is(tok::kw_auto);
   if (TryConsumeDeclarationSpecifier() == TPResult::Error)
     return TPResult::Error;
 
@@ -282,7 +231,7 @@ Parser::TPResult Parser::TryParseSimpleDeclaration(bool AllowForRangeDecl) {
   // simple-declaration. Don't bother calling isCXXDeclarationSpecifier in the
   // overwhelmingly common case that the next token is a '('.
   if (Tok.isNot(tok::l_paren)) {
-    TPResult TPR = isCXXDeclarationSpecifier(ImplicitTypenameContext::No);
+    TPResult TPR = isCXXDeclarationSpecifier();
     if (TPR == TPResult::Ambiguous)
       return TPResult::True;
     if (TPR == TPResult::True || TPR == TPResult::Error)
@@ -290,8 +239,7 @@ Parser::TPResult Parser::TryParseSimpleDeclaration(bool AllowForRangeDecl) {
     assert(TPR == TPResult::False);
   }
 
-  TPResult TPR = TryParseInitDeclaratorList(
-      /*mayHaveTrailingReturnType=*/DeclSpecifierIsAuto);
+  TPResult TPR = TryParseInitDeclaratorList();
   if (TPR != TPResult::Ambiguous)
     return TPR;
 
@@ -328,15 +276,10 @@ Parser::TPResult Parser::TryParseSimpleDeclaration(bool AllowForRangeDecl) {
 ///         '{' initializer-list ','[opt] '}'
 ///         '{' '}'
 ///
-Parser::TPResult
-Parser::TryParseInitDeclaratorList(bool MayHaveTrailingReturnType) {
-  while (true) {
+Parser::TPResult Parser::TryParseInitDeclaratorList() {
+  while (1) {
     // declarator
-    TPResult TPR = TryParseDeclarator(
-        /*mayBeAbstract=*/false,
-        /*mayHaveIdentifier=*/true,
-        /*mayHaveDirectInit=*/false,
-        /*mayHaveTrailingReturnType=*/MayHaveTrailingReturnType);
+    TPResult TPR = TryParseDeclarator(false/*mayBeAbstract*/);
     if (TPR != TPResult::Ambiguous)
       return TPR;
 
@@ -497,8 +440,7 @@ bool Parser::isEnumBase(bool AllowSemi) {
   // FIXME: We could disallow non-type decl-specifiers here, but it makes no
   // difference: those specifiers are ill-formed regardless of the
   // interpretation.
-  TPResult R = isCXXDeclarationSpecifier(ImplicitTypenameContext::No,
-                                         /*BracedCastResult=*/TPResult::True,
+  TPResult R = isCXXDeclarationSpecifier(/*BracedCastResult*/ TPResult::True,
                                          &InvalidAsDeclSpec);
   if (R == TPResult::Ambiguous) {
     // We either have a decl-specifier followed by '(' or an undeclared
@@ -512,8 +454,7 @@ bool Parser::isEnumBase(bool AllowSemi) {
       return true;
 
     // A second decl-specifier unambiguously indicatges an enum-base.
-    R = isCXXDeclarationSpecifier(ImplicitTypenameContext::No, TPResult::True,
-                                  &InvalidAsDeclSpec);
+    R = isCXXDeclarationSpecifier(TPResult::True, &InvalidAsDeclSpec);
   }
 
   return R != TPResult::False;
@@ -542,27 +483,20 @@ Parser::isCXXConditionDeclarationOrInitStatement(bool CanBeInitStatement,
   ConditionDeclarationOrInitStatementState State(*this, CanBeInitStatement,
                                                  CanBeForRangeDecl);
 
-  if (CanBeInitStatement && Tok.is(tok::kw_using))
-    return ConditionOrInitStatement::InitStmtDecl;
-  if (State.update(isCXXDeclarationSpecifier(ImplicitTypenameContext::No)))
+  if (State.update(isCXXDeclarationSpecifier()))
     return State.result();
 
   // It might be a declaration; we need tentative parsing.
   RevertingTentativeParsingAction PA(*this);
 
   // FIXME: A tag definition unambiguously tells us this is an init-statement.
-  bool MayHaveTrailingReturnType = Tok.is(tok::kw_auto);
   if (State.update(TryConsumeDeclarationSpecifier()))
     return State.result();
   assert(Tok.is(tok::l_paren) && "Expected '('");
 
   while (true) {
     // Consume a declarator.
-    if (State.update(TryParseDeclarator(
-            /*mayBeAbstract=*/false,
-            /*mayHaveIdentifier=*/true,
-            /*mayHaveDirectInit=*/false,
-            /*mayHaveTrailingReturnType=*/MayHaveTrailingReturnType)))
+    if (State.update(TryParseDeclarator(false/*mayBeAbstract*/)))
       return State.result();
 
     // Attributes, asm label, or an initializer imply this is not an expression.
@@ -635,7 +569,7 @@ bool Parser::isCXXTypeId(TentativeCXXTypeIdContext Context, bool &isAmbiguous) {
   // type. The resolution is that any construct that could possibly be a type-id
   // in its syntactic context shall be considered a type-id.
 
-  TPResult TPR = isCXXDeclarationSpecifier(ImplicitTypenameContext::No);
+  TPResult TPR = isCXXDeclarationSpecifier();
   if (TPR != TPResult::Ambiguous)
     return TPR != TPResult::False; // Returns true for TPResult::True or
                                      // TPResult::Error.
@@ -647,16 +581,13 @@ bool Parser::isCXXTypeId(TentativeCXXTypeIdContext Context, bool &isAmbiguous) {
   // We need tentative parsing...
 
   RevertingTentativeParsingAction PA(*this);
-  bool MayHaveTrailingReturnType = Tok.is(tok::kw_auto);
 
   // type-specifier-seq
   TryConsumeDeclarationSpecifier();
   assert(Tok.is(tok::l_paren) && "Expected '('");
 
   // declarator
-  TPR = TryParseDeclarator(true /*mayBeAbstract*/, false /*mayHaveIdentifier*/,
-                           /*mayHaveDirectInit=*/false,
-                           MayHaveTrailingReturnType);
+  TPR = TryParseDeclarator(true/*mayBeAbstract*/, false/*mayHaveIdentifier*/);
 
   // In case of an error, let the declaration parsing code handle it.
   if (TPR == TPResult::Error)
@@ -668,12 +599,7 @@ bool Parser::isCXXTypeId(TentativeCXXTypeIdContext Context, bool &isAmbiguous) {
     if (Context == TypeIdInParens && Tok.is(tok::r_paren)) {
       TPR = TPResult::True;
       isAmbiguous = true;
-    // We are supposed to be inside the first operand to a _Generic selection
-    // expression, so if we find a comma after the declarator, we've found a
-    // type and not an expression.
-    } else if (Context == TypeIdAsGenericSelectionArgument && Tok.is(tok::comma)) {
-      TPR = TPResult::True;
-      isAmbiguous = true;
+
     // We are supposed to be inside a template argument, so if after
     // the abstract declarator we encounter a '>', '>>' (in C++0x), or
     // ','; or, in C++0x, an ellipsis immediately preceding such, this
@@ -690,9 +616,6 @@ bool Parser::isCXXTypeId(TentativeCXXTypeIdContext Context, bool &isAmbiguous) {
       TPR = TPResult::True;
       isAmbiguous = true;
 
-    } else if (Context == TypeIdInTrailingReturnType) {
-      TPR = TPResult::True;
-      isAmbiguous = true;
     } else
       TPR = TPResult::False;
   }
@@ -738,9 +661,6 @@ Parser::CXX11AttributeKind
 Parser::isCXX11AttributeSpecifier(bool Disambiguate,
                                   bool OuterMightBeMessageSend) {
   if (Tok.is(tok::kw_alignas))
-    return CAK_AttributeSpecifier;
-
-  if (Tok.isRegularKeywordAttribute())
     return CAK_AttributeSpecifier;
 
   if (Tok.isNot(tok::l_square) || NextToken().isNot(tok::l_square))
@@ -882,8 +802,7 @@ Parser::isCXX11AttributeSpecifier(bool Disambiguate,
 
 bool Parser::TrySkipAttributes() {
   while (Tok.isOneOf(tok::l_square, tok::kw___attribute, tok::kw___declspec,
-                     tok::kw_alignas) ||
-         Tok.isRegularKeywordAttribute()) {
+                     tok::kw_alignas)) {
     if (Tok.is(tok::l_square)) {
       ConsumeBracket();
       if (Tok.isNot(tok::l_square))
@@ -894,8 +813,6 @@ bool Parser::TrySkipAttributes() {
       // Note that explicitly checking for `[[` and `]]` allows to fail as
       // expected in the case of the Objective-C message send syntax.
       ConsumeBracket();
-    } else if (Tok.isRegularKeywordAttribute()) {
-      ConsumeToken();
     } else {
       ConsumeToken();
       if (Tok.isNot(tok::l_paren))
@@ -1013,7 +930,7 @@ Parser::TPResult Parser::TryParseOperatorId() {
   // Maybe this is a conversion-function-id.
   bool AnyDeclSpecifiers = false;
   while (true) {
-    TPResult TPR = isCXXDeclarationSpecifier(ImplicitTypenameContext::No);
+    TPResult TPR = isCXXDeclarationSpecifier();
     if (TPR == TPResult::Error)
       return TPR;
     if (TPR == TPResult::False) {
@@ -1083,8 +1000,7 @@ Parser::TPResult Parser::TryParseOperatorId() {
 ///
 Parser::TPResult Parser::TryParseDeclarator(bool mayBeAbstract,
                                             bool mayHaveIdentifier,
-                                            bool mayHaveDirectInit,
-                                            bool mayHaveTrailingReturnType) {
+                                            bool mayHaveDirectInit) {
   // declarator:
   //   direct-declarator
   //   ptr-operator declarator
@@ -1119,14 +1035,13 @@ Parser::TPResult Parser::TryParseDeclarator(bool mayBeAbstract,
   } else if (Tok.is(tok::l_paren)) {
     ConsumeParen();
     if (mayBeAbstract &&
-        (Tok.is(tok::r_paren) || // 'int()' is a function.
-                                 // 'int(...)' is a function.
+        (Tok.is(tok::r_paren) ||       // 'int()' is a function.
+         // 'int(...)' is a function.
          (Tok.is(tok::ellipsis) && NextToken().is(tok::r_paren)) ||
-         isDeclarationSpecifier(
-             ImplicitTypenameContext::No))) { // 'int(int)' is a function.
+         isDeclarationSpecifier())) {   // 'int(int)' is a function.
       // '(' parameter-declaration-clause ')' cv-qualifier-seq[opt]
       //        exception-specification[opt]
-      TPResult TPR = TryParseFunctionDeclarator(mayHaveTrailingReturnType);
+      TPResult TPR = TryParseFunctionDeclarator();
       if (TPR != TPResult::Ambiguous)
         return TPR;
     } else {
@@ -1151,7 +1066,7 @@ Parser::TPResult Parser::TryParseDeclarator(bool mayBeAbstract,
   if (mayHaveDirectInit)
     return TPResult::Ambiguous;
 
-  while (true) {
+  while (1) {
     TPResult TPR(TPResult::Ambiguous);
 
     if (Tok.is(tok::l_paren)) {
@@ -1165,7 +1080,7 @@ Parser::TPResult Parser::TryParseDeclarator(bool mayBeAbstract,
       // direct-declarator '(' parameter-declaration-clause ')'
       //        cv-qualifier-seq[opt] exception-specification[opt]
       ConsumeParen();
-      TPR = TryParseFunctionDeclarator(mayHaveTrailingReturnType);
+      TPR = TryParseFunctionDeclarator();
     } else if (Tok.is(tok::l_square)) {
       // direct-declarator '[' constant-expression[opt] ']'
       // direct-abstract-declarator[opt] '[' constant-expression[opt] ']'
@@ -1186,7 +1101,9 @@ Parser::TPResult Parser::TryParseDeclarator(bool mayBeAbstract,
 }
 
 bool Parser::isTentativelyDeclared(IdentifierInfo *II) {
-  return llvm::is_contained(TentativelyDeclaredIdentifiers, II);
+  return std::find(TentativelyDeclaredIdentifiers.begin(),
+                   TentativelyDeclaredIdentifiers.end(), II)
+      != TentativelyDeclaredIdentifiers.end();
 }
 
 namespace {
@@ -1328,37 +1245,19 @@ public:
 /// [GNU]     restrict
 ///
 Parser::TPResult
-Parser::isCXXDeclarationSpecifier(ImplicitTypenameContext AllowImplicitTypename,
-                                  Parser::TPResult BracedCastResult,
+Parser::isCXXDeclarationSpecifier(Parser::TPResult BracedCastResult,
                                   bool *InvalidAsDeclSpec) {
-  auto IsPlaceholderSpecifier = [&](TemplateIdAnnotation *TemplateId,
-                                    int Lookahead) {
+  auto IsPlaceholderSpecifier = [&] (TemplateIdAnnotation *TemplateId,
+                                     int Lookahead) {
     // We have a placeholder-constraint (we check for 'auto' or 'decltype' to
     // distinguish 'C<int>;' from 'C<int> auto c = 1;')
     return TemplateId->Kind == TNK_Concept_template &&
-           (GetLookAheadToken(Lookahead + 1)
-                .isOneOf(tok::kw_auto, tok::kw_decltype,
-                         // If we have an identifier here, the user probably
-                         // forgot the 'auto' in the placeholder constraint,
-                         // e.g. 'C<int> x = 2;' This will be diagnosed nicely
-                         // later, so disambiguate as a declaration.
-                         tok::identifier,
-                         // CVR qualifierslikely the same situation for the
-                         // user, so let this be diagnosed nicely later. We
-                         // cannot handle references here, as `C<int> & Other`
-                         // and `C<int> && Other` are both legal.
-                         tok::kw_const, tok::kw_volatile, tok::kw_restrict) ||
-            // While `C<int> && Other` is legal, doing so while not specifying a
-            // template argument is NOT, so see if we can fix up in that case at
-            // minimum. Concepts require at least 1 template parameter, so we
-            // can count on the argument count.
-            // FIXME: In the future, we migth be able to have SEMA look up the
-            // declaration for this concept, and see how many template
-            // parameters it has.  If the concept isn't fully specified, it is
-            // possibly a situation where we want deduction, such as:
-            // `BinaryConcept<int> auto f = bar();`
-            (TemplateId->NumArgs == 0 &&
-             GetLookAheadToken(Lookahead + 1).isOneOf(tok::amp, tok::ampamp)));
+        GetLookAheadToken(Lookahead + 1).isOneOf(tok::kw_auto, tok::kw_decltype,
+            // If we have an identifier here, the user probably forgot the
+            // 'auto' in the placeholder constraint, e.g. 'C<int> x = 2;'
+            // This will be diagnosed nicely later, so disambiguate as a
+            // declaration.
+            tok::identifier);
   };
   switch (Tok.getKind()) {
   case tok::identifier: {
@@ -1389,7 +1288,7 @@ Parser::isCXXDeclarationSpecifier(ImplicitTypenameContext AllowImplicitTypename,
         // template template argument, we'll undo this when checking the
         // validity of the argument.
         if (getLangOpts().CPlusPlus17) {
-          if (TryAnnotateTypeOrScopeToken(AllowImplicitTypename))
+          if (TryAnnotateTypeOrScopeToken())
             return TPResult::Error;
           if (Tok.isNot(tok::identifier))
             break;
@@ -1410,7 +1309,7 @@ Parser::isCXXDeclarationSpecifier(ImplicitTypenameContext AllowImplicitTypename,
       // a missing 'typename' keyword. Don't use TryAnnotateName in this case,
       // since it will annotate as a primary expression, and we want to use the
       // "missing 'typename'" logic.
-      if (TryAnnotateTypeOrScopeToken(AllowImplicitTypename))
+      if (TryAnnotateTypeOrScopeToken())
         return TPResult::Error;
       // If annotation failed, assume it's a non-type.
       // FIXME: If this happens due to an undeclared identifier, treat it as
@@ -1420,43 +1319,30 @@ Parser::isCXXDeclarationSpecifier(ImplicitTypenameContext AllowImplicitTypename,
     }
 
     // We annotated this token as something. Recurse to handle whatever we got.
-    return isCXXDeclarationSpecifier(AllowImplicitTypename, BracedCastResult,
-                                     InvalidAsDeclSpec);
+    return isCXXDeclarationSpecifier(BracedCastResult, InvalidAsDeclSpec);
   }
 
   case tok::kw_typename:  // typename T::type
     // Annotate typenames and C++ scope specifiers.  If we get one, just
     // recurse to handle whatever we get.
-    if (TryAnnotateTypeOrScopeToken(ImplicitTypenameContext::Yes))
+    if (TryAnnotateTypeOrScopeToken())
       return TPResult::Error;
-    return isCXXDeclarationSpecifier(ImplicitTypenameContext::Yes,
-                                     BracedCastResult, InvalidAsDeclSpec);
-
-  case tok::kw_auto: {
-    if (!getLangOpts().CPlusPlus23)
-      return TPResult::True;
-    if (NextToken().is(tok::l_brace))
-      return TPResult::False;
-    if (NextToken().is(tok::l_paren))
-      return TPResult::Ambiguous;
-    return TPResult::True;
-  }
+    return isCXXDeclarationSpecifier(BracedCastResult, InvalidAsDeclSpec);
 
   case tok::coloncolon: {    // ::foo::bar
     const Token &Next = NextToken();
     if (Next.isOneOf(tok::kw_new,       // ::new
                      tok::kw_delete))   // ::delete
       return TPResult::False;
-    [[fallthrough]];
+    LLVM_FALLTHROUGH;
   }
   case tok::kw___super:
   case tok::kw_decltype:
     // Annotate typenames and C++ scope specifiers.  If we get one, just
     // recurse to handle whatever we get.
-    if (TryAnnotateTypeOrScopeToken(AllowImplicitTypename))
+    if (TryAnnotateTypeOrScopeToken())
       return TPResult::Error;
-    return isCXXDeclarationSpecifier(AllowImplicitTypename, BracedCastResult,
-                                     InvalidAsDeclSpec);
+    return isCXXDeclarationSpecifier(BracedCastResult, InvalidAsDeclSpec);
 
     // decl-specifier:
     //   storage-class-specifier
@@ -1475,6 +1361,7 @@ Parser::isCXXDeclarationSpecifier(ImplicitTypenameContext AllowImplicitTypename,
   case tok::kw_static:
   case tok::kw_extern:
   case tok::kw_mutable:
+  case tok::kw_auto:
   case tok::kw___thread:
   case tok::kw_thread_local:
   case tok::kw__Thread_local:
@@ -1514,7 +1401,7 @@ Parser::isCXXDeclarationSpecifier(ImplicitTypenameContext AllowImplicitTypename,
   case tok::kw_private:
     if (!getLangOpts().OpenCL)
       return TPResult::False;
-    [[fallthrough]];
+    LLVM_FALLTHROUGH;
   case tok::kw___private:
   case tok::kw___local:
   case tok::kw___global:
@@ -1526,12 +1413,6 @@ Parser::isCXXDeclarationSpecifier(ImplicitTypenameContext AllowImplicitTypename,
   case tok::kw___read_write:
     // OpenCL pipe
   case tok::kw_pipe:
-
-    // HLSL address space qualifiers
-  case tok::kw_groupshared:
-  case tok::kw_in:
-  case tok::kw_inout:
-  case tok::kw_out:
 
     // GNU
   case tok::kw_restrict:
@@ -1562,10 +1443,6 @@ Parser::isCXXDeclarationSpecifier(ImplicitTypenameContext AllowImplicitTypename,
   case tok::kw___kindof:
     return TPResult::True;
 
-    // WebAssemblyFuncref
-  case tok::kw___funcref:
-    return TPResult::True;
-
     // Borland
   case tok::kw___pascal:
     return TPResult::True;
@@ -1574,17 +1451,6 @@ Parser::isCXXDeclarationSpecifier(ImplicitTypenameContext AllowImplicitTypename,
   case tok::kw___vector:
     return TPResult::True;
 
-  case tok::kw_this: {
-    // Try to parse a C++23 Explicit Object Parameter
-    // We do that in all language modes to produce a better diagnostic.
-    if (getLangOpts().CPlusPlus) {
-      RevertingTentativeParsingAction PA(*this);
-      ConsumeToken();
-      return isCXXDeclarationSpecifier(AllowImplicitTypename, BracedCastResult,
-                                       InvalidAsDeclSpec);
-    }
-    return TPResult::False;
-  }
   case tok::annot_template_id: {
     TemplateIdAnnotation *TemplateId = takeTemplateIdAnnotation(Tok);
     // If lookup for the template-name found nothing, don't assume we have a
@@ -1606,14 +1472,14 @@ Parser::isCXXDeclarationSpecifier(ImplicitTypenameContext AllowImplicitTypename,
     if (TemplateId->Kind != TNK_Type_template)
       return TPResult::False;
     CXXScopeSpec SS;
-    AnnotateTemplateIdTokenAsType(SS, AllowImplicitTypename);
+    AnnotateTemplateIdTokenAsType(SS);
     assert(Tok.is(tok::annot_typename));
     goto case_typename;
   }
 
   case tok::annot_cxxscope: // foo::bar or ::foo::bar, but already parsed
     // We've already annotated a scope; try to annotate a type.
-    if (TryAnnotateTypeOrScopeToken(AllowImplicitTypename))
+    if (TryAnnotateTypeOrScopeToken())
       return TPResult::Error;
     if (!Tok.is(tok::annot_typename)) {
       if (Tok.is(tok::annot_cxxscope) &&
@@ -1644,8 +1510,8 @@ Parser::isCXXDeclarationSpecifier(ImplicitTypenameContext AllowImplicitTypename,
           bool isIdentifier = Tok.is(tok::identifier);
           TPResult TPR = TPResult::False;
           if (!isIdentifier)
-            TPR = isCXXDeclarationSpecifier(
-                AllowImplicitTypename, BracedCastResult, InvalidAsDeclSpec);
+            TPR = isCXXDeclarationSpecifier(BracedCastResult,
+                                            InvalidAsDeclSpec);
 
           if (isIdentifier ||
               TPR == TPResult::True || TPR == TPResult::Error)
@@ -1671,7 +1537,7 @@ Parser::isCXXDeclarationSpecifier(ImplicitTypenameContext AllowImplicitTypename,
         } else {
           // Try to resolve the name. If it doesn't exist, assume it was
           // intended to name a type and keep disambiguating.
-          switch (TryAnnotateName(/*CCC=*/nullptr, AllowImplicitTypename)) {
+          switch (TryAnnotateName()) {
           case ANK_Error:
             return TPResult::Error;
           case ANK_TentativeDecl:
@@ -1682,10 +1548,7 @@ Parser::isCXXDeclarationSpecifier(ImplicitTypenameContext AllowImplicitTypename,
             if (getLangOpts().CPlusPlus17) {
               if (TryAnnotateTypeOrScopeToken())
                 return TPResult::Error;
-              // If we annotated then the current token should not still be ::
-              // FIXME we may want to also check for tok::annot_typename but
-              // currently don't have a test case.
-              if (Tok.isNot(tok::annot_cxxscope))
+              if (Tok.isNot(tok::identifier))
                 break;
             }
 
@@ -1704,14 +1567,13 @@ Parser::isCXXDeclarationSpecifier(ImplicitTypenameContext AllowImplicitTypename,
           // Annotated it, check again.
           assert(Tok.isNot(tok::annot_cxxscope) ||
                  NextToken().isNot(tok::identifier));
-          return isCXXDeclarationSpecifier(AllowImplicitTypename,
-                                           BracedCastResult, InvalidAsDeclSpec);
+          return isCXXDeclarationSpecifier(BracedCastResult, InvalidAsDeclSpec);
         }
       }
       return TPResult::False;
     }
     // If that succeeded, fallthrough into the generic simple-type-id case.
-    [[fallthrough]];
+    LLVM_FALLTHROUGH;
 
     // The ambiguity resides in a simple-type-specifier/typename-specifier
     // followed by a '('. The '(' could either be the start of:
@@ -1754,7 +1616,7 @@ Parser::isCXXDeclarationSpecifier(ImplicitTypenameContext AllowImplicitTypename,
 
       return TPResult::True;
     }
-    [[fallthrough]];
+    LLVM_FALLTHROUGH;
 
   case tok::kw_char:
   case tok::kw_wchar_t:
@@ -1775,12 +1637,8 @@ Parser::isCXXDeclarationSpecifier(ImplicitTypenameContext AllowImplicitTypename,
   case tok::kw___bf16:
   case tok::kw__Float16:
   case tok::kw___float128:
-  case tok::kw___ibm128:
   case tok::kw_void:
   case tok::annot_decltype:
-  case tok::kw__Accum:
-  case tok::kw__Fract:
-  case tok::kw__Sat:
 #define GENERIC_IMAGE_TYPE(ImgType, Id) case tok::kw_##ImgType##_t:
 #include "clang/Basic/OpenCLImageTypes.def"
     if (NextToken().is(tok::l_paren))
@@ -1823,15 +1681,14 @@ Parser::isCXXDeclarationSpecifier(ImplicitTypenameContext AllowImplicitTypename,
     return TPResult::True;
   }
 
-#define TRANSFORM_TYPE_TRAIT_DEF(_, Trait) case tok::kw___##Trait:
-#include "clang/Basic/TransformTypeTraits.def"
+  // C++0x type traits support
+  case tok::kw___underlying_type:
     return TPResult::True;
 
   // C11 _Atomic
   case tok::kw__Atomic:
     return TPResult::True;
 
-  case tok::kw__BitInt:
   case tok::kw__ExtInt: {
     if (NextToken().isNot(tok::l_paren))
       return TPResult::Error;
@@ -1862,8 +1719,7 @@ bool Parser::isCXXDeclarationSpecifierAType() {
   case tok::annot_template_id:
   case tok::annot_typename:
   case tok::kw_typeof:
-#define TRANSFORM_TYPE_TRAIT_DEF(_, Trait) case tok::kw___##Trait:
-#include "clang/Basic/TransformTypeTraits.def"
+  case tok::kw___underlying_type:
     return true;
 
     // elaborated-type-specifier
@@ -1884,7 +1740,6 @@ bool Parser::isCXXDeclarationSpecifierAType() {
   case tok::kw_short:
   case tok::kw_int:
   case tok::kw__ExtInt:
-  case tok::kw__BitInt:
   case tok::kw_long:
   case tok::kw___int64:
   case tok::kw___int128:
@@ -1896,13 +1751,9 @@ bool Parser::isCXXDeclarationSpecifierAType() {
   case tok::kw___bf16:
   case tok::kw__Float16:
   case tok::kw___float128:
-  case tok::kw___ibm128:
   case tok::kw_void:
   case tok::kw___unknown_anytype:
   case tok::kw___auto_type:
-  case tok::kw__Accum:
-  case tok::kw__Fract:
-  case tok::kw__Sat:
 #define GENERIC_IMAGE_TYPE(ImgType, Id) case tok::kw_##ImgType##_t:
 #include "clang/Basic/OpenCLImageTypes.def"
     return true;
@@ -1970,8 +1821,7 @@ Parser::TPResult Parser::TryParseProtocolQualifiers() {
 /// '(' parameter-declaration-clause ')' cv-qualifier-seq[opt]
 ///         exception-specification[opt]
 ///
-bool Parser::isCXXFunctionDeclarator(
-    bool *IsAmbiguous, ImplicitTypenameContext AllowImplicitTypename) {
+bool Parser::isCXXFunctionDeclarator(bool *IsAmbiguous) {
 
   // C++ 8.2p1:
   // The ambiguity arising from the similarity between a function-style cast and
@@ -1986,9 +1836,7 @@ bool Parser::isCXXFunctionDeclarator(
 
   ConsumeParen();
   bool InvalidAsDeclaration = false;
-  TPResult TPR = TryParseParameterDeclarationClause(
-      &InvalidAsDeclaration, /*VersusTemplateArgument=*/false,
-      AllowImplicitTypename);
+  TPResult TPR = TryParseParameterDeclarationClause(&InvalidAsDeclaration);
   if (TPR == TPResult::Ambiguous) {
     if (Tok.isNot(tok::r_paren))
       TPR = TPResult::False;
@@ -2032,9 +1880,9 @@ bool Parser::isCXXFunctionDeclarator(
 ///   attribute-specifier-seq[opt] decl-specifier-seq abstract-declarator[opt]
 ///     attributes[opt] '=' assignment-expression
 ///
-Parser::TPResult Parser::TryParseParameterDeclarationClause(
-    bool *InvalidAsDeclaration, bool VersusTemplateArgument,
-    ImplicitTypenameContext AllowImplicitTypename) {
+Parser::TPResult
+Parser::TryParseParameterDeclarationClause(bool *InvalidAsDeclaration,
+                                           bool VersusTemplateArgument) {
 
   if (Tok.is(tok::r_paren))
     return TPResult::Ambiguous;
@@ -2046,7 +1894,7 @@ Parser::TPResult Parser::TryParseParameterDeclarationClause(
   //   parameter-declaration
   //   parameter-declaration-list ',' parameter-declaration
   //
-  while (true) {
+  while (1) {
     // '...'[opt]
     if (Tok.is(tok::ellipsis)) {
       ConsumeToken();
@@ -2067,8 +1915,8 @@ Parser::TPResult Parser::TryParseParameterDeclarationClause(
     // decl-specifier-seq
     // A parameter-declaration's initializer must be preceded by an '=', so
     // decl-specifier-seq '{' is not a parameter in C++11.
-    TPResult TPR = isCXXDeclarationSpecifier(
-        AllowImplicitTypename, TPResult::False, InvalidAsDeclaration);
+    TPResult TPR = isCXXDeclarationSpecifier(TPResult::False,
+                                             InvalidAsDeclaration);
     // A declaration-specifier (not followed by '(' or '{') means this can't be
     // an expression, but it could still be a template argument.
     if (TPR != TPResult::Ambiguous &&
@@ -2076,7 +1924,6 @@ Parser::TPResult Parser::TryParseParameterDeclarationClause(
       return TPR;
 
     bool SeenType = false;
-    bool DeclarationSpecifierIsAuto = Tok.is(tok::kw_auto);
     do {
       SeenType |= isCXXDeclarationSpecifierAType();
       if (TryConsumeDeclarationSpecifier() == TPResult::Error)
@@ -2086,7 +1933,7 @@ Parser::TPResult Parser::TryParseParameterDeclarationClause(
       if (SeenType && Tok.is(tok::identifier))
         return TPResult::True;
 
-      TPR = isCXXDeclarationSpecifier(AllowImplicitTypename, TPResult::False,
+      TPR = isCXXDeclarationSpecifier(TPResult::False,
                                       InvalidAsDeclaration);
       if (TPR == TPResult::Error)
         return TPR;
@@ -2098,11 +1945,7 @@ Parser::TPResult Parser::TryParseParameterDeclarationClause(
 
     // declarator
     // abstract-declarator[opt]
-    TPR = TryParseDeclarator(
-        /*mayBeAbstract=*/true,
-        /*mayHaveIdentifier=*/true,
-        /*mayHaveDirectInit=*/false,
-        /*mayHaveTrailingReturnType=*/DeclarationSpecifierIsAuto);
+    TPR = TryParseDeclarator(true/*mayBeAbstract*/);
     if (TPR != TPResult::Ambiguous)
       return TPR;
 
@@ -2156,8 +1999,7 @@ Parser::TPResult Parser::TryParseParameterDeclarationClause(
 /// exception-specification:
 ///   'throw' '(' type-id-list[opt] ')'
 ///
-Parser::TPResult
-Parser::TryParseFunctionDeclarator(bool MayHaveTrailingReturnType) {
+Parser::TPResult Parser::TryParseFunctionDeclarator() {
   // The '(' is already parsed.
 
   TPResult TPR = TryParseParameterDeclarationClause();
@@ -2202,50 +2044,7 @@ Parser::TryParseFunctionDeclarator(bool MayHaveTrailingReturnType) {
     }
   }
 
-  // attribute-specifier-seq
-  if (!TrySkipAttributes())
-    return TPResult::Ambiguous;
-
-  // trailing-return-type
-  if (Tok.is(tok::arrow) && MayHaveTrailingReturnType) {
-    if (TPR == TPResult::True)
-      return TPR;
-    ConsumeToken();
-    if (Tok.is(tok::identifier) && NameAfterArrowIsNonType()) {
-      return TPResult::False;
-    }
-    if (isCXXTypeId(TentativeCXXTypeIdContext::TypeIdInTrailingReturnType))
-      return TPResult::True;
-  }
-
   return TPResult::Ambiguous;
-}
-
-// When parsing an identifier after an arrow it may be a member expression,
-// in which case we should not annotate it as an independant expression
-// so we just lookup that name, if it's not a type the construct is not
-// a function declaration.
-bool Parser::NameAfterArrowIsNonType() {
-  assert(Tok.is(tok::identifier));
-  Token Next = NextToken();
-  if (Next.is(tok::coloncolon))
-    return false;
-  IdentifierInfo *Name = Tok.getIdentifierInfo();
-  SourceLocation NameLoc = Tok.getLocation();
-  CXXScopeSpec SS;
-  TentativeParseCCC CCC(Next);
-  Sema::NameClassification Classification =
-      Actions.ClassifyName(getCurScope(), SS, Name, NameLoc, Next, &CCC);
-  switch (Classification.getKind()) {
-  case Sema::NC_OverloadSet:
-  case Sema::NC_NonType:
-  case Sema::NC_VarTemplate:
-  case Sema::NC_FunctionTemplate:
-    return true;
-  default:
-    break;
-  }
-  return false;
 }
 
 /// '[' constant-expression[opt] ']'
@@ -2296,9 +2095,9 @@ Parser::TPResult Parser::isTemplateArgumentList(unsigned TokensToSkip) {
   // but one good distinguishing factor is that a "decl-specifier" not
   // followed by '(' or '{' can't appear in an expression.
   bool InvalidAsTemplateArgumentList = false;
-  if (isCXXDeclarationSpecifier(ImplicitTypenameContext::No, TPResult::False,
-                                &InvalidAsTemplateArgumentList) ==
-      TPResult::True)
+  if (isCXXDeclarationSpecifier(TPResult::False,
+                                       &InvalidAsTemplateArgumentList) ==
+             TPResult::True)
     return TPResult::True;
   if (InvalidAsTemplateArgumentList)
     return TPResult::False;

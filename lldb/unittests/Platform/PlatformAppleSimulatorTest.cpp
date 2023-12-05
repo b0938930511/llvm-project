@@ -9,9 +9,6 @@
 #include "gtest/gtest.h"
 
 #include "Plugins/Platform/MacOSX/PlatformAppleSimulator.h"
-#include "Plugins/Platform/MacOSX/PlatformRemoteAppleTV.h"
-#include "Plugins/Platform/MacOSX/PlatformRemoteAppleWatch.h"
-#include "Plugins/Platform/MacOSX/PlatformRemoteiOS.h"
 #include "TestingSupport/SubsystemRAII.h"
 #include "lldb/Host/FileSystem.h"
 #include "lldb/Host/HostInfo.h"
@@ -21,19 +18,22 @@ using namespace lldb;
 using namespace lldb_private;
 
 class PlatformAppleSimulatorTest : public ::testing::Test {
-  SubsystemRAII<FileSystem, HostInfo, PlatformAppleSimulator, PlatformRemoteiOS,
-                PlatformRemoteAppleTV, PlatformRemoteAppleWatch>
+  SubsystemRAII<FileSystem, HostInfo, PlatformAppleSimulator>
       subsystems;
 };
 
 #ifdef __APPLE__
 
 static void testSimPlatformArchHasSimEnvironment(llvm::StringRef name) {
-  auto platform_sp = Platform::Create(name);
+  Status error;
+  auto platform_sp = Platform::Create(ConstString(name), error);
   ASSERT_TRUE(platform_sp);
   int num_arches = 0;
 
-  for (auto arch : platform_sp->GetSupportedArchitectures({})) {
+  while (true) {
+    ArchSpec arch;
+    if (!platform_sp->GetSupportedArchitectureAtIndex(num_arches, arch))
+      break;
     EXPECT_EQ(arch.GetTriple().getEnvironment(), llvm::Triple::Simulator);
     num_arches++;
   }
@@ -58,40 +58,13 @@ TEST_F(PlatformAppleSimulatorTest, TestHostPlatformToSim) {
   };
 
   for (auto sim : sim_platforms) {
-    PlatformList list;
-    ArchSpec arch = platform_arch;
-    arch.GetTriple().setOS(sim);
-    arch.GetTriple().setEnvironment(llvm::Triple::Simulator);
-
-    auto platform_sp = list.GetOrCreate(arch, {}, nullptr);
-    EXPECT_TRUE(platform_sp);
-  }
-}
-
-TEST_F(PlatformAppleSimulatorTest, TestPlatformSelectionOrder) {
-  static const ArchSpec platform_arch(
-      HostInfo::GetArchitecture(HostInfo::eArchKindDefault));
-
-  const llvm::Triple::OSType sim_platforms[] = {
-      llvm::Triple::IOS,
-      llvm::Triple::TvOS,
-      llvm::Triple::WatchOS,
-  };
-
-  PlatformList list;
-  list.GetOrCreate("remote-ios");
-  list.GetOrCreate("remote-tvos");
-  list.GetOrCreate("remote-watchos");
-
-  for (auto sim : sim_platforms) {
     ArchSpec arch = platform_arch;
     arch.GetTriple().setOS(sim);
     arch.GetTriple().setEnvironment(llvm::Triple::Simulator);
 
     Status error;
-    auto platform_sp = list.GetOrCreate(arch, {}, nullptr, error);
+    auto platform_sp = Platform::Create(arch, nullptr, error);
     EXPECT_TRUE(platform_sp);
-    EXPECT_TRUE(platform_sp->GetName().contains("simulator"));
   }
 }
 

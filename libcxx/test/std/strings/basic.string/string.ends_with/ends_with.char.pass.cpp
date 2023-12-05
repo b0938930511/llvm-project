@@ -9,35 +9,27 @@
 
 // <string>
 
-// constexpr bool ends_with(charT x) const noexcept;
+//   bool ends_with(charT x) const noexcept;
 
 #include <string>
 #include <cassert>
 
 #include "test_macros.h"
 
-template <class S>
-constexpr void test_string() {
-  S s1{};
-  S s2{"abcde", 5};
+int main(int, char**)
+{
+    {
+    typedef std::string S;
+    S  s1 {};
+    S  s2 { "abcde", 5 };
 
-  ASSERT_NOEXCEPT(s1.ends_with('e'));
+    ASSERT_NOEXCEPT(s1.ends_with('e'));
 
-  assert(!s1.ends_with('e'));
-  assert(!s1.ends_with('x'));
-  assert(s2.ends_with('e'));
-  assert(!s2.ends_with('x'));
-}
-
-constexpr bool test() {
-  test_string<std::string>();
-
-  return true;
-}
-
-int main(int, char**) {
-  test();
-  static_assert(test());
+    assert (!s1.ends_with('e'));
+    assert (!s1.ends_with('x'));
+    assert ( s2.ends_with('e'));
+    assert (!s2.ends_with('x'));
+    }
 
   return 0;
 }

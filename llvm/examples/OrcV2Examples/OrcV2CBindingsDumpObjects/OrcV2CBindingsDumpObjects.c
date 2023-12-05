@@ -17,6 +17,7 @@
 
 #include "llvm-c/Core.h"
 #include "llvm-c/Error.h"
+#include "llvm-c/Initialization.h"
 #include "llvm-c/LLJIT.h"
 #include "llvm-c/Support.h"
 #include "llvm-c/Target.h"
@@ -30,7 +31,7 @@ int handleError(LLVMErrorRef Err) {
   return 1;
 }
 
-LLVMOrcThreadSafeModuleRef createDemoModule(void) {
+LLVMOrcThreadSafeModuleRef createDemoModule() {
   LLVMOrcThreadSafeContextRef TSCtx = LLVMOrcCreateNewThreadSafeContext();
   LLVMContextRef Ctx = LLVMOrcThreadSafeContextGetContext(TSCtx);
   LLVMModuleRef M = LLVMModuleCreateWithNameInContext("demo", Ctx);
@@ -55,11 +56,12 @@ LLVMErrorRef dumpObjectsTransform(void *Ctx, LLVMMemoryBufferRef *ObjInOut) {
   return LLVMOrcDumpObjects_CallOperator(DumpObjects, ObjInOut);
 }
 
-int main(int argc, const char *argv[]) {
+int main(int argc, char *argv[]) {
 
   int MainResult = 0;
 
-  LLVMParseCommandLineOptions(argc, argv, "");
+  LLVMParseCommandLineOptions(argc, (const char **)argv, "");
+  LLVMInitializeCore(LLVMGetGlobalPassRegistry());
 
   LLVMInitializeNativeTarget();
   LLVMInitializeNativeAsmPrinter();

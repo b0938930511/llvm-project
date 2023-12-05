@@ -11,10 +11,11 @@ add_mlir_conversion_library(MLIRTosaToSCF
 
   LINK_LIBS PUBLIC
   MLIRIR
-  MLIRSCFDialect
+  MLIRSCF
+  MLIRStandard
   MLIRPass
-  MLIRTensorDialect
-  MLIRTosaDialect
+  MLIRTensor
+  MLIRTosa
   MLIRTosaTransforms
   MLIRSupport
   )

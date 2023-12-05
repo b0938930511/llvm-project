@@ -11,7 +11,9 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::modernize {
+namespace clang {
+namespace tidy {
+namespace modernize {
 
 /// Replace default bodies of special member functions with '= default;'.
 /// \code
@@ -31,12 +33,12 @@ namespace clang::tidy::modernize {
 /// \endcode
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/modernize/use-equals-default.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/modernize-use-equals-default.html
 class UseEqualsDefaultCheck : public ClangTidyCheck {
 public:
   UseEqualsDefaultCheck(StringRef Name, ClangTidyContext *Context);
   bool isLanguageVersionSupported(const LangOptions &LangOpts) const override {
-    return LangOpts.CPlusPlus11;
+    return LangOpts.CPlusPlus;
   }
   void storeOptions(ClangTidyOptions::OptionMap &Opts) override;
   void registerMatchers(ast_matchers::MatchFinder *Finder) override;
@@ -46,6 +48,8 @@ private:
   const bool IgnoreMacros;
 };
 
-} // namespace clang::tidy::modernize
+} // namespace modernize
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_MODERNIZE_USE_EQUALS_DEFAULT_H

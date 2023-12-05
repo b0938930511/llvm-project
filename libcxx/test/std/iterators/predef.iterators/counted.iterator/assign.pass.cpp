@@ -7,6 +7,8 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
+// UNSUPPORTED: libcpp-no-concepts
+// UNSUPPORTED: gcc-10
 
 // template<class I2>
 //   requires assignable_from<I&, const I2&>
@@ -28,14 +30,14 @@ public:
     typedef int *                                                 pointer;
     typedef int &                                                 reference;
 
-    friend constexpr int *base(const AssignableFromIter& i) {return i.it_;}
+    constexpr int *base() const {return it_;}
 
     AssignableFromIter() = default;
     explicit constexpr AssignableFromIter(int *it) : it_(it) {}
-    constexpr AssignableFromIter(const forward_iterator<int*>& it) : it_(base(it)) {}
+    constexpr AssignableFromIter(const forward_iterator<int*>& it) : it_(it.base()) {}
 
     constexpr AssignableFromIter& operator=(const forward_iterator<int*> &other) {
-      it_ = base(other);
+      it_ = other.base();
       return *this;
     }
 
@@ -69,11 +71,11 @@ constexpr bool test() {
   {
     std::counted_iterator iter1(AssignableFromIter{buffer}, 8);
     std::counted_iterator iter2(forward_iterator<int*>{buffer + 2}, 6);
-    assert(base(iter1.base()) == buffer);
+    assert(iter1.base().base() == buffer);
     assert(iter1.count() == 8);
     std::counted_iterator<AssignableFromIter>& result = (iter1 = iter2);
     assert(&result == &iter1);
-    assert(base(iter1.base()) == buffer + 2);
+    assert(iter1.base().base() == buffer + 2);
     assert(iter1.count() == 6);
 
     ASSERT_SAME_TYPE(decltype(iter1 = iter2), std::counted_iterator<AssignableFromIter>&);
@@ -81,11 +83,11 @@ constexpr bool test() {
   {
     std::counted_iterator iter1(AssignableFromIter{buffer}, 8);
     const std::counted_iterator iter2(forward_iterator<int*>{buffer + 2}, 6);
-    assert(base(iter1.base()) == buffer);
+    assert(iter1.base().base() == buffer);
     assert(iter1.count() == 8);
     std::counted_iterator<AssignableFromIter>& result = (iter1 = iter2);
     assert(&result == &iter1);
-    assert(base(iter1.base()) == buffer + 2);
+    assert(iter1.base().base() == buffer + 2);
     assert(iter1.count() == 6);
 
     ASSERT_SAME_TYPE(decltype(iter1 = iter2), std::counted_iterator<AssignableFromIter>&);

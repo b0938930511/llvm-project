@@ -18,7 +18,6 @@
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCExpr.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 
 namespace llvm {
@@ -64,7 +63,7 @@ public:
       return getRegNo() == E->getRegNo();
     return false;
   }
-  void visitUsedExpr(MCStreamer &Streamer) const override {}
+  void visitUsedExpr(MCStreamer &Streamer) const override{};
   MCFragment *findAssociatedFragment() const override { return nullptr; }
 
   // There are no TLS X86MCExprs at the moment.

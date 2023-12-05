@@ -12,7 +12,9 @@
 #include "../ClangTidyCheck.h"
 #include "clang/AST/Decl.h"
 
-namespace clang::tidy::performance {
+namespace clang {
+namespace tidy {
+namespace performance {
 
 // The check detects local variable declarations that are copy initialized with
 // the const reference of a function call or the const reference of a method
@@ -40,10 +42,12 @@ private:
   void handleCopyFromLocalVar(const VarDecl &NewVar, const VarDecl &OldVar,
                               const Stmt &BlockStmt, const DeclStmt &Stmt,
                               bool IssueFix, ASTContext &Context);
-  const std::vector<StringRef> AllowedTypes;
-  const std::vector<StringRef> ExcludedContainerTypes;
+  const std::vector<std::string> AllowedTypes;
+  const std::vector<std::string> ExcludedContainerTypes;
 };
 
-} // namespace clang::tidy::performance
+} // namespace performance
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_PERFORMANCE_UNNECESSARY_COPY_INITIALIZATION_H

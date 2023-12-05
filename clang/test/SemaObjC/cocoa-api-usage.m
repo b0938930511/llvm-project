@@ -76,7 +76,7 @@ typedef signed char BOOL;
 #define PAIR(x) @#x, [NSNumber numberWithInt:(x)]
 #define TWO(x) ((x), (x))
 
-void foo(void) {
+void foo() {
   NSString *str = M([NSString stringWithString:@"foo"]); // expected-warning {{redundant}}
   str = [[NSString alloc] initWithString:@"foo"]; // expected-warning {{redundant}}
   NSArray *arr = [NSArray arrayWithArray:@[str]]; // expected-warning {{redundant}}

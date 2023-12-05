@@ -14,7 +14,6 @@
 #include "clang/StaticAnalyzer/Core/BugReporter/BugType.h"
 #include "clang/StaticAnalyzer/Core/Checker.h"
 #include "clang/StaticAnalyzer/Core/CheckerManager.h"
-#include "clang/StaticAnalyzer/Core/PathSensitive/CallDescription.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CallEvent.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CheckerContext.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/ProgramState.h"
@@ -41,9 +40,9 @@ bool isRootChanged(intptr_t k) { return k == ROOT_CHANGED; }
 //                      bug<--foo()--          JAIL_ENTERED<--foo()--
 class ChrootChecker : public Checker<eval::Call, check::PreCall> {
   // This bug refers to possibly break out of a chroot() jail.
-  mutable std::unique_ptr<BugType> BT_BreakJail;
+  mutable std::unique_ptr<BuiltinBug> BT_BreakJail;
 
-  const CallDescription Chroot{{"chroot"}, 1}, Chdir{{"chdir"}, 1};
+  const CallDescription Chroot{"chroot", 1}, Chdir{"chdir", 1};
 
 public:
   ChrootChecker() {}
@@ -64,11 +63,11 @@ private:
 } // end anonymous namespace
 
 bool ChrootChecker::evalCall(const CallEvent &Call, CheckerContext &C) const {
-  if (Chroot.matches(Call)) {
+  if (Call.isCalled(Chroot)) {
     evalChroot(Call, C);
     return true;
   }
-  if (Chdir.matches(Call)) {
+  if (Call.isCalled(Chdir)) {
     evalChdir(Call, C);
     return true;
   }
@@ -116,7 +115,7 @@ void ChrootChecker::evalChdir(const CallEvent &Call, CheckerContext &C) const {
 void ChrootChecker::checkPreCall(const CallEvent &Call,
                                  CheckerContext &C) const {
   // Ignore chroot and chdir.
-  if (matchesAny(Call, Chroot, Chdir))
+  if (Call.isCalled(Chroot) || Call.isCalled(Chdir))
     return;
 
   // If jail state is ROOT_CHANGED, generate BugReport.
@@ -125,11 +124,11 @@ void ChrootChecker::checkPreCall(const CallEvent &Call,
     if (isRootChanged((intptr_t) *k))
       if (ExplodedNode *N = C.generateNonFatalErrorNode()) {
         if (!BT_BreakJail)
-          BT_BreakJail.reset(new BugType(this, "Break out of jail"));
-        constexpr llvm::StringLiteral Msg =
-            "No call of chdir(\"/\") immediately after chroot";
-        C.emitReport(
-            std::make_unique<PathSensitiveBugReport>(*BT_BreakJail, Msg, N));
+          BT_BreakJail.reset(new BuiltinBug(
+              this, "Break out of jail", "No call of chdir(\"/\") immediately "
+                                         "after chroot"));
+        C.emitReport(std::make_unique<PathSensitiveBugReport>(
+            *BT_BreakJail, BT_BreakJail->getDescription(), N));
       }
 }
 

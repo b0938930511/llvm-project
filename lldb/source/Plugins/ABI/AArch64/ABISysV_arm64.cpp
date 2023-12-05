@@ -8,11 +8,10 @@
 
 #include "ABISysV_arm64.h"
 
-#include <optional>
 #include <vector>
 
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/TargetParser/Triple.h"
+#include "llvm/ADT/Triple.h"
 
 #include "lldb/Core/Module.h"
 #include "lldb/Core/PluginManager.h"
@@ -24,7 +23,6 @@
 #include "lldb/Target/Target.h"
 #include "lldb/Target/Thread.h"
 #include "lldb/Utility/ConstString.h"
-#include "lldb/Utility/LLDBLog.h"
 #include "lldb/Utility/Log.h"
 #include "lldb/Utility/RegisterValue.h"
 #include "lldb/Utility/Scalar.h"
@@ -67,7 +65,7 @@ bool ABISysV_arm64::PrepareTrivialCall(Thread &thread, addr_t sp,
   if (!reg_ctx)
     return false;
 
-  Log *log = GetLog(LLDBLog::Expressions);
+  Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_EXPRESSIONS));
 
   if (log) {
     StreamString s;
@@ -147,7 +145,7 @@ bool ABISysV_arm64::GetArgumentValues(Thread &thread, ValueList &values) const {
     if (value_type) {
       bool is_signed = false;
       size_t bit_width = 0;
-      std::optional<uint64_t> bit_size = value_type.GetBitSize(&thread);
+      llvm::Optional<uint64_t> bit_size = value_type.GetBitSize(&thread);
       if (!bit_size)
         return false;
       if (value_type.IsIntegerOrEnumerationType(is_signed)) {
@@ -276,17 +274,26 @@ Status ABISysV_arm64::SetReturnValueObject(lldb::StackFrameSP &frame_sp,
 
           if (v0_info) {
             if (byte_size <= 16) {
-              RegisterValue reg_value;
-              error = reg_value.SetValueFromData(*v0_info, data, 0, true);
-              if (error.Success())
-                if (!reg_ctx->WriteRegister(v0_info, reg_value))
-                  error.SetErrorString("failed to write register v0");
+              if (byte_size <= RegisterValue::GetMaxByteSize()) {
+                RegisterValue reg_value;
+                error = reg_value.SetValueFromData(v0_info, data, 0, true);
+                if (error.Success()) {
+                  if (!reg_ctx->WriteRegister(v0_info, reg_value))
+                    error.SetErrorString("failed to write register v0");
+                }
+              } else {
+                error.SetErrorStringWithFormat(
+                    "returning float values with a byte size of %" PRIu64
+                    " are not supported",
+                    byte_size);
+              }
             } else {
               error.SetErrorString("returning float values longer than 128 "
                                    "bits are not supported");
             }
-          } else
+          } else {
             error.SetErrorString("v0 register is not available on this target");
+          }
         }
       }
     } else if (type_flags & eTypeIsVector) {
@@ -296,7 +303,7 @@ Status ABISysV_arm64::SetReturnValueObject(lldb::StackFrameSP &frame_sp,
         if (v0_info) {
           if (byte_size <= v0_info->byte_size) {
             RegisterValue reg_value;
-            error = reg_value.SetValueFromData(*v0_info, data, 0, true);
+            error = reg_value.SetValueFromData(v0_info, data, 0, true);
             if (error.Success()) {
               if (!reg_ctx->WriteRegister(v0_info, reg_value))
                 error.SetErrorString("failed to write register v0");
@@ -460,7 +467,7 @@ static bool LoadValueFromConsecutiveGPRRegisters(
     uint32_t &NGRN,       // NGRN (see ABI documentation)
     uint32_t &NSRN,       // NSRN (see ABI documentation)
     DataExtractor &data) {
-  std::optional<uint64_t> byte_size =
+  llvm::Optional<uint64_t> byte_size =
       value_type.GetByteSize(exe_ctx.GetBestExecutionContextScope());
 
   if (byte_size || *byte_size == 0)
@@ -479,7 +486,7 @@ static bool LoadValueFromConsecutiveGPRRegisters(
     if (NSRN < 8 && (8 - NSRN) >= homogeneous_count) {
       if (!base_type)
         return false;
-      std::optional<uint64_t> base_byte_size =
+      llvm::Optional<uint64_t> base_byte_size =
           base_type.GetByteSize(exe_ctx.GetBestExecutionContextScope());
       if (!base_byte_size)
         return false;
@@ -504,8 +511,8 @@ static bool LoadValueFromConsecutiveGPRRegisters(
         // Make sure we have enough room in "heap_data_up"
         if ((data_offset + *base_byte_size) <= heap_data_up->GetByteSize()) {
           const size_t bytes_copied = reg_value.GetAsMemoryData(
-              *reg_info, heap_data_up->GetBytes() + data_offset,
-              *base_byte_size, byte_order, error);
+              reg_info, heap_data_up->GetBytes() + data_offset, *base_byte_size,
+              byte_order, error);
           if (bytes_copied != *base_byte_size)
             return false;
           data_offset += bytes_copied;
@@ -540,7 +547,7 @@ static bool LoadValueFromConsecutiveGPRRegisters(
 
       const size_t curr_byte_size = std::min<size_t>(8, bytes_left);
       const size_t bytes_copied = reg_value.GetAsMemoryData(
-          *reg_info, heap_data_up->GetBytes() + data_offset, curr_byte_size,
+          reg_info, heap_data_up->GetBytes() + data_offset, curr_byte_size,
           byte_order, error);
       if (bytes_copied == 0)
         return false;
@@ -553,12 +560,9 @@ static bool LoadValueFromConsecutiveGPRRegisters(
   } else {
     const RegisterInfo *reg_info = nullptr;
     if (is_return_value) {
-      // The SysV arm64 ABI doesn't require you to write the return location 
-      // back to x8 before returning from the function the way the x86_64 ABI 
-      // does.  It looks like all the users of this ABI currently choose not to
-      // do that, and so we can't reconstruct stack based returns on exit 
-      // from the function.
-      return false;
+      // We are assuming we are decoding this immediately after returning from
+      // a function call and that the address of the structure is in x8
+      reg_info = reg_ctx->GetRegisterInfoByName("x8", 0);
     } else {
       // We are assuming we are stopped at the first instruction in a function
       // and that the ABI is being respected so all parameters appear where
@@ -573,6 +577,9 @@ static bool LoadValueFromConsecutiveGPRRegisters(
         return false;
       ++NGRN;
     }
+
+    if (reg_info == nullptr)
+      return false;
 
     const lldb::addr_t value_addr =
         reg_ctx->ReadRegisterAsUnsigned(reg_info, LLDB_INVALID_ADDRESS);
@@ -609,7 +616,8 @@ ValueObjectSP ABISysV_arm64::GetReturnValueObjectImpl(
   if (!reg_ctx)
     return return_valobj_sp;
 
-  std::optional<uint64_t> byte_size = return_compiler_type.GetByteSize(&thread);
+  llvm::Optional<uint64_t> byte_size =
+      return_compiler_type.GetByteSize(&thread);
   if (!byte_size)
     return return_valobj_sp;
 
@@ -652,10 +660,10 @@ ValueObjectSP ABISysV_arm64::GetReturnValueObjectImpl(
                       reg_ctx->ReadRegister(x1_reg_info, x1_reg_value)) {
                     Status error;
                     if (x0_reg_value.GetAsMemoryData(
-                            *x0_reg_info, heap_data_up->GetBytes() + 0, 8,
+                            x0_reg_info, heap_data_up->GetBytes() + 0, 8,
                             byte_order, error) &&
                         x1_reg_value.GetAsMemoryData(
-                            *x1_reg_info, heap_data_up->GetBytes() + 8, 8,
+                            x1_reg_info, heap_data_up->GetBytes() + 8, 8,
                             byte_order, error)) {
                       DataExtractor data(
                           DataBufferSP(heap_data_up.release()), byte_order,
@@ -746,7 +754,7 @@ ValueObjectSP ABISysV_arm64::GetReturnValueObjectImpl(
         RegisterValue reg_value;
         if (reg_ctx->ReadRegister(v0_info, reg_value)) {
           Status error;
-          if (reg_value.GetAsMemoryData(*v0_info, heap_data_up->GetBytes(),
+          if (reg_value.GetAsMemoryData(v0_info, heap_data_up->GetBytes(),
                                         heap_data_up->GetByteSize(), byte_order,
                                         error)) {
             DataExtractor data(DataBufferSP(heap_data_up.release()), byte_order,
@@ -782,20 +790,14 @@ lldb::addr_t ABISysV_arm64::FixAddress(addr_t pc, addr_t mask) {
 // Reads code or data address mask for the current Linux process.
 static lldb::addr_t ReadLinuxProcessAddressMask(lldb::ProcessSP process_sp,
                                                 llvm::StringRef reg_name) {
-  // 0 means there isn't a mask or it has not been read yet.
-  // We do not return the top byte mask unless thread_sp is valid.
-  // This prevents calls to this function before the thread is setup locking
-  // in the value to just the top byte mask, in cases where pointer
-  // authentication might also be active.
-  uint64_t address_mask = 0;
+  // Linux configures user-space virtual addresses with top byte ignored.
+  // We set default value of mask such that top byte is masked out.
+  uint64_t address_mask = ~((1ULL << 56) - 1);
+  // If Pointer Authentication feature is enabled then Linux exposes
+  // PAC data and code mask register. Try reading relevant register
+  // below and merge it with default address mask calculated above.
   lldb::ThreadSP thread_sp = process_sp->GetThreadList().GetSelectedThread();
   if (thread_sp) {
-    // Linux configures user-space virtual addresses with top byte ignored.
-    // We set default value of mask such that top byte is masked out.
-    address_mask = ~((1ULL << 56) - 1);
-    // If Pointer Authentication feature is enabled then Linux exposes
-    // PAC data and code mask register. Try reading relevant register
-    // below and merge it with default address mask calculated above.
     lldb::RegisterContextSP reg_ctx_sp = thread_sp->GetRegisterContext();
     if (reg_ctx_sp) {
       const RegisterInfo *reg_info =
@@ -843,3 +845,14 @@ void ABISysV_arm64::Initialize() {
 void ABISysV_arm64::Terminate() {
   PluginManager::UnregisterPlugin(CreateInstance);
 }
+
+lldb_private::ConstString ABISysV_arm64::GetPluginNameStatic() {
+  static ConstString g_name("SysV-arm64");
+  return g_name;
+}
+
+// PluginInterface protocol
+
+ConstString ABISysV_arm64::GetPluginName() { return GetPluginNameStatic(); }
+
+uint32_t ABISysV_arm64::GetPluginVersion() { return 1; }

@@ -25,8 +25,7 @@
 #include "llvm/CodeGen/BasicTTIImpl.h"
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/Function.h"
-#include "llvm/TargetParser/SubtargetFeature.h"
-#include <optional>
+#include "llvm/MC/SubtargetFeature.h"
 
 namespace llvm {
 
@@ -119,13 +118,8 @@ public:
     return !ST->isTargetDarwin() && !ST->hasMVEFloatOps();
   }
 
-  std::optional<Instruction *> instCombineIntrinsic(InstCombiner &IC,
-                                                    IntrinsicInst &II) const;
-  std::optional<Value *> simplifyDemandedVectorEltsIntrinsic(
-      InstCombiner &IC, IntrinsicInst &II, APInt DemandedElts, APInt &UndefElts,
-      APInt &UndefElts2, APInt &UndefElts3,
-      std::function<void(Instruction *, unsigned, APInt, APInt &)>
-          SimplifyAndSetOp) const;
+  Optional<Instruction *> instCombineIntrinsic(InstCombiner &IC,
+                                               IntrinsicInst &II) const;
 
   /// \name Scalar TTI Implementations
   /// @{
@@ -178,7 +172,7 @@ public:
     llvm_unreachable("Unsupported register kind");
   }
 
-  unsigned getMaxInterleaveFactor(ElementCount VF) {
+  unsigned getMaxInterleaveFactor(unsigned VF) {
     return ST->getMaxInterleaveFactor();
   }
 
@@ -190,18 +184,6 @@ public:
     return isLegalMaskedLoad(DataTy, Alignment);
   }
 
-  bool forceScalarizeMaskedGather(VectorType *VTy, Align Alignment) {
-    // For MVE, we have a custom lowering pass that will already have custom
-    // legalised any gathers that we can lower to MVE intrinsics, and want to
-    // expand all the rest. The pass runs before the masked intrinsic lowering
-    // pass.
-    return true;
-  }
-
-  bool forceScalarizeMaskedScatter(VectorType *VTy, Align Alignment) {
-    return forceScalarizeMaskedGather(VTy, Alignment);
-  }
-
   bool isLegalMaskedGather(Type *Ty, Align Alignment);
 
   bool isLegalMaskedScatter(Type *Ty, Align Alignment) {
@@ -210,17 +192,11 @@ public:
 
   InstructionCost getMemcpyCost(const Instruction *I);
 
-  uint64_t getMaxMemIntrinsicInlineSizeThreshold() const {
-    return ST->getMaxInlineSizeThreshold();
-  }
-
   int getNumMemOps(const IntrinsicInst *I) const;
 
   InstructionCost getShuffleCost(TTI::ShuffleKind Kind, VectorType *Tp,
-                                 ArrayRef<int> Mask,
-                                 TTI::TargetCostKind CostKind, int Index,
-                                 VectorType *SubTp,
-                                 ArrayRef<const Value *> Args = std::nullopt);
+                                 ArrayRef<int> Mask, int Index,
+                                 VectorType *SubTp);
 
   bool preferInLoopReduction(unsigned Opcode, Type *Ty,
                              TTI::ReductionFlags Flags) const;
@@ -243,26 +219,26 @@ public:
                                      TTI::TargetCostKind CostKind,
                                      const Instruction *I = nullptr);
 
-  using BaseT::getVectorInstrCost;
   InstructionCost getVectorInstrCost(unsigned Opcode, Type *Val,
-                                     TTI::TargetCostKind CostKind,
-                                     unsigned Index, Value *Op0, Value *Op1);
+                                     unsigned Index);
 
   InstructionCost getAddressComputationCost(Type *Val, ScalarEvolution *SE,
                                             const SCEV *Ptr);
 
   InstructionCost getArithmeticInstrCost(
-      unsigned Opcode, Type *Ty, TTI::TargetCostKind CostKind,
-      TTI::OperandValueInfo Op1Info = {TTI::OK_AnyValue, TTI::OP_None},
-      TTI::OperandValueInfo Op2Info = {TTI::OK_AnyValue, TTI::OP_None},
+      unsigned Opcode, Type *Ty,
+      TTI::TargetCostKind CostKind = TTI::TCK_RecipThroughput,
+      TTI::OperandValueKind Op1Info = TTI::OK_AnyValue,
+      TTI::OperandValueKind Op2Info = TTI::OK_AnyValue,
+      TTI::OperandValueProperties Opd1PropInfo = TTI::OP_None,
+      TTI::OperandValueProperties Opd2PropInfo = TTI::OP_None,
       ArrayRef<const Value *> Args = ArrayRef<const Value *>(),
       const Instruction *CxtI = nullptr);
 
-  InstructionCost
-  getMemoryOpCost(unsigned Opcode, Type *Src, MaybeAlign Alignment,
-                  unsigned AddressSpace, TTI::TargetCostKind CostKind,
-                  TTI::OperandValueInfo OpInfo = {TTI::OK_AnyValue, TTI::OP_None},
-                  const Instruction *I = nullptr);
+  InstructionCost getMemoryOpCost(unsigned Opcode, Type *Src,
+                                  MaybeAlign Alignment, unsigned AddressSpace,
+                                  TTI::TargetCostKind CostKind,
+                                  const Instruction *I = nullptr);
 
   InstructionCost getMaskedMemoryOpCost(unsigned Opcode, Type *Src,
                                         Align Alignment, unsigned AddressSpace,
@@ -270,7 +246,8 @@ public:
 
   InstructionCost getInterleavedMemoryOpCost(
       unsigned Opcode, Type *VecTy, unsigned Factor, ArrayRef<unsigned> Indices,
-      Align Alignment, unsigned AddressSpace, TTI::TargetCostKind CostKind,
+      Align Alignment, unsigned AddressSpace,
+      TTI::TargetCostKind CostKind = TTI::TCK_SizeAndLatency,
       bool UseMaskForCond = false, bool UseMaskForGaps = false);
 
   InstructionCost getGatherScatterOpCost(unsigned Opcode, Type *DataTy,
@@ -280,30 +257,14 @@ public:
                                          const Instruction *I = nullptr);
 
   InstructionCost getArithmeticReductionCost(unsigned Opcode, VectorType *ValTy,
-                                             std::optional<FastMathFlags> FMF,
+                                             Optional<FastMathFlags> FMF,
                                              TTI::TargetCostKind CostKind);
-  InstructionCost getExtendedReductionCost(unsigned Opcode, bool IsUnsigned,
-                                           Type *ResTy, VectorType *ValTy,
-                                           FastMathFlags FMF,
-                                           TTI::TargetCostKind CostKind);
-  InstructionCost getMulAccReductionCost(bool IsUnsigned, Type *ResTy,
-                                         VectorType *ValTy,
-                                         TTI::TargetCostKind CostKind);
-
-  InstructionCost getMinMaxReductionCost(Intrinsic::ID IID, VectorType *Ty,
-                                         FastMathFlags FMF,
-                                         TTI::TargetCostKind CostKind);
+  InstructionCost getExtendedAddReductionCost(bool IsMLA, bool IsUnsigned,
+                                              Type *ResTy, VectorType *ValTy,
+                                              TTI::TargetCostKind CostKind);
 
   InstructionCost getIntrinsicInstrCost(const IntrinsicCostAttributes &ICA,
                                         TTI::TargetCostKind CostKind);
-
-  /// getScalingFactorCost - Return the cost of the scaling used in
-  /// addressing mode represented by AM.
-  /// If the AM is supported, the return value must be >= 0.
-  /// If the AM is not supported, the return value must be negative.
-  InstructionCost getScalingFactorCost(Type *Ty, GlobalValue *BaseGV,
-                                       int64_t BaseOffset, bool HasBaseReg,
-                                       int64_t Scale, unsigned AddrSpace) const;
 
   bool maybeLoweredToCall(Instruction &I);
   bool isLoweredToCall(const Function *F);
@@ -311,13 +272,17 @@ public:
                                 AssumptionCache &AC,
                                 TargetLibraryInfo *LibInfo,
                                 HardwareLoopInfo &HWLoopInfo);
-  bool preferPredicateOverEpilogue(TailFoldingInfo *TFI);
+  bool preferPredicateOverEpilogue(Loop *L, LoopInfo *LI,
+                                   ScalarEvolution &SE,
+                                   AssumptionCache &AC,
+                                   TargetLibraryInfo *TLI,
+                                   DominatorTree *DT,
+                                   const LoopAccessInfo *LAI);
   void getUnrollingPreferences(Loop *L, ScalarEvolution &SE,
                                TTI::UnrollingPreferences &UP,
                                OptimizationRemarkEmitter *ORE);
 
-  TailFoldingStyle
-  getPreferredTailFoldingStyle(bool IVUpdateMayOverflow = true) const;
+  bool emitGetActiveLaneMask() const;
 
   void getPeelingPreferences(Loop *L, ScalarEvolution &SE,
                              TTI::PeelingPreferences &PP);
@@ -330,9 +295,6 @@ public:
 
     return true;
   }
-
-  bool hasArmWideBranch(bool Thumb) const;
-
   /// @}
 };
 

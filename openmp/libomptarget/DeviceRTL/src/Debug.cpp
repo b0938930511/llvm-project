@@ -10,35 +10,21 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Shared/Environment.h"
-
-#include "Configuration.h"
 #include "Debug.h"
-#include "Interface.h"
-#include "Mapping.h"
-#include "State.h"
-#include "Types.h"
+#include "Configuration.h"
 
-using namespace ompx;
+using namespace _OMP;
 
-#pragma omp begin declare target device_type(nohost)
+#pragma omp declare target
 
 extern "C" {
-void __assert_assume(bool condition) { __builtin_assume(condition); }
-
-void __assert_fail(const char *expr, const char *file, unsigned line,
-                   const char *function) {
-  __assert_fail_internal(expr, nullptr, file, line, function);
-}
-void __assert_fail_internal(const char *expr, const char *msg, const char *file,
-                            unsigned line, const char *function) {
-  if (msg) {
-    PRINTF("%s:%u: %s: Assertion %s (`%s') failed.\n", file, line, function,
-           msg, expr);
-  } else {
-    PRINTF("%s:%u: %s: Assertion `%s' failed.\n", file, line, function, expr);
+void __assert_assume(bool cond, const char *exp, const char *file, int line) {
+  if (!cond && config::isDebugMode(config::DebugLevel::Assertion)) {
+    PRINTF("ASSERTION failed: %s at %s, line %d\n", exp, file, line);
+    __builtin_trap();
   }
-  __builtin_trap();
+
+  __builtin_assume(cond);
 }
 }
 

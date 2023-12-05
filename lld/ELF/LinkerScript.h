@@ -15,15 +15,18 @@
 #include "lld/Common/Strings.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/Compiler.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <vector>
 
-namespace lld::elf {
+namespace lld {
+namespace elf {
 
 class Defined;
 class InputFile;
@@ -31,14 +34,14 @@ class InputSection;
 class InputSectionBase;
 class OutputSection;
 class SectionBase;
+class Symbol;
 class ThunkSection;
-struct OutputDesc;
 
 // This represents an r-value in the linker script.
 struct ExprValue {
   ExprValue(SectionBase *sec, bool forceAbsolute, uint64_t val,
             const Twine &loc)
-      : sec(sec), val(val), forceAbsolute(forceAbsolute), loc(loc.str()) {}
+      : sec(sec), forceAbsolute(forceAbsolute), val(val), loc(loc.str()) {}
 
   ExprValue(uint64_t val) : ExprValue(nullptr, false, val, "") {}
 
@@ -50,16 +53,16 @@ struct ExprValue {
   // If a value is relative to a section, it has a non-null Sec.
   SectionBase *sec;
 
+  // True if this expression is enclosed in ABSOLUTE().
+  // This flag affects the return value of getValue().
+  bool forceAbsolute;
+
   uint64_t val;
   uint64_t alignment = 1;
 
   // The original st_type if the expression represents a symbol. Any operation
   // resets type to STT_NOTYPE.
   uint8_t type = llvm::ELF::STT_NOTYPE;
-
-  // True if this expression is enclosed in ABSOLUTE().
-  // This flag affects the return value of getValue().
-  bool forceAbsolute;
 
   // Original source location. Used for error messages.
   std::string loc;
@@ -79,18 +82,17 @@ enum SectionsCommandKind {
   ByteKind    // BYTE(expr), SHORT(expr), LONG(expr) or QUAD(expr)
 };
 
-struct SectionCommand {
-  SectionCommand(int k) : kind(k) {}
+struct BaseCommand {
+  BaseCommand(int k) : kind(k) {}
   int kind;
 };
 
 // This represents ". = <expr>" or "<symbol> = <expr>".
-struct SymbolAssignment : SectionCommand {
-  SymbolAssignment(StringRef name, Expr e, unsigned symOrder, std::string loc)
-      : SectionCommand(AssignmentKind), name(name), expression(e),
-        symOrder(symOrder), location(loc) {}
+struct SymbolAssignment : BaseCommand {
+  SymbolAssignment(StringRef name, Expr e, std::string loc)
+      : BaseCommand(AssignmentKind), name(name), expression(e), location(loc) {}
 
-  static bool classof(const SectionCommand *c) {
+  static bool classof(const BaseCommand *c) {
     return c->kind == AssignmentKind;
   }
 
@@ -104,11 +106,6 @@ struct SymbolAssignment : SectionCommand {
   // Command attributes for PROVIDE, HIDDEN and PROVIDE_HIDDEN.
   bool provide = false;
   bool hidden = false;
-
-  // This assignment references DATA_SEGMENT_RELRO_END.
-  bool dataSegmentRelroEnd = false;
-
-  unsigned symOrder;
 
   // Holds file name and line number for error reporting.
   std::string location;
@@ -135,35 +132,16 @@ enum class ConstraintKind { NoConstraint, ReadOnly, ReadWrite };
 // MEMORY command.
 struct MemoryRegion {
   MemoryRegion(StringRef name, Expr origin, Expr length, uint32_t flags,
-               uint32_t invFlags, uint32_t negFlags, uint32_t negInvFlags)
+               uint32_t negFlags)
       : name(std::string(name)), origin(origin), length(length), flags(flags),
-        invFlags(invFlags), negFlags(negFlags), negInvFlags(negInvFlags) {}
+        negFlags(negFlags) {}
 
   std::string name;
   Expr origin;
   Expr length;
-  // A section can be assigned to the region if any of these ELF section flags
-  // are set...
   uint32_t flags;
-  // ... or any of these flags are not set.
-  // For example, the memory region attribute "r" maps to SHF_WRITE.
-  uint32_t invFlags;
-  // A section cannot be assigned to the region if any of these ELF section
-  // flags are set...
   uint32_t negFlags;
-  // ... or any of these flags are not set.
-  // For example, the memory region attribute "!r" maps to SHF_WRITE.
-  uint32_t negInvFlags;
   uint64_t curPos = 0;
-
-  uint64_t getOrigin() const { return origin().getValue(); }
-  uint64_t getLength() const { return length().getValue(); }
-
-  bool compatibleWith(uint32_t secFlags) const {
-    if ((secFlags & negFlags) || (~secFlags & negInvFlags))
-      return false;
-    return (secFlags & flags) || (~secFlags & invFlags);
-  }
 };
 
 // This struct represents one section match pattern in SECTIONS() command.
@@ -173,7 +151,7 @@ class SectionPattern {
   StringMatcher excludedFilePat;
 
   // Cache of the most recent input argument and result of excludesFile().
-  mutable std::optional<std::pair<const InputFile *, bool>> excludesFileCache;
+  mutable llvm::Optional<std::pair<const InputFile *, bool>> excludesFileCache;
 
 public:
   SectionPattern(StringMatcher &&pat1, StringMatcher &&pat2)
@@ -188,19 +166,19 @@ public:
   SortSectionPolicy sortInner;
 };
 
-class InputSectionDescription : public SectionCommand {
+class InputSectionDescription : public BaseCommand {
   SingleStringMatcher filePat;
 
   // Cache of the most recent input argument and result of matchesFile().
-  mutable std::optional<std::pair<const InputFile *, bool>> matchesFileCache;
+  mutable llvm::Optional<std::pair<const InputFile *, bool>> matchesFileCache;
 
 public:
   InputSectionDescription(StringRef filePattern, uint64_t withFlags = 0,
                           uint64_t withoutFlags = 0)
-      : SectionCommand(InputSectionKind), filePat(filePattern),
+      : BaseCommand(InputSectionKind), filePat(filePattern),
         withFlags(withFlags), withoutFlags(withoutFlags) {}
 
-  static bool classof(const SectionCommand *c) {
+  static bool classof(const BaseCommand *c) {
     return c->kind == InputSectionKind;
   }
 
@@ -208,20 +186,20 @@ public:
 
   // Input sections that matches at least one of SectionPatterns
   // will be associated with this InputSectionDescription.
-  SmallVector<SectionPattern, 0> sectionPatterns;
+  std::vector<SectionPattern> sectionPatterns;
 
   // Includes InputSections and MergeInputSections. Used temporarily during
   // assignment of input sections to output sections.
-  SmallVector<InputSectionBase *, 0> sectionBases;
+  std::vector<InputSectionBase *> sectionBases;
 
   // Used after the finalizeInputSections() pass. MergeInputSections have been
   // merged into MergeSyntheticSections.
-  SmallVector<InputSection *, 0> sections;
+  std::vector<InputSection *> sections;
 
   // Temporary record of synthetic ThunkSection instances and the pass that
   // they were created in. This is used to insert newly created ThunkSections
   // into Sections at the end of a createThunks() pass.
-  SmallVector<std::pair<ThunkSection *, uint32_t>, 0> thunkSections;
+  std::vector<std::pair<ThunkSection *, uint32_t>> thunkSections;
 
   // SectionPatterns can be filtered with the INPUT_SECTION_FLAGS command.
   uint64_t withFlags;
@@ -229,12 +207,12 @@ public:
 };
 
 // Represents BYTE(), SHORT(), LONG(), or QUAD().
-struct ByteCommand : SectionCommand {
+struct ByteCommand : BaseCommand {
   ByteCommand(Expr e, unsigned size, std::string commandString)
-      : SectionCommand(ByteKind), commandString(commandString), expression(e),
+      : BaseCommand(ByteKind), commandString(commandString), expression(e),
         size(size) {}
 
-  static bool classof(const SectionCommand *c) { return c->kind == ByteKind; }
+  static bool classof(const BaseCommand *c) { return c->kind == ByteKind; }
 
   // Keeps string representing the command. Used for -Map" is perhaps better.
   std::string commandString;
@@ -249,7 +227,7 @@ struct ByteCommand : SectionCommand {
 };
 
 struct InsertCommand {
-  SmallVector<StringRef, 0> names;
+  std::vector<StringRef> names;
   bool isAfter;
   StringRef where;
 };
@@ -259,7 +237,7 @@ struct PhdrsCommand {
   unsigned type = llvm::ELF::PT_NULL;
   bool hasFilehdr = false;
   bool hasPhdrs = false;
-  std::optional<unsigned> flags;
+  llvm::Optional<unsigned> flags;
   Expr lmaExpr = nullptr;
 };
 
@@ -276,7 +254,7 @@ class LinkerScript final {
     uint64_t tbssAddr = 0;
   };
 
-  llvm::DenseMap<llvm::CachedHashStringRef, OutputDesc *> nameToOutputSection;
+  llvm::DenseMap<StringRef, OutputSection *> nameToOutputSection;
 
   void addSymbol(SymbolAssignment *cmd);
   void assignSymbol(SymbolAssignment *cmd, bool inSec);
@@ -284,105 +262,97 @@ class LinkerScript final {
   void expandOutputSection(uint64_t size);
   void expandMemoryRegions(uint64_t size);
 
-  SmallVector<InputSectionBase *, 0>
+  std::vector<InputSectionBase *>
   computeInputSections(const InputSectionDescription *,
                        ArrayRef<InputSectionBase *>);
 
-  SmallVector<InputSectionBase *, 0> createInputSectionList(OutputSection &cmd);
+  std::vector<InputSectionBase *> createInputSectionList(OutputSection &cmd);
 
   void discardSynthetic(OutputSection &);
 
-  SmallVector<size_t, 0> getPhdrIndices(OutputSection *sec);
+  std::vector<size_t> getPhdrIndices(OutputSection *sec);
 
-  std::pair<MemoryRegion *, MemoryRegion *>
-  findMemoryRegion(OutputSection *sec, MemoryRegion *hint);
+  MemoryRegion *findMemoryRegion(OutputSection *sec);
+
+  void switchTo(OutputSection *sec);
+  uint64_t advance(uint64_t size, unsigned align);
+  void output(InputSection *sec);
 
   void assignOffsets(OutputSection *sec);
 
-  // This captures the local AddressState and makes it accessible
+  // Ctx captures the local AddressState and makes it accessible
   // deliberately. This is needed as there are some cases where we cannot just
   // thread the current state through to a lambda function created by the
   // script parser.
   // This should remain a plain pointer as its lifetime is smaller than
   // LinkerScript.
-  AddressState *state = nullptr;
+  AddressState *ctx = nullptr;
 
   OutputSection *aether;
 
   uint64_t dot;
 
 public:
-  OutputDesc *createOutputSection(StringRef name, StringRef location);
-  OutputDesc *getOrCreateOutputSection(StringRef name);
+  OutputSection *createOutputSection(StringRef name, StringRef location);
+  OutputSection *getOrCreateOutputSection(StringRef name);
 
   bool hasPhdrsCommands() { return !phdrsCommands.empty(); }
   uint64_t getDot() { return dot; }
-  void discard(InputSectionBase &s);
+  void discard(InputSectionBase *s);
 
   ExprValue getSymbolValue(StringRef name, const Twine &loc);
 
   void addOrphanSections();
   void diagnoseOrphanHandling() const;
-  void diagnoseMissingSGSectionAddress() const;
-  void adjustOutputSections();
+  void adjustSectionsBeforeSorting();
   void adjustSectionsAfterSorting();
 
-  SmallVector<PhdrEntry *, 0> createPhdrs();
+  std::vector<PhdrEntry *> createPhdrs();
   bool needsInterpSection();
 
   bool shouldKeep(InputSectionBase *s);
   const Defined *assignAddresses();
-  void allocateHeaders(SmallVector<PhdrEntry *, 0> &phdrs);
+  void allocateHeaders(std::vector<PhdrEntry *> &phdrs);
   void processSectionCommands();
   void processSymbolAssignments();
   void declareSymbols();
 
-  bool isDiscarded(const OutputSection *sec) const;
-
   // Used to handle INSERT AFTER statements.
   void processInsertCommands();
 
-  // Describe memory region usage.
-  void printMemoryUsage(raw_ostream &os);
-
-  // Check backward location counter assignment and memory region/LMA overflows.
-  void checkFinalScriptConditions() const;
-
   // SECTIONS command list.
-  SmallVector<SectionCommand *, 0> sectionCommands;
+  std::vector<BaseCommand *> sectionCommands;
 
   // PHDRS command list.
-  SmallVector<PhdrsCommand, 0> phdrsCommands;
+  std::vector<PhdrsCommand> phdrsCommands;
 
   bool hasSectionsCommand = false;
-  bool seenDataAlign = false;
-  bool seenRelroEnd = false;
   bool errorOnMissingSection = false;
-  std::string backwardDotErr;
 
   // List of section patterns specified with KEEP commands. They will
   // be kept even if they are unused and --gc-sections is specified.
-  SmallVector<InputSectionDescription *, 0> keptSections;
+  std::vector<InputSectionDescription *> keptSections;
 
   // A map from memory region name to a memory region descriptor.
   llvm::MapVector<llvm::StringRef, MemoryRegion *> memoryRegions;
 
   // A list of symbols referenced by the script.
-  SmallVector<llvm::StringRef, 0> referencedSymbols;
+  std::vector<llvm::StringRef> referencedSymbols;
 
   // Used to implement INSERT [AFTER|BEFORE]. Contains output sections that need
   // to be reordered.
-  SmallVector<InsertCommand, 0> insertCommands;
+  std::vector<InsertCommand> insertCommands;
 
   // OutputSections specified by OVERWRITE_SECTIONS.
-  SmallVector<OutputDesc *, 0> overwriteSections;
+  std::vector<OutputSection *> overwriteSections;
 
   // Sections that will be warned/errored by --orphan-handling.
-  SmallVector<const InputSectionBase *, 0> orphanSections;
+  std::vector<const InputSectionBase *> orphanSections;
 };
 
-LLVM_LIBRARY_VISIBILITY extern std::unique_ptr<LinkerScript> script;
+extern LinkerScript *script;
 
-} // end namespace lld::elf
+} // end namespace elf
+} // end namespace lld
 
 #endif // LLD_ELF_LINKER_SCRIPT_H

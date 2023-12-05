@@ -58,12 +58,7 @@ public:
     VK_Sparc_TLS_IE_LDX,
     VK_Sparc_TLS_IE_ADD,
     VK_Sparc_TLS_LE_HIX22,
-    VK_Sparc_TLS_LE_LOX10,
-    VK_Sparc_HIX22,
-    VK_Sparc_LOX10,
-    VK_Sparc_GOTDATA_HIX22,
-    VK_Sparc_GOTDATA_LOX10,
-    VK_Sparc_GOTDATA_OP,
+    VK_Sparc_TLS_LE_LOX10
   };
 
 private:
@@ -107,6 +102,8 @@ public:
   static bool classof(const MCExpr *E) {
     return E->getKind() == MCExpr::Target;
   }
+
+  static bool classof(const SparcMCExpr *) { return true; }
 
   static VariantKind parseVariantKind(StringRef name);
   static bool printVariantKind(raw_ostream &OS, VariantKind Kind);

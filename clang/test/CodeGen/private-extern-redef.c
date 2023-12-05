@@ -1,4 +1,5 @@
 // RUN: %clang_cc1 -triple x86_64-darwin-apple -emit-llvm -o - %s | FileCheck %s
+// rdar://9609649
 
 __private_extern__ const int I;
 __private_extern__ const int J = 927;
@@ -23,7 +24,7 @@ extern int P;
 
 void bar(int);
 
-void foo(void) {
+void foo() {
   bar(I);
 }
 

@@ -1,4 +1,5 @@
-! RUN: %python %S/test_errors.py %s %flang_fc1
+! RUN: %S/test_errors.sh %s %t %flang_fc1
+! REQUIRES: shell
 
 ! Test use of implicitly declared variable in specification expression
 
@@ -40,7 +41,6 @@ contains
   subroutine s3a()
     implicit none
     real :: a(m, n)
-    !WARN: '%s' was used without (or before) being explicitly typed
     !ERROR: No explicit type declared for 'n'
     common n
   end

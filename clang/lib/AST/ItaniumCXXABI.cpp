@@ -26,7 +26,6 @@
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/iterator.h"
-#include <optional>
 
 using namespace clang;
 
@@ -85,8 +84,8 @@ template<typename T> bool isDenseMapKeyTombstone(T V) {
       V, llvm::DenseMapInfo<T>::getTombstoneKey());
 }
 
-template <typename T>
-std::optional<bool> areDenseMapKeysEqualSpecialValues(T LHS, T RHS) {
+template<typename T>
+Optional<bool> areDenseMapKeysEqualSpecialValues(T LHS, T RHS) {
   bool LHSEmpty = isDenseMapKeyEmpty(LHS);
   bool RHSEmpty = isDenseMapKeyEmpty(RHS);
   if (LHSEmpty || RHSEmpty)
@@ -97,7 +96,7 @@ std::optional<bool> areDenseMapKeysEqualSpecialValues(T LHS, T RHS) {
   if (LHSTombstone || RHSTombstone)
     return LHSTombstone && RHSTombstone;
 
-  return std::nullopt;
+  return None;
 }
 
 template<>
@@ -114,8 +113,8 @@ struct DenseMapInfo<DecompositionDeclName> {
     return llvm::hash_combine_range(Key.begin(), Key.end());
   }
   static bool isEqual(DecompositionDeclName LHS, DecompositionDeclName RHS) {
-    if (std::optional<bool> Result =
-            areDenseMapKeysEqualSpecialValues(LHS.Bindings, RHS.Bindings))
+    if (Optional<bool> Result = areDenseMapKeysEqualSpecialValues(
+            LHS.Bindings, RHS.Bindings))
       return *Result;
 
     return LHS.Bindings.size() == RHS.Bindings.size() &&
@@ -182,37 +181,6 @@ public:
   }
 };
 
-// A version of this for SYCL that makes sure that 'device' mangling context
-// matches the lambda mangling number, so that __builtin_sycl_unique_stable_name
-// can be consistently generated between a MS and Itanium host by just referring
-// to the device mangling number.
-class ItaniumSYCLNumberingContext : public ItaniumNumberingContext {
-  llvm::DenseMap<const CXXMethodDecl *, unsigned> ManglingNumbers;
-  using ManglingItr = decltype(ManglingNumbers)::iterator;
-
-public:
-  ItaniumSYCLNumberingContext(ItaniumMangleContext *Mangler)
-      : ItaniumNumberingContext(Mangler) {}
-
-  unsigned getManglingNumber(const CXXMethodDecl *CallOperator) override {
-    unsigned Number = ItaniumNumberingContext::getManglingNumber(CallOperator);
-    std::pair<ManglingItr, bool> emplace_result =
-        ManglingNumbers.try_emplace(CallOperator, Number);
-    (void)emplace_result;
-    assert(emplace_result.second && "Lambda number set multiple times?");
-    return Number;
-  }
-
-  using ItaniumNumberingContext::getManglingNumber;
-
-  unsigned getDeviceManglingNumber(const CXXMethodDecl *CallOperator) override {
-    ManglingItr Itr = ManglingNumbers.find(CallOperator);
-    assert(Itr != ManglingNumbers.end() && "Lambda not yet mangled?");
-
-    return Itr->second;
-  }
-};
-
 class ItaniumCXXABI : public CXXABI {
 private:
   std::unique_ptr<MangleContext> Mangler;
@@ -225,7 +193,7 @@ public:
   MemberPointerInfo
   getMemberPointerInfo(const MemberPointerType *MPT) const override {
     const TargetInfo &Target = Context.getTargetInfo();
-    TargetInfo::IntType PtrDiff = Target.getPtrDiffType(LangAS::Default);
+    TargetInfo::IntType PtrDiff = Target.getPtrDiffType(0);
     MemberPointerInfo MPI;
     MPI.Width = Target.getTypeWidth(PtrDiff);
     MPI.Align = Target.getTypeAlign(PtrDiff);
@@ -252,8 +220,8 @@ public:
       return false;
 
     const ASTRecordLayout &Layout = Context.getASTRecordLayout(RD);
-    CharUnits PointerSize = Context.toCharUnitsFromBits(
-        Context.getTargetInfo().getPointerWidth(LangAS::Default));
+    CharUnits PointerSize =
+      Context.toCharUnitsFromBits(Context.getTargetInfo().getPointerWidth(0));
     return Layout.getNonVirtualSize() == PointerSize;
   }
 
@@ -281,9 +249,6 @@ public:
 
   std::unique_ptr<MangleNumberingContext>
   createMangleNumberingContext() const override {
-    if (Context.getLangOpts().isSYCL())
-      return std::make_unique<ItaniumSYCLNumberingContext>(
-          cast<ItaniumMangleContext>(Mangler.get()));
     return std::make_unique<ItaniumNumberingContext>(
         cast<ItaniumMangleContext>(Mangler.get()));
   }

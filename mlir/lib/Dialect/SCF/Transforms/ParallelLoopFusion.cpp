@@ -10,20 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "mlir/Dialect/SCF/Transforms/Passes.h"
-
+#include "PassDetail.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/SCF/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/Passes.h"
+#include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/SCF/Transforms.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/OpDefinition.h"
-#include "mlir/Interfaces/SideEffectInterfaces.h"
-
-namespace mlir {
-#define GEN_PASS_DEF_SCFPARALLELLOOPFUSION
-#include "mlir/Dialect/SCF/Transforms/Passes.h.inc"
-} // namespace mlir
 
 using namespace mlir;
 using namespace mlir::scf;
@@ -46,11 +41,9 @@ static bool equalIterationSpaces(ParallelOp firstPloop,
     // TODO: Extend this to support aliases and equal constants.
     return std::equal(lhs.begin(), lhs.end(), rhs.begin());
   };
-  return matchOperands(firstPloop.getLowerBound(),
-                       secondPloop.getLowerBound()) &&
-         matchOperands(firstPloop.getUpperBound(),
-                       secondPloop.getUpperBound()) &&
-         matchOperands(firstPloop.getStep(), secondPloop.getStep());
+  return matchOperands(firstPloop.lowerBound(), secondPloop.lowerBound()) &&
+         matchOperands(firstPloop.upperBound(), secondPloop.upperBound()) &&
+         matchOperands(firstPloop.step(), secondPloop.step());
 }
 
 /// Checks if the parallel loops have mixed access to the same buffers. Returns
@@ -58,10 +51,10 @@ static bool equalIterationSpaces(ParallelOp firstPloop,
 /// loop reads.
 static bool haveNoReadsAfterWriteExceptSameIndex(
     ParallelOp firstPloop, ParallelOp secondPloop,
-    const IRMapping &firstToSecondPloopIndices) {
+    const BlockAndValueMapping &firstToSecondPloopIndices) {
   DenseMap<Value, SmallVector<ValueRange, 1>> bufferStores;
   firstPloop.getBody()->walk([&](memref::StoreOp store) {
-    bufferStores[store.getMemRef()].push_back(store.getIndices());
+    bufferStores[store.getMemRef()].push_back(store.indices());
   });
   auto walkResult = secondPloop.getBody()->walk([&](memref::LoadOp load) {
     // Stop if the memref is defined in secondPloop body. Careful alias analysis
@@ -81,7 +74,7 @@ static bool haveNoReadsAfterWriteExceptSameIndex(
     // Check that the load indices of secondPloop coincide with store indices of
     // firstPloop for the same memrefs.
     auto storeIndices = write->second.front();
-    auto loadIndices = load.getIndices();
+    auto loadIndices = load.indices();
     if (storeIndices.size() != loadIndices.size())
       return WalkResult::interrupt();
     for (int i = 0, e = storeIndices.size(); i < e; ++i) {
@@ -98,20 +91,21 @@ static bool haveNoReadsAfterWriteExceptSameIndex(
 /// write patterns.
 static LogicalResult
 verifyDependencies(ParallelOp firstPloop, ParallelOp secondPloop,
-                   const IRMapping &firstToSecondPloopIndices) {
+                   const BlockAndValueMapping &firstToSecondPloopIndices) {
   if (!haveNoReadsAfterWriteExceptSameIndex(firstPloop, secondPloop,
                                             firstToSecondPloopIndices))
     return failure();
 
-  IRMapping secondToFirstPloopIndices;
+  BlockAndValueMapping secondToFirstPloopIndices;
   secondToFirstPloopIndices.map(secondPloop.getBody()->getArguments(),
                                 firstPloop.getBody()->getArguments());
   return success(haveNoReadsAfterWriteExceptSameIndex(
       secondPloop, firstPloop, secondToFirstPloopIndices));
 }
 
-static bool isFusionLegal(ParallelOp firstPloop, ParallelOp secondPloop,
-                          const IRMapping &firstToSecondPloopIndices) {
+static bool
+isFusionLegal(ParallelOp firstPloop, ParallelOp secondPloop,
+              const BlockAndValueMapping &firstToSecondPloopIndices) {
   return !hasNestedParallelOp(firstPloop) &&
          !hasNestedParallelOp(secondPloop) &&
          equalIterationSpaces(firstPloop, secondPloop) &&
@@ -122,7 +116,7 @@ static bool isFusionLegal(ParallelOp firstPloop, ParallelOp secondPloop,
 /// Prepends operations of firstPloop's body into secondPloop's body.
 static void fuseIfLegal(ParallelOp firstPloop, ParallelOp secondPloop,
                         OpBuilder b) {
-  IRMapping firstToSecondPloopIndices;
+  BlockAndValueMapping firstToSecondPloopIndices;
   firstToSecondPloopIndices.map(firstPloop.getBody()->getArguments(),
                                 secondPloop.getBody()->getArguments());
 
@@ -155,7 +149,8 @@ void mlir::scf::naivelyFuseParallelOps(Region &region) {
         continue;
       }
       // TODO: Handle region side effects properly.
-      noSideEffects &= isMemoryEffectFree(&op) && op.getNumRegions() == 0;
+      noSideEffects &=
+          MemoryEffectOpInterface::hasNoEffect(&op) && op.getNumRegions() == 0;
     }
     for (ArrayRef<ParallelOp> ploops : ploopChains) {
       for (int i = 0, e = ploops.size(); i + 1 < e; ++i)
@@ -166,7 +161,7 @@ void mlir::scf::naivelyFuseParallelOps(Region &region) {
 
 namespace {
 struct ParallelLoopFusion
-    : public impl::SCFParallelLoopFusionBase<ParallelLoopFusion> {
+    : public SCFParallelLoopFusionBase<ParallelLoopFusion> {
   void runOnOperation() override {
     getOperation()->walk([&](Operation *child) {
       for (Region &region : child->getRegions())

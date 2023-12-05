@@ -40,24 +40,25 @@ class MultiplexExternalSemaSource : public ExternalSemaSource {
   static char ID;
 
 private:
-  SmallVector<ExternalSemaSource *, 2> Sources;
+  SmallVector<ExternalSemaSource *, 2> Sources; // doesn't own them.
 
 public:
-  /// Constructs a new multiplexing external sema source and appends the
+
+  ///Constructs a new multiplexing external sema source and appends the
   /// given element to it.
   ///
-  ///\param[in] S1 - A non-null (old) ExternalSemaSource.
-  ///\param[in] S2 - A non-null (new) ExternalSemaSource.
+  ///\param[in] s1 - A non-null (old) ExternalSemaSource.
+  ///\param[in] s2 - A non-null (new) ExternalSemaSource.
   ///
-  MultiplexExternalSemaSource(ExternalSemaSource *S1, ExternalSemaSource *S2);
+  MultiplexExternalSemaSource(ExternalSemaSource& s1, ExternalSemaSource& s2);
 
   ~MultiplexExternalSemaSource() override;
 
-  /// Appends new source to the source list.
+  ///Appends new source to the source list.
   ///
-  ///\param[in] Source - An ExternalSemaSource.
+  ///\param[in] source - An ExternalSemaSource.
   ///
-  void AddSource(ExternalSemaSource *Source);
+  void addSource(ExternalSemaSource &source);
 
   //===--------------------------------------------------------------------===//
   // ExternalASTSource.
@@ -359,9 +360,6 @@ public:
   /// \return true if a diagnostic was produced, false otherwise.
   bool MaybeDiagnoseMissingCompleteType(SourceLocation Loc,
                                         QualType T) override;
-
-  // Inform all attached sources that a mangling number was assigned.
-  void AssignedLambdaNumbering(const CXXRecordDecl *Lambda) override;
 
   /// LLVM-style RTTI.
   /// \{

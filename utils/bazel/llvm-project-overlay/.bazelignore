@@ -1,6 +1,4 @@
 # Ignore the utils/bazel directory when this is overlayed onto the repo root.
 utils/bazel
-# Ignore third-party projects. These should be configured separately and some
-# include Bazel configs.
+# This directory has a Bazel config
 libcxx/utils/google-benchmark
-third-party/benchmark

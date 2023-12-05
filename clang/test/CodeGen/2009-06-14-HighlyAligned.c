@@ -3,6 +3,6 @@
 
 static int highly_aligned __attribute__((aligned(4096)));
 
-int f(void) {
+int f() {
 	return highly_aligned;
 }

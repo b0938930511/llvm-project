@@ -13,7 +13,9 @@
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::cert {
+namespace clang {
+namespace tidy {
+namespace cert {
 
 ProperlySeededRandomGeneratorCheck::ProperlySeededRandomGeneratorCheck(
     StringRef Name, ClangTidyContext *Context)
@@ -110,7 +112,7 @@ void ProperlySeededRandomGeneratorCheck::checkSeed(
 
   const std::string SeedType(
       Func->getArg(0)->IgnoreCasts()->getType().getAsString());
-  if (llvm::is_contained(DisallowedSeedTypes, SeedType)) {
+  if (llvm::find(DisallowedSeedTypes, SeedType) != DisallowedSeedTypes.end()) {
     diag(Func->getExprLoc(),
          "random number generator seeded with a disallowed source of seed "
          "value will generate a predictable sequence of values");
@@ -118,4 +120,6 @@ void ProperlySeededRandomGeneratorCheck::checkSeed(
   }
 }
 
-} // namespace clang::tidy::cert
+} // namespace cert
+} // namespace tidy
+} // namespace clang

@@ -14,13 +14,9 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/CallInterfaces.h"
-#include "mlir/Support/LLVM.h"
+#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SCCIterator.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/raw_ostream.h"
-#include <cassert>
-#include <memory>
 
 using namespace mlir;
 
@@ -96,9 +92,7 @@ static void computeCallGraph(Operation *op, CallGraph &cg,
       computeCallGraph(&nested, cg, symbolTable, parentNode, resolveCalls);
 }
 
-CallGraph::CallGraph(Operation *op)
-    : externalCallerNode(/*callableRegion=*/nullptr),
-      unknownCalleeNode(/*callableRegion=*/nullptr) {
+CallGraph::CallGraph(Operation *op) : externalNode(/*callableRegion=*/nullptr) {
   // Make two passes over the graph, one to compute the callables and one to
   // resolve the calls. We split these up as we may have nested callable objects
   // that need to be reserved before the calls.
@@ -128,7 +122,7 @@ CallGraphNode *CallGraph::getOrAddNode(Region *region,
       // that *could* be called from external sources. This requires extending
       // the interface for callables to check if they may be referenced
       // externally.
-      externalCallerNode.addAbstractEdge(node.get());
+      externalNode.addAbstractEdge(node.get());
     }
   }
   return node.get();
@@ -137,12 +131,12 @@ CallGraphNode *CallGraph::getOrAddNode(Region *region,
 /// Lookup a call graph node for the given region, or nullptr if none is
 /// registered.
 CallGraphNode *CallGraph::lookupNode(Region *region) const {
-  const auto *it = nodes.find(region);
+  auto it = nodes.find(region);
   return it == nodes.end() ? nullptr : it->second.get();
 }
 
 /// Resolve the callable for given callee to a node in the callgraph, or the
-/// unknown callee node if a valid node was not resolved.
+/// external node if a valid node was not resolved.
 CallGraphNode *
 CallGraph::resolveCallable(CallOpInterface call,
                            SymbolTableCollection &symbolTable) const {
@@ -151,7 +145,8 @@ CallGraph::resolveCallable(CallOpInterface call,
     if (auto *node = lookupNode(callableOp.getCallableRegion()))
       return node;
 
-  return getUnknownCalleeNode();
+  // If we don't have a valid direct region, this is an external call.
+  return getExternalNode();
 }
 
 /// Erase the given node from the callgraph.
@@ -181,12 +176,8 @@ void CallGraph::print(raw_ostream &os) const {
 
   // Functor used to output the name for the given node.
   auto emitNodeName = [&](const CallGraphNode *node) {
-    if (node == getExternalCallerNode()) {
-      os << "<External-Caller-Node>";
-      return;
-    }
-    if (node == getUnknownCalleeNode()) {
-      os << "<Unknown-Callee-Node>";
+    if (node->isExternal()) {
+      os << "<External-Node>";
       return;
     }
 

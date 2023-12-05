@@ -6,11 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-// UNSUPPORTED: c++03, c++11, c++14
-// UNSUPPORTED: availability-filesystem-missing
+// UNSUPPORTED: c++03
 
 // These tests require locale for non-char paths
-// UNSUPPORTED: no-localization
+// UNSUPPORTED: libcpp-has-no-localization
 
 // <filesystem>
 
@@ -30,7 +29,8 @@
 // template <class InputIterator>
 //   path& concat(InputIterator first, InputIterator last);
 
-#include <filesystem>
+
+#include "filesystem_include.h"
 #include <type_traits>
 #include <string>
 #include <string_view>
@@ -39,12 +39,11 @@
 // On Windows, charset conversions cause allocations in the path class in
 // cases where no allocations are done on other platforms.
 
-#include "../path_helper.h"
-#include "count_new.h"
-#include "make_string.h"
-#include "test_iterators.h"
 #include "test_macros.h"
-namespace fs = std::filesystem;
+#include "test_iterators.h"
+#include "count_new.h"
+#include "filesystem_test_helper.h"
+
 
 struct ConcatOperatorTestcase {
   MultiStringType lhs;
@@ -142,20 +141,17 @@ void doConcatSourceAllocTest(ConcatOperatorTestcase const& TC)
   // For the path native type, no allocations will be performed because no
   // conversion is required.
 
-#if TEST_SUPPORTS_LIBRARY_INTERNAL_ALLOCATIONS
-  // Only check allocations if we can pick up allocations done within the
-  // library implementation.
-  bool ExpectNoAllocations = std::is_same<CharT, path::value_type>::value;
-#endif
+  // In DLL builds on Windows, the overridden operator new won't pick up
+  // allocations done within the DLL, so the RequireAllocationGuard below
+  // won't necessarily see allocations in the cases where they're expected.
+  bool DisableAllocations = std::is_same<CharT, path::value_type>::value;
   {
     path LHS(L); PathReserve(LHS, ReserveSize);
     InputIter RHS(R);
     {
-      RequireAllocationGuard g(0); // require "at least zero" allocations by default
-#if TEST_SUPPORTS_LIBRARY_INTERNAL_ALLOCATIONS
-      if (ExpectNoAllocations)
-        g.requireExactly(0);
-#endif
+      RequireAllocationGuard  g; // requires 1 or more allocations occur by default
+      if (DisableAllocations) g.requireExactly(0);
+      else TEST_ONLY_WIN32_DLL(g.requireAtLeast(0));
       LHS += RHS;
     }
     assert(LHS == E);
@@ -165,11 +161,9 @@ void doConcatSourceAllocTest(ConcatOperatorTestcase const& TC)
     InputIter RHS(R);
     InputIter REnd(StrEnd(R));
     {
-      RequireAllocationGuard g(0); // require "at least zero" allocations by default
-#if TEST_SUPPORTS_LIBRARY_INTERNAL_ALLOCATIONS
-      if (ExpectNoAllocations)
-        g.requireExactly(0);
-#endif
+      RequireAllocationGuard g;
+      if (DisableAllocations) g.requireExactly(0);
+      else TEST_ONLY_WIN32_DLL(g.requireAtLeast(0));
       LHS.concat(RHS, REnd);
     }
     assert(LHS == E);
@@ -328,7 +322,7 @@ void test_sfinae() {
     static_assert(has_concat<It>(), "");
   }
   {
-    using It = cpp17_output_iterator<const char*>;
+    using It = output_iterator<const char*>;
     static_assert(!has_concat<It>(), "");
   }
   {
@@ -362,9 +356,7 @@ int main(int, char**)
       assert(&Ref == &LHS);
     }
     doConcatSourceTest<char>    (TC);
-#ifndef TEST_HAS_NO_WIDE_CHARACTERS
     doConcatSourceTest<wchar_t> (TC);
-#endif
     doConcatSourceTest<char16_t>(TC);
     doConcatSourceTest<char32_t>(TC);
   }
@@ -395,15 +387,11 @@ int main(int, char**)
       assert(LHS == E);
     }
     LIBCPP_ONLY(doConcatSourceAllocTest<char>(TC));
-#ifndef TEST_HAS_NO_WIDE_CHARACTERS
     LIBCPP_ONLY(doConcatSourceAllocTest<wchar_t>(TC));
-#endif
   }
   for (auto const& TC : CharTestCases) {
     doConcatECharTest<char>(TC);
-#ifndef TEST_HAS_NO_WIDE_CHARACTERS
     doConcatECharTest<wchar_t>(TC);
-#endif
     doConcatECharTest<char16_t>(TC);
     doConcatECharTest<char32_t>(TC);
   }

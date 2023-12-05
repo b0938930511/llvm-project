@@ -10,8 +10,9 @@ from lldbsuite.test import lldbutil
 
 from functionalities.breakpoint.hardware_breakpoints.base import *
 
-
 class BreakpointLocationsTestCase(HardwareBreakpointTestBase):
+    mydir = TestBase.compute_mydir(__file__)
+
     @skipIf(oslist=["linux"], archs=["arm"])
     def supports_hw_breakpoints(self):
         return super().supports_hw_breakpoints()
@@ -33,8 +34,7 @@ class BreakpointLocationsTestCase(HardwareBreakpointTestBase):
         self.build()
 
         _, _, thread, _ = lldbutil.run_to_line_breakpoint(
-            self, lldb.SBFileSpec("main.c"), 1
-        )
+            self, lldb.SBFileSpec("main.c"), 1)
 
         self.runCmd("settings set target.require-hardware-breakpoint true")
 
@@ -44,11 +44,10 @@ class BreakpointLocationsTestCase(HardwareBreakpointTestBase):
 
         # Ensure we fail when stepping through the API.
         error = lldb.SBError()
-        thread.StepInto("", 4, error)
+        thread.StepInto('', 4, error)
         self.assertTrue(error.Fail())
-        self.assertTrue(
-            "Could not create hardware breakpoint for thread plan" in error.GetCString()
-        )
+        self.assertTrue("Could not create hardware breakpoint for thread plan"
+                        in error.GetCString())
 
     @expectedFailureIfFn(supports_hw_breakpoints)
     def test_step_out(self):
@@ -56,8 +55,7 @@ class BreakpointLocationsTestCase(HardwareBreakpointTestBase):
         self.build()
 
         _, _, thread, _ = lldbutil.run_to_line_breakpoint(
-            self, lldb.SBFileSpec("main.c"), 1
-        )
+            self, lldb.SBFileSpec("main.c"), 1)
 
         self.runCmd("settings set target.require-hardware-breakpoint true")
 
@@ -68,9 +66,8 @@ class BreakpointLocationsTestCase(HardwareBreakpointTestBase):
         error = lldb.SBError()
         thread.StepOut(error)
         self.assertTrue(error.Fail())
-        self.assertTrue(
-            "Could not create hardware breakpoint for thread plan" in error.GetCString()
-        )
+        self.assertTrue("Could not create hardware breakpoint for thread plan"
+                        in error.GetCString())
 
     @expectedFailureIfFn(supports_hw_breakpoints)
     def test_step_over(self):
@@ -78,8 +75,7 @@ class BreakpointLocationsTestCase(HardwareBreakpointTestBase):
         self.build()
 
         _, _, thread, _ = lldbutil.run_to_line_breakpoint(
-            self, lldb.SBFileSpec("main.c"), 7
-        )
+            self, lldb.SBFileSpec("main.c"), 7)
 
         self.runCmd("settings set target.require-hardware-breakpoint true")
 
@@ -87,8 +83,9 @@ class BreakpointLocationsTestCase(HardwareBreakpointTestBase):
         self.expect(
             "thread step-over",
             error=True,
-            substrs=["error: Could not create hardware breakpoint for thread plan."],
-        )
+            substrs=[
+                'error: Could not create hardware breakpoint for thread plan.'
+            ])
 
     @expectedFailureIfFn(supports_hw_breakpoints)
     def test_step_until(self):
@@ -96,8 +93,7 @@ class BreakpointLocationsTestCase(HardwareBreakpointTestBase):
         self.build()
 
         _, _, thread, _ = lldbutil.run_to_line_breakpoint(
-            self, lldb.SBFileSpec("main.c"), 7
-        )
+            self, lldb.SBFileSpec("main.c"), 7)
 
         self.runCmd("settings set target.require-hardware-breakpoint true")
 
@@ -106,6 +102,5 @@ class BreakpointLocationsTestCase(HardwareBreakpointTestBase):
         # Ensure we fail when stepping through the API.
         error = thread.StepOverUntil(lldb.SBFrame(), lldb.SBFileSpec(), 5)
         self.assertTrue(error.Fail())
-        self.assertTrue(
-            "Could not create hardware breakpoint for thread plan" in error.GetCString()
-        )
+        self.assertTrue("Could not create hardware breakpoint for thread plan"
+                        in error.GetCString())

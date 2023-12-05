@@ -19,59 +19,59 @@ static int g4; // expected-error{{static declaration of 'g4' follows non-static 
 __private_extern__ int g5; // expected-note{{previous declaration}}
 static int g5; // expected-error{{static declaration of 'g5' follows non-static declaration}}
 
-void f0(void) {
+void f0() {
   int g6; // expected-note {{previous}}
   extern int g6; // expected-error {{extern declaration of 'g6' follows non-extern declaration}}
 }
 
-void f1(void) {
+void f1() {
   int g7; // expected-note {{previous}}
   __private_extern__ int g7; // expected-error {{extern declaration of 'g7' follows non-extern declaration}}
 }
 
-void f2(void) {
+void f2() {
   extern int g8; // expected-note{{previous declaration}}
   int g8; // expected-error {{non-extern declaration of 'g8' follows extern declaration}}
 }
 
-void f3(void) {
+void f3() {
   __private_extern__ int g9; // expected-note{{previous declaration}}
   int g9; // expected-error {{non-extern declaration of 'g9' follows extern declaration}}
 }
 
-void f4(void) {
+void f4() {
   extern int g10;
   extern int g10;
 }
 
-void f5(void) {
+void f5() {
   __private_extern__ int g11;
   __private_extern__ int g11;
 }
 
-void f6(void) {
+void f6() {
   // FIXME: Diagnose
   extern int g12;
   __private_extern__ int g12;
 }
 
-void f7(void) {
+void f7() {
   // FIXME: Diagnose
   __private_extern__ int g13;
   extern int g13;
 }
 
 struct s0;
-void f8(void) {
+void f8() {
   extern struct s0 g14;
   __private_extern__ struct s0 g14;
 }
 struct s0 { int x; };
 
-void f9(void) {
-  extern int g15 = 0; // expected-error{{declaration of block scope identifier with linkage cannot have an initializer}}
+void f9() {
+  extern int g15 = 0; // expected-error{{'extern' variable cannot have an initializer}}
   // FIXME: linkage specifier in warning.
-  __private_extern__ int g16 = 0; // expected-error{{declaration of block scope identifier with linkage cannot have an initializer}}
+  __private_extern__ int g16 = 0; // expected-error{{'extern' variable cannot have an initializer}}
 }
 
 extern int g17;

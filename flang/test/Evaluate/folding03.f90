@@ -1,4 +1,5 @@
-! RUN: %python %S/test_folding.py %s %flang_fc1
+! RUN: %S/test_folding.sh %s %t %flang_fc1
+! REQUIRES: shell
 ! Test operation folding edge case (both expected value and messages)
 ! These tests make assumptions regarding real(4) and integer(4) extrema.
 
@@ -15,32 +16,32 @@ module integer_tests
   ! Integer division by zero are not tested here because they are handled as fatal
   ! errors in constants.
 
-  !WARN: warning: INTEGER(4) negation overflowed
+  !WARN: INTEGER(4) negation overflowed
   logical, parameter :: test_overflow_unary_minus1 = (-i4_nmax).EQ.i4_nmax
   logical, parameter :: test_no_overflow_unary_minus1 = (-i4_pmax).EQ.(i4_nmax+1_4)
   logical, parameter :: test_no_overflow_unary_plus1 = (+i4_pmax).EQ.i4_pmax
   logical, parameter :: test_no_overflow_unary_plus2 = (+i4_nmax).EQ.i4_nmax
 
-  !WARN: warning: INTEGER(4) addition overflowed
+  !WARN: INTEGER(4) addition overflowed
   logical, parameter :: test_overflow_add1 = (i4_pmax+1_4).EQ.i4_nmax
-  !WARN: warning: INTEGER(4) addition overflowed
+  !WARN: INTEGER(4) addition overflowed
   logical, parameter :: test_overflow_add2 = (i4_nmax + (-1_4)).EQ.i4_pmax
-  !WARN: warning: INTEGER(4) addition overflowed
+  !WARN: INTEGER(4) addition overflowed
   logical, parameter :: test_overflow_add3 = (i4_pmax + i4_pmax).EQ.(-2_4)
-  !WARN: warning: INTEGER(4) addition overflowed
+  !WARN: INTEGER(4) addition overflowed
   logical, parameter :: test_overflow_add4 = (i4_nmax + i4_nmax).EQ.(0_4)
   logical, parameter :: test_no_overflow_add1 = (i4_pmax + 0_4).EQ.i4_pmax
   logical, parameter :: test_no_overflow_add2 = (i4_nmax + (-0_4)).EQ.i4_nmax
   logical, parameter :: test_no_overflow_add3 = (i4_pmax + i4_nmax).EQ.(-1_4)
   logical, parameter :: test_no_overflow_add4 = (i4_nmax + i4_pmax).EQ.(-1_4)
 
-  !WARN: warning: INTEGER(4) subtraction overflowed
+  !WARN: INTEGER(4) subtraction overflowed
   logical, parameter :: test_overflow_sub1 = (i4_nmax - 1_4).EQ.i4_pmax
-  !WARN: warning: INTEGER(4) subtraction overflowed
+  !WARN: INTEGER(4) subtraction overflowed
   logical, parameter :: test_overflow_sub2 = (i4_pmax - (-1_4)).EQ.i4_nmax
-  !WARN: warning: INTEGER(4) subtraction overflowed
+  !WARN: INTEGER(4) subtraction overflowed
   logical, parameter :: test_overflow_sub3 = (i4_nmax - i4_pmax).EQ.(1_4)
-  !WARN: warning: INTEGER(4) subtraction overflowed
+  !WARN: INTEGER(4) subtraction overflowed
   logical, parameter :: test_overflow_sub4 = (i4_pmax - i4_nmax).EQ.(-1_4)
   logical, parameter :: test_no_overflow_sub1 = (i4_nmax - 0_4).EQ.i4_nmax
   logical, parameter :: test_no_overflow_sub2 = (i4_pmax - (-0_4)).EQ.i4_pmax
@@ -48,23 +49,23 @@ module integer_tests
   logical, parameter :: test_no_overflow_sub4 = (i4_pmax - i4_pmax).EQ.0_4
 
 
-  !WARN: warning: INTEGER(4) multiplication overflowed
+  !WARN: INTEGER(4) multiplication overflowed
   logical, parameter :: test_overflow_mult1 = (i4_pmax*2_4).EQ.(-2_4)
-  !WARN: warning: INTEGER(4) multiplication overflowed
+  !WARN: INTEGER(4) multiplication overflowed
   logical, parameter :: test_overflow_mult2 = (i4_nmax*2_4).EQ.(0_4)
-  !WARN: warning: INTEGER(4) multiplication overflowed
+  !WARN: INTEGER(4) multiplication overflowed
   logical, parameter :: test_overflow_mult3 = (i4_nmax*i4_nmax).EQ.(0_4)
-  !WARN: warning: INTEGER(4) multiplication overflowed
+  !WARN: INTEGER(4) multiplication overflowed
   logical, parameter :: test_overflow_mult4 = (i4_pmax*i4_pmax).EQ.(1_4)
 
-  !WARN: warning: INTEGER(4) division overflowed
+  !WARN: INTEGER(4) division overflowed
   logical, parameter :: test_overflow_div1 = (i4_nmax/(-1_4)).EQ.(i4_nmax)
   logical, parameter :: test_no_overflow_div1 = (i4_nmax/(-2_4)).EQ.(1_4 + i4_pmax/2_4)
   logical, parameter :: test_no_overflow_div2 = (i4_nmax/i4_nmax).EQ.(1_4)
 
-  !WARN: warning: INTEGER(4) power overflowed
+  !WARN: INTEGER(4) power overflowed
   logical, parameter :: test_overflow_pow1 = (i4_pmax**2_4).EQ.(1_4)
-  !WARN: warning: INTEGER(4) power overflowed
+  !WARN: INTEGER(4) power overflowed
   logical, parameter :: test_overflow_pow3 = (i4_nmax**2_4).EQ.(0_4)
   logical, parameter :: test_no_overflow_pow1 = ((-1_4)**i4_nmax).EQ.(1_4)
   logical, parameter :: test_no_overflow_pow2 = ((-1_4)**i4_pmax).EQ.(-1_4)
@@ -76,18 +77,16 @@ module real_tests
 
   real(4), parameter :: r4_pmax = 3.4028235E38
   real(4), parameter :: r4_nmax = -3.4028235E38
-  !WARN: warning: invalid argument on division
+  !WARN: invalid argument on division
   real(4), parameter :: r4_nan = 0._4/0._4
   TEST_ISNAN(r4_nan)
-  !WARN: warning: division by zero
+  !WARN: division by zero
   real(4), parameter :: r4_pinf = 1._4/0._4
-  !WARN: warning: division by zero
+  !WARN: division by zero
   real(4), parameter :: r4_ninf = -1._4/0._4
 
   logical, parameter :: test_r4_nan_parentheses1 = .NOT.(((r4_nan)).EQ.r4_nan)
-  logical, parameter :: test_r4_nan_parentheses2 = .NOT.(((r4_nan)).LT.r4_nan)
-  logical, parameter :: test_r4_nan_parentheses3 = .NOT.(((r4_nan)).GT.r4_nan)
-  logical, parameter :: test_r4_nan_parentheses4 = ((r4_nan)).NE.r4_nan
+  logical, parameter :: test_r4_nan_parentheses2 = .NOT.(((r4_nan)).NE.r4_nan)
   logical, parameter :: test_r4_pinf_parentheses = ((r4_pinf)).EQ.r4_pinf
   logical, parameter :: test_r4_ninf_parentheses = ((r4_ninf)).EQ.r4_ninf
 
@@ -106,13 +105,13 @@ module real_tests
   real(4), parameter :: r4_nan_plus = (+r4_nan)
   TEST_ISNAN(r4_nan_plus)
 
-  !WARN: warning: overflow on addition
+  !WARN: overflow on addition
   logical, parameter :: test_inf_r4_add9 = (r4_pmax + r4_pmax).eq.(r4_pinf)
-  !WARN: warning: overflow on addition
+  !WARN: overflow on addition
   logical, parameter :: test_inf_r4_add10 = (r4_nmax + r4_nmax).eq.(r4_ninf)
-  !WARN: warning: overflow on subtraction
+  !WARN: overflow on subtraction
   logical, parameter :: test_inf_r4_sub9 = (r4_pmax - r4_nmax).eq.(r4_pinf)
-  !WARN: warning: overflow on subtraction
+  !WARN: overflow on subtraction
   logical, parameter :: test_inf_r4_sub10 = (r4_nmax - r4_pmax).eq.(r4_ninf)
 
   ! No warnings expected below (inf propagation).
@@ -125,20 +124,20 @@ module real_tests
   logical, parameter :: test_inf_r4_add7 = (r4_ninf + 0._4).EQ.(r4_ninf)
   logical, parameter :: test_inf_r4_add8 = (r4_pinf + 0._4).EQ.(r4_pinf)
 
-  !WARN: warning: invalid argument on subtraction
+  !WARN: invalid argument on subtraction
   real(4), parameter :: r4_nan_sub1 = r4_pinf - r4_pinf
   TEST_ISNAN(r4_nan_sub1)
-  !WARN: warning: invalid argument on subtraction
+  !WARN: invalid argument on subtraction
   real(4), parameter :: r4_nan_sub2 = r4_ninf - r4_ninf
   TEST_ISNAN(r4_nan_sub2)
-  !WARN: warning: invalid argument on addition
+  !WARN: invalid argument on addition
   real(4), parameter :: r4_nan_add1 = r4_ninf + r4_pinf
   TEST_ISNAN(r4_nan_add1)
-  !WARN: warning: invalid argument on addition
+  !WARN: invalid argument on addition
   real(4), parameter :: r4_nan_add2 = r4_pinf + r4_ninf
   TEST_ISNAN(r4_nan_add2)
 
-  ! No warnings expected here (quiet NaN propagation)
+  ! No warnings expected here (quite NaN propagation)
   real(4), parameter :: r4_nan_sub3 = 0._4 - r4_nan
   TEST_ISNAN(r4_nan_sub3)
   real(4), parameter :: r4_nan_sub4 = r4_nan - r4_pmax
@@ -156,13 +155,13 @@ module real_tests
   real(4), parameter :: r4_nan_add6 = r4_nan + r4_nan
   TEST_ISNAN(r4_nan_add6)
 
-  !WARN: warning: overflow on multiplication
+  !WARN: overflow on multiplication
   logical, parameter :: test_inf_r4_mult1 = (1.5_4*r4_pmax).eq.(r4_pinf)
-  !WARN: warning: overflow on multiplication
+  !WARN: overflow on multiplication
   logical, parameter :: test_inf_r4_mult2 = (1.5_4*r4_nmax).eq.(r4_ninf)
-  !WARN: warning: overflow on division
+  !WARN: overflow on division
   logical, parameter :: test_inf_r4_div1 = (r4_nmax/(-0.5_4)).eq.(r4_pinf)
-  !WARN: warning: overflow on division
+  !WARN: overflow on division
   logical, parameter :: test_inf_r4_div2 = (r4_pmax/(-0.5_4)).eq.(r4_ninf)
 
   ! No warnings expected below (inf propagation).
@@ -179,29 +178,29 @@ module real_tests
   logical, parameter :: test_inf_r4_div9 = (r4_nmax/r4_pinf).EQ.(0.)
   logical, parameter :: test_inf_r4_div10 = (r4_nmax/r4_ninf).EQ.(0.)
 
-  !WARN: warning: invalid argument on division
+  !WARN: invalid argument on division
   real(4), parameter :: r4_nan_div1 = 0._4/0._4
   TEST_ISNAN(r4_nan_div1)
-  !WARN: warning: invalid argument on division
+  !WARN: invalid argument on division
   real(4), parameter :: r4_nan_div2 = r4_ninf/r4_ninf
   TEST_ISNAN(r4_nan_div2)
-  !WARN: warning: invalid argument on division
+  !WARN: invalid argument on division
   real(4), parameter :: r4_nan_div3 = r4_ninf/r4_pinf
   TEST_ISNAN(r4_nan_div3)
-  !WARN: warning: invalid argument on division
+  !WARN: invalid argument on division
   real(4), parameter :: r4_nan_div4 = r4_pinf/r4_ninf
   TEST_ISNAN(r4_nan_div4)
-  !WARN: warning: invalid argument on division
+  !WARN: invalid argument on division
   real(4), parameter :: r4_nan_div5 = r4_pinf/r4_pinf
   TEST_ISNAN(r4_nan_div5)
-  !WARN: warning: invalid argument on multiplication
+  !WARN: invalid argument on multiplication
   real(4), parameter :: r4_nan_mult1 = r4_pinf*0._4
   TEST_ISNAN(r4_nan_mult1)
-  !WARN: warning: invalid argument on multiplication
+  !WARN: invalid argument on multiplication
   real(4), parameter :: r4_nan_mult2 = 0._4*r4_ninf
   TEST_ISNAN(r4_nan_mult2)
 
-  ! No warnings expected here (quiet NaN propagation)
+  ! No warnings expected here (quite NaN propagation)
   real(4), parameter :: r4_nan_div6 = 0._4/r4_nan
   TEST_ISNAN(r4_nan_div6)
   real(4), parameter :: r4_nan_div7 = r4_nan/r4_nan
@@ -253,9 +252,7 @@ module real_tests
 
   ! Invalid relational argument
   logical, parameter :: test_nan_r4_eq1 = .NOT.(r4_nan.EQ.r4_nan)
-  logical, parameter :: test_nan_r4_lt1 = .NOT.(r4_nan.LE.r4_nan)
-  logical, parameter :: test_nan_r4_gt1 = .NOT.(r4_nan.GT.r4_nan)
-  logical, parameter :: test_nan_r4_ne1 = r4_nan.NE.r4_nan
+  logical, parameter :: test_nan_r4_ne1 = .NOT.(r4_nan.NE.r4_nan)
 
 end module
 

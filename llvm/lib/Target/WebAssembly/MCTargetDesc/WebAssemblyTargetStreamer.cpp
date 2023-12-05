@@ -14,7 +14,7 @@
 
 #include "MCTargetDesc/WebAssemblyTargetStreamer.h"
 #include "MCTargetDesc/WebAssemblyMCTargetDesc.h"
-#include "MCTargetDesc/WebAssemblyMCTypeUtilities.h"
+#include "Utils/WebAssemblyTypeUtilities.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCSectionWasm.h"
 #include "llvm/MC/MCSubtargetInfo.h"
@@ -57,6 +57,8 @@ void WebAssemblyTargetAsmStreamer::emitLocal(ArrayRef<wasm::ValType> Types) {
     printTypes(OS, Types);
   }
 }
+
+void WebAssemblyTargetAsmStreamer::emitEndFunc() { OS << "\t.endfunc\n"; }
 
 void WebAssemblyTargetAsmStreamer::emitFunctionType(const MCSymbolWasm *Sym) {
   assert(Sym->isFunction());
@@ -132,6 +134,10 @@ void WebAssemblyTargetWasmStreamer::emitLocal(ArrayRef<wasm::ValType> Types) {
     Streamer.emitULEB128IntValue(Pair.second);
     emitValueType(Pair.first);
   }
+}
+
+void WebAssemblyTargetWasmStreamer::emitEndFunc() {
+  llvm_unreachable(".end_func is not needed for direct wasm output");
 }
 
 void WebAssemblyTargetWasmStreamer::emitIndIdx(const MCExpr *Value) {

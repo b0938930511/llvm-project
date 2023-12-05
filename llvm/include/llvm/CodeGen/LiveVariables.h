@@ -37,7 +37,6 @@
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/TargetRegisterInfo.h"
 #include "llvm/InitializePasses.h"
-#include "llvm/PassRegistry.h"
 
 namespace llvm {
 
@@ -118,12 +117,17 @@ private:
   ///
   IndexedMap<VarInfo, VirtReg2IndexFunctor> VirtRegInfo;
 
+  /// PHIJoins - list of virtual registers that are PHI joins. These registers
+  /// may have multiple definitions, and they require special handling when
+  /// building live intervals.
+  SparseBitVector<> PHIJoins;
+
 private:   // Intermediate data structures
-  MachineFunction *MF = nullptr;
+  MachineFunction *MF;
 
-  MachineRegisterInfo *MRI = nullptr;
+  MachineRegisterInfo* MRI;
 
-  const TargetRegisterInfo *TRI = nullptr;
+  const TargetRegisterInfo *TRI;
 
   // PhysRegInfo - Keep track of which instruction was the last def of a
   // physical register. This is a purely local property, because all physical
@@ -147,7 +151,7 @@ private:   // Intermediate data structures
   bool HandlePhysRegKill(Register Reg, MachineInstr *MI);
 
   /// HandleRegMask - Call HandlePhysRegKill for all registers clobbered by Mask.
-  void HandleRegMask(const MachineOperand &, unsigned);
+  void HandleRegMask(const MachineOperand&);
 
   void HandlePhysRegUse(Register Reg, MachineInstr &MI);
   void HandlePhysRegDef(Register Reg, MachineInstr *MI,
@@ -170,22 +174,19 @@ private:   // Intermediate data structures
   /// is coming from.
   void analyzePHINodes(const MachineFunction& Fn);
 
-  void runOnInstr(MachineInstr &MI, SmallVectorImpl<unsigned> &Defs,
-                  unsigned NumRegs);
+  void runOnInstr(MachineInstr &MI, SmallVectorImpl<unsigned> &Defs);
 
   void runOnBlock(MachineBasicBlock *MBB, unsigned NumRegs);
 public:
 
   bool runOnMachineFunction(MachineFunction &MF) override;
 
+  /// RegisterDefIsDead - Return true if the specified instruction defines the
+  /// specified register, but that definition is dead.
+  bool RegisterDefIsDead(MachineInstr &MI, Register Reg) const;
+
   //===--------------------------------------------------------------------===//
   //  API to update live variable information
-
-  /// Recompute liveness from scratch for a virtual register \p Reg that is
-  /// known to have a single def that dominates all uses. This can be useful
-  /// after removing some uses of \p Reg. It is not necessary for the whole
-  /// machine function to be in SSA form.
-  void recomputeForSingleDefVirtReg(Register Reg);
 
   /// replaceKillInstruction - Update register kill info by replacing a kill
   /// instruction with a new one.
@@ -211,7 +212,8 @@ public:
       return false;
 
     bool Removed = false;
-    for (MachineOperand &MO : MI.operands()) {
+    for (unsigned i = 0, e = MI.getNumOperands(); i != e; ++i) {
+      MachineOperand &MO = MI.getOperand(i);
       if (MO.isReg() && MO.isKill() && MO.getReg() == Reg) {
         MO.setIsKill(false);
         Removed = true;
@@ -246,7 +248,8 @@ public:
       return false;
 
     bool Removed = false;
-    for (MachineOperand &MO : MI.operands()) {
+    for (unsigned i = 0, e = MI.getNumOperands(); i != e; ++i) {
+      MachineOperand &MO = MI.getOperand(i);
       if (MO.isReg() && MO.isDef() && MO.getReg() == Reg) {
         MO.setIsDead(false);
         Removed = true;
@@ -298,6 +301,12 @@ public:
                    MachineBasicBlock *DomBB,
                    MachineBasicBlock *SuccBB,
                    std::vector<SparseBitVector<>> &LiveInSets);
+
+  /// isPHIJoin - Return true if Reg is a phi join register.
+  bool isPHIJoin(Register Reg) { return PHIJoins.test(Reg.id()); }
+
+  /// setPHIJoin - Mark Reg as a phi join register.
+  void setPHIJoin(Register Reg) { PHIJoins.set(Reg.id()); }
 };
 
 } // End llvm namespace

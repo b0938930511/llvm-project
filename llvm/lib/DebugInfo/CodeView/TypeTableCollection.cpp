@@ -8,10 +8,9 @@
 
 #include "llvm/DebugInfo/CodeView/TypeTableCollection.h"
 
-#include "llvm/DebugInfo/CodeView/CodeView.h"
+#include "llvm/DebugInfo/CodeView/CVTypeVisitor.h"
 #include "llvm/DebugInfo/CodeView/RecordName.h"
-#include "llvm/DebugInfo/CodeView/TypeIndex.h"
-#include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/BinaryStreamReader.h"
 
 using namespace llvm;
 using namespace llvm::codeview;
@@ -21,17 +20,17 @@ TypeTableCollection::TypeTableCollection(ArrayRef<ArrayRef<uint8_t>> Records)
   Names.resize(Records.size());
 }
 
-std::optional<TypeIndex> TypeTableCollection::getFirst() {
+Optional<TypeIndex> TypeTableCollection::getFirst() {
   if (empty())
-    return std::nullopt;
+    return None;
   return TypeIndex::fromArrayIndex(0);
 }
 
-std::optional<TypeIndex> TypeTableCollection::getNext(TypeIndex Prev) {
+Optional<TypeIndex> TypeTableCollection::getNext(TypeIndex Prev) {
   assert(contains(Prev));
   ++Prev;
   if (Prev.toArrayIndex() == size())
-    return std::nullopt;
+    return None;
   return Prev;
 }
 

@@ -174,12 +174,8 @@ struct JumpTable {
   /// check MBB.  This is when updating PHI nodes in successors.
   MachineBasicBlock *Default;
 
-  /// The debug location of the instruction this JumpTable was produced from.
-  std::optional<SDLoc> SL; // For SelectionDAG
-
-  JumpTable(unsigned R, unsigned J, MachineBasicBlock *M, MachineBasicBlock *D,
-            std::optional<SDLoc> SL)
-      : Reg(R), JTI(J), MBB(M), Default(D), SL(SL) {}
+  JumpTable(unsigned R, unsigned J, MachineBasicBlock *M, MachineBasicBlock *D)
+      : Reg(R), JTI(J), MBB(M), Default(D) {}
 };
 struct JumpTableHeader {
   APInt First;
@@ -187,12 +183,12 @@ struct JumpTableHeader {
   const Value *SValue;
   MachineBasicBlock *HeaderBB;
   bool Emitted;
-  bool FallthroughUnreachable = false;
+  bool OmitRangeCheck;
 
   JumpTableHeader(APInt F, APInt L, const Value *SV, MachineBasicBlock *H,
                   bool E = false)
       : First(std::move(F)), Last(std::move(L)), SValue(SV), HeaderBB(H),
-        Emitted(E) {}
+        Emitted(E), OmitRangeCheck(false) {}
 };
 using JumpTableBlock = std::pair<JumpTableHeader, JumpTable>;
 
@@ -222,14 +218,14 @@ struct BitTestBlock {
   BitTestInfo Cases;
   BranchProbability Prob;
   BranchProbability DefaultProb;
-  bool FallthroughUnreachable = false;
+  bool OmitRangeCheck;
 
   BitTestBlock(APInt F, APInt R, const Value *SV, unsigned Rg, MVT RgVT, bool E,
                bool CR, MachineBasicBlock *P, MachineBasicBlock *D,
                BitTestInfo C, BranchProbability Pr)
       : First(std::move(F)), Range(std::move(R)), SValue(SV), Reg(Rg),
         RegVT(RgVT), Emitted(E), ContiguousRange(CR), Parent(P), Default(D),
-        Cases(std::move(C)), Prob(Pr) {}
+        Cases(std::move(C)), Prob(Pr), OmitRangeCheck(false) {}
 };
 
 /// Return the range of values within a range.
@@ -241,11 +237,11 @@ uint64_t getJumpTableNumCases(const SmallVectorImpl<unsigned> &TotalCases,
                               unsigned First, unsigned Last);
 
 struct SwitchWorkListItem {
-  MachineBasicBlock *MBB = nullptr;
+  MachineBasicBlock *MBB;
   CaseClusterIt FirstCluster;
   CaseClusterIt LastCluster;
-  const ConstantInt *GE = nullptr;
-  const ConstantInt *LT = nullptr;
+  const ConstantInt *GE;
+  const ConstantInt *LT;
   BranchProbability DefaultProb;
 };
 using SwitchWorkList = SmallVector<SwitchWorkListItem, 4>;
@@ -274,13 +270,13 @@ public:
   std::vector<BitTestBlock> BitTestCases;
 
   void findJumpTables(CaseClusterVector &Clusters, const SwitchInst *SI,
-                      std::optional<SDLoc> SL, MachineBasicBlock *DefaultMBB,
+                      MachineBasicBlock *DefaultMBB,
                       ProfileSummaryInfo *PSI, BlockFrequencyInfo *BFI);
 
   bool buildJumpTable(const CaseClusterVector &Clusters, unsigned First,
                       unsigned Last, const SwitchInst *SI,
-                      const std::optional<SDLoc> &SL,
                       MachineBasicBlock *DefaultMBB, CaseCluster &JTCluster);
+
 
   void findBitTestClusters(CaseClusterVector &Clusters, const SwitchInst *SI);
 
@@ -296,9 +292,9 @@ public:
   virtual ~SwitchLowering() = default;
 
 private:
-  const TargetLowering *TLI = nullptr;
-  const TargetMachine *TM = nullptr;
-  const DataLayout *DL = nullptr;
+  const TargetLowering *TLI;
+  const TargetMachine *TM;
+  const DataLayout *DL;
   FunctionLoweringInfo &FuncInfo;
 };
 

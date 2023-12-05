@@ -40,7 +40,7 @@ struct Foo2 {
 
 void (^bptr)(void);
 
-int func(void) {
+int func() {
   __attribute__((__blocks__(byref))) struct Foo foo;
   ^{ foo.data = 0; }();
   __block struct Foo2 foo2;

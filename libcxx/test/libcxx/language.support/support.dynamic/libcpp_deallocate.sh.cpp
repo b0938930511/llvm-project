@@ -9,14 +9,24 @@
 // test libc++'s implementation of align_val_t, and the relevant new/delete
 // overloads in all dialects when -faligned-allocation is present.
 
-// Libc++ when built for z/OS doesn't contain the aligned allocation functions,
+// Libc++ defers to the underlying MSVC library to provide the new/delete
+// definitions, which does not yet provide aligned allocation
+// XFAIL: LIBCXX-WINDOWS-FIXME
+
+// The dylibs shipped before macosx10.13 do not contain the aligned allocation
+// functions, so trying to force using those with -faligned-allocation results
+// in a link error.
+// XFAIL: use_system_cxx_lib && target={{.+}}-apple-macosx10.{{9|10|11|12}}
+
+// Libcxx when built for z/OS doesn't contain the aligned allocation functions,
 // nor does the dynamic library shipped with z/OS.
 // UNSUPPORTED: target={{.+}}-zos{{.*}}
 
-// XFAIL: sanitizer-new-delete && !hwasan
+// AppleClang < 10 incorrectly warns that aligned allocation is not supported
+// even when it is supported.
+// UNSUPPORTED: apple-clang-9
 
-// TODO: Investigate this failure
-// UNSUPPORTED: ubsan
+// XFAIL: sanitizer-new-delete, ubsan
 
 // GCC doesn't support the aligned-allocation flags.
 // XFAIL: gcc
@@ -30,16 +40,12 @@
 // RUN: %{build} -fno-aligned-allocation -fno-sized-deallocation -DNO_ALIGN -DNO_SIZE
 // RUN: %{run}
 
-#include <cassert>
-#include <cstdlib>
 #include <new>
+#include <typeinfo>
+#include <string>
+#include <cassert>
 
 #include "test_macros.h"
-
-TEST_DIAGNOSTIC_PUSH
-TEST_CLANG_DIAGNOSTIC_IGNORED("-Wprivate-header")
-#include <__memory/aligned_alloc.h>
-TEST_DIAGNOSTIC_POP
 
 struct alloc_stats {
   alloc_stats() { reset(); }
@@ -101,7 +107,7 @@ void operator delete(void* p)TEST_NOEXCEPT {
 }
 
 #ifndef NO_SIZE
-void operator delete(void* p, std::size_t n)TEST_NOEXCEPT {
+void operator delete(void* p, size_t n)TEST_NOEXCEPT {
   ::free(p);
   stats.sized_called++;
   stats.last_size = n;
@@ -111,14 +117,14 @@ void operator delete(void* p, std::size_t n)TEST_NOEXCEPT {
 
 #ifndef NO_ALIGN
 void operator delete(void* p, std::align_val_t a)TEST_NOEXCEPT {
-  std::__libcpp_aligned_free(p);
+  ::free(p);
   stats.aligned_called++;
   stats.last_align = static_cast<int>(a);
   stats.last_size = -1;
 }
 
-void operator delete(void* p, std::size_t n, std::align_val_t a)TEST_NOEXCEPT {
-  std::__libcpp_aligned_free(p);
+void operator delete(void* p, size_t n, std::align_val_t a)TEST_NOEXCEPT {
+  ::free(p);
   stats.aligned_sized_called++;
   stats.last_align = static_cast<int>(a);
   stats.last_size = n;
@@ -128,12 +134,12 @@ void operator delete(void* p, std::size_t n, std::align_val_t a)TEST_NOEXCEPT {
 void test_libcpp_dealloc() {
   void* p = nullptr;
 #ifdef __STDCPP_DEFAULT_NEW_ALIGNMENT__
-  std::size_t over_align_val = __STDCPP_DEFAULT_NEW_ALIGNMENT__ * 2;
+  size_t over_align_val = __STDCPP_DEFAULT_NEW_ALIGNMENT__ * 2;
 #else
-  std::size_t over_align_val = TEST_ALIGNOF(std::max_align_t) * 2;
+  size_t over_align_val = TEST_ALIGNOF(std::max_align_t) * 2;
 #endif
-  std::size_t under_align_val = TEST_ALIGNOF(int);
-  std::size_t with_size_val = 2;
+  size_t under_align_val = TEST_ALIGNOF(int);
+  size_t with_size_val = 2;
 
   {
     std::__libcpp_deallocate_unsized(p, under_align_val);

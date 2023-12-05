@@ -37,7 +37,7 @@ namespace sys {
     /// The size as it was allocated. This is always greater or equal to the
     /// size that was originally requested.
     size_t allocatedSize() const { return AllocatedSize; }
-
+  
   private:
     void *Address;    ///< Address of first byte of memory area
     size_t AllocatedSize; ///< Size, in bytes of the memory area
@@ -148,22 +148,13 @@ namespace sys {
       return *this;
     }
     ~OwningMemoryBlock() {
-      if (M.base())
-        Memory::releaseMappedMemory(M);
+      Memory::releaseMappedMemory(M);
     }
     void *base() const { return M.base(); }
     /// The size as it was allocated. This is always greater or equal to the
     /// size that was originally requested.
     size_t allocatedSize() const { return M.allocatedSize(); }
     MemoryBlock getMemoryBlock() const { return M; }
-    std::error_code release() {
-      std::error_code EC;
-      if (M.base()) {
-        EC = Memory::releaseMappedMemory(M);
-        M = MemoryBlock();
-      }
-      return EC;
-    }
   private:
     MemoryBlock M;
   };

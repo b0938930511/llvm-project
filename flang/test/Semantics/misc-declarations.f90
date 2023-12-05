@@ -1,4 +1,5 @@
-! RUN: %python %S/test_errors.py %s %flang_fc1
+! RUN: %S/test_errors.sh %s %t %flang_fc1
+! REQUIRES: shell
 ! Miscellaneous constraint and requirement checking on declarations:
 ! - 8.5.6.2 & 8.5.6.3 constraints on coarrays
 ! - 8.5.19 constraints on the VOLATILE attribute
@@ -6,7 +7,7 @@
 module m
   !ERROR: 'mustbedeferred' is an ALLOCATABLE coarray and must have a deferred coshape
   real, allocatable :: mustBeDeferred[*]  ! C827
-  !ERROR: 'mustbeexplicit' is a non-ALLOCATABLE coarray and must have an explicit coshape
+  !ERROR: Component 'mustbeexplicit' is a non-ALLOCATABLE coarray and must have an explicit coshape
   real :: mustBeExplicit[:]  ! C828
   type :: hasCoarray
     real, allocatable :: coarray[:]
@@ -29,7 +30,7 @@ module m
     volatile :: coarrayComponent
   end subroutine
   subroutine C868(coarray,coarrayComponent)
-    real :: coarray[*]
+    real, volatile :: coarray[*]
     type(hasCoarray) :: coarrayComponent
     block
       !ERROR: VOLATILE attribute may not apply to a coarray accessed by USE or host association
@@ -38,8 +39,4 @@ module m
       volatile :: coarrayComponent
     end block
   end subroutine
-  subroutine C839(x)
-    !ERROR: Coarray 'x' may not be an assumed-rank array
-    real, intent(in) :: x(..)[*]
-  end
 end module

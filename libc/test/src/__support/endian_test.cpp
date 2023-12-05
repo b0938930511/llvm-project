@@ -7,26 +7,26 @@
 //===----------------------------------------------------------------------===//
 
 #include "src/__support/endian.h"
-#include "test/UnitTest/Test.h"
+#include "utils/UnitTest/Test.h"
 
-namespace LIBC_NAMESPACE {
+namespace __llvm_libc {
 
 struct LlvmLibcEndian : testing::Test {
   template <typename T> void check(const T original, const T swapped) {
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    EXPECT_EQ(Endian::to_little_endian(original), original);
-    EXPECT_EQ(Endian::to_big_endian(original), swapped);
+    EXPECT_EQ(Endian::ToLittleEndian(original), original);
+    EXPECT_EQ(Endian::ToBigEndian(original), swapped);
 #endif
 #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-    EXPECT_EQ(Endian::to_big_endian(original), original);
-    EXPECT_EQ(Endian::to_little_endian(original), swapped);
+    EXPECT_EQ(Endian::ToBigEndian(original), original);
+    EXPECT_EQ(Endian::ToLittleEndian(original), swapped);
 #endif
   }
 };
 
 TEST_F(LlvmLibcEndian, Field) {
-  EXPECT_EQ(Endian::IS_LITTLE, __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__);
-  EXPECT_EQ(Endian::IS_BIG, __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__);
+  EXPECT_EQ(Endian::isLittle, __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__);
+  EXPECT_EQ(Endian::isBig, __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__);
 }
 
 TEST_F(LlvmLibcEndian, uint8_t) {
@@ -52,4 +52,4 @@ TEST_F(LlvmLibcEndian, uint64_t) {
   check(original, swapped);
 }
 
-} // namespace LIBC_NAMESPACE
+} // namespace __llvm_libc

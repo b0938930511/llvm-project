@@ -9,8 +9,6 @@
 #ifndef MLIR_DIALECT_QUANT_UNIFORMSUPPORT_H_
 #define MLIR_DIALECT_QUANT_UNIFORMSUPPORT_H_
 
-#include <utility>
-
 #include "mlir/Dialect/Quant/QuantTypes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Types.h"
@@ -33,7 +31,7 @@ namespace quant {
 /// process.
 struct ExpressedToQuantizedConverter {
   /// Creates a converter for the given input type.
-  static ExpressedToQuantizedConverter forInputType(Type inputType);
+  static const ExpressedToQuantizedConverter forInputType(Type inputType);
 
   /// Converts the inputType to be based on the given elemental type,
   /// returning the new type (or nullptr and emit an error on failure).
@@ -67,7 +65,7 @@ public:
             static_cast<double>(uniformType.getStorageTypeMin()),
             static_cast<double>(uniformType.getStorageTypeMax()),
             uniformType.getStorageTypeIntegralWidth(), uniformType.isSigned()) {
-    assert(isa<FloatType>(uniformType.getExpressedType()));
+    assert(uniformType.getExpressedType().isa<FloatType>());
     assert(uniformType.getStorageType().isSignlessInteger());
   }
 
@@ -81,8 +79,7 @@ public:
         roundMode(APFloat::rmNearestTiesToAway) {}
 
   UniformQuantizedValueConverter(double scale, double zeroPoint,
-                                 const APFloat &clampMin,
-                                 const APFloat &clampMax,
+                                 APFloat clampMin, APFloat clampMax,
                                  uint32_t storageBitWidth, bool isSigned)
       : scale(scale), zeroPoint(zeroPoint), clampMin(clampMin),
         clampMax(clampMax), scaleDouble(scale), zeroPointDouble(zeroPoint),
@@ -119,11 +116,11 @@ public:
   }
 
   int64_t quantizeFloatToInt64(APFloat expressedValue) const {
-    APInt qValue = quantizeFloatToInt(std::move(expressedValue));
+    APInt qValue = quantizeFloatToInt(expressedValue);
     return isSigned ? qValue.getSExtValue() : qValue.getZExtValue();
   }
 
-  virtual ~UniformQuantizedValueConverter() = default;
+  virtual ~UniformQuantizedValueConverter() {}
 
 private:
   // An optimized implementation to quantize f32 to i8/u8 with C++ native
@@ -171,7 +168,7 @@ private:
 
 /// An utility class to quantize an attribute by the per-axis quantization
 /// parameters. The size of the quantization dim in the converted elements
-/// attribute should match the size of scales/zeroPoints vectors in the
+/// attribute should matche the size of of scales/zeroPoints vectors in the
 /// quantization parameters.
 class UniformQuantizedPerAxisValueConverter {
 public:
@@ -184,7 +181,7 @@ public:
         storageBitWidth(uniformType.getStorageTypeIntegralWidth()),
         isSigned(uniformType.isSigned()),
         quantizationDim(uniformType.getQuantizedDimension()) {
-    assert(isa<FloatType>(uniformType.getExpressedType()));
+    assert(uniformType.getExpressedType().isa<FloatType>());
     assert(uniformType.getStorageType().isSignlessInteger());
     assert(scales.size() == zeroPoints.size());
   }

@@ -14,27 +14,24 @@
 #include <cassert>
 
 #include "test_macros.h"
-#include "unique_ptr_test_helper.h"
 
-TEST_CONSTEXPR_CXX23 bool test() {
-  std::default_delete<A> d;
-  A* p = new A;
-  if (!TEST_IS_CONSTANT_EVALUATED)
+struct A
+{
+    static int count;
+    A() {++count;}
+    A(const A&) {++count;}
+    ~A() {--count;}
+};
+
+int A::count = 0;
+
+int main(int, char**)
+{
+    std::default_delete<A> d;
+    A* p = new A;
     assert(A::count == 1);
-
-  d(p);
-
-  if (!TEST_IS_CONSTANT_EVALUATED)
+    d(p);
     assert(A::count == 0);
-
-  return true;
-}
-
-int main(int, char**) {
-  test();
-#if TEST_STD_VER >= 23
-  static_assert(test());
-#endif
 
   return 0;
 }

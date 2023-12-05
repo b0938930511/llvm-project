@@ -10,7 +10,6 @@
 
 #include "../common/TraceHTR.h"
 #include "lldb/Host/OptionParser.h"
-#include "lldb/Interpreter/CommandOptionArgumentTable.h"
 #include "lldb/Target/Process.h"
 #include "lldb/Target/Trace.h"
 
@@ -54,15 +53,15 @@ Status CommandObjectThreadTraceExportCTF::CommandOptions::SetOptionValue(
 void CommandObjectThreadTraceExportCTF::CommandOptions::OptionParsingStarting(
     ExecutionContext *execution_context) {
   m_file.clear();
-  m_thread_index = std::nullopt;
+  m_thread_index = None;
 }
 
 llvm::ArrayRef<OptionDefinition>
 CommandObjectThreadTraceExportCTF::CommandOptions::GetDefinitions() {
-  return llvm::ArrayRef(g_thread_trace_export_ctf_options);
+  return llvm::makeArrayRef(g_thread_trace_export_ctf_options);
 }
 
-void CommandObjectThreadTraceExportCTF::DoExecute(Args &command,
+bool CommandObjectThreadTraceExportCTF::DoExecute(Args &command,
                                                   CommandReturnObject &result) {
   const TraceSP &trace_sp = m_exe_ctx.GetTargetSP()->GetTrace();
   Process *process = m_exe_ctx.GetProcessPtr();
@@ -74,22 +73,20 @@ void CommandObjectThreadTraceExportCTF::DoExecute(Args &command,
 
   if (thread == nullptr) {
     const uint32_t num_threads = process->GetThreadList().GetSize();
-    size_t tid = m_options.m_thread_index.value_or(LLDB_INVALID_THREAD_ID);
+    size_t tid = m_options.m_thread_index ? *m_options.m_thread_index
+                                          : LLDB_INVALID_THREAD_ID;
     result.AppendErrorWithFormatv(
         "Thread index {0} is out of range (valid values are 1 - {1}).\n", tid,
         num_threads);
+    return false;
   } else {
-    auto do_work = [&]() -> Error {
-      Expected<TraceCursorSP> cursor = trace_sp->CreateNewCursor(*thread);
-      if (!cursor)
-        return cursor.takeError();
-      TraceHTR htr(*thread, **cursor);
-      htr.ExecutePasses();
-      return htr.Export(m_options.m_file);
-    };
-
-    if (llvm::Error err = do_work()) {
+    TraceHTR htr(*thread, *trace_sp->GetCursor(*thread));
+    htr.ExecutePasses();
+    if (llvm::Error err = htr.Export(m_options.m_file)) {
       result.AppendErrorWithFormat("%s\n", toString(std::move(err)).c_str());
+      return false;
+    } else {
+      return true;
     }
   }
 }

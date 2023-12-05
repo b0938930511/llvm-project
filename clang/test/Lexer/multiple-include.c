@@ -11,7 +11,7 @@
 #include "multiple-include.c"
 #undef XVID_AUTO_INCLUDE
 
-typedef void ff(void);
+typedef void ff();
 typedef struct { ff *a;} S;
 
 S s = { H_Pass_8_C };
@@ -21,7 +21,7 @@ S s = { H_Pass_8_C };
 #if defined(XVID_AUTO_INCLUDE) && defined(REFERENCE_CODE)
 #elif defined(XVID_AUTO_INCLUDE) && !defined(REFERENCE_CODE)
 
-static void FUNC_H(void){};
+static void FUNC_H(){};
 #undef FUNC_H
 
 #endif

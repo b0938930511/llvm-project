@@ -4,12 +4,10 @@ static_library("Passes") {
     "//llvm/lib/Analysis",
     "//llvm/lib/CodeGen",
     "//llvm/lib/IR",
-    "//llvm/lib/IRPrinter",
     "//llvm/lib/Support",
     "//llvm/lib/Target",
     "//llvm/lib/Transforms/AggressiveInstCombine",
     "//llvm/lib/Transforms/Coroutines",
-    "//llvm/lib/Transforms/HipStdPar",
     "//llvm/lib/Transforms/IPO",
     "//llvm/lib/Transforms/InstCombine",
     "//llvm/lib/Transforms/Instrumentation",
@@ -19,10 +17,8 @@ static_library("Passes") {
     "//llvm/lib/Transforms/Vectorize",
   ]
   sources = [
-    "OptimizationLevel.cpp",
     "PassBuilder.cpp",
     "PassBuilderBindings.cpp",
-    "PassBuilderPipelines.cpp",
     "PassPlugin.cpp",
     "StandardInstrumentations.cpp",
   ]

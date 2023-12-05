@@ -24,7 +24,7 @@ typedef unsigned int size_t;
 
 @class NSString;
 
-int main(void) {
+int main() {
   NSMutableArray<P> * array;
   id oldObject = array[10];
  

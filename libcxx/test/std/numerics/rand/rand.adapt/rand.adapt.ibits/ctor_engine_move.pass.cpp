@@ -14,9 +14,7 @@
 // explicit independent_bits_engine(const Engine& e);
 
 #include <random>
-
 #include <cassert>
-#include <utility>
 
 #include "test_macros.h"
 

@@ -6,7 +6,7 @@
 ; Do the import now. Ensures that the importer handles an external call
 ; from imported callanalias() to a function that is defined already in
 ; the dest module, but as an alias.
-; RUN: opt -passes=function-import -summary-file %t3.thinlto.bc %t.bc -S | FileCheck %s
+; RUN: opt -function-import -summary-file %t3.thinlto.bc %t.bc -S | FileCheck %s
 
 define i32 @main() #0 {
 entry:
@@ -14,7 +14,7 @@ entry:
   ret i32 0
 }
 
-@analias = alias void (), ptr @globalfunc
+@analias = alias void (), void ()* @globalfunc
 
 define void @globalfunc() #0 {
 entry:

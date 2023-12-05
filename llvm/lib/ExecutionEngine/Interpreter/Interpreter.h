@@ -37,7 +37,7 @@ class AllocaHolder {
   std::vector<void *> Allocations;
 
 public:
-  AllocaHolder() = default;
+  AllocaHolder() {}
 
   // Make this type move-only.
   AllocaHolder(AllocaHolder &&) = default;
@@ -224,6 +224,8 @@ private:  // Helper functions
                                    ExecutionContext &SF);
   GenericValue executeBitCastInst(Value *SrcVal, Type *DstTy,
                                   ExecutionContext &SF);
+  GenericValue executeCastOperation(Instruction::CastOps opcode, Value *SrcVal,
+                                    Type *Ty, ExecutionContext &SF);
   void popStackAndReturnValueToCaller(Type *RetTy, GenericValue Result);
 
 };

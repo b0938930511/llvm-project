@@ -20,21 +20,12 @@
 struct A {
   int i_;
 
-  TEST_CONSTEXPR_CXX23 A() : i_(7) {}
+  A() : i_(7) {}
 };
 
-TEST_CONSTEXPR_CXX23 bool test() {
+int main(int, char**) {
   std::unique_ptr<A> p(new A);
   assert(p->i_ == 7);
-
-  return true;
-}
-
-int main(int, char**) {
-  test();
-#if TEST_STD_VER >= 23
-  static_assert(test());
-#endif
 
   return 0;
 }

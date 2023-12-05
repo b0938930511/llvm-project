@@ -13,7 +13,9 @@
 using namespace clang::ast_matchers;
 using namespace clang::ast_matchers::internal;
 
-namespace clang::tidy::hicpp {
+namespace clang {
+namespace tidy {
+namespace hicpp {
 
 SignedBitwiseCheck::SignedBitwiseCheck(StringRef Name,
                                        ClangTidyContext *Context)
@@ -78,24 +80,26 @@ void SignedBitwiseCheck::check(const MatchFinder::MatchResult &Result) {
          "No signed operand found in problematic bitwise operations");
 
   bool IsUnary = false;
-  SourceLocation OperatorLoc;
+  SourceLocation Location;
 
   if (const auto *UnaryOp = N.getNodeAs<UnaryOperator>("unary-signed")) {
     IsUnary = true;
-    OperatorLoc = UnaryOp->getOperatorLoc();
+    Location = UnaryOp->getBeginLoc();
   } else {
     if (const auto *BinaryOp =
             N.getNodeAs<BinaryOperator>("binary-no-sign-interference"))
-      OperatorLoc = BinaryOp->getOperatorLoc();
+      Location = BinaryOp->getBeginLoc();
     else if (const auto *BinaryOp =
                  N.getNodeAs<BinaryOperator>("binary-sign-interference"))
-      OperatorLoc = BinaryOp->getOperatorLoc();
+      Location = BinaryOp->getBeginLoc();
     else
       llvm_unreachable("unexpected matcher result");
   }
-  diag(SignedOperand->getBeginLoc(), "use of a signed integer operand with a "
-                                     "%select{binary|unary}0 bitwise operator")
-      << IsUnary << SignedOperand->getSourceRange() << OperatorLoc;
+  diag(Location, "use of a signed integer operand with a "
+                 "%select{binary|unary}0 bitwise operator")
+      << IsUnary << SignedOperand->getSourceRange();
 }
 
-} // namespace clang::tidy::hicpp
+} // namespace hicpp
+} // namespace tidy
+} // namespace clang

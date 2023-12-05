@@ -23,6 +23,9 @@
 
 namespace llvm {
 
+class BinaryStreamReader;
+class BinaryStreamWriter;
+
 namespace pdb {
 
 Error readSparseBitVector(BinaryStreamReader &Stream, SparseBitVector<> &V);
@@ -35,7 +38,6 @@ class HashTableIterator
     : public iterator_facade_base<HashTableIterator<ValueT>,
                                   std::forward_iterator_tag,
                                   const std::pair<uint32_t, ValueT>> {
-  using BaseT = typename HashTableIterator::iterator_facade_base;
   friend HashTable<ValueT>;
 
   HashTableIterator(const HashTable<ValueT> &Map, uint32_t Index,
@@ -74,7 +76,9 @@ public:
 
   // Implement postfix op++ in terms of prefix op++ by using the superclass
   // implementation.
-  using BaseT::operator++;
+  using iterator_facade_base<HashTableIterator<ValueT>,
+                             std::forward_iterator_tag,
+                             const std::pair<uint32_t, ValueT>>::operator++;
   HashTableIterator &operator++() {
     while (Index < Map->Buckets.size()) {
       ++Index;
@@ -218,7 +222,7 @@ public:
   const_iterator find_as(const Key &K, TraitsT &Traits) const {
     uint32_t H = Traits.hashLookupKey(K) % capacity();
     uint32_t I = H;
-    std::optional<uint32_t> FirstUnused;
+    Optional<uint32_t> FirstUnused;
     do {
       if (isPresent(I)) {
         if (Traits.storageKeyToLookupKey(Buckets[I].first) == K)
@@ -248,7 +252,7 @@ public:
   /// from a real key to an internal key.
   template <typename Key, typename TraitsT>
   bool set_as(const Key &K, ValueT V, TraitsT &Traits) {
-    return set_as_internal(K, std::move(V), Traits, std::nullopt);
+    return set_as_internal(K, std::move(V), Traits, None);
   }
 
   template <typename Key, typename TraitsT>
@@ -271,7 +275,7 @@ private:
   /// from a real key to an internal key.
   template <typename Key, typename TraitsT>
   bool set_as_internal(const Key &K, ValueT V, TraitsT &Traits,
-                       std::optional<uint32_t> InternalKey) {
+                       Optional<uint32_t> InternalKey) {
     auto Entry = find_as(K, Traits);
     if (Entry != end()) {
       assert(isPresent(Entry.index()));

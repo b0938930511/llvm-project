@@ -1,18 +1,6 @@
 add_mlir_dialect_library(MLIRMemRefTransforms
-  AllocationOpInterfaceImpl.cpp
-  ComposeSubView.cpp
-  ExpandOps.cpp
-  ExpandRealloc.cpp
-  ExpandStridedMetadata.cpp
-  EmulateWideInt.cpp
-  EmulateNarrowType.cpp
-  ExtractAddressComputations.cpp
-  FoldMemRefAliasOps.cpp
-  IndependenceTransforms.cpp
-  MultiBuffer.cpp
-  NormalizeMemRefs.cpp
+  FoldSubViewOps.cpp
   ResolveShapedTypeResultDims.cpp
-  RuntimeOpVerification.cpp
 
   ADDITIONAL_HEADER_DIRS
   ${MLIR_MAIN_INCLUDE_DIR}/mlir/Dialect/MemRef
@@ -21,23 +9,13 @@ add_mlir_dialect_library(MLIRMemRefTransforms
   MLIRMemRefPassIncGen
 
   LINK_LIBS PUBLIC
-  MLIRAffineDialect
-  MLIRAffineTransforms
-  MLIRAffineUtils
-  MLIRArithDialect
-  MLIRArithTransforms
-  MLIRBufferizationDialect
-  MLIRDialectUtils
-  MLIRFuncDialect
-  MLIRGPUDialect
+  MLIRAffine
   MLIRInferTypeOpInterface
-  MLIRLoopLikeInterface
-  MLIRMemRefDialect
-  MLIRNVGPUDialect
+  MLIRMemRef
   MLIRPass
-  MLIRTensorDialect
+  MLIRStandard
+  MLIRTensor
   MLIRTransforms
-  MLIRValueBoundsOpInterface
-  MLIRVectorDialect
+  MLIRVector
 )
 

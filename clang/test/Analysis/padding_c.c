@@ -176,7 +176,7 @@ struct HoldsOverlyAlignedChar { // expected-warning{{Excessive padding in 'struc
   char c2;
 };
 
-void internalStructFunc(void) {
+void internalStructFunc() {
   struct X { // expected-warning{{Excessive padding in 'struct X'}}
     char c1;
     int t;
@@ -185,7 +185,7 @@ void internalStructFunc(void) {
   struct X obj;
 }
 
-void typedefStructFunc(void) {
+void typedefStructFunc() {
   typedef struct { // expected-warning{{Excessive padding in 'S'}}
     char c1;
     int t;
@@ -194,7 +194,7 @@ void typedefStructFunc(void) {
   S obj;
 }
 
-void anonStructFunc(void) {
+void anonStructFunc() {
   struct { // expected-warning{{Excessive padding in 'struct (unnamed}}
     char c1;
     int t;
@@ -228,7 +228,7 @@ struct SmallArrayInFunc {
   char c2;
 };
 
-void arrayHolder(void) {
+void arrayHolder() {
   struct SmallArrayInFunc Arr[15];
 }
 
@@ -243,6 +243,6 @@ struct HoldsSmallArray {
   struct SmallArrayInStruct Field[20];
 } HoldsSmallArrayElt;
 
-void nestedPadding(void) {
+void nestedPadding() {
   struct HoldsSmallArray Arr[15];
 }

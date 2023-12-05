@@ -11,7 +11,6 @@
 
 #include "MCTargetDesc/CSKYFixupKinds.h"
 #include "llvm/MC/MCAsmBackend.h"
-#include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/MC/MCTargetOptions.h"
 
 namespace llvm {
@@ -20,7 +19,7 @@ class CSKYAsmBackend : public MCAsmBackend {
 
 public:
   CSKYAsmBackend(const MCSubtargetInfo &STI, const MCTargetOptions &OP)
-      : MCAsmBackend(llvm::endianness::little) {}
+      : MCAsmBackend(support::little) {}
 
   unsigned int getNumFixupKinds() const override {
     return CSKY::NumTargetFixupKinds;
@@ -40,20 +39,7 @@ public:
   void relaxInstruction(MCInst &Inst,
                         const MCSubtargetInfo &STI) const override;
 
-  bool mayNeedRelaxation(const MCInst &Inst,
-                         const MCSubtargetInfo &STI) const override;
-
-  bool fixupNeedsRelaxationAdvanced(const MCFixup &Fixup, bool Resolved,
-                                    uint64_t Value,
-                                    const MCRelaxableFragment *DF,
-                                    const MCAsmLayout &Layout,
-                                    const bool WasForced) const override;
-
-  bool writeNopData(raw_ostream &OS, uint64_t Count,
-                    const MCSubtargetInfo *STI) const override;
-
-  bool shouldForceRelocation(const MCAssembler &Asm, const MCFixup &Fixup,
-                             const MCValue &Target) override;
+  bool writeNopData(raw_ostream &OS, uint64_t Count) const override;
 
   std::unique_ptr<MCObjectTargetWriter>
   createObjectTargetWriter() const override;

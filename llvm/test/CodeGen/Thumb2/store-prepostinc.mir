@@ -5,41 +5,41 @@
   target datalayout = "e-m:e-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64"
   target triple = "thumbv7m-none-unknown-eabi"
 
-  define ptr @STR_pre4(ptr %p, i32 %v) { unreachable }
-  define ptr @STR_pre8(ptr %p, i32 %v) { unreachable }
-  define ptr @STR_pre255(ptr %p, i32 %v) { unreachable }
-  define ptr @STR_pre256(ptr %p, i32 %v) { unreachable }
+  define i8* @STR_pre4(i8* %p, i32 %v) { unreachable }
+  define i8* @STR_pre8(i8* %p, i32 %v) { unreachable }
+  define i8* @STR_pre255(i8* %p, i32 %v) { unreachable }
+  define i8* @STR_pre256(i8* %p, i32 %v) { unreachable }
 
-  define ptr @STRD_pre4(ptr %p, i32 %v) { unreachable }
-  define ptr @STRD_pre8(ptr %p, i32 %v) { unreachable }
-  define ptr @STRD_pre255(ptr %p, i32 %v) { unreachable }
-  define ptr @STRD_pre256(ptr %p, i32 %v) { unreachable }
-  define ptr @STRD_pre1020(ptr %p, i32 %v) { unreachable }
-  define ptr @STRD_pre1024(ptr %p, i32 %v) { unreachable }
-  define ptr @STRD_prem4(ptr %p, i32 %v) { unreachable }
-  define ptr @STRD_prem8(ptr %p, i32 %v) { unreachable }
-  define ptr @STRD_prem255(ptr %p, i32 %v) { unreachable }
-  define ptr @STRD_prem256(ptr %p, i32 %v) { unreachable }
-  define ptr @STRD_prem1020(ptr %p, i32 %v) { unreachable }
-  define ptr @STRD_prem1024(ptr %p, i32 %v) { unreachable }
+  define i8* @STRD_pre4(i8* %p, i32 %v) { unreachable }
+  define i8* @STRD_pre8(i8* %p, i32 %v) { unreachable }
+  define i8* @STRD_pre255(i8* %p, i32 %v) { unreachable }
+  define i8* @STRD_pre256(i8* %p, i32 %v) { unreachable }
+  define i8* @STRD_pre1020(i8* %p, i32 %v) { unreachable }
+  define i8* @STRD_pre1024(i8* %p, i32 %v) { unreachable }
+  define i8* @STRD_prem4(i8* %p, i32 %v) { unreachable }
+  define i8* @STRD_prem8(i8* %p, i32 %v) { unreachable }
+  define i8* @STRD_prem255(i8* %p, i32 %v) { unreachable }
+  define i8* @STRD_prem256(i8* %p, i32 %v) { unreachable }
+  define i8* @STRD_prem1020(i8* %p, i32 %v) { unreachable }
+  define i8* @STRD_prem1024(i8* %p, i32 %v) { unreachable }
 
-  define ptr @STR_post4(ptr %p, i32 %v) { unreachable }
-  define ptr @STR_post8(ptr %p, i32 %v) { unreachable }
-  define ptr @STR_post255(ptr %p, i32 %v) { unreachable }
-  define ptr @STR_post256(ptr %p, i32 %v) { unreachable }
+  define i8* @STR_post4(i8* %p, i32 %v) { unreachable }
+  define i8* @STR_post8(i8* %p, i32 %v) { unreachable }
+  define i8* @STR_post255(i8* %p, i32 %v) { unreachable }
+  define i8* @STR_post256(i8* %p, i32 %v) { unreachable }
 
-  define ptr @STRD_post4(ptr %p, i32 %v) { unreachable }
-  define ptr @STRD_post8(ptr %p, i32 %v) { unreachable }
-  define ptr @STRD_post255(ptr %p, i32 %v) { unreachable }
-  define ptr @STRD_post256(ptr %p, i32 %v) { unreachable }
-  define ptr @STRD_post1020(ptr %p, i32 %v) { unreachable }
-  define ptr @STRD_post1024(ptr %p, i32 %v) { unreachable }
-  define ptr @STRD_postm4(ptr %p, i32 %v) { unreachable }
-  define ptr @STRD_postm8(ptr %p, i32 %v) { unreachable }
-  define ptr @STRD_postm255(ptr %p, i32 %v) { unreachable }
-  define ptr @STRD_postm256(ptr %p, i32 %v) { unreachable }
-  define ptr @STRD_postm1020(ptr %p, i32 %v) { unreachable }
-  define ptr @STRD_postm1024(ptr %p, i32 %v) { unreachable }
+  define i8* @STRD_post4(i8* %p, i32 %v) { unreachable }
+  define i8* @STRD_post8(i8* %p, i32 %v) { unreachable }
+  define i8* @STRD_post255(i8* %p, i32 %v) { unreachable }
+  define i8* @STRD_post256(i8* %p, i32 %v) { unreachable }
+  define i8* @STRD_post1020(i8* %p, i32 %v) { unreachable }
+  define i8* @STRD_post1024(i8* %p, i32 %v) { unreachable }
+  define i8* @STRD_postm4(i8* %p, i32 %v) { unreachable }
+  define i8* @STRD_postm8(i8* %p, i32 %v) { unreachable }
+  define i8* @STRD_postm255(i8* %p, i32 %v) { unreachable }
+  define i8* @STRD_postm256(i8* %p, i32 %v) { unreachable }
+  define i8* @STRD_postm1020(i8* %p, i32 %v) { unreachable }
+  define i8* @STRD_postm1024(i8* %p, i32 %v) { unreachable }
 
 ...
 ---
@@ -55,9 +55,8 @@ body:             |
 
     ; CHECK-LABEL: name: STR_pre4
     ; CHECK: liveins: $r0, $r1
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: early-clobber $r0 = t2STR_PRE killed $r1, $r0, 4, 14 /* CC::al */, $noreg :: (store (s32))
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: early-clobber $r0 = t2STR_PRE killed $r1, $r0, 4, 14 /* CC::al */, $noreg :: (store (s32))
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     renamable $r0 = nuw t2ADDri killed renamable $r0, 4, 14 /* CC::al */, $noreg, $noreg
     t2STRi12 killed renamable $r1, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s32))
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -76,10 +75,9 @@ body:             |
 
     ; CHECK-LABEL: name: STR_pre8
     ; CHECK: liveins: $r0, $r1
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: renamable $r0 = nuw t2ADDri killed renamable $r0, 8, 14 /* CC::al */, $noreg, $noreg
-    ; CHECK-NEXT: t2STRi12 killed renamable $r1, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s32))
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: renamable $r0 = nuw t2ADDri killed renamable $r0, 8, 14 /* CC::al */, $noreg, $noreg
+    ; CHECK: t2STRi12 killed renamable $r1, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s32))
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     renamable $r0 = nuw t2ADDri killed renamable $r0, 8, 14 /* CC::al */, $noreg, $noreg
     t2STRi12 killed renamable $r1, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s32))
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -98,10 +96,9 @@ body:             |
 
     ; CHECK-LABEL: name: STR_pre255
     ; CHECK: liveins: $r0, $r1
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: renamable $r0 = nuw t2ADDri killed renamable $r0, 255, 14 /* CC::al */, $noreg, $noreg
-    ; CHECK-NEXT: t2STRi12 killed renamable $r1, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s32))
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: renamable $r0 = nuw t2ADDri killed renamable $r0, 255, 14 /* CC::al */, $noreg, $noreg
+    ; CHECK: t2STRi12 killed renamable $r1, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s32))
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     renamable $r0 = nuw t2ADDri killed renamable $r0, 255, 14 /* CC::al */, $noreg, $noreg
     t2STRi12 killed renamable $r1, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s32))
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -120,10 +117,9 @@ body:             |
 
     ; CHECK-LABEL: name: STR_pre256
     ; CHECK: liveins: $r0, $r1
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: renamable $r0 = nuw t2ADDri killed renamable $r0, 256, 14 /* CC::al */, $noreg, $noreg
-    ; CHECK-NEXT: t2STRi12 killed renamable $r1, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s32))
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: renamable $r0 = nuw t2ADDri killed renamable $r0, 256, 14 /* CC::al */, $noreg, $noreg
+    ; CHECK: t2STRi12 killed renamable $r1, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s32))
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     renamable $r0 = nuw t2ADDri killed renamable $r0, 256, 14 /* CC::al */, $noreg, $noreg
     t2STRi12 killed renamable $r1, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s32))
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -143,10 +139,9 @@ body:             |
 
     ; CHECK-LABEL: name: STRD_pre4
     ; CHECK: liveins: $r0, $r1, $r2
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: renamable $r0 = nuw t2ADDri killed renamable $r0, 4, 14 /* CC::al */, $noreg, $noreg
-    ; CHECK-NEXT: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: renamable $r0 = nuw t2ADDri killed renamable $r0, 4, 14 /* CC::al */, $noreg, $noreg
+    ; CHECK: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     renamable $r0 = nuw t2ADDri killed renamable $r0, 4, 14 /* CC::al */, $noreg, $noreg
     t2STRDi8 killed renamable $r1, killed renamable $r2, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -166,9 +161,8 @@ body:             |
 
     ; CHECK-LABEL: name: STRD_pre8
     ; CHECK: liveins: $r0, $r1, $r2
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: $r0 = t2STRD_PRE killed renamable $r1, killed renamable $r2, killed $r0, 8, 14 /* CC::al */, $noreg :: (store (s64))
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: $r0 = t2STRD_PRE killed renamable $r1, killed renamable $r2, killed $r0, 8, 14 /* CC::al */, $noreg :: (store (s64))
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     renamable $r0 = nuw t2ADDri killed renamable $r0, 8, 14 /* CC::al */, $noreg, $noreg
     t2STRDi8 killed renamable $r1, killed renamable $r2, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -188,10 +182,9 @@ body:             |
 
     ; CHECK-LABEL: name: STRD_pre255
     ; CHECK: liveins: $r0, $r1, $r2
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: renamable $r0 = nuw t2ADDri killed renamable $r0, 255, 14 /* CC::al */, $noreg, $noreg
-    ; CHECK-NEXT: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: renamable $r0 = nuw t2ADDri killed renamable $r0, 255, 14 /* CC::al */, $noreg, $noreg
+    ; CHECK: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     renamable $r0 = nuw t2ADDri killed renamable $r0, 255, 14 /* CC::al */, $noreg, $noreg
     t2STRDi8 killed renamable $r1, killed renamable $r2, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -211,10 +204,9 @@ body:             |
 
     ; CHECK-LABEL: name: STRD_pre256
     ; CHECK: liveins: $r0, $r1, $r2
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: renamable $r0 = nuw t2ADDri killed renamable $r0, 256, 14 /* CC::al */, $noreg, $noreg
-    ; CHECK-NEXT: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: renamable $r0 = nuw t2ADDri killed renamable $r0, 256, 14 /* CC::al */, $noreg, $noreg
+    ; CHECK: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     renamable $r0 = nuw t2ADDri killed renamable $r0, 256, 14 /* CC::al */, $noreg, $noreg
     t2STRDi8 killed renamable $r1, killed renamable $r2, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -234,10 +226,9 @@ body:             |
 
     ; CHECK-LABEL: name: STRD_pre1020
     ; CHECK: liveins: $r0, $r1, $r2
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: renamable $r0 = nuw t2ADDri killed renamable $r0, 1020, 14 /* CC::al */, $noreg, $noreg
-    ; CHECK-NEXT: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: renamable $r0 = nuw t2ADDri killed renamable $r0, 1020, 14 /* CC::al */, $noreg, $noreg
+    ; CHECK: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     renamable $r0 = nuw t2ADDri killed renamable $r0, 1020, 14 /* CC::al */, $noreg, $noreg
     t2STRDi8 killed renamable $r1, killed renamable $r2, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -257,10 +248,9 @@ body:             |
 
     ; CHECK-LABEL: name: STRD_pre1024
     ; CHECK: liveins: $r0, $r1, $r2
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: renamable $r0 = nuw t2ADDri killed renamable $r0, 1024, 14 /* CC::al */, $noreg, $noreg
-    ; CHECK-NEXT: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: renamable $r0 = nuw t2ADDri killed renamable $r0, 1024, 14 /* CC::al */, $noreg, $noreg
+    ; CHECK: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     renamable $r0 = nuw t2ADDri killed renamable $r0, 1024, 14 /* CC::al */, $noreg, $noreg
     t2STRDi8 killed renamable $r1, killed renamable $r2, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -280,10 +270,9 @@ body:             |
 
     ; CHECK-LABEL: name: STRD_prem4
     ; CHECK: liveins: $r0, $r1, $r2
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: renamable $r0 = nuw t2SUBri killed renamable $r0, 4, 14 /* CC::al */, $noreg, $noreg
-    ; CHECK-NEXT: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: renamable $r0 = nuw t2SUBri killed renamable $r0, 4, 14 /* CC::al */, $noreg, $noreg
+    ; CHECK: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     renamable $r0 = nuw t2SUBri killed renamable $r0, 4, 14 /* CC::al */, $noreg, $noreg
     t2STRDi8 killed renamable $r1, killed renamable $r2, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -303,9 +292,8 @@ body:             |
 
     ; CHECK-LABEL: name: STRD_prem8
     ; CHECK: liveins: $r0, $r1, $r2
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: $r0 = t2STRD_PRE killed renamable $r1, killed renamable $r2, killed $r0, -8, 14 /* CC::al */, $noreg :: (store (s64))
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: $r0 = t2STRD_PRE killed renamable $r1, killed renamable $r2, killed $r0, -8, 14 /* CC::al */, $noreg :: (store (s64))
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     renamable $r0 = nuw t2SUBri killed renamable $r0, 8, 14 /* CC::al */, $noreg, $noreg
     t2STRDi8 killed renamable $r1, killed renamable $r2, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -325,10 +313,9 @@ body:             |
 
     ; CHECK-LABEL: name: STRD_prem255
     ; CHECK: liveins: $r0, $r1, $r2
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: renamable $r0 = nuw t2SUBri killed renamable $r0, 255, 14 /* CC::al */, $noreg, $noreg
-    ; CHECK-NEXT: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: renamable $r0 = nuw t2SUBri killed renamable $r0, 255, 14 /* CC::al */, $noreg, $noreg
+    ; CHECK: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     renamable $r0 = nuw t2SUBri killed renamable $r0, 255, 14 /* CC::al */, $noreg, $noreg
     t2STRDi8 killed renamable $r1, killed renamable $r2, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -348,10 +335,9 @@ body:             |
 
     ; CHECK-LABEL: name: STRD_prem256
     ; CHECK: liveins: $r0, $r1, $r2
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: renamable $r0 = nuw t2SUBri killed renamable $r0, 256, 14 /* CC::al */, $noreg, $noreg
-    ; CHECK-NEXT: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: renamable $r0 = nuw t2SUBri killed renamable $r0, 256, 14 /* CC::al */, $noreg, $noreg
+    ; CHECK: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     renamable $r0 = nuw t2SUBri killed renamable $r0, 256, 14 /* CC::al */, $noreg, $noreg
     t2STRDi8 killed renamable $r1, killed renamable $r2, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -371,10 +357,9 @@ body:             |
 
     ; CHECK-LABEL: name: STRD_prem1020
     ; CHECK: liveins: $r0, $r1, $r2
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: renamable $r0 = nuw t2SUBri killed renamable $r0, 1020, 14 /* CC::al */, $noreg, $noreg
-    ; CHECK-NEXT: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: renamable $r0 = nuw t2SUBri killed renamable $r0, 1020, 14 /* CC::al */, $noreg, $noreg
+    ; CHECK: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     renamable $r0 = nuw t2SUBri killed renamable $r0, 1020, 14 /* CC::al */, $noreg, $noreg
     t2STRDi8 killed renamable $r1, killed renamable $r2, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -394,10 +379,9 @@ body:             |
 
     ; CHECK-LABEL: name: STRD_prem1024
     ; CHECK: liveins: $r0, $r1, $r2
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: renamable $r0 = nuw t2SUBri killed renamable $r0, 1024, 14 /* CC::al */, $noreg, $noreg
-    ; CHECK-NEXT: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: renamable $r0 = nuw t2SUBri killed renamable $r0, 1024, 14 /* CC::al */, $noreg, $noreg
+    ; CHECK: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     renamable $r0 = nuw t2SUBri killed renamable $r0, 1024, 14 /* CC::al */, $noreg, $noreg
     t2STRDi8 killed renamable $r1, killed renamable $r2, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -417,9 +401,8 @@ body:             |
 
     ; CHECK-LABEL: name: STR_post4
     ; CHECK: liveins: $r0, $r1
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: early-clobber $r0 = t2STR_POST killed $r1, $r0, 4, 14 /* CC::al */, $noreg :: (store (s32))
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: early-clobber $r0 = t2STR_POST killed $r1, $r0, 4, 14 /* CC::al */, $noreg :: (store (s32))
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     t2STRi12 killed renamable $r1, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s32))
     renamable $r0 = nuw t2ADDri killed renamable $r0, 4, 14 /* CC::al */, $noreg, $noreg
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -438,9 +421,8 @@ body:             |
 
     ; CHECK-LABEL: name: STR_post8
     ; CHECK: liveins: $r0, $r1
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: early-clobber $r0 = t2STR_POST killed $r1, $r0, 8, 14 /* CC::al */, $noreg :: (store (s32))
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: early-clobber $r0 = t2STR_POST killed $r1, $r0, 8, 14 /* CC::al */, $noreg :: (store (s32))
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     t2STRi12 killed renamable $r1, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s32))
     renamable $r0 = nuw t2ADDri killed renamable $r0, 8, 14 /* CC::al */, $noreg, $noreg
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -459,9 +441,9 @@ body:             |
 
     ; CHECK-LABEL: name: STR_post255
     ; CHECK: liveins: $r0, $r1
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: early-clobber $r0 = t2STR_POST killed $r1, $r0, 255, 14 /* CC::al */, $noreg :: (store (s32))
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: t2STRi12 killed renamable $r1, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s32))
+    ; CHECK: renamable $r0 = nuw t2ADDri killed renamable $r0, 255, 14 /* CC::al */, $noreg, $noreg
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     t2STRi12 killed renamable $r1, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s32))
     renamable $r0 = nuw t2ADDri killed renamable $r0, 255, 14 /* CC::al */, $noreg, $noreg
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -480,10 +462,9 @@ body:             |
 
     ; CHECK-LABEL: name: STR_post256
     ; CHECK: liveins: $r0, $r1
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: t2STRi12 killed renamable $r1, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s32))
-    ; CHECK-NEXT: renamable $r0 = nuw t2ADDri killed renamable $r0, 256, 14 /* CC::al */, $noreg, $noreg
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: t2STRi12 killed renamable $r1, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s32))
+    ; CHECK: renamable $r0 = nuw t2ADDri killed renamable $r0, 256, 14 /* CC::al */, $noreg, $noreg
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     t2STRi12 killed renamable $r1, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s32))
     renamable $r0 = nuw t2ADDri killed renamable $r0, 256, 14 /* CC::al */, $noreg, $noreg
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -503,9 +484,8 @@ body:             |
 
     ; CHECK-LABEL: name: STRD_post4
     ; CHECK: liveins: $r0, $r1, $r2
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: $r0 = t2STRD_POST killed renamable $r1, killed renamable $r2, killed $r0, 4, 14 /* CC::al */, $noreg :: (store (s64))
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: $r0 = t2STRD_POST killed renamable $r1, killed renamable $r2, killed $r0, 4, 14 /* CC::al */, $noreg :: (store (s64))
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     t2STRDi8 killed renamable $r1, killed renamable $r2, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
     renamable $r0 = nuw t2ADDri killed renamable $r0, 4, 14 /* CC::al */, $noreg, $noreg
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -525,9 +505,8 @@ body:             |
 
     ; CHECK-LABEL: name: STRD_post8
     ; CHECK: liveins: $r0, $r1, $r2
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: $r0 = t2STRD_POST killed renamable $r1, killed renamable $r2, killed $r0, 8, 14 /* CC::al */, $noreg :: (store (s64))
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: $r0 = t2STRD_POST killed renamable $r1, killed renamable $r2, killed $r0, 8, 14 /* CC::al */, $noreg :: (store (s64))
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     t2STRDi8 killed renamable $r1, killed renamable $r2, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
     renamable $r0 = nuw t2ADDri killed renamable $r0, 8, 14 /* CC::al */, $noreg, $noreg
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -547,10 +526,9 @@ body:             |
 
     ; CHECK-LABEL: name: STRD_post255
     ; CHECK: liveins: $r0, $r1, $r2
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
-    ; CHECK-NEXT: renamable $r0 = nuw t2ADDri killed renamable $r0, 255, 14 /* CC::al */, $noreg, $noreg
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
+    ; CHECK: renamable $r0 = nuw t2ADDri killed renamable $r0, 255, 14 /* CC::al */, $noreg, $noreg
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     t2STRDi8 killed renamable $r1, killed renamable $r2, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
     renamable $r0 = nuw t2ADDri killed renamable $r0, 255, 14 /* CC::al */, $noreg, $noreg
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -570,9 +548,8 @@ body:             |
 
     ; CHECK-LABEL: name: STRD_post256
     ; CHECK: liveins: $r0, $r1, $r2
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: $r0 = t2STRD_POST killed renamable $r1, killed renamable $r2, killed $r0, 256, 14 /* CC::al */, $noreg :: (store (s64))
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: $r0 = t2STRD_POST killed renamable $r1, killed renamable $r2, killed $r0, 256, 14 /* CC::al */, $noreg :: (store (s64))
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     t2STRDi8 killed renamable $r1, killed renamable $r2, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
     renamable $r0 = nuw t2ADDri killed renamable $r0, 256, 14 /* CC::al */, $noreg, $noreg
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -592,9 +569,8 @@ body:             |
 
     ; CHECK-LABEL: name: STRD_post1020
     ; CHECK: liveins: $r0, $r1, $r2
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: $r0 = t2STRD_POST killed renamable $r1, killed renamable $r2, killed $r0, 1020, 14 /* CC::al */, $noreg :: (store (s64))
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: $r0 = t2STRD_POST killed renamable $r1, killed renamable $r2, killed $r0, 1020, 14 /* CC::al */, $noreg :: (store (s64))
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     t2STRDi8 killed renamable $r1, killed renamable $r2, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
     renamable $r0 = nuw t2ADDri killed renamable $r0, 1020, 14 /* CC::al */, $noreg, $noreg
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -614,10 +590,9 @@ body:             |
 
     ; CHECK-LABEL: name: STRD_post1024
     ; CHECK: liveins: $r0, $r1, $r2
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
-    ; CHECK-NEXT: renamable $r0 = nuw t2ADDri killed renamable $r0, 1024, 14 /* CC::al */, $noreg, $noreg
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
+    ; CHECK: renamable $r0 = nuw t2ADDri killed renamable $r0, 1024, 14 /* CC::al */, $noreg, $noreg
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     t2STRDi8 killed renamable $r1, killed renamable $r2, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
     renamable $r0 = nuw t2ADDri killed renamable $r0, 1024, 14 /* CC::al */, $noreg, $noreg
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -637,9 +612,8 @@ body:             |
 
     ; CHECK-LABEL: name: STRD_postm4
     ; CHECK: liveins: $r0, $r1, $r2
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: $r0 = t2STRD_POST killed renamable $r1, killed renamable $r2, killed $r0, -4, 14 /* CC::al */, $noreg :: (store (s64))
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: $r0 = t2STRD_POST killed renamable $r1, killed renamable $r2, killed $r0, -4, 14 /* CC::al */, $noreg :: (store (s64))
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     t2STRDi8 killed renamable $r1, killed renamable $r2, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
     renamable $r0 = nuw t2SUBri killed renamable $r0, 4, 14 /* CC::al */, $noreg, $noreg
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -659,9 +633,8 @@ body:             |
 
     ; CHECK-LABEL: name: STRD_postm8
     ; CHECK: liveins: $r0, $r1, $r2
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: $r0 = t2STRD_POST killed renamable $r1, killed renamable $r2, killed $r0, -8, 14 /* CC::al */, $noreg :: (store (s64))
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: $r0 = t2STRD_POST killed renamable $r1, killed renamable $r2, killed $r0, -8, 14 /* CC::al */, $noreg :: (store (s64))
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     t2STRDi8 killed renamable $r1, killed renamable $r2, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
     renamable $r0 = nuw t2SUBri killed renamable $r0, 8, 14 /* CC::al */, $noreg, $noreg
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -681,10 +654,9 @@ body:             |
 
     ; CHECK-LABEL: name: STRD_postm255
     ; CHECK: liveins: $r0, $r1, $r2
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
-    ; CHECK-NEXT: renamable $r0 = nuw t2SUBri killed renamable $r0, 255, 14 /* CC::al */, $noreg, $noreg
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
+    ; CHECK: renamable $r0 = nuw t2SUBri killed renamable $r0, 255, 14 /* CC::al */, $noreg, $noreg
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     t2STRDi8 killed renamable $r1, killed renamable $r2, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
     renamable $r0 = nuw t2SUBri killed renamable $r0, 255, 14 /* CC::al */, $noreg, $noreg
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -704,9 +676,8 @@ body:             |
 
     ; CHECK-LABEL: name: STRD_postm256
     ; CHECK: liveins: $r0, $r1, $r2
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: $r0 = t2STRD_POST killed renamable $r1, killed renamable $r2, killed $r0, 256, 14 /* CC::al */, $noreg :: (store (s64))
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: $r0 = t2STRD_POST killed renamable $r1, killed renamable $r2, killed $r0, 256, 14 /* CC::al */, $noreg :: (store (s64))
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     t2STRDi8 killed renamable $r1, killed renamable $r2, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
     renamable $r0 = nuw t2ADDri killed renamable $r0, 256, 14 /* CC::al */, $noreg, $noreg
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -726,9 +697,8 @@ body:             |
 
     ; CHECK-LABEL: name: STRD_postm1020
     ; CHECK: liveins: $r0, $r1, $r2
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: $r0 = t2STRD_POST killed renamable $r1, killed renamable $r2, killed $r0, -1020, 14 /* CC::al */, $noreg :: (store (s64))
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: $r0 = t2STRD_POST killed renamable $r1, killed renamable $r2, killed $r0, -1020, 14 /* CC::al */, $noreg :: (store (s64))
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     t2STRDi8 killed renamable $r1, killed renamable $r2, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
     renamable $r0 = nuw t2SUBri killed renamable $r0, 1020, 14 /* CC::al */, $noreg, $noreg
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0
@@ -748,10 +718,9 @@ body:             |
 
     ; CHECK-LABEL: name: STRD_postm1024
     ; CHECK: liveins: $r0, $r1, $r2
-    ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
-    ; CHECK-NEXT: renamable $r0 = nuw t2SUBri killed renamable $r0, 1024, 14 /* CC::al */, $noreg, $noreg
-    ; CHECK-NEXT: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
+    ; CHECK: t2STRDi8 killed $r1, killed $r2, $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
+    ; CHECK: renamable $r0 = nuw t2SUBri killed renamable $r0, 1024, 14 /* CC::al */, $noreg, $noreg
+    ; CHECK: tBX_RET 14 /* CC::al */, $noreg, implicit $r0
     t2STRDi8 killed renamable $r1, killed renamable $r2, renamable $r0, 0, 14 /* CC::al */, $noreg :: (store (s64))
     renamable $r0 = nuw t2SUBri killed renamable $r0, 1024, 14 /* CC::al */, $noreg, $noreg
     tBX_RET 14 /* CC::al */, $noreg, implicit $r0

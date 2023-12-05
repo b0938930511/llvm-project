@@ -24,15 +24,15 @@ class Deleter {
   Deleter& operator=(Deleter&);
 
 public:
-  TEST_CONSTEXPR_CXX23 Deleter() : state_(0) {}
+  Deleter() : state_(0) {}
 
-  TEST_CONSTEXPR_CXX23 int state() const { return state_; }
+  int state() const { return state_; }
 
-  TEST_CONSTEXPR_CXX23 void operator()(void*) { ++state_; }
+  void operator()(void*) { ++state_; }
 };
 
 template <class T>
-TEST_CONSTEXPR_CXX23 void test_basic() {
+void test_basic() {
   Deleter d;
   assert(d.state() == 0);
   {
@@ -43,18 +43,9 @@ TEST_CONSTEXPR_CXX23 void test_basic() {
   assert(d.state() == 0);
 }
 
-TEST_CONSTEXPR_CXX23 bool test() {
+int main(int, char**) {
   test_basic<int>();
   test_basic<int[]>();
-
-  return true;
-}
-
-int main(int, char**) {
-  test();
-#if TEST_STD_VER >= 23
-  static_assert(test());
-#endif
 
   return 0;
 }

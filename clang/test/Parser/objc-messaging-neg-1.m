@@ -4,7 +4,7 @@
 +(void) foo:(int) a;
 @end
 
-int main(void) {
+int main() {
   id a;
   [a bla:0 6:7]; // expected-error {{expected ']'}}
   [A foo bar]; // expected-error {{expected ':'}}

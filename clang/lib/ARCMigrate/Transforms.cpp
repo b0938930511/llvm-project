@@ -25,7 +25,7 @@ using namespace trans;
 ASTTraverser::~ASTTraverser() { }
 
 bool MigrationPass::CFBridgingFunctionsDefined() {
-  if (!EnableCFBridgeFns)
+  if (!EnableCFBridgeFns.hasValue())
     EnableCFBridgeFns = SemaRef.isKnownName("CFBridgingRetain") &&
                         SemaRef.isKnownName("CFBridgingRelease");
   return *EnableCFBridgeFns;
@@ -95,9 +95,11 @@ bool trans::isPlusOne(const Expr *E) {
           ento::cocoa::isRefType(callE->getType(), "CF",
                                  FD->getIdentifier()->getName())) {
         StringRef fname = FD->getIdentifier()->getName();
-        if (fname.endswith("Retain") || fname.contains("Create") ||
-            fname.contains("Copy"))
+        if (fname.endswith("Retain") ||
+            fname.find("Create") != StringRef::npos ||
+            fname.find("Copy") != StringRef::npos) {
           return true;
+        }
       }
     }
   }
@@ -417,7 +419,7 @@ bool MigrationContext::rewritePropertyAttribute(StringRef fromAttr,
   if (tok.is(tok::r_paren))
     return false;
 
-  while (true) {
+  while (1) {
     if (tok.isNot(tok::raw_identifier)) return false;
     if (tok.getRawIdentifier() == fromAttr) {
       if (!toAttr.empty()) {

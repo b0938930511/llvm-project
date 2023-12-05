@@ -23,14 +23,14 @@
 
 template <int ID = 0>
 struct GenericDeleter {
-  TEST_CONSTEXPR_CXX23 void operator()(void*) const {}
+  void operator()(void*) const {}
 };
 
 template <int ID = 0>
 struct GenericConvertingDeleter {
   template <int OID>
-  TEST_CONSTEXPR_CXX23 GenericConvertingDeleter(GenericConvertingDeleter<OID>) {}
-  TEST_CONSTEXPR_CXX23 void operator()(void*) const {}
+  GenericConvertingDeleter(GenericConvertingDeleter<OID>) {}
+  void operator()(void*) const {}
 };
 
 template <class Templ, class Other>
@@ -50,35 +50,37 @@ using EnableIfSpecialization = typename std::enable_if<
 
 template <int ID>
 struct TrackingDeleter {
-  TEST_CONSTEXPR_CXX23 TrackingDeleter() : arg_type(&makeArgumentID<>()) {}
+  TrackingDeleter() : arg_type(&makeArgumentID<>()) {}
 
-  TEST_CONSTEXPR_CXX23 TrackingDeleter(TrackingDeleter const&) : arg_type(&makeArgumentID<TrackingDeleter const&>()) {}
+  TrackingDeleter(TrackingDeleter const&)
+      : arg_type(&makeArgumentID<TrackingDeleter const&>()) {}
 
-  TEST_CONSTEXPR_CXX23 TrackingDeleter(TrackingDeleter&&) : arg_type(&makeArgumentID<TrackingDeleter&&>()) {}
+  TrackingDeleter(TrackingDeleter&&)
+      : arg_type(&makeArgumentID<TrackingDeleter &&>()) {}
 
   template <class T, class = EnableIfSpecialization<TrackingDeleter, T> >
-  TEST_CONSTEXPR_CXX23 TrackingDeleter(T&&) : arg_type(&makeArgumentID<T&&>()) {}
+  TrackingDeleter(T&&) : arg_type(&makeArgumentID<T&&>()) {}
 
-  TEST_CONSTEXPR_CXX23 TrackingDeleter& operator=(TrackingDeleter const&) {
+  TrackingDeleter& operator=(TrackingDeleter const&) {
     arg_type = &makeArgumentID<TrackingDeleter const&>();
     return *this;
   }
 
-  TEST_CONSTEXPR_CXX23 TrackingDeleter& operator=(TrackingDeleter&&) {
+  TrackingDeleter& operator=(TrackingDeleter &&) {
     arg_type = &makeArgumentID<TrackingDeleter &&>();
     return *this;
   }
 
   template <class T, class = EnableIfSpecialization<TrackingDeleter, T> >
-  TEST_CONSTEXPR_CXX23 TrackingDeleter& operator=(T&&) {
+  TrackingDeleter& operator=(T&&) {
     arg_type = &makeArgumentID<T&&>();
     return *this;
   }
 
-  TEST_CONSTEXPR_CXX23 void operator()(void*) const {}
+  void operator()(void*) const {}
 
 public:
-  TEST_CONSTEXPR_CXX23 TypeID const* reset() const {
+  TypeID const* reset() const {
     TypeID const* tmp = arg_type;
     arg_type = nullptr;
     return tmp;
@@ -93,8 +95,9 @@ bool checkArg(TrackingDeleter<ID> const& d) {
   return d.arg_type && *d.arg_type == makeArgumentID<ExpectT>();
 }
 
+
 template <bool IsArray>
-TEST_CONSTEXPR_CXX23 void test_sfinae() {
+void test_sfinae() {
   typedef typename std::conditional<IsArray, A[], A>::type VT;
 
   { // Test that different non-reference deleter types are allowed so long
@@ -141,8 +144,9 @@ TEST_CONSTEXPR_CXX23 void test_sfinae() {
   }
 }
 
+
 template <bool IsArray>
-TEST_CONSTEXPR_CXX23 void test_noexcept() {
+void test_noexcept() {
   typedef typename std::conditional<IsArray, A[], A>::type VT;
   {
     typedef std::unique_ptr<const VT> APtr;
@@ -166,8 +170,9 @@ TEST_CONSTEXPR_CXX23 void test_noexcept() {
   }
 }
 
+
 template <bool IsArray>
-TEST_CONSTEXPR_CXX23 void test_deleter_value_category() {
+void test_deleter_value_category() {
   typedef typename std::conditional<IsArray, A[], A>::type VT;
   using TD1 = TrackingDeleter<1>;
   using TD2 = TrackingDeleter<2>;
@@ -198,28 +203,18 @@ TEST_CONSTEXPR_CXX23 void test_deleter_value_category() {
   }
 }
 
-TEST_CONSTEXPR_CXX23 bool test() {
+
+int main(int, char**) {
   {
     test_sfinae</*IsArray*/false>();
     test_noexcept<false>();
-    if (!TEST_IS_CONSTANT_EVALUATED)
-      test_deleter_value_category<false>();
+    test_deleter_value_category<false>();
   }
   {
     test_sfinae</*IsArray*/true>();
     test_noexcept<true>();
-    if (!TEST_IS_CONSTANT_EVALUATED)
-      test_deleter_value_category<true>();
+    test_deleter_value_category<true>();
   }
-
-  return true;
-}
-
-int main(int, char**) {
-  test();
-#if TEST_STD_VER >= 23
-  static_assert(test());
-#endif
 
   return 0;
 }

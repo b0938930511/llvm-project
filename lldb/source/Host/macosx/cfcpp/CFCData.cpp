@@ -12,7 +12,7 @@
 CFCData::CFCData(CFDataRef data) : CFCReleaser<CFDataRef>(data) {}
 
 // CFCData copy constructor
-CFCData::CFCData(const CFCData &rhs) = default;
+CFCData::CFCData(const CFCData &rhs) : CFCReleaser<CFDataRef>(rhs) {}
 
 // CFCData copy constructor
 CFCData &CFCData::operator=(const CFCData &rhs)
@@ -47,7 +47,8 @@ CFDataRef CFCData::Serialize(CFPropertyListRef plist,
   CFCReleaser<CFWriteStreamRef> stream(
       ::CFWriteStreamCreateWithAllocatedBuffers(alloc, alloc));
   ::CFWriteStreamOpen(stream.get());
-  CFIndex len = ::CFPropertyListWrite(plist, stream.get(), format, 0, nullptr);
+  CFIndex len =
+      ::CFPropertyListWriteToStream(plist, stream.get(), format, NULL);
   if (len > 0)
     reset((CFDataRef)::CFWriteStreamCopyProperty(stream.get(),
                                                  kCFStreamPropertyDataWritten));

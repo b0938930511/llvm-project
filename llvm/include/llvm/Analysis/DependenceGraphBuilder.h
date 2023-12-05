@@ -43,7 +43,7 @@ public:
   AbstractDependenceGraphBuilder(GraphType &G, DependenceInfo &D,
                                  const BasicBlockListType &BBs)
       : Graph(G), DI(D), BBList(BBs) {}
-  virtual ~AbstractDependenceGraphBuilder() = default;
+  virtual ~AbstractDependenceGraphBuilder() {}
 
   /// The main entry to the graph construction algorithm. It starts by
   /// creating nodes in increasing order of granularity and then
@@ -156,14 +156,15 @@ protected:
 
   /// Given an instruction \p I return its associated ordinal number.
   size_t getOrdinal(Instruction &I) {
-    assert(InstOrdinalMap.contains(&I) &&
+    assert(InstOrdinalMap.find(&I) != InstOrdinalMap.end() &&
            "No ordinal computed for this instruction.");
     return InstOrdinalMap[&I];
   }
 
   /// Given a node \p N return its associated ordinal number.
   size_t getOrdinal(NodeType &N) {
-    assert(NodeOrdinalMap.contains(&N) && "No ordinal computed for this node.");
+    assert(NodeOrdinalMap.find(&N) != NodeOrdinalMap.end() &&
+           "No ordinal computed for this node.");
     return NodeOrdinalMap[&N];
   }
 

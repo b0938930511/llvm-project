@@ -17,6 +17,8 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/Module.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Pass.h"
 #include "llvm/Transforms/Utils.h"
@@ -66,7 +68,7 @@ static bool runImpl(Function &F) {
       II->getUnwindDest()->removePredecessor(&BB);
 
       // Remove the invoke instruction now.
-      II->eraseFromParent();
+      BB.getInstList().erase(II);
 
       ++NumInvokes;
       Changed = true;

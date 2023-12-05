@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-
 #ifndef LIBCPP_TEST_BITSET_TEST_CASES_H
 #define LIBCPP_TEST_BITSET_TEST_CASES_H
 
@@ -13,20 +12,18 @@
 #include <string>
 #include <vector>
 
-#include "test_macros.h"
-
 template <int N>
-TEST_CONSTEXPR_CXX23 std::vector<std::bitset<N> > get_test_cases();
+std::vector<std::bitset<N> > get_test_cases();
 
 template <>
-TEST_CONSTEXPR_CXX23 inline std::vector<std::bitset<0> > get_test_cases<0>() {
+inline std::vector<std::bitset<0> > get_test_cases<0>() {
     std::vector<std::bitset<0> > cases;
     cases.push_back(std::bitset<0>());
     return cases;
 }
 
 template <>
-TEST_CONSTEXPR_CXX23 inline std::vector<std::bitset<1> > get_test_cases<1>() {
+inline std::vector<std::bitset<1> > get_test_cases<1>() {
     std::vector<std::bitset<1> > cases;
     cases.push_back(std::bitset<1>("0"));
     cases.push_back(std::bitset<1>("1"));
@@ -34,7 +31,7 @@ TEST_CONSTEXPR_CXX23 inline std::vector<std::bitset<1> > get_test_cases<1>() {
 }
 
 template <>
-TEST_CONSTEXPR_CXX23 inline std::vector<std::bitset<2> > get_test_cases<2>() {
+inline std::vector<std::bitset<2> > get_test_cases<2>() {
     std::vector<std::bitset<2> > cases;
     cases.push_back(std::bitset<2>("00"));
     cases.push_back(std::bitset<2>("01"));
@@ -44,7 +41,7 @@ TEST_CONSTEXPR_CXX23 inline std::vector<std::bitset<2> > get_test_cases<2>() {
 }
 
 template <>
-TEST_CONSTEXPR_CXX23 inline std::vector<std::bitset<31> > get_test_cases<31>() {
+inline std::vector<std::bitset<31> > get_test_cases<31>() {
     std::vector<std::bitset<31> > cases;
     cases.push_back(std::bitset<31>("0000000000000000000000000000000"));
     cases.push_back(std::bitset<31>("0000000000000000000000000000001"));
@@ -62,7 +59,7 @@ TEST_CONSTEXPR_CXX23 inline std::vector<std::bitset<31> > get_test_cases<31>() {
 }
 
 template <>
-TEST_CONSTEXPR_CXX23 inline std::vector<std::bitset<32> > get_test_cases<32>() {
+inline std::vector<std::bitset<32> > get_test_cases<32>() {
     std::vector<std::bitset<32> > cases;
     cases.push_back(std::bitset<32>("00000000000000000000000000000000"));
     cases.push_back(std::bitset<32>("00000000000000000000000000000001"));
@@ -80,7 +77,7 @@ TEST_CONSTEXPR_CXX23 inline std::vector<std::bitset<32> > get_test_cases<32>() {
 }
 
 template <>
-TEST_CONSTEXPR_CXX23 inline std::vector<std::bitset<33> > get_test_cases<33>() {
+inline std::vector<std::bitset<33> > get_test_cases<33>() {
     std::vector<std::bitset<33> > cases;
     cases.push_back(std::bitset<33>("000000000000000000000000000000000"));
     cases.push_back(std::bitset<33>("000000000000000000000000000000001"));
@@ -98,7 +95,7 @@ TEST_CONSTEXPR_CXX23 inline std::vector<std::bitset<33> > get_test_cases<33>() {
 }
 
 template <>
-TEST_CONSTEXPR_CXX23 inline std::vector<std::bitset<63> > get_test_cases<63>() {
+inline std::vector<std::bitset<63> > get_test_cases<63>() {
     std::vector<std::bitset<63> > cases;
     cases.push_back(std::bitset<63>("000000000000000000000000000000000000000000000000000000000000000"));
     cases.push_back(std::bitset<63>("000000000000000000000000000000000000000000000000000000000000001"));
@@ -116,7 +113,7 @@ TEST_CONSTEXPR_CXX23 inline std::vector<std::bitset<63> > get_test_cases<63>() {
 }
 
 template <>
-TEST_CONSTEXPR_CXX23 inline std::vector<std::bitset<64> > get_test_cases<64>() {
+inline std::vector<std::bitset<64> > get_test_cases<64>() {
     std::vector<std::bitset<64> > cases;
     cases.push_back(std::bitset<64>("0000000000000000000000000000000000000000000000000000000000000000"));
     cases.push_back(std::bitset<64>("0000000000000000000000000000000000000000000000000000000000000001"));
@@ -134,7 +131,7 @@ TEST_CONSTEXPR_CXX23 inline std::vector<std::bitset<64> > get_test_cases<64>() {
 }
 
 template <>
-TEST_CONSTEXPR_CXX23 inline std::vector<std::bitset<65> > get_test_cases<65>() {
+inline std::vector<std::bitset<65> > get_test_cases<65>() {
     std::vector<std::bitset<65> > cases;
     cases.push_back(std::bitset<65>("00000000000000000000000000000000000000000000000000000000000000000"));
     cases.push_back(std::bitset<65>("00000000000000000000000000000000000000000000000000000000000000001"));
@@ -151,7 +148,7 @@ TEST_CONSTEXPR_CXX23 inline std::vector<std::bitset<65> > get_test_cases<65>() {
     return cases;
 }
 
-TEST_CONSTEXPR_CXX23 inline std::string str_repeat(std::string s, unsigned int n) {
+inline std::string str_repeat(std::string s, unsigned int n) {
     std::string res = s;
     for (; n != 0; --n)
         res += s;
@@ -159,7 +156,7 @@ TEST_CONSTEXPR_CXX23 inline std::string str_repeat(std::string s, unsigned int n
 }
 
 template <>
-TEST_CONSTEXPR_CXX23 inline std::vector<std::bitset<1000> > get_test_cases<1000>() {
+inline std::vector<std::bitset<1000> > get_test_cases<1000>() {
     std::vector<std::bitset<1000> > cases;
     cases.push_back(std::bitset<1000>(std::string(1000, '0')));
     cases.push_back(std::bitset<1000>(std::string(999, '0') + std::string(1, '1')));

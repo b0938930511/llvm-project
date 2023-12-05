@@ -50,7 +50,6 @@
 #include "llvm/MC/MCSchedule.h"
 #include "llvm/Pass.h"
 #include <unordered_map>
-#include <map>
 
 using namespace llvm;
 
@@ -238,7 +237,7 @@ shouldReplaceInst(MachineFunction *MF, const MCInstrDesc *InstDesc,
     SIMDInstrTable[InstID] = false;
     return false;
   }
-  for (const auto *IDesc : InstDescRepl)
+  for (auto IDesc : InstDescRepl)
   {
     SCDescRepl = SchedModel.getMCSchedModel()->getSchedClassDesc(
       IDesc->getSchedClass());
@@ -251,7 +250,7 @@ shouldReplaceInst(MachineFunction *MF, const MCInstrDesc *InstDesc,
 
   // Replacement cost.
   unsigned ReplCost = 0;
-  for (const auto *IDesc :InstDescRepl)
+  for (auto IDesc :InstDescRepl)
     ReplCost += SchedModel.computeInstrLatency(IDesc->getOpcode());
 
   if (SchedModel.computeInstrLatency(InstDesc->getOpcode()) > ReplCost)
@@ -634,7 +633,7 @@ bool AArch64SIMDInstrOpt::optimizeLdStInterleave(MachineInstr &MI) {
 /// Return true when the instruction is processed successfully.
 bool AArch64SIMDInstrOpt::processSeqRegInst(MachineInstr *DefiningMI,
      unsigned* StReg, unsigned* StRegKill, unsigned NumArg) const {
-  assert(DefiningMI != nullptr);
+  assert (DefiningMI != NULL);
   if (DefiningMI->getOpcode() != AArch64::REG_SEQUENCE)
     return false;
 
@@ -642,7 +641,7 @@ bool AArch64SIMDInstrOpt::processSeqRegInst(MachineInstr *DefiningMI,
     StReg[i]     = DefiningMI->getOperand(2*i+1).getReg();
     StRegKill[i] = getKillRegState(DefiningMI->getOperand(2*i+1).isKill());
 
-    // Validation check for the other arguments.
+    // Sanity check for the other arguments.
     if (DefiningMI->getOperand(2*i+2).isImm()) {
       switch (DefiningMI->getOperand(2*i+2).getImm()) {
       default:
@@ -712,7 +711,9 @@ bool AArch64SIMDInstrOpt::runOnMachineFunction(MachineFunction &MF) {
     if (!shouldExitEarly(&MF, OptimizationKind)) {
       SmallVector<MachineInstr *, 8> RemoveMIs;
       for (MachineBasicBlock &MBB : MF) {
-        for (MachineInstr &MI : MBB) {
+        for (MachineBasicBlock::iterator MII = MBB.begin(), MIE = MBB.end();
+             MII != MIE;) {
+          MachineInstr &MI = *MII;
           bool InstRewrite;
           if (OptimizationKind == VectorElem)
             InstRewrite = optimizeVectElement(MI) ;
@@ -724,6 +725,7 @@ bool AArch64SIMDInstrOpt::runOnMachineFunction(MachineFunction &MF) {
             RemoveMIs.push_back(&MI);
             Changed = true;
           }
+          ++MII;
         }
       }
       for (MachineInstr *MI : RemoveMIs)

@@ -1,14 +1,16 @@
-! RUN: %python %S/test_errors.py %s %flang_fc1 -pedantic
-!
+! RUN: %S/test_errors.sh %s %t %flang_fc1 -pedantic -Werror
+! REQUIRES: shell
+
+! Issue 458 -- semantic checks for a normal DO loop.  The DO variable
+! and the initial, final, and step expressions must be INTEGER if the
+! options for standard conformance and turning warnings into errors
+! are both in effect.  This test turns on the options for standards
+! conformance and turning warnings into errors.  This produces error
+! messages for the cases where REAL and DOUBLE PRECISION variables
+! and expressions are used in the DO controls.
+
 ! C1120 -- DO variable (and associated expressions) must be INTEGER.
 ! This is extended by allowing REAL and DOUBLE PRECISION
-!
-! The standard requires the DO variable and the initial, final, and step
-! expressions to be INTEGER. As an extension, we do however allow them to be
-! REAL or DOUBLE PRECISION. This test turns on the option for standard
-! conformance checking to test that we get portability warnings for these
-! cases. We also check that other types, such as CHARACTER and LOGICAL, yield
-! errors when used in the DO controls.
 
 MODULE share
   INTEGER :: intvarshare
@@ -50,13 +52,11 @@ PROGRAM do_issue_458
   END DO
 
 ! REAL DO variable
-!PORTABILITY: DO controls should be INTEGER
   DO rvar = 1, 10, 3
     PRINT *, "rvar is: ", rvar
   END DO
 
 ! DOUBLE PRECISISON DO variable
-!PORTABILITY: DO controls should be INTEGER
   DO dvar = 1, 10, 3
     PRINT *, "dvar is: ", dvar
   END DO
@@ -69,14 +69,12 @@ PROGRAM do_issue_458
 
 ! Pointer to REAL DO variable
   ALLOCATE(prvar)
-!PORTABILITY: DO controls should be INTEGER
   DO prvar = 1, 10, 3
     PRINT *, "prvar is: ", prvar
   END DO
 
 ! Pointer to DOUBLE PRECISION DO variable
   ALLOCATE(pdvar)
-!PORTABILITY: DO controls should be INTEGER
   DO pdvar = 1, 10, 3
     PRINT *, "pdvar is: ", pdvar
   END DO
@@ -148,26 +146,22 @@ PROGRAM do_issue_458
   END DO
 
 ! Shared association REAL DO variable
-!PORTABILITY: DO controls should be INTEGER
   DO realvarshare = 1, 10, 3
     PRINT *, "ivar is: ", ivar
   END DO
 
 ! Shared association DOUBLE PRECISION DO variable
-!PORTABILITY: DO controls should be INTEGER
   DO dpvarshare = 1, 10, 3
     PRINT *, "ivar is: ", ivar
   END DO
 
 ! Initial expressions
 ! REAL initial expression
-!PORTABILITY: DO controls should be INTEGER
   DO ivar = rvar, 10, 3
     PRINT *, "ivar is: ", ivar
   END DO
 
 ! DOUBLE PRECISION initial expression
-!PORTABILITY: DO controls should be INTEGER
   DO ivar = dvar, 10, 3
     PRINT *, "ivar is: ", ivar
   END DO
@@ -178,13 +172,11 @@ PROGRAM do_issue_458
   END DO
 
 ! Pointer to REAL initial expression
-!PORTABILITY: DO controls should be INTEGER
   DO ivar = prvar, 10, 3
     PRINT *, "ivar is: ", ivar
   END DO
 
 ! Pointer to DOUBLE PRECISION initial expression
-!PORTABILITY: DO controls should be INTEGER
   DO ivar = pdvar, 10, 3
     PRINT *, "ivar is: ", ivar
   END DO
@@ -215,19 +207,17 @@ PROGRAM do_issue_458
 
 ! Invalid initial expression
 !ERROR: Integer literal is too large for INTEGER(KIND=4)
-  DO ivar = -2147483649_4, 10, 3
+  DO ivar = -2147483648_4, 10, 3
     PRINT *, "ivar is: ", ivar
   END DO
 
 ! Final expression
 ! REAL final expression
-!PORTABILITY: DO controls should be INTEGER
   DO ivar = 1, rvar, 3
     PRINT *, "ivar is: ", ivar
   END DO
 
 ! DOUBLE PRECISION final expression
-!PORTABILITY: DO controls should be INTEGER
   DO ivar = 1, dvar, 3
     PRINT *, "ivar is: ", ivar
   END DO
@@ -238,13 +228,11 @@ PROGRAM do_issue_458
   END DO
 
 ! Pointer to REAL final expression
-!PORTABILITY: DO controls should be INTEGER
   DO ivar = 1, prvar, 3
     PRINT *, "ivar is: ", ivar
   END DO
 
 ! Pointer to DOUBLE PRECISION final expression
-!PORTABILITY: DO controls should be INTEGER
   DO ivar = pdvar, 10, 3
     PRINT *, "ivar is: ", ivar
   END DO
@@ -257,19 +245,17 @@ PROGRAM do_issue_458
 
 ! Invalid final expression
 !ERROR: Integer literal is too large for INTEGER(KIND=4)
-  DO ivar = 1, -2147483649_4, 3
+  DO ivar = 1, -2147483648_4, 3
     PRINT *, "ivar is: ", ivar
   END DO
 
 ! Step expression
 ! REAL step expression
-!PORTABILITY: DO controls should be INTEGER
   DO ivar = 1, 10, rvar
     PRINT *, "ivar is: ", ivar
   END DO
 
 ! DOUBLE PRECISION step expression
-!PORTABILITY: DO controls should be INTEGER
   DO ivar = 1, 10, dvar
     PRINT *, "ivar is: ", ivar
   END DO
@@ -280,13 +266,11 @@ PROGRAM do_issue_458
   END DO
 
 ! Pointer to REAL step expression
-!PORTABILITY: DO controls should be INTEGER
   DO ivar = 1, 10, prvar
     PRINT *, "ivar is: ", ivar
   END DO
 
 ! Pointer to DOUBLE PRECISION step expression
-!PORTABILITY: DO controls should be INTEGER
   DO ivar = 1, 10, pdvar
     PRINT *, "ivar is: ", ivar
   END DO
@@ -299,7 +283,7 @@ PROGRAM do_issue_458
 
 ! Invalid step expression
 !ERROR: Integer literal is too large for INTEGER(KIND=4)
-  DO ivar = 1, 10, -2147483649_4
+  DO ivar = 1, 10, -2147483648_4
     PRINT *, "ivar is: ", ivar
   END DO
 

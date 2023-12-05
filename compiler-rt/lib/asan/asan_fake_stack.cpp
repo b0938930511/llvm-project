@@ -28,8 +28,8 @@ static const u64 kAllocaRedzoneMask = 31UL;
 // For small size classes inline PoisonShadow for better performance.
 ALWAYS_INLINE void SetShadow(uptr ptr, uptr size, uptr class_id, u64 magic) {
   u64 *shadow = reinterpret_cast<u64*>(MemToShadow(ptr));
-  if (ASAN_SHADOW_SCALE == 3 && class_id <= 6) {
-    // This code expects ASAN_SHADOW_SCALE=3.
+  if (SHADOW_SCALE == 3 && class_id <= 6) {
+    // This code expects SHADOW_SCALE=3.
     for (uptr i = 0; i < (((uptr)1) << class_id); i++) {
       shadow[i] = magic;
       // Make sure this does not become memset.
@@ -54,11 +54,10 @@ FakeStack *FakeStack::Create(uptr stack_size_log) {
                              : MmapOrDie(size, "FakeStack"));
   res->stack_size_log_ = stack_size_log;
   u8 *p = reinterpret_cast<u8 *>(res);
-  VReport(1,
-          "T%d: FakeStack created: %p -- %p stack_size_log: %zd; "
+  VReport(1, "T%d: FakeStack created: %p -- %p stack_size_log: %zd; "
           "mmapped %zdK, noreserve=%d \n",
-          GetCurrentTidOrInvalid(), (void *)p,
-          (void *)(p + FakeStack::RequiredSize(stack_size_log)), stack_size_log,
+          GetCurrentTidOrInvalid(), p,
+          p + FakeStack::RequiredSize(stack_size_log), stack_size_log,
           size >> 10, flags()->uar_noreserve);
   return res;
 }
@@ -68,8 +67,8 @@ void FakeStack::Destroy(int tid) {
   if (Verbosity() >= 2) {
     InternalScopedString str;
     for (uptr class_id = 0; class_id < kNumberOfSizeClasses; class_id++)
-      str.AppendF("%zd: %zd/%zd; ", class_id, hint_position_[class_id],
-                  NumberOfFrames(stack_size_log(), class_id));
+      str.append("%zd: %zd/%zd; ", class_id, hint_position_[class_id],
+                 NumberOfFrames(stack_size_log(), class_id));
     Report("T%d: FakeStack destroyed: %s\n", tid, str.data());
   }
   uptr size = RequiredSize(stack_size_log_);
@@ -133,12 +132,6 @@ void FakeStack::HandleNoReturn() {
   needs_gc_ = true;
 }
 
-// Hack: The statement below is not true if we take into account sigaltstack or
-// makecontext. It should be possible to make GC to discard wrong stack frame if
-// we use these tools. For now, let's support the simplest case and allow GC to
-// discard only frames from the default stack, assuming there is no buffer on
-// the stack which is used for makecontext or sigaltstack.
-//
 // When throw, longjmp or some such happens we don't call OnFree() and
 // as the result may leak one or more fake frames, but the good news is that
 // we are notified about all such events by HandleNoReturn().
@@ -146,14 +139,7 @@ void FakeStack::HandleNoReturn() {
 // We do it based on their 'real_stack' values -- everything that is lower
 // than the current real_stack is garbage.
 NOINLINE void FakeStack::GC(uptr real_stack) {
-  AsanThread *curr_thread = GetCurrentThread();
-  if (!curr_thread)
-    return;  // Try again when we have a thread.
-  auto top = curr_thread->stack_top();
-  auto bottom = curr_thread->stack_bottom();
-  if (real_stack < bottom || real_stack > top)
-    return;  // Not the default stack.
-
+  uptr collected = 0;
   for (uptr class_id = 0; class_id < kNumberOfSizeClasses; class_id++) {
     u8 *flags = GetFlags(stack_size_log(), class_id);
     for (uptr i = 0, n = NumberOfFrames(stack_size_log(), class_id); i < n;
@@ -161,12 +147,9 @@ NOINLINE void FakeStack::GC(uptr real_stack) {
       if (flags[i] == 0) continue;  // not allocated.
       FakeFrame *ff = reinterpret_cast<FakeFrame *>(
           GetFrame(stack_size_log(), class_id, i));
-      // GC only on the default stack.
-      if (bottom < ff->real_stack && ff->real_stack < real_stack) {
+      if (ff->real_stack < real_stack) {
         flags[i] = 0;
-        // Poison the frame, so the any access will be reported as UAR.
-        SetShadow(reinterpret_cast<uptr>(ff), BytesInSizeClass(class_id),
-                  class_id, kMagic8);
+        collected++;
       }
     }
   }
@@ -223,12 +206,11 @@ static FakeStack *GetFakeStackFastAlways() {
 
 static ALWAYS_INLINE uptr OnMalloc(uptr class_id, uptr size) {
   FakeStack *fs = GetFakeStackFast();
-  if (!fs)
-    return 0;
-  FakeFrame *ff =
-      fs->Allocate(fs->stack_size_log(), class_id, GET_CURRENT_FRAME());
-  if (!ff)
-    return 0;  // Out of fake stack.
+  if (!fs) return 0;
+  uptr local_stack;
+  uptr real_stack = reinterpret_cast<uptr>(&local_stack);
+  FakeFrame *ff = fs->Allocate(fs->stack_size_log(), class_id, real_stack);
+  if (!ff) return 0;  // Out of fake stack.
   uptr ptr = reinterpret_cast<uptr>(ff);
   SetShadow(ptr, size, class_id, 0);
   return ptr;
@@ -238,8 +220,9 @@ static ALWAYS_INLINE uptr OnMallocAlways(uptr class_id, uptr size) {
   FakeStack *fs = GetFakeStackFastAlways();
   if (!fs)
     return 0;
-  FakeFrame *ff =
-      fs->Allocate(fs->stack_size_log(), class_id, GET_CURRENT_FRAME());
+  uptr local_stack;
+  uptr real_stack = reinterpret_cast<uptr>(&local_stack);
+  FakeFrame *ff = fs->Allocate(fs->stack_size_log(), class_id, real_stack);
   if (!ff)
     return 0;  // Out of fake stack.
   uptr ptr = reinterpret_cast<uptr>(ff);
@@ -310,10 +293,10 @@ void __asan_alloca_poison(uptr addr, uptr size) {
   uptr LeftRedzoneAddr = addr - kAllocaRedzoneSize;
   uptr PartialRzAddr = addr + size;
   uptr RightRzAddr = (PartialRzAddr + kAllocaRedzoneMask) & ~kAllocaRedzoneMask;
-  uptr PartialRzAligned = PartialRzAddr & ~(ASAN_SHADOW_GRANULARITY - 1);
+  uptr PartialRzAligned = PartialRzAddr & ~(SHADOW_GRANULARITY - 1);
   FastPoisonShadow(LeftRedzoneAddr, kAllocaRedzoneSize, kAsanAllocaLeftMagic);
   FastPoisonShadowPartialRightRedzone(
-      PartialRzAligned, PartialRzAddr % ASAN_SHADOW_GRANULARITY,
+      PartialRzAligned, PartialRzAddr % SHADOW_GRANULARITY,
       RightRzAddr - PartialRzAligned, kAsanAllocaRightMagic);
   FastPoisonShadow(RightRzAddr, kAllocaRedzoneSize, kAsanAllocaRightMagic);
 }
@@ -321,8 +304,7 @@ void __asan_alloca_poison(uptr addr, uptr size) {
 SANITIZER_INTERFACE_ATTRIBUTE
 void __asan_allocas_unpoison(uptr top, uptr bottom) {
   if ((!top) || (top > bottom)) return;
-  REAL(memset)
-  (reinterpret_cast<void *>(MemToShadow(top)), 0,
-   (bottom - top) / ASAN_SHADOW_GRANULARITY);
+  REAL(memset)(reinterpret_cast<void*>(MemToShadow(top)), 0,
+               (bottom - top) / SHADOW_GRANULARITY);
 }
 } // extern "C"

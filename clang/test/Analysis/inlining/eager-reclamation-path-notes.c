@@ -7,15 +7,15 @@ void use(int *ptr, int val) {
   // expected-note@-1 {{Dereference of null pointer (loaded from variable 'ptr')}}
 }
 
-int compute(void) {
+int compute() {
   // Do something that will take enough processing to trigger trimming.
   // FIXME: This is actually really sensitive. If the interval timing is just
   // wrong, the node for the actual dereference may also be collected, and all
-  // the path notes will disappear.
+  // the path notes will disappear. <rdar://problem/12511814>
   return 2 + 3 + 4 + 5 + 6;
 }
 
-void testSimple(void) {
+void testSimple() {
   int *p = 0;
   // expected-note@-1 {{'p' initialized to a null pointer value}}
   use(p, compute());
@@ -35,7 +35,7 @@ void passThrough(int *p) {
   // expected-note@-2 {{Calling 'use2'}}
 }
 
-void testChainedCalls(void) {
+void testChainedCalls() {
   int *ptr = 0;
   // expected-note@-1 {{'ptr' initialized to a null pointer value}}
   passThrough(ptr);

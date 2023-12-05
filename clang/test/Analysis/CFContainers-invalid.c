@@ -13,7 +13,7 @@ CFArrayRef CFArrayCreate(CFAllocatorRef);
 CFDictionaryRef CFDictionaryCreate(CFAllocatorRef);
 CFSetRef CFSetCreate(CFAllocatorRef);
 
-void testNoCrash(void) {
+void testNoCrash() {
   (void)CFArrayCreate(kCFAllocatorDefault);
   (void)CFDictionaryCreate(kCFAllocatorDefault);
   (void)CFSetCreate(kCFAllocatorDefault);

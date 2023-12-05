@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
+// UNSUPPORTED: libcpp-no-concepts
 
 // template<class T>
 // concept move_constructible;
@@ -76,3 +77,5 @@ static_assert(std::move_constructible<const ImplicitlyDeletedMoveAssign&&>);
 static_assert(!std::move_constructible<NonMovable>);
 static_assert(!std::move_constructible<DerivedFromNonMovable>);
 static_assert(!std::move_constructible<HasANonMovable>);
+
+int main(int, char**) { return 0; }

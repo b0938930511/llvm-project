@@ -2,7 +2,7 @@
 
 
 // Test ?: in function calls
-extern void fp(int, char*);
+extern fp(int, char*);
 char *Ext;
 void
 __bb_exit_func (void)

@@ -11,7 +11,9 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::modernize {
+namespace clang {
+namespace tidy {
+namespace modernize {
 
 /// Replace dynamic exception specifications, with
 /// `noexcept` (or user-defined macro) or `noexcept(false)`.
@@ -26,7 +28,7 @@ namespace clang::tidy::modernize {
 /// \endcode
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/modernize/use-noexcept.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/modernize-use-noexcept.html
 class UseNoexceptCheck : public ClangTidyCheck {
 public:
   UseNoexceptCheck(StringRef Name, ClangTidyContext *Context);
@@ -38,10 +40,12 @@ public:
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
 
 private:
-  const StringRef NoexceptMacro;
+  const std::string NoexceptMacro;
   const bool UseNoexceptFalse;
 };
 
-} // namespace clang::tidy::modernize
+} // namespace modernize
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_MODERNIZE_USE_NOEXCEPT_H

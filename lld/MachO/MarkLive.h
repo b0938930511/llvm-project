@@ -9,10 +9,12 @@
 #ifndef LLD_MACHO_MARKLIVE_H
 #define LLD_MACHO_MARKLIVE_H
 
-namespace lld::macho {
+namespace lld {
+namespace macho {
 
 void markLive();
 
-} // namespace lld::macho
+} // namespace macho
+} // namespace lld
 
 #endif // LLD_MACHO_MARKLIVE_H

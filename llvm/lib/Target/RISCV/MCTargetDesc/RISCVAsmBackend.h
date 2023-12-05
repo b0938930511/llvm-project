@@ -1,4 +1,4 @@
-//===-- RISCVAsmBackend.h - RISC-V Assembler Backend ----------------------===//
+//===-- RISCVAsmBackend.h - RISCV Assembler Backend -----------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -27,15 +27,18 @@ class RISCVAsmBackend : public MCAsmBackend {
   bool Is64Bit;
   bool ForceRelocs = false;
   const MCTargetOptions &TargetOptions;
+  RISCVABI::ABI TargetABI = RISCVABI::ABI_Unknown;
 
 public:
   RISCVAsmBackend(const MCSubtargetInfo &STI, uint8_t OSABI, bool Is64Bit,
                   const MCTargetOptions &Options)
-      : MCAsmBackend(llvm::endianness::little, RISCV::fixup_riscv_relax),
-        STI(STI), OSABI(OSABI), Is64Bit(Is64Bit), TargetOptions(Options) {
+      : MCAsmBackend(support::little), STI(STI), OSABI(OSABI), Is64Bit(Is64Bit),
+        TargetOptions(Options) {
+    TargetABI = RISCVABI::computeTargetABI(
+        STI.getTargetTriple(), STI.getFeatureBits(), Options.getABIName());
     RISCVFeatures::validate(STI.getTargetTriple(), STI.getFeatureBits());
   }
-  ~RISCVAsmBackend() override = default;
+  ~RISCVAsmBackend() override {}
 
   void setForceRelocs() { ForceRelocs = true; }
 
@@ -52,10 +55,6 @@ public:
                            const MCFixup &Fixup, const MCFragment *DF,
                            const MCValue &Target, uint64_t &Value,
                            bool &WasForced) override;
-
-  bool handleAddSubRelocations(const MCAsmLayout &Layout, const MCFragment &F,
-                               const MCFixup &Fixup, const MCValue &Target,
-                               uint64_t &FixedValue) const override;
 
   void applyFixup(const MCAssembler &Asm, const MCFixup &Fixup,
                   const MCValue &Target, MutableArrayRef<char> Data,
@@ -84,7 +83,7 @@ public:
     return RISCV::NumTargetFixupKinds;
   }
 
-  std::optional<MCFixupKind> getFixupKind(StringRef Name) const override;
+  Optional<MCFixupKind> getFixupKind(StringRef Name) const override;
 
   const MCFixupKindInfo &getFixupKindInfo(MCFixupKind Kind) const override;
 
@@ -99,13 +98,11 @@ public:
                           bool &WasRelaxed) const override;
   bool relaxDwarfCFA(MCDwarfCallFrameFragment &DF, MCAsmLayout &Layout,
                      bool &WasRelaxed) const override;
-  bool relaxLEB128(MCLEBFragment &LF, MCAsmLayout &Layout,
-                   int64_t &Value) const override;
 
-  bool writeNopData(raw_ostream &OS, uint64_t Count,
-                    const MCSubtargetInfo *STI) const override;
+  bool writeNopData(raw_ostream &OS, uint64_t Count) const override;
 
   const MCTargetOptions &getTargetOptions() const { return TargetOptions; }
+  RISCVABI::ABI getTargetABI() const { return TargetABI; }
 };
 }
 

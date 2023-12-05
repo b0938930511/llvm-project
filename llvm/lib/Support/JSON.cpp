@@ -8,15 +8,11 @@
 
 #include "llvm/Support/JSON.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Format.h"
-#include "llvm/Support/NativeFormatting.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cctype>
-#include <cerrno>
-#include <optional>
 
 namespace llvm {
 namespace json {
@@ -39,30 +35,30 @@ const Value *Object::get(StringRef K) const {
     return nullptr;
   return &I->second;
 }
-std::optional<std::nullptr_t> Object::getNull(StringRef K) const {
+llvm::Optional<std::nullptr_t> Object::getNull(StringRef K) const {
   if (auto *V = get(K))
     return V->getAsNull();
-  return std::nullopt;
+  return llvm::None;
 }
-std::optional<bool> Object::getBoolean(StringRef K) const {
+llvm::Optional<bool> Object::getBoolean(StringRef K) const {
   if (auto *V = get(K))
     return V->getAsBoolean();
-  return std::nullopt;
+  return llvm::None;
 }
-std::optional<double> Object::getNumber(StringRef K) const {
+llvm::Optional<double> Object::getNumber(StringRef K) const {
   if (auto *V = get(K))
     return V->getAsNumber();
-  return std::nullopt;
+  return llvm::None;
 }
-std::optional<int64_t> Object::getInteger(StringRef K) const {
+llvm::Optional<int64_t> Object::getInteger(StringRef K) const {
   if (auto *V = get(K))
     return V->getAsInteger();
-  return std::nullopt;
+  return llvm::None;
 }
-std::optional<llvm::StringRef> Object::getString(StringRef K) const {
+llvm::Optional<llvm::StringRef> Object::getString(StringRef K) const {
   if (auto *V = get(K))
     return V->getAsString();
-  return std::nullopt;
+  return llvm::None;
 }
 const json::Object *Object::getObject(StringRef K) const {
   if (auto *V = get(K))
@@ -113,7 +109,6 @@ void Value::copyFrom(const Value &M) {
   case T_Boolean:
   case T_Double:
   case T_Integer:
-  case T_UINT64:
     memcpy(&Union, &M.Union, sizeof(Union));
     break;
   case T_StringRef:
@@ -138,7 +133,6 @@ void Value::moveFrom(const Value &&M) {
   case T_Boolean:
   case T_Double:
   case T_Integer:
-  case T_UINT64:
     memcpy(&Union, &M.Union, sizeof(Union));
     break;
   case T_StringRef:
@@ -165,7 +159,6 @@ void Value::destroy() {
   case T_Boolean:
   case T_Double:
   case T_Integer:
-  case T_UINT64:
     break;
   case T_StringRef:
     as<StringRef>().~StringRef();
@@ -411,7 +404,7 @@ private:
            C == 'e' || C == 'E' || C == '+' || C == '-' || C == '.';
   }
 
-  std::optional<Error> Err;
+  Optional<Error> Err;
   const char *Start, *P, *End;
 };
 
@@ -512,24 +505,12 @@ bool Parser::parseNumber(char First, Value &Out) {
     S.push_back(next());
   char *End;
   // Try first to parse as integer, and if so preserve full 64 bits.
-  // We check for errno for out of bounds errors and for End == S.end()
-  // to make sure that the numeric string is not malformed.
-  errno = 0;
-  int64_t I = std::strtoll(S.c_str(), &End, 10);
-  if (End == S.end() && errno != ERANGE) {
+  // strtoll returns long long >= 64 bits, so check it's in range too.
+  auto I = std::strtoll(S.c_str(), &End, 10);
+  if (End == S.end() && I >= std::numeric_limits<int64_t>::min() &&
+      I <= std::numeric_limits<int64_t>::max()) {
     Out = int64_t(I);
     return true;
-  }
-  // strtroull has a special handling for negative numbers, but in this
-  // case we don't want to do that because negative numbers were already
-  // handled in the previous block.
-  if (First != '-') {
-    errno = 0;
-    uint64_t UI = std::strtoull(S.c_str(), &End, 10);
-    if (End == S.end() && errno != ERANGE) {
-      Out = UI;
-      return true;
-    }
   }
   // If it's not an integer
   Out = std::strtod(S.c_str(), &End);
@@ -769,8 +750,6 @@ void llvm::json::OStream::value(const Value &V) {
     valueBegin();
     if (V.Type == Value::T_Integer)
       OS << *V.getAsInteger();
-    else if (V.Type == Value::T_UINT64)
-      OS << *V.getAsUINT64();
     else
       OS << format("%.*g", std::numeric_limits<double>::max_digits10,
                    *V.getAsNumber());

@@ -15,10 +15,8 @@
 #include "Plugins/SymbolFile/DWARF/SymbolFileDWARF.h"
 #include "lldb/Utility/ConstString.h"
 #include "llvm/DebugInfo/DWARF/DWARFAcceleratorTable.h"
-#include <optional>
 
-namespace lldb_private::plugin {
-namespace dwarf {
+namespace lldb_private {
 class DebugNamesDWARFIndex : public DWARFIndex {
 public:
   static llvm::Expected<std::unique_ptr<DebugNamesDWARFIndex>>
@@ -34,7 +32,7 @@ public:
   GetGlobalVariables(const RegularExpression &regex,
                      llvm::function_ref<bool(DWARFDIE die)> callback) override;
   void
-  GetGlobalVariables(DWARFUnit &cu,
+  GetGlobalVariables(const DWARFUnit &cu,
                      llvm::function_ref<bool(DWARFDIE die)> callback) override;
   void
   GetObjCMethods(ConstString class_name,
@@ -48,9 +46,9 @@ public:
                 llvm::function_ref<bool(DWARFDIE die)> callback) override;
   void GetNamespaces(ConstString name,
                      llvm::function_ref<bool(DWARFDIE die)> callback) override;
-  void GetFunctions(const Module::LookupInfo &lookup_info,
-                    SymbolFileDWARF &dwarf,
+  void GetFunctions(ConstString name, SymbolFileDWARF &dwarf,
                     const CompilerDeclContext &parent_decl_ctx,
+                    uint32_t name_type_mask,
                     llvm::function_ref<bool(DWARFDIE die)> callback) override;
   void GetFunctions(const RegularExpression &regex,
                     llvm::function_ref<bool(DWARFDIE die)> callback) override;
@@ -79,9 +77,10 @@ private:
   std::unique_ptr<DebugNames> m_debug_names_up;
   ManualDWARFIndex m_fallback;
 
-  std::optional<DIERef> ToDIERef(const DebugNames::Entry &entry);
+  llvm::Optional<DIERef> ToDIERef(const DebugNames::Entry &entry);
   bool ProcessEntry(const DebugNames::Entry &entry,
-                    llvm::function_ref<bool(DWARFDIE die)> callback);
+                    llvm::function_ref<bool(DWARFDIE die)> callback,
+                    llvm::StringRef name);
 
   static void MaybeLogLookupError(llvm::Error error,
                                   const DebugNames::NameIndex &ni,
@@ -90,7 +89,6 @@ private:
   static llvm::DenseSet<dw_offset_t> GetUnits(const DebugNames &debug_names);
 };
 
-} // namespace dwarf
-} // namespace lldb_private::plugin
+} // namespace lldb_private
 
 #endif // LLDB_SOURCE_PLUGINS_SYMBOLFILE_DWARF_DEBUGNAMESDWARFINDEX_H

@@ -6,13 +6,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <__thread/poll_with_backoff.h>
-#include <__thread/timed_backoff_policy.h>
-#include <exception>
-#include <future>
-#include <limits>
-#include <thread>
-#include <vector>
+#include "__config"
+#ifndef _LIBCPP_HAS_NO_THREADS
+
+#include "thread"
+#include "exception"
+#include "vector"
+#include "future"
+#include "limits"
 
 #if __has_include(<unistd.h>)
 # include <unistd.h> // for sysconf
@@ -113,13 +114,8 @@ sleep_for(const chrono::nanoseconds& ns)
 __thread_specific_ptr<__thread_struct>&
 __thread_local_data()
 {
-  // Even though __thread_specific_ptr's destructor doesn't actually destroy
-  // anything (see comments there), we can't call it at all because threads may
-  // outlive the static variable and calling its destructor means accessing an
-  // object outside of its lifetime, which is UB.
-  alignas(__thread_specific_ptr<__thread_struct>) static char __b[sizeof(__thread_specific_ptr<__thread_struct>)];
-  static __thread_specific_ptr<__thread_struct>* __p = new (__b) __thread_specific_ptr<__thread_struct>();
-  return *__p;
+    static __thread_specific_ptr<__thread_struct> __p;
+    return __p;
 }
 
 // __thread_struct_imp
@@ -162,8 +158,8 @@ __thread_struct_imp::~__thread_struct_imp()
     for (_Notify::iterator i = notify_.begin(), e = notify_.end();
             i != e; ++i)
     {
-        i->first->notify_all();
         i->second->unlock();
+        i->first->notify_all();
     }
     for (_AsyncStates::iterator i = async_states_.begin(), e = async_states_.end();
             i != e; ++i)
@@ -211,3 +207,5 @@ __thread_struct::__make_ready_at_thread_exit(__assoc_sub_state* __s)
 }
 
 _LIBCPP_END_NAMESPACE_STD
+
+#endif // !_LIBCPP_HAS_NO_THREADS

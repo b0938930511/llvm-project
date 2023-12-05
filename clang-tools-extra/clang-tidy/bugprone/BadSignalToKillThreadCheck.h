@@ -10,14 +10,15 @@
 #define LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_BUGPRONE_BADSIGNALTOKILLTHREADCHECK_H
 
 #include "../ClangTidyCheck.h"
-#include <optional>
 
-namespace clang::tidy::bugprone {
+namespace clang {
+namespace tidy {
+namespace bugprone {
 
 /// Finds ``pthread_kill`` function calls when thread is terminated by
 /// ``SIGTERM`` signal.
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/bugprone/bad-signal-to-kill-thread.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/bugprone-bad-signal-to-kill-thread.html
 class BadSignalToKillThreadCheck : public ClangTidyCheck {
 public:
   BadSignalToKillThreadCheck(StringRef Name, ClangTidyContext *Context)
@@ -26,9 +27,11 @@ public:
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
   void registerPPCallbacks(const SourceManager &SM, Preprocessor *PP,
                            Preprocessor *ModuleExpanderPP) override;
-  std::optional<unsigned> SigtermValue;
+  Optional<unsigned> SigtermValue;
 };
 
-} // namespace clang::tidy::bugprone
+} // namespace bugprone
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_BUGPRONE_BADSIGNALTOKILLTHREADCHECK_H

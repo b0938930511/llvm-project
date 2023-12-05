@@ -3,10 +3,10 @@
 
 #if !defined(__linux__) && !defined(__FreeBSD__) && \
     !defined(__OpenBSD__) && !defined(__CYGWIN__) && !defined(__DragonFly__)
-void foo(void) __attribute__((weak_import));
+void foo() __attribute__((weak_import));
 #else
-void foo(void) __attribute__((weak));
+void foo() __attribute__((weak));
 #endif
 
-void bar(void) { foo(); }
+void bar() { foo(); }
 

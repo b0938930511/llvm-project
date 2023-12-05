@@ -8,6 +8,7 @@ int main(void) {
   return 0;
 }
 
-// DEBUG: omptarget
-// NDEBUG-NOT: omptarget
+// DEBUG: Libomptarget
+// NDEBUG-NOT: Libomptarget
 // NDEBUG-NOT: Target
+

@@ -13,9 +13,16 @@
 // static constexpr int_type eof();
 
 #include <string>
+#include <cassert>
 
-int main(int, char**) {
-  std::char_traits<char16_t>::int_type i = std::char_traits<char16_t>::eof();
-  ((void)i); // Prevent unused warning
+#include "test_macros.h"
+
+int main(int, char**)
+{
+#ifndef _LIBCPP_HAS_NO_UNICODE_CHARS
+    std::char_traits<char16_t>::int_type i = std::char_traits<char16_t>::eof();
+    ((void)i); // Prevent unused warning
+#endif
+
   return 0;
 }

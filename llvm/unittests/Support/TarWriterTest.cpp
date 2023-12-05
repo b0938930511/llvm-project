@@ -68,7 +68,7 @@ static std::vector<uint8_t> createTar(StringRef Base, StringRef Filename) {
 
 static UstarHeader createUstar(StringRef Base, StringRef Filename) {
   std::vector<uint8_t> Buf = createTar(Base, Filename);
-  EXPECT_GE(Buf.size(), sizeof(UstarHeader));
+  EXPECT_TRUE(Buf.size() >= sizeof(UstarHeader));
   return *reinterpret_cast<const UstarHeader *>(Buf.data());
 }
 
@@ -112,7 +112,7 @@ TEST_F(TarWriterTest, LongFilename) {
 
 TEST_F(TarWriterTest, Pax) {
   std::vector<uint8_t> Buf = createTar("", std::string(200, 'x'));
-  EXPECT_GE(Buf.size(), 1024u);
+  EXPECT_TRUE(Buf.size() >= 1024);
 
   auto *Hdr = reinterpret_cast<const UstarHeader *>(Buf.data());
   EXPECT_EQ("", StringRef(Hdr->Prefix));

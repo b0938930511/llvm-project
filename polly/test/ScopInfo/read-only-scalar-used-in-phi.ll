@@ -1,4 +1,5 @@
-; RUN: opt %loadPolly -polly-print-scops -disable-output < %s | FileCheck %s
+; RUN: opt %loadPolly -analyze -polly-scops \
+; RUN: < %s | FileCheck %s
 ;
 ;    float foo(float sum, float A[]) {
 ;
@@ -37,7 +38,7 @@
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 
-define float @foo(float %sum, ptr %A) {
+define float @foo(float %sum, float* %A) {
 bb:
   br label %next
 
@@ -47,8 +48,8 @@ next:
 bb1:
   %i = phi i64 [ 0, %next ], [ %i.next, %bb1 ]
   %phisum = phi float [ %sum, %next ], [ %tmp5, %bb1 ]
-  %tmp = getelementptr inbounds float, ptr %A, i64 %i
-  %tmp4 = load float, ptr %tmp, align 4
+  %tmp = getelementptr inbounds float, float* %A, i64 %i
+  %tmp4 = load float, float* %tmp, align 4
   %tmp5 = fadd float %phisum, %tmp4
   %i.next = add nuw nsw i64 %i, 1
   %exitcond = icmp ne i64 %i, 100

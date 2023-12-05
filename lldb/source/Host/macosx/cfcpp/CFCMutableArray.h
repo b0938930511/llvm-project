@@ -21,7 +21,7 @@ public:
                                                           // the same array and
                                                           // just bump the ref
                                                           // count
-  ~CFCMutableArray() override;
+  virtual ~CFCMutableArray();
 
   CFIndex GetCount() const;
   CFIndex GetCountOfValue(const void *value) const;

@@ -10,15 +10,13 @@
 #define LLVM_CLANG_LEX_PREPROCESSOROPTIONS_H_
 
 #include "clang/Basic/BitmaskEnum.h"
-#include "clang/Basic/FileEntry.h"
 #include "clang/Basic/LLVM.h"
-#include "clang/Lex/DependencyDirectivesScanner.h"
+#include "clang/Lex/PreprocessorExcludedConditionalDirectiveSkipMapping.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include <functional>
 #include <map>
 #include <memory>
-#include <optional>
 #include <set>
 #include <string>
 #include <utility>
@@ -68,9 +66,6 @@ public:
   std::vector<std::pair<std::string, bool/*isUndef*/>> Macros;
   std::vector<std::string> Includes;
   std::vector<std::string> MacroIncludes;
-
-  /// Perform extra checks when loading PCM files for mutable file systems.
-  bool ModulesCheckRelocated = true;
 
   /// Initialize the preprocessor with the compiler and target specific
   /// predefines.
@@ -133,8 +128,7 @@ public:
   ///
   /// When the lexer is done, one of the things that need to be preserved is the
   /// conditional #if stack, so the ASTWriter/ASTReader can save/restore it when
-  /// processing the rest of the file. Similarly, we track an unterminated
-  /// #pragma assume_nonnull.
+  /// processing the rest of the file.
   bool GeneratePreamble = false;
 
   /// Whether to write comment locations into the PCH when building it.
@@ -151,6 +145,9 @@ public:
 
   /// When enabled, the preprocessor will construct editor placeholder tokens.
   bool LexEditorPlaceholders = true;
+
+  /// When enabled, the preprocessor will expand special builtin macros.
+  bool LexExpandSpecialBuiltins = true;
 
   /// True if the SourceManager should report the original file name for
   /// contents of files that were remapped to other files. Defaults to true.
@@ -205,27 +202,19 @@ public:
   /// build it again.
   std::shared_ptr<FailedModulesSet> FailedModules;
 
-  /// Function for getting the dependency preprocessor directives of a file.
+  /// Contains the currently active skipped range mappings for skipping excluded
+  /// conditional directives.
   ///
-  /// These are directives derived from a special form of lexing where the
-  /// source input is scanned for the preprocessor directives that might have an
-  /// effect on the dependencies for a compilation unit.
-  ///
-  /// Enables a client to cache the directives for a file and provide them
-  /// across multiple compiler invocations.
-  /// FIXME: Allow returning an error.
-  std::function<std::optional<ArrayRef<dependency_directives_scan::Directive>>(
-      FileEntryRef)>
-      DependencyDirectivesForFile;
+  /// The pointer is passed to the Preprocessor when it's constructed. The
+  /// pointer is unowned, the client is responsible for its lifetime.
+  ExcludedPreprocessorDirectiveSkipMapping
+      *ExcludedConditionalDirectiveSkipMappings = nullptr;
 
   /// Set up preprocessor for RunAnalysis action.
   bool SetUpStaticAnalyzer = false;
 
   /// Prevents intended crashes when using #pragma clang __debug. For testing.
   bool DisablePragmaDebugCrash = false;
-
-  /// If set, the UNIX timestamp specified by SOURCE_DATE_EPOCH.
-  std::optional<uint64_t> SourceDateEpoch;
 
 public:
   PreprocessorOptions() : PrecompiledPreambleBytes(0, false) {}
@@ -260,6 +249,7 @@ public:
     ImplicitPCHInclude.clear();
     SingleFileParseMode = false;
     LexEditorPlaceholders = true;
+    LexExpandSpecialBuiltins = true;
     RetainRemappedFileBuffers = true;
     PrecompiledPreambleBytes.first = 0;
     PrecompiledPreambleBytes.second = false;

@@ -11,8 +11,8 @@ void foo1(void*);
 void foo2(void* const);
 
 
-void bar(void) {
-  // CHECK:  FunctionDecl {{.*}} <line:{{.*}}, line:{{.*}}> line:{{.*}} bar 'void (void)'
+void bar() {
+  // CHECK:  FunctionDecl {{.*}} <line:{{.*}}, line:{{.*}}> line:{{.*}} bar 'void ()'
 
   foo1(0);
   // CHECK: ImplicitCastExpr {{.*}} <col:{{.*}}> 'void *' <NullToPointer>

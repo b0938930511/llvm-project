@@ -32,7 +32,7 @@ enum PartialMappingIdx {
   PMI_Min = PMI_GPR,
 };
 
-const RegisterBankInfo::PartialMapping PartMappings[]{
+RegisterBankInfo::PartialMapping PartMappings[]{
     {0, 32, GPRBRegBank},
     {0, 32, FPRBRegBank},
     {0, 64, FPRBRegBank},
@@ -47,7 +47,7 @@ enum ValueMappingIdx {
     MSAIdx = 10
 };
 
-const RegisterBankInfo::ValueMapping ValueMappings[] = {
+RegisterBankInfo::ValueMapping ValueMappings[] = {
     // invalid
     {nullptr, 0},
     // up to 3 operands in GPRs
@@ -73,7 +73,8 @@ const RegisterBankInfo::ValueMapping ValueMappings[] = {
 
 using namespace llvm;
 
-MipsRegisterBankInfo::MipsRegisterBankInfo(const TargetRegisterInfo &TRI) {}
+MipsRegisterBankInfo::MipsRegisterBankInfo(const TargetRegisterInfo &TRI)
+    : MipsGenRegisterBankInfo() {}
 
 const RegisterBank &
 MipsRegisterBankInfo::getRegBankFromRegClass(const TargetRegisterClass &RC,
@@ -153,7 +154,8 @@ static bool isGprbTwoInstrUnalignedLoadOrStore(const MachineInstr *MI) {
   if (MI->getOpcode() == TargetOpcode::G_LOAD ||
       MI->getOpcode() == TargetOpcode::G_STORE) {
     auto MMO = *MI->memoperands_begin();
-    const MipsSubtarget &STI = MI->getMF()->getSubtarget<MipsSubtarget>();
+    const MipsSubtarget &STI =
+        static_cast<const MipsSubtarget &>(MI->getMF()->getSubtarget());
     if (MMO->getSize() == 4 && (!STI.systemSupportsUnalignedAccess() &&
                                 MMO->getAlign() < MMO->getSize()))
       return true;
@@ -184,7 +186,7 @@ void MipsRegisterBankInfo::AmbiguousRegDefUseContainer::addDefUses(
     MachineInstr *NonCopyInstr = skipCopiesOutgoing(&UseMI);
     // Copy with many uses.
     if (NonCopyInstr->getOpcode() == TargetOpcode::COPY &&
-        !NonCopyInstr->getOperand(0).getReg().isPhysical())
+        !Register::isPhysicalRegister(NonCopyInstr->getOperand(0).getReg()))
       addDefUses(NonCopyInstr->getOperand(0).getReg(), MRI);
     else
       DefUses.push_back(skipCopiesOutgoing(&UseMI));
@@ -206,7 +208,7 @@ MipsRegisterBankInfo::AmbiguousRegDefUseContainer::skipCopiesOutgoing(
   const MachineRegisterInfo &MRI = MF.getRegInfo();
   MachineInstr *Ret = MI;
   while (Ret->getOpcode() == TargetOpcode::COPY &&
-         !Ret->getOperand(0).getReg().isPhysical() &&
+         !Register::isPhysicalRegister(Ret->getOperand(0).getReg()) &&
          MRI.hasOneUse(Ret->getOperand(0).getReg())) {
     Ret = &(*MRI.use_instr_begin(Ret->getOperand(0).getReg()));
   }
@@ -220,7 +222,7 @@ MipsRegisterBankInfo::AmbiguousRegDefUseContainer::skipCopiesIncoming(
   const MachineRegisterInfo &MRI = MF.getRegInfo();
   MachineInstr *Ret = MI;
   while (Ret->getOpcode() == TargetOpcode::COPY &&
-         !Ret->getOperand(1).getReg().isPhysical())
+         !Register::isPhysicalRegister(Ret->getOperand(1).getReg()))
     Ret = MRI.getVRegDef(Ret->getOperand(1).getReg());
   return Ret;
 }
@@ -360,7 +362,7 @@ void MipsRegisterBankInfo::TypeInfoForMF::setTypes(const MachineInstr *MI,
 
 void MipsRegisterBankInfo::TypeInfoForMF::setTypesAccordingToPhysicalRegister(
     const MachineInstr *MI, const MachineInstr *CopyInst, unsigned Op) {
-  assert((CopyInst->getOperand(Op).getReg().isPhysical()) &&
+  assert((Register::isPhysicalRegister(CopyInst->getOperand(Op).getReg())) &&
          "Copies of non physical registers should not be considered here.\n");
 
   const MachineFunction &MF = *CopyInst->getMF();
@@ -397,7 +399,7 @@ void MipsRegisterBankInfo::TypeInfoForMF::cleanupIfNewFunction(
 
 static const MipsRegisterBankInfo::ValueMapping *
 getMSAMapping(const MachineFunction &MF) {
-  assert(MF.getSubtarget<MipsSubtarget>().hasMSA() &&
+  assert(static_cast<const MipsSubtarget &>(MF.getSubtarget()).hasMSA() &&
          "MSA mapping not available on target without MSA.");
   return &Mips::ValueMappings[Mips::MSAIdx];
 }
@@ -675,15 +677,9 @@ using InstListTy = GISelWorkList<4>;
 namespace {
 class InstManager : public GISelChangeObserver {
   InstListTy &InstList;
-  MachineIRBuilder &B;
 
 public:
-  InstManager(MachineIRBuilder &B, InstListTy &Insts) : InstList(Insts), B(B) {
-    assert(!B.isObservingChanges());
-    B.setChangeObserver(*this);
-  }
-
-  ~InstManager() { B.stopObservingChanges(); }
+  InstManager(InstListTy &Insts) : InstList(Insts) {}
 
   void createdInstr(MachineInstr &MI) override { InstList.insert(&MI); }
   void erasingInstr(MachineInstr &MI) override {}
@@ -730,18 +726,17 @@ combineAwayG_UNMERGE_VALUES(LegalizationArtifactCombiner &ArtCombiner,
 }
 
 void MipsRegisterBankInfo::applyMappingImpl(
-    MachineIRBuilder &Builder, const OperandsMapper &OpdMapper) const {
+    const OperandsMapper &OpdMapper) const {
   MachineInstr &MI = OpdMapper.getMI();
-  Builder.setInstrAndDebugLoc(MI);
-
   InstListTy NewInstrs;
   MachineFunction *MF = MI.getMF();
   MachineRegisterInfo &MRI = OpdMapper.getMRI();
   const LegalizerInfo &LegInfo = *MF->getSubtarget().getLegalizerInfo();
 
-  InstManager NewInstrObserver(Builder, NewInstrs);
-  LegalizerHelper Helper(*MF, NewInstrObserver, Builder);
-  LegalizationArtifactCombiner ArtCombiner(Builder, MF->getRegInfo(), LegInfo);
+  InstManager NewInstrObserver(NewInstrs);
+  MachineIRBuilder B(MI, NewInstrObserver);
+  LegalizerHelper Helper(*MF, NewInstrObserver, B);
+  LegalizationArtifactCombiner ArtCombiner(B, MF->getRegInfo(), LegInfo);
 
   switch (MI.getOpcode()) {
   case TargetOpcode::G_LOAD:

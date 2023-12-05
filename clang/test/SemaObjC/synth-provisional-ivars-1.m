@@ -1,5 +1,6 @@
 // RUN: %clang_cc1 -fsyntax-only -verify -Wno-objc-root-class %s
 // expected-no-diagnostics
+// rdar://8913053
 
 typedef unsigned char BOOL;
 
@@ -10,7 +11,7 @@ typedef unsigned char BOOL;
 @property(assign) BOOL isAppleInternal;
 @end
 
-static BOOL isAppleInternal(void) {return 0; }
+static BOOL isAppleInternal() {return 0; }
 
 @implementation MailApp
 

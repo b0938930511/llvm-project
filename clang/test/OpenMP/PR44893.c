@@ -2,13 +2,13 @@
 
 // Do not crash ;)
 
-void foo(void)
+void foo()
 {
 #pragma omp critical
   ;
 }
 
-void bar(void)
+void bar()
 {
   foo();
   foo();

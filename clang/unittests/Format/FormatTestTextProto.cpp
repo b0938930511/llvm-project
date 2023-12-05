@@ -6,21 +6,43 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "FormatTestBase.h"
+#include "FormatTestUtils.h"
+#include "clang/Format/Format.h"
+#include "llvm/Support/Debug.h"
+#include "gtest/gtest.h"
 
-#define DEBUG_TYPE "format-test-text-proto"
+#define DEBUG_TYPE "format-test"
 
 namespace clang {
 namespace format {
-namespace test {
-namespace {
 
-class FormatTestTextProto : public FormatTestBase {
+class FormatTestTextProto : public ::testing::Test {
 protected:
-  virtual FormatStyle getDefaultStyle() const override {
+  static std::string format(llvm::StringRef Code, unsigned Offset,
+                            unsigned Length, const FormatStyle &Style) {
+    LLVM_DEBUG(llvm::errs() << "---\n");
+    LLVM_DEBUG(llvm::errs() << Code << "\n\n");
+    std::vector<tooling::Range> Ranges(1, tooling::Range(Offset, Length));
+    tooling::Replacements Replaces = reformat(Style, Code, Ranges);
+    auto Result = applyAllReplacements(Code, Replaces);
+    EXPECT_TRUE(static_cast<bool>(Result));
+    LLVM_DEBUG(llvm::errs() << "\n" << *Result << "\n\n");
+    return *Result;
+  }
+
+  static std::string format(llvm::StringRef Code, const FormatStyle &Style) {
+    return format(Code, 0, Code.size(), Style);
+  }
+
+  static void verifyFormat(llvm::StringRef Code, const FormatStyle &Style) {
+    EXPECT_EQ(Code.str(), format(Code, Style)) << "Expected code is not stable";
+    EXPECT_EQ(Code.str(), format(test::messUp(Code), Style));
+  }
+
+  static void verifyFormat(llvm::StringRef Code) {
     FormatStyle Style = getGoogleStyle(FormatStyle::LK_TextProto);
     Style.ColumnLimit = 60; // To make writing tests easier.
-    return Style;
+    verifyFormat(Code, Style);
   }
 };
 
@@ -370,7 +392,7 @@ TEST_F(FormatTestTextProto, UnderstandsHashComments) {
             "### another triple-hash comment\n"
             "#### a quadriple-hash comment\n"
             "dd: 100\n"
-            "#### another quadriple-hash comment",
+            "#### another quadriple-hash comment\n",
             format("aaa: 100\n"
                    "##this is a double-hash comment.\n"
                    "bb: 100\n"
@@ -380,24 +402,7 @@ TEST_F(FormatTestTextProto, UnderstandsHashComments) {
                    "### another triple-hash comment\n"
                    "####a quadriple-hash comment\n"
                    "dd: 100\n"
-                   "#### another quadriple-hash comment",
-                   Style));
-
-  // Ensure we support a common pattern for naming sections.
-  EXPECT_EQ("##############\n"
-            "# section name\n"
-            "##############",
-            format("##############\n"
-                   "# section name\n"
-                   "##############",
-                   Style));
-
-  EXPECT_EQ("///////////////\n"
-            "// section name\n"
-            "///////////////",
-            format("///////////////\n"
-                   "// section name\n"
-                   "///////////////",
+                   "#### another quadriple-hash comment\n",
                    Style));
 }
 
@@ -540,7 +545,7 @@ TEST_F(FormatTestTextProto, AcceptsOperatorAsKey) {
 
 TEST_F(FormatTestTextProto, BreaksConsecutiveStringLiterals) {
   verifyFormat("ala: \"str1\"\n"
-               "     \"str2\"");
+               "     \"str2\"\n");
 }
 
 TEST_F(FormatTestTextProto, PutsMultipleEntriesInExtensionsOnNewlines) {
@@ -669,7 +674,7 @@ TEST_F(FormatTestTextProto, BreaksEntriesOfSubmessagesContainingSubmessages) {
                "  key: 1\n"
                "  sub: {}\n"
                "}\n"
-               "# comment");
+               "# comment\n");
   verifyFormat("sub: {\n"
                "  key: 1\n"
                "  # comment\n"
@@ -735,7 +740,5 @@ TEST_F(FormatTestTextProto, KeepsAmpersandsNextToKeys) {
                "}");
 }
 
-} // namespace
-} // namespace test
 } // namespace format
 } // end namespace clang

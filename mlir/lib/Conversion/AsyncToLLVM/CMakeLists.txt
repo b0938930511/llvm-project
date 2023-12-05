@@ -11,11 +11,10 @@ add_mlir_conversion_library(MLIRAsyncToLLVM
   Core
 
   LINK_LIBS PUBLIC
-  MLIRArithDialect
-  MLIRAsyncDialect
-  MLIRFuncToLLVM
-  MLIRFuncTransforms
+  MLIRAsync
   MLIRLLVMCommonConversion
-  MLIRLLVMDialect
+  MLIRLLVMIR
+  MLIRStandardOpsTransforms
+  MLIRStandardToLLVM
   MLIRTransforms
   )

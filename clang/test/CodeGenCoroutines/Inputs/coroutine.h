@@ -1,7 +1,6 @@
-// This is a mock file for <coroutine>.
 #pragma once
 
-namespace std {
+namespace std { namespace experimental { inline namespace coroutines_v1 {
 
 template <typename R, typename...> struct coroutine_traits {
   using promise_type = typename R::promise_type;
@@ -53,58 +52,24 @@ template <typename Promise> struct coroutine_handle : coroutine_handle<> {
   }
 };
 
-template <typename _PromiseT>
-bool operator==(coroutine_handle<_PromiseT> const &_Left,
-                coroutine_handle<_PromiseT> const &_Right) noexcept {
-  return _Left.address() == _Right.address();
-}
-
-template <typename _PromiseT>
-bool operator!=(coroutine_handle<_PromiseT> const &_Left,
-                coroutine_handle<_PromiseT> const &_Right) noexcept {
-  return !(_Left == _Right);
-}
-
-struct noop_coroutine_promise {};
-
-template <>
-struct coroutine_handle<noop_coroutine_promise> {
-  operator coroutine_handle<>() const noexcept {
-    return coroutine_handle<>::from_address(address());
+  template <typename _PromiseT>
+  bool operator==(coroutine_handle<_PromiseT> const& _Left,
+    coroutine_handle<_PromiseT> const& _Right) noexcept
+  {
+    return _Left.address() == _Right.address();
   }
 
-  constexpr explicit operator bool() const noexcept { return true; }
-  constexpr bool done() const noexcept { return false; }
-
-  constexpr void operator()() const noexcept {}
-  constexpr void resume() const noexcept {}
-  constexpr void destroy() const noexcept {}
-
-  noop_coroutine_promise &promise() const noexcept {
-    return *static_cast<noop_coroutine_promise *>(
-        __builtin_coro_promise(this->__handle_, alignof(noop_coroutine_promise), false));
+  template <typename _PromiseT>
+  bool operator!=(coroutine_handle<_PromiseT> const& _Left,
+    coroutine_handle<_PromiseT> const& _Right) noexcept
+  {
+    return !(_Left == _Right);
   }
-
-  constexpr void *address() const noexcept { return __handle_; }
-
-private:
-  friend coroutine_handle<noop_coroutine_promise> noop_coroutine() noexcept;
-
-  coroutine_handle() noexcept {
-    this->__handle_ = __builtin_coro_noop();
-  }
-
-  void *__handle_ = nullptr;
-};
-
-using noop_coroutine_handle = coroutine_handle<noop_coroutine_promise>;
-
-inline noop_coroutine_handle noop_coroutine() noexcept { return noop_coroutine_handle(); }
 
 struct suspend_always {
-  bool await_ready() noexcept { return false; }
-  void await_suspend(coroutine_handle<>) noexcept {}
-  void await_resume() noexcept {}
+  bool await_ready() { return false; }
+  void await_suspend(coroutine_handle<>) {}
+  void await_resume() {}
 };
 struct suspend_never {
   bool await_ready() noexcept { return true; }
@@ -112,4 +77,4 @@ struct suspend_never {
   void await_resume() noexcept {}
 };
 
-} // namespace std
+}}}

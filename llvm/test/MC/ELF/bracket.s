@@ -4,5 +4,5 @@
 // CHECK: error: expected ']' in brackets expression
 .size	x, [.-x)
 
-// CHECK: :[[#@LINE+1]]:14: error: expected ')'
+// CHECK: error: expected ')' in parentheses expression
 .size	y, (.-y]

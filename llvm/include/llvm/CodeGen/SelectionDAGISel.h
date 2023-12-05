@@ -16,14 +16,12 @@
 
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/SelectionDAG.h"
+#include "llvm/CodeGen/TargetSubtargetInfo.h"
 #include "llvm/IR/BasicBlock.h"
 #include <memory>
 
 namespace llvm {
 class AAResults;
-class AssumptionCache;
-class TargetInstrInfo;
-class TargetMachine;
 class SelectionDAGBuilder;
 class SDValue;
 class MachineRegisterInfo;
@@ -48,10 +46,9 @@ public:
   MachineRegisterInfo *RegInfo;
   SelectionDAG *CurDAG;
   std::unique_ptr<SelectionDAGBuilder> SDB;
-  AAResults *AA = nullptr;
-  AssumptionCache *AC = nullptr;
-  GCFunctionInfo *GFI = nullptr;
-  CodeGenOptLevel OptLevel;
+  AAResults *AA;
+  GCFunctionInfo *GFI;
+  CodeGenOpt::Level OptLevel;
   const TargetInstrInfo *TII;
   const TargetLowering *TLI;
   bool FastISelFailed;
@@ -61,15 +58,10 @@ public:
   /// Used to report things like combines and FastISel failures.
   std::unique_ptr<OptimizationRemarkEmitter> ORE;
 
-  /// True if the function currently processing is in the function printing list
-  /// (i.e. `-filter-print-funcs`).
-  /// This is primarily used by ISEL_DUMP, which spans in multiple member
-  /// functions. Storing the filter result here so that we only need to do the
-  /// filtering once.
-  bool MatchFilterFuncName = false;
+  static char ID;
 
-  explicit SelectionDAGISel(char &ID, TargetMachine &tm,
-                            CodeGenOptLevel OL = CodeGenOptLevel::Default);
+  explicit SelectionDAGISel(TargetMachine &tm,
+                            CodeGenOpt::Level OL = CodeGenOpt::Default);
   ~SelectionDAGISel() override;
 
   const TargetLowering *getTargetLowering() const { return TLI; }
@@ -96,10 +88,9 @@ public:
   /// not match or is not implemented, return true.  The resultant operands
   /// (which will appear in the machine instruction) should be added to the
   /// OutOps vector.
-  virtual bool
-  SelectInlineAsmMemoryOperand(const SDValue &Op,
-                               InlineAsm::ConstraintCode ConstraintID,
-                               std::vector<SDValue> &OutOps) {
+  virtual bool SelectInlineAsmMemoryOperand(const SDValue &Op,
+                                            unsigned ConstraintID,
+                                            std::vector<SDValue> &OutOps) {
     return true;
   }
 
@@ -112,7 +103,7 @@ public:
   /// FIXME: This is a static member function because the MSP430/X86
   /// targets, which uses it during isel.  This could become a proper member.
   static bool IsLegalToFold(SDValue N, SDNode *U, SDNode *Root,
-                            CodeGenOptLevel OptLevel,
+                            CodeGenOpt::Level OptLevel,
                             bool IgnoreChains = false);
 
   static void InvalidateNodeId(SDNode *N);
@@ -124,33 +115,18 @@ public:
   enum BuiltinOpcodes {
     OPC_Scope,
     OPC_RecordNode,
-    OPC_RecordChild0,
-    OPC_RecordChild1,
-    OPC_RecordChild2,
-    OPC_RecordChild3,
-    OPC_RecordChild4,
-    OPC_RecordChild5,
-    OPC_RecordChild6,
-    OPC_RecordChild7,
+    OPC_RecordChild0, OPC_RecordChild1, OPC_RecordChild2, OPC_RecordChild3,
+    OPC_RecordChild4, OPC_RecordChild5, OPC_RecordChild6, OPC_RecordChild7,
     OPC_RecordMemRef,
     OPC_CaptureGlueInput,
     OPC_MoveChild,
-    OPC_MoveChild0,
-    OPC_MoveChild1,
-    OPC_MoveChild2,
-    OPC_MoveChild3,
-    OPC_MoveChild4,
-    OPC_MoveChild5,
-    OPC_MoveChild6,
-    OPC_MoveChild7,
+    OPC_MoveChild0, OPC_MoveChild1, OPC_MoveChild2, OPC_MoveChild3,
+    OPC_MoveChild4, OPC_MoveChild5, OPC_MoveChild6, OPC_MoveChild7,
     OPC_MoveParent,
     OPC_CheckSame,
-    OPC_CheckChild0Same,
-    OPC_CheckChild1Same,
-    OPC_CheckChild2Same,
-    OPC_CheckChild3Same,
+    OPC_CheckChild0Same, OPC_CheckChild1Same,
+    OPC_CheckChild2Same, OPC_CheckChild3Same,
     OPC_CheckPatternPredicate,
-    OPC_CheckPatternPredicate2,
     OPC_CheckPredicate,
     OPC_CheckPredicateWithOperands,
     OPC_CheckOpcode,
@@ -158,39 +134,22 @@ public:
     OPC_CheckType,
     OPC_CheckTypeRes,
     OPC_SwitchType,
-    OPC_CheckChild0Type,
-    OPC_CheckChild1Type,
-    OPC_CheckChild2Type,
-    OPC_CheckChild3Type,
-    OPC_CheckChild4Type,
-    OPC_CheckChild5Type,
-    OPC_CheckChild6Type,
-    OPC_CheckChild7Type,
+    OPC_CheckChild0Type, OPC_CheckChild1Type, OPC_CheckChild2Type,
+    OPC_CheckChild3Type, OPC_CheckChild4Type, OPC_CheckChild5Type,
+    OPC_CheckChild6Type, OPC_CheckChild7Type,
     OPC_CheckInteger,
-    OPC_CheckChild0Integer,
-    OPC_CheckChild1Integer,
-    OPC_CheckChild2Integer,
-    OPC_CheckChild3Integer,
-    OPC_CheckChild4Integer,
-    OPC_CheckCondCode,
-    OPC_CheckChild2CondCode,
+    OPC_CheckChild0Integer, OPC_CheckChild1Integer, OPC_CheckChild2Integer,
+    OPC_CheckChild3Integer, OPC_CheckChild4Integer,
+    OPC_CheckCondCode, OPC_CheckChild2CondCode,
     OPC_CheckValueType,
     OPC_CheckComplexPat,
-    OPC_CheckAndImm,
-    OPC_CheckOrImm,
+    OPC_CheckAndImm, OPC_CheckOrImm,
     OPC_CheckImmAllOnesV,
     OPC_CheckImmAllZerosV,
     OPC_CheckFoldableChainNode,
 
     OPC_EmitInteger,
-    // Space-optimized forms that implicitly encode integer VT.
-    OPC_EmitInteger8,
-    OPC_EmitInteger16,
-    OPC_EmitInteger32,
-    OPC_EmitInteger64,
     OPC_EmitStringInteger,
-    // Space-optimized forms that implicitly encode integer VT.
-    OPC_EmitStringInteger32,
     OPC_EmitRegister,
     OPC_EmitRegister2,
     OPC_EmitConvertToTarget,
@@ -203,14 +162,10 @@ public:
     OPC_EmitNodeXForm,
     OPC_EmitNode,
     // Space-optimized forms that implicitly encode number of result VTs.
-    OPC_EmitNode0,
-    OPC_EmitNode1,
-    OPC_EmitNode2,
+    OPC_EmitNode0, OPC_EmitNode1, OPC_EmitNode2,
     OPC_MorphNodeTo,
     // Space-optimized forms that implicitly encode number of result VTs.
-    OPC_MorphNodeTo0,
-    OPC_MorphNodeTo1,
-    OPC_MorphNodeTo2,
+    OPC_MorphNodeTo0, OPC_MorphNodeTo1, OPC_MorphNodeTo2,
     OPC_CompleteMatch,
     // Contains offset in table for pattern being selected
     OPC_Coverage
@@ -244,7 +199,7 @@ public:
 protected:
   /// DAGSize - Size of DAG being instruction selected.
   ///
-  unsigned DAGSize = 0;
+  unsigned DAGSize;
 
   /// ReplaceUses - replace all uses of the old node F with the use
   /// of the new node T.
@@ -364,14 +319,6 @@ private:
 
   void Select_FREEZE(SDNode *N);
   void Select_ARITH_FENCE(SDNode *N);
-  void Select_MEMBARRIER(SDNode *N);
-
-  void pushStackMapLiveVariable(SmallVectorImpl<SDValue> &Ops, SDValue Operand,
-                                SDLoc DL);
-  void Select_STACKMAP(SDNode *N);
-  void Select_PATCHPOINT(SDNode *N);
-
-  void Select_JUMP_TABLE_DEBUG_INFO(SDNode *N);
 
 private:
   void DoInstructionSelection();
@@ -382,9 +329,6 @@ private:
   /// personality specific tasks. Returns true if the block should be
   /// instruction selected, false if no code should be emitted for it.
   bool PrepareEHLandingPad();
-
-  // Mark and Report IPToState for each Block under AsynchEH
-  void reportIPToStateForBlocks(MachineFunction *Fn);
 
   /// Perform instruction selection on all basic blocks in the function.
   void SelectAllBasicBlocks(const Function &Fn);

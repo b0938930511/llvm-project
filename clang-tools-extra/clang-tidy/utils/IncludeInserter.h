@@ -13,11 +13,11 @@
 #include "clang/Basic/Diagnostic.h"
 #include "llvm/ADT/StringSet.h"
 #include <memory>
-#include <optional>
 
 namespace clang {
 class Preprocessor;
-namespace tidy::utils {
+namespace tidy {
+namespace utils {
 
 /// Produces fixes to insert specified includes to source files, if not
 /// yet present.
@@ -59,8 +59,7 @@ public:
   /// using \code
   ///   Options.getLocalOrGlobal("IncludeStyle", <DefaultStyle>)
   /// \endcode
-  explicit IncludeInserter(IncludeSorter::IncludeStyle Style,
-                           bool SelfContainedDiags);
+  explicit IncludeInserter(IncludeSorter::IncludeStyle Style);
 
   /// Registers this with the Preprocessor \p PP, must be called before this
   /// class is used.
@@ -69,17 +68,17 @@ public:
   /// Creates a \p Header inclusion directive fixit in the File \p FileID.
   /// When \p Header is enclosed in angle brackets, uses angle brackets in the
   /// inclusion directive, otherwise uses quotes.
-  /// Returns ``std::nullopt`` on error or if the inclusion directive already
+  /// Returns ``llvm::None`` on error or if the inclusion directive already
   /// exists.
-  std::optional<FixItHint> createIncludeInsertion(FileID FileID,
-                                                  llvm::StringRef Header);
+  llvm::Optional<FixItHint> createIncludeInsertion(FileID FileID,
+                                                   llvm::StringRef Header);
 
   /// Creates a \p Header inclusion directive fixit in the main file.
   /// When \p Header is enclosed in angle brackets, uses angle brackets in the
   /// inclusion directive, otherwise uses quotes.
-  /// Returns ``std::nullopt`` on error or if the inclusion directive already
+  /// Returns ``llvm::None`` on error or if the inclusion directive already
   /// exists.
-  std::optional<FixItHint>
+  llvm::Optional<FixItHint>
   createMainFileIncludeInsertion(llvm::StringRef Header);
 
   IncludeSorter::IncludeStyle getStyle() const { return Style; }
@@ -94,10 +93,10 @@ private:
   llvm::DenseMap<FileID, llvm::StringSet<>> InsertedHeaders;
   const SourceManager *SourceMgr{nullptr};
   const IncludeSorter::IncludeStyle Style;
-  const bool SelfContainedDiags;
   friend class IncludeInserterCallback;
 };
 
-} // namespace tidy::utils
+} // namespace utils
+} // namespace tidy
 } // namespace clang
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_INCLUDEINSERTER_H

@@ -15,6 +15,7 @@
 #define LLVM_EXECUTIONENGINE_ORC_OBJECTLINKINGLAYER_H
 
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ExecutionEngine/JITLink/JITLink.h"
 #include "llvm/ExecutionEngine/JITSymbol.h"
@@ -36,6 +37,10 @@ class EHFrameRegistrar;
 class LinkGraph;
 class Symbol;
 } // namespace jitlink
+
+namespace object {
+class ObjectFile;
+} // namespace object
 
 namespace orc {
 
@@ -79,8 +84,8 @@ public:
       return Error::success();
     }
     virtual Error notifyFailed(MaterializationResponsibility &MR) = 0;
-    virtual Error notifyRemovingResources(JITDylib &JD, ResourceKey K) = 0;
-    virtual void notifyTransferringResources(JITDylib &JD, ResourceKey DstKey,
+    virtual Error notifyRemovingResources(ResourceKey K) = 0;
+    virtual void notifyTransferringResources(ResourceKey DstKey,
                                              ResourceKey SrcKey) = 0;
 
     /// Return any dependencies that synthetic symbols (e.g. init symbols)
@@ -179,17 +184,16 @@ public:
   }
 
 private:
-  using FinalizedAlloc = jitlink::JITLinkMemoryManager::FinalizedAlloc;
+  using AllocPtr = std::unique_ptr<jitlink::JITLinkMemoryManager::Allocation>;
 
   void modifyPassConfig(MaterializationResponsibility &MR,
                         jitlink::LinkGraph &G,
                         jitlink::PassConfiguration &PassConfig);
   void notifyLoaded(MaterializationResponsibility &MR);
-  Error notifyEmitted(MaterializationResponsibility &MR, FinalizedAlloc FA);
+  Error notifyEmitted(MaterializationResponsibility &MR, AllocPtr Alloc);
 
-  Error handleRemoveResources(JITDylib &JD, ResourceKey K) override;
-  void handleTransferResources(JITDylib &JD, ResourceKey DstKey,
-                               ResourceKey SrcKey) override;
+  Error handleRemoveResources(ResourceKey K) override;
+  void handleTransferResources(ResourceKey DstKey, ResourceKey SrcKey) override;
 
   mutable std::mutex LayerMutex;
   jitlink::JITLinkMemoryManager &MemMgr;
@@ -197,7 +201,7 @@ private:
   bool OverrideObjectFlags = false;
   bool AutoClaimObjectSymbols = false;
   ReturnObjectBufferFunction ReturnObjectBuffer;
-  DenseMap<ResourceKey, std::vector<FinalizedAlloc>> Allocs;
+  DenseMap<ResourceKey, std::vector<AllocPtr>> Allocs;
   std::vector<std::unique_ptr<Plugin>> Plugins;
 };
 
@@ -211,16 +215,22 @@ public:
                         jitlink::PassConfiguration &PassConfig) override;
   Error notifyEmitted(MaterializationResponsibility &MR) override;
   Error notifyFailed(MaterializationResponsibility &MR) override;
-  Error notifyRemovingResources(JITDylib &JD, ResourceKey K) override;
-  void notifyTransferringResources(JITDylib &JD, ResourceKey DstKey,
+  Error notifyRemovingResources(ResourceKey K) override;
+  void notifyTransferringResources(ResourceKey DstKey,
                                    ResourceKey SrcKey) override;
 
 private:
+
+  struct EHFrameRange {
+    JITTargetAddress Addr = 0;
+    size_t Size;
+  };
+
   std::mutex EHFramePluginMutex;
   ExecutionSession &ES;
   std::unique_ptr<jitlink::EHFrameRegistrar> Registrar;
-  DenseMap<MaterializationResponsibility *, ExecutorAddrRange> InProcessLinks;
-  DenseMap<ResourceKey, std::vector<ExecutorAddrRange>> EHFrameRanges;
+  DenseMap<MaterializationResponsibility *, EHFrameRange> InProcessLinks;
+  DenseMap<ResourceKey, std::vector<EHFrameRange>> EHFrameRanges;
 };
 
 } // end namespace orc

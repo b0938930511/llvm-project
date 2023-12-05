@@ -8,6 +8,7 @@
 
 #include "lldb/Interpreter/OptionValueSInt64.h"
 
+#include "lldb/Host/StringConvert.h"
 #include "lldb/Utility/Stream.h"
 
 using namespace lldb;
@@ -40,9 +41,10 @@ Status OptionValueSInt64::SetValueFromString(llvm::StringRef value_ref,
 
   case eVarSetOperationReplace:
   case eVarSetOperationAssign: {
-    llvm::StringRef value_trimmed = value_ref.trim();
-    int64_t value;
-    if (llvm::to_integer(value_trimmed, value)) {
+    bool success = false;
+    std::string value_str = value_ref.trim().str();
+    int64_t value = StringConvert::ToSInt64(value_str.c_str(), 0, 0, &success);
+    if (success) {
       if (value >= m_min_value && value <= m_max_value) {
         m_value_was_set = true;
         m_current_value = value;

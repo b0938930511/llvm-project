@@ -1,3 +1,4 @@
+; RUN: opt -strip-dead-prototypes -S -o - < %s | FileCheck %s
 ; RUN: opt -S -passes=strip-dead-prototypes < %s | FileCheck %s
 
 ; CHECK: declare i32 @f

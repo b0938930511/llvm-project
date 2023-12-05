@@ -7,11 +7,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/DebugInfo/PDB/Native/NativeTypeUDT.h"
-#include "llvm/DebugInfo/CodeView/CodeView.h"
-#include "llvm/DebugInfo/PDB/IPDBEnumChildren.h"
-#include "llvm/DebugInfo/PDB/Native/NativeSession.h"
-#include "llvm/DebugInfo/PDB/Native/SymbolCache.h"
-#include "llvm/DebugInfo/PDB/PDBExtras.h"
+
+#include "llvm/DebugInfo/CodeView/TypeDeserializer.h"
+
+#include <cassert>
 
 using namespace llvm;
 using namespace llvm::codeview;
@@ -20,12 +19,12 @@ using namespace llvm::pdb;
 NativeTypeUDT::NativeTypeUDT(NativeSession &Session, SymIndexId Id,
                              codeview::TypeIndex TI, codeview::ClassRecord CR)
     : NativeRawSymbol(Session, PDB_SymType::UDT, Id), Index(TI),
-      Class(std::move(CR)), Tag(&*Class) {}
+      Class(std::move(CR)), Tag(Class.getPointer()) {}
 
 NativeTypeUDT::NativeTypeUDT(NativeSession &Session, SymIndexId Id,
                              codeview::TypeIndex TI, codeview::UnionRecord UR)
     : NativeRawSymbol(Session, PDB_SymType::UDT, Id), Index(TI),
-      Union(std::move(UR)), Tag(&*Union) {}
+      Union(std::move(UR)), Tag(Union.getPointer()) {}
 
 NativeTypeUDT::NativeTypeUDT(NativeSession &Session, SymIndexId Id,
                              NativeTypeUDT &UnmodifiedType,
@@ -33,7 +32,7 @@ NativeTypeUDT::NativeTypeUDT(NativeSession &Session, SymIndexId Id,
     : NativeRawSymbol(Session, PDB_SymType::UDT, Id),
       UnmodifiedType(&UnmodifiedType), Modifiers(std::move(Modifier)) {}
 
-NativeTypeUDT::~NativeTypeUDT() = default;
+NativeTypeUDT::~NativeTypeUDT() {}
 
 void NativeTypeUDT::dump(raw_ostream &OS, int Indent,
                          PdbSymbolIdField ShowIdFields,
@@ -45,7 +44,7 @@ void NativeTypeUDT::dump(raw_ostream &OS, int Indent,
   dumpSymbolIdField(OS, "lexicalParentId", 0, Indent, Session,
                     PdbSymbolIdField::LexicalParent, ShowIdFields,
                     RecurseIdFields);
-  if (Modifiers)
+  if (Modifiers.hasValue())
     dumpSymbolIdField(OS, "unmodifiedTypeId", getUnmodifiedTypeId(), Indent,
                       Session, PdbSymbolIdField::UnmodifiedType, ShowIdFields,
                       RecurseIdFields);

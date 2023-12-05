@@ -1,4 +1,5 @@
-! RUN: %python %S/test_errors.py %s %flang_fc1 -pedantic
+! RUN: %S/test_errors.sh %s %t %flang_fc1
+! REQUIRES: shell
 ! Test BLOCK DATA subprogram (14.3)
 block data foo
   !ERROR: IMPORT is not allowed in a BLOCK DATA subprogram
@@ -7,12 +8,11 @@ block data foo
   !ERROR: An initialized variable in BLOCK DATA must be in a COMMON block
   integer :: notInCommon = 1
   integer :: uninitialized ! ok
-  !PORTABILITY: Procedure pointer 'q' should not have an ELEMENTAL intrinsic as its interface
   !ERROR: 'q' may not appear in a BLOCK DATA subprogram
   procedure(sin), pointer :: q => cos
   !ERROR: 'p' may not be a procedure as it is in a COMMON block
   procedure(sin), pointer :: p => cos
-  common /block/ p, pi
+  common /block/ pi, p
   !ERROR: An initialized variable in BLOCK DATA must be in a COMMON block
   integer :: inDataButNotCommon
   data inDataButNotCommon /1/
@@ -32,8 +32,4 @@ block data foo
   integer :: inCommonF1, inCommonF2
   !ERROR: 'incommonf1' is storage associated with 'incommonf2' by EQUIVALENCE elsewhere in COMMON block /f/
   common /f/ inCommonF1, inCommonF2
-  !Regression test for llvm-project/issues/65922 - no error expected
-  common /g/ inCommonG1, inCommonG2
-  real inCommonG1(-9:10), inCommonG2(10), otherG(11)
-  equivalence (inCommonG1(1), otherG), (otherG(11), inCommonG2)
 end block data

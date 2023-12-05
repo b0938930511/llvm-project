@@ -9,8 +9,8 @@ add_mlir_translation_library(MLIRAMXToLLVMIRTranslation
 
   LINK_LIBS PUBLIC
   MLIRIR
-  MLIRAMXDialect
-  MLIRLLVMDialect
+  MLIRAMX
+  MLIRLLVMIR
   MLIRSupport
   MLIRTargetLLVMIRExport
   )

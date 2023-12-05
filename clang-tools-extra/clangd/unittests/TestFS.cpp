@@ -8,26 +8,15 @@
 #include "TestFS.h"
 #include "GlobalCompilationDatabase.h"
 #include "URI.h"
-#include "support/Logger.h"
 #include "support/Path.h"
+#include "llvm/ADT/None.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Errc.h"
 #include "llvm/Support/Path.h"
-#include <optional>
 
 namespace clang {
 namespace clangd {
-
-namespace {
-
-// Tries to strip \p Prefix from beginning of \p Path. Returns true on success.
-// If \p Prefix doesn't match, leaves \p Path untouched and returns false.
-bool pathConsumeFront(PathRef &Path, PathRef Prefix) {
-  if (!pathStartsWith(Prefix, Path))
-    return false;
-  Path = Path.drop_front(Prefix.size());
-  return true;
-}
-} // namespace
 
 llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
 buildTestFS(llvm::StringMap<std::string> const &Files,
@@ -51,15 +40,15 @@ MockCompilationDatabase::MockCompilationDatabase(llvm::StringRef Directory,
   // -ffreestanding avoids implicit stdc-predef.h.
 }
 
-std::optional<ProjectInfo>
+llvm::Optional<ProjectInfo>
 MockCompilationDatabase::getProjectInfo(PathRef File) const {
   return ProjectInfo{std::string(Directory)};
 }
 
-std::optional<tooling::CompileCommand>
+llvm::Optional<tooling::CompileCommand>
 MockCompilationDatabase::getCompileCommand(PathRef File) const {
   if (ExtraClangFlags.empty())
-    return std::nullopt;
+    return None;
 
   auto FileName = llvm::sys::path::filename(File);
 
@@ -110,7 +99,7 @@ public:
   llvm::Expected<std::string>
   getAbsolutePath(llvm::StringRef /*Authority*/, llvm::StringRef Body,
                   llvm::StringRef HintPath) const override {
-    if (!HintPath.empty() && !pathStartsWith(testRoot(), HintPath))
+    if (!HintPath.empty() && !HintPath.startswith(testRoot()))
       return error("Hint path is not empty and doesn't start with {0}: {1}",
                    testRoot(), HintPath);
     if (!Body.consume_front("/"))
@@ -122,11 +111,12 @@ public:
 
   llvm::Expected<URI>
   uriFromAbsolutePath(llvm::StringRef AbsolutePath) const override {
-    if (!pathConsumeFront(AbsolutePath, testRoot()))
+    llvm::StringRef Body = AbsolutePath;
+    if (!Body.consume_front(testRoot()))
       return error("{0} does not start with {1}", AbsolutePath, testRoot());
 
     return URI(Scheme, /*Authority=*/"",
-               llvm::sys::path::convert_to_slash(AbsolutePath));
+               llvm::sys::path::convert_to_slash(Body));
   }
 };
 

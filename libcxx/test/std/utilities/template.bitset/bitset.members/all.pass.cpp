@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// bool all() const; // constexpr since C++23
+// test bool all() const;
 
 #include <bitset>
 #include <cassert>
@@ -15,7 +15,7 @@
 #include "test_macros.h"
 
 template <std::size_t N>
-TEST_CONSTEXPR_CXX23 void test_all() {
+void test_all() {
     std::bitset<N> v;
     v.reset();
     assert(v.all() == (N == 0));
@@ -27,25 +27,16 @@ TEST_CONSTEXPR_CXX23 void test_all() {
     }
 }
 
-TEST_CONSTEXPR_CXX23 bool test() {
-  test_all<0>();
-  test_all<1>();
-  test_all<31>();
-  test_all<32>();
-  test_all<33>();
-  test_all<63>();
-  test_all<64>();
-  test_all<65>();
-  test_all<1000>();
-
-  return true;
-}
-
 int main(int, char**) {
-  test();
-#if TEST_STD_VER > 20
-  static_assert(test());
-#endif
+    test_all<0>();
+    test_all<1>();
+    test_all<31>();
+    test_all<32>();
+    test_all<33>();
+    test_all<63>();
+    test_all<64>();
+    test_all<65>();
+    test_all<1000>();
 
-  return 0;
+    return 0;
 }

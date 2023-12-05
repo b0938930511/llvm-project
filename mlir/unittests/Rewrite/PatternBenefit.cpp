@@ -6,7 +6,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "mlir/IR/OwningOpRef.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Rewrite/PatternApplicator.h"
 #include "gtest/gtest.h"
@@ -21,7 +20,7 @@ TEST(PatternBenefitTest, BenefitOrder) {
   MLIRContext context;
 
   OpBuilder builder(&context);
-  OwningOpRef<ModuleOp> module = ModuleOp::create(builder.getUnknownLoc());
+  auto module = ModuleOp::create(builder.getUnknownLoc());
 
   struct Pattern1 : public OpRewritePattern<ModuleOp> {
     Pattern1(mlir::MLIRContext *context, bool *called)
@@ -72,7 +71,7 @@ TEST(PatternBenefitTest, BenefitOrder) {
   };
 
   MyPatternRewriter rewriter(&context);
-  (void)pa.matchAndRewrite(*module, rewriter);
+  (void)pa.matchAndRewrite(module, rewriter);
 
   EXPECT_TRUE(called1);
   EXPECT_TRUE(called2);

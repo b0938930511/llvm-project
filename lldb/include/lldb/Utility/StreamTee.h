@@ -19,15 +19,18 @@ namespace lldb_private {
 
 class StreamTee : public Stream {
 public:
-  StreamTee(bool colors = false) : Stream(colors) {}
+  StreamTee(bool colors = false)
+      : Stream(colors), m_streams_mutex(), m_streams() {}
 
-  StreamTee(lldb::StreamSP &stream_sp) {
+  StreamTee(lldb::StreamSP &stream_sp)
+      : Stream(), m_streams_mutex(), m_streams() {
     // No need to lock mutex during construction
     if (stream_sp)
       m_streams.push_back(stream_sp);
   }
 
-  StreamTee(lldb::StreamSP &stream_sp, lldb::StreamSP &stream_2_sp) {
+  StreamTee(lldb::StreamSP &stream_sp, lldb::StreamSP &stream_2_sp)
+      : Stream(), m_streams_mutex(), m_streams() {
     // No need to lock mutex during construction
     if (stream_sp)
       m_streams.push_back(stream_sp);
@@ -35,7 +38,8 @@ public:
       m_streams.push_back(stream_2_sp);
   }
 
-  StreamTee(const StreamTee &rhs) : Stream(rhs) {
+  StreamTee(const StreamTee &rhs)
+      : Stream(rhs), m_streams_mutex(), m_streams() {
     // Don't copy until we lock down "rhs"
     std::lock_guard<std::recursive_mutex> guard(rhs.m_streams_mutex);
     m_streams = rhs.m_streams;

@@ -11,14 +11,16 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::readability {
+namespace clang {
+namespace tidy {
+namespace readability {
 
 /// Finds variables declared as auto that could be declared as:
 /// 'auto*' or 'const auto *' and reference variables declared as:
 /// 'const auto &'.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/readability/qualified-auto.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/readability-qualified-auto.html
 class QualifiedAutoCheck : public ClangTidyCheck {
 public:
   QualifiedAutoCheck(StringRef Name, ClangTidyContext *Context)
@@ -35,6 +37,8 @@ private:
   const bool AddConstToQualified;
 };
 
-} // namespace clang::tidy::readability
+} // namespace readability
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_READABILITY_QUALIFIEDAUTOCHECK_H

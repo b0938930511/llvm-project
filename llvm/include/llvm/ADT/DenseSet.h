@@ -5,10 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-///
-/// \file
-/// This file defines the DenseSet and SmallDenseSet classes.
-///
+//
+// This file defines the DenseSet and SmallDenseSet classes.
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef LLVM_ADT_DENSESET_H
@@ -18,6 +17,7 @@
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/type_traits.h"
+#include <algorithm>
 #include <cstddef>
 #include <initializer_list>
 #include <iterator>

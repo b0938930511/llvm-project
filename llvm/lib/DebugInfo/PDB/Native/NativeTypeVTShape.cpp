@@ -1,7 +1,4 @@
 #include "llvm/DebugInfo/PDB/Native/NativeTypeVTShape.h"
-#include "llvm/DebugInfo/PDB/IPDBEnumChildren.h"
-#include "llvm/DebugInfo/PDB/Native/NativeSession.h"
-#include "llvm/DebugInfo/PDB/PDBExtras.h"
 
 using namespace llvm;
 using namespace llvm::pdb;
@@ -13,7 +10,7 @@ NativeTypeVTShape::NativeTypeVTShape(NativeSession &Session, SymIndexId Id,
     : NativeRawSymbol(Session, PDB_SymType::VTableShape, Id), TI(TI),
       Record(std::move(SR)) {}
 
-NativeTypeVTShape::~NativeTypeVTShape() = default;
+NativeTypeVTShape::~NativeTypeVTShape() {}
 
 void NativeTypeVTShape::dump(raw_ostream &OS, int Indent,
                              PdbSymbolIdField ShowIdFields,

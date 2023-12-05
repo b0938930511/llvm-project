@@ -11,39 +11,32 @@ from lldbsuite.test import lldbutil
 
 
 class ObjCDataFormatterTestCase(TestBase):
-    def appkit_tester_impl(self, commands, use_constant_classes):
-        if use_constant_classes:
-            self.build()
-        else:
-            disable_constant_classes = {
-                "CC": "xcrun clang",  # FIXME: Remove when flags are available upstream.
-                "CFLAGS_EXTRAS": "-fno-constant-nsnumber-literals "
-                + "-fno-constant-nsarray-literals "
-                + "-fno-constant-nsdictionary-literals",
-            }
-            self.build(dictionary=disable_constant_classes)
-        self.appkit_common_data_formatters_command()
-        commands()
 
-    def appkit_common_data_formatters_command(self):
-        """Test formatters for AppKit classes."""
-        self.target, process, thread, bkpt = lldbutil.run_to_source_breakpoint(
-            self, "// Set break point at this line.", lldb.SBFileSpec("main.m", False)
-        )
+   mydir = TestBase.compute_mydir(__file__)
 
-        # The stop reason of the thread should be breakpoint.
-        self.expect(
-            "thread list",
-            STOPPED_DUE_TO_BREAKPOINT,
-            substrs=["stopped", "stop reason = breakpoint"],
-        )
+   def appkit_tester_impl(self, commands):
+      self.build()
+      self.appkit_common_data_formatters_command()
+      commands()
 
-        # This is the function to remove the custom formats in order to have a
-        # clean slate for the next test case.
-        def cleanup():
-            self.runCmd("type format clear", check=False)
-            self.runCmd("type summary clear", check=False)
-            self.runCmd("type synth clear", check=False)
+   def appkit_common_data_formatters_command(self):
+      """Test formatters for AppKit classes."""
+      self.target, process, thread, bkpt = lldbutil.run_to_source_breakpoint(
+          self, '// Set break point at this line.',
+          lldb.SBFileSpec('main.m', False))
 
-        # Execute the cleanup function during test case tear down.
-        self.addTearDownHook(cleanup)
+      # The stop reason of the thread should be breakpoint.
+      self.expect(
+          "thread list",
+          STOPPED_DUE_TO_BREAKPOINT,
+          substrs=['stopped', 'stop reason = breakpoint'])
+
+      # This is the function to remove the custom formats in order to have a
+      # clean slate for the next test case.
+      def cleanup():
+         self.runCmd('type format clear', check=False)
+         self.runCmd('type summary clear', check=False)
+         self.runCmd('type synth clear', check=False)
+
+      # Execute the cleanup function during test case tear down.
+      self.addTearDownHook(cleanup)

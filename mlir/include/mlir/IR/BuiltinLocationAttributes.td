@@ -13,12 +13,11 @@
 #ifndef BUILTIN_LOCATION_ATTRIBUTES_TD
 #define BUILTIN_LOCATION_ATTRIBUTES_TD
 
-include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/BuiltinDialect.td"
 
 // Base class for Builtin dialect location attributes.
-class Builtin_LocationAttr<string name, list<Trait> traits = []>
-    : AttrDef<Builtin_Dialect, name, traits, "::mlir::LocationAttr"> {
+class Builtin_LocationAttr<string name>
+    : AttrDef<Builtin_Dialect, name, [], "::mlir::LocationAttr"> {
   let cppClassName = name;
   let mnemonic = ?;
 }
@@ -56,7 +55,6 @@ def CallSiteLoc : Builtin_LocationAttr<"CallSiteLoc"> {
                                         "ArrayRef<Location>":$frames)>
   ];
   let skipDefaultBuilders = 1;
-  let attrName = "builtin.call_site_loc";
 }
 
 //===----------------------------------------------------------------------===//
@@ -83,10 +81,10 @@ def FileLineColLoc : Builtin_LocationAttr<"FileLineColLoc"> {
     loc("mysource.cc":10:8)
     ```
   }];
-  let parameters = (ins "StringAttr":$filename, "unsigned":$line,
+  let parameters = (ins "Identifier":$filename, "unsigned":$line,
                         "unsigned":$column);
   let builders = [
-    AttrBuilderWithInferredContext<(ins "StringAttr":$filename,
+    AttrBuilderWithInferredContext<(ins "Identifier":$filename,
                                         "unsigned":$line,
                                         "unsigned":$column), [{
       return $_get(filename.getContext(), filename, line, column);
@@ -94,12 +92,11 @@ def FileLineColLoc : Builtin_LocationAttr<"FileLineColLoc"> {
     AttrBuilder<(ins "StringRef":$filename, "unsigned":$line,
                      "unsigned":$column), [{
       return $_get($_ctxt,
-                   StringAttr::get($_ctxt, filename.empty() ? "-" : filename),
+                   Identifier::get(filename.empty() ? "-" : filename, $_ctxt),
                    line, column);
     }]>
   ];
   let skipDefaultBuilders = 1;
-  let attrName = "builtin.file_line_loc";
 }
 
 //===----------------------------------------------------------------------===//
@@ -139,7 +136,6 @@ def FusedLoc : Builtin_LocationAttr<"FusedLoc"> {
       return get(locs, Attribute(), context);
     }
   }];
-  let attrName = "builtin.fused_loc";
 }
 
 //===----------------------------------------------------------------------===//
@@ -165,19 +161,18 @@ def NameLoc : Builtin_LocationAttr<"NameLoc"> {
     loc("CSE"("mysource.cc":10:8))
     ```
   }];
-  let parameters = (ins "StringAttr":$name, "Location":$childLoc);
+  let parameters = (ins "Identifier":$name, "Location":$childLoc);
   let builders = [
-    AttrBuilderWithInferredContext<(ins "StringAttr":$name,
+    AttrBuilderWithInferredContext<(ins "Identifier":$name,
                                         "Location":$childLoc), [{
       return $_get(name.getContext(), name, childLoc);
     }]>,
-    AttrBuilderWithInferredContext<(ins "StringAttr":$name), [{
+    AttrBuilderWithInferredContext<(ins "Identifier":$name), [{
       return $_get(name.getContext(), name,
                    UnknownLoc::get(name.getContext()));
     }]>
   ];
   let skipDefaultBuilders = 1;
-  let attrName = "builtin.name_loc";
 }
 
 //===----------------------------------------------------------------------===//
@@ -207,12 +202,12 @@ def OpaqueLoc : Builtin_LocationAttr<"OpaqueLoc"> {
     /// Returns an instance of opaque location which contains a given pointer to
     /// an object. The corresponding MLIR location is set to UnknownLoc.
     template <typename T>
-    static OpaqueLoc get(T underlyingLocation, MLIRContext *context);
+    static Location get(T underlyingLocation, MLIRContext *context);
 
     /// Returns an instance of opaque location which contains a given pointer to
     /// an object and an additional MLIR location.
     template <typename T>
-    static OpaqueLoc get(T underlyingLocation, Location fallbackLocation) {
+    static Location get(T underlyingLocation, Location fallbackLocation) {
       return get(reinterpret_cast<uintptr_t>(underlyingLocation),
                  TypeID::get<T>(), fallbackLocation);
     }
@@ -243,7 +238,6 @@ def OpaqueLoc : Builtin_LocationAttr<"OpaqueLoc"> {
     }
   }];
   let skipDefaultBuilders = 1;
-  let attrName = "builtin.opaque_loc";
 }
 
 //===----------------------------------------------------------------------===//
@@ -273,7 +267,6 @@ def UnknownLoc : Builtin_LocationAttr<"UnknownLoc"> {
   let extraClassDeclaration = [{
     static UnknownLoc get(MLIRContext *context);
   }];
-  let attrName = "builtin.unknown_loc";
 }
 
 #endif // BUILTIN_LOCATION_ATTRIBUTES_TD

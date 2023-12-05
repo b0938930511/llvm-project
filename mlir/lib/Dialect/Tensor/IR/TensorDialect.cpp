@@ -6,9 +6,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/InliningUtils.h"
 
@@ -25,15 +22,15 @@ namespace {
 struct TensorInlinerInterface : public DialectInlinerInterface {
   using DialectInlinerInterface::DialectInlinerInterface;
   bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
-                       IRMapping &valueMapping) const final {
+                       BlockAndValueMapping &valueMapping) const final {
     return true;
   }
   bool isLegalToInline(Operation *, Region *, bool wouldBeCloned,
-                       IRMapping &) const final {
+                       BlockAndValueMapping &) const final {
     return true;
   }
 };
-} // namespace
+} // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
 // TensorDialect Methods

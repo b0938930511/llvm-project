@@ -9,8 +9,9 @@
 #ifndef LLVM_MC_MCPARSER_MCASMPARSEREXTENSION_H
 #define LLVM_MC_MCPARSER_MCASMPARSEREXTENSION_H
 
-#include "llvm/ADT/STLFunctionalExtras.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/MC/MCParser/MCAsmLexer.h"
 #include "llvm/MC/MCParser/MCAsmParser.h"
 #include "llvm/Support/SMLoc.h"
 
@@ -22,7 +23,7 @@ class Twine;
 /// which is implemented by target and object file assembly parser
 /// implementations.
 class MCAsmParserExtension {
-  MCAsmParser *Parser = nullptr;
+  MCAsmParser *Parser;
 
 protected:
   MCAsmParserExtension();

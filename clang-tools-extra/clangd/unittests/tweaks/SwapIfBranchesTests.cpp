@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TestTU.h"
 #include "TweakTesting.h"
 #include "gmock/gmock-matchers.h"
 #include "gmock/gmock.h"
@@ -27,17 +28,19 @@ TEST_F(SwapIfBranchesTest, Test) {
   EXPECT_AVAILABLE("^i^f^^(^t^r^u^e^) { return; } ^e^l^s^e^ { return; }");
   EXPECT_UNAVAILABLE("if (true) {^return ^;^ } else { ^return^;^ }");
   // Available in subexpressions of the condition;
-  EXPECT_AVAILABLE("if(2 + [[2]] + 2) { return; } else {return;}");
+  EXPECT_THAT("if(2 + [[2]] + 2) { return; } else {return;}", isAvailable());
   // But not as part of the branches.
-  EXPECT_UNAVAILABLE("if(2 + 2 + 2) { [[return]]; } else { return; }");
+  EXPECT_THAT("if(2 + 2 + 2) { [[return]]; } else { return; }",
+              Not(isAvailable()));
   // Range covers the "else" token, so available.
-  EXPECT_AVAILABLE("if(2 + 2 + 2) { return[[; } else {return;]]}");
+  EXPECT_THAT("if(2 + 2 + 2) { return[[; } else {return;]]}", isAvailable());
   // Not available in compound statements in condition.
-  EXPECT_UNAVAILABLE("if([]{return [[true]];}()) { return; } else { return; }");
+  EXPECT_THAT("if([]{return [[true]];}()) { return; } else { return; }",
+              Not(isAvailable()));
   // Not available if both sides aren't braced.
-  EXPECT_UNAVAILABLE("^if (1) return; else { return; }");
+  EXPECT_THAT("^if (1) return; else { return; }", Not(isAvailable()));
   // Only one if statement is supported!
-  EXPECT_UNAVAILABLE("[[if(1){}else{}if(2){}else{}]]");
+  EXPECT_THAT("[[if(1){}else{}if(2){}else{}]]", Not(isAvailable()));
 }
 
 } // namespace

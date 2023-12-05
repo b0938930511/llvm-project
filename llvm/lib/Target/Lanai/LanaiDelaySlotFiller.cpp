@@ -51,8 +51,9 @@ struct Filler : public MachineFunctionPass {
     TRI = Subtarget.getRegisterInfo();
 
     bool Changed = false;
-    for (MachineBasicBlock &MBB : MF)
-      Changed |= runOnMachineBasicBlock(MBB);
+    for (MachineFunction::iterator FI = MF.begin(), FE = MF.end(); FI != FE;
+         ++FI)
+      Changed |= runOnMachineBasicBlock(*FI);
     return Changed;
   }
 
@@ -199,7 +200,8 @@ bool Filler::delayHasHazard(MachineBasicBlock::instr_iterator MI, bool &SawLoad,
   assert((!MI->isCall() && !MI->isReturn()) &&
          "Cannot put calls or returns in delay slot.");
 
-  for (const MachineOperand &MO : MI->operands()) {
+  for (unsigned I = 0, E = MI->getNumOperands(); I != E; ++I) {
+    const MachineOperand &MO = MI->getOperand(I);
     unsigned Reg;
 
     if (!MO.isReg() || !(Reg = MO.getReg()))
@@ -224,7 +226,7 @@ void Filler::insertDefsUses(MachineBasicBlock::instr_iterator MI,
                             SmallSet<unsigned, 32> &RegDefs,
                             SmallSet<unsigned, 32> &RegUses) {
   // If MI is a call or return, just examine the explicit non-variadic operands.
-  const MCInstrDesc &MCID = MI->getDesc();
+  MCInstrDesc MCID = MI->getDesc();
   unsigned E = MI->isCall() || MI->isReturn() ? MCID.getNumOperands()
                                               : MI->getNumOperands();
   for (unsigned I = 0; I != E; ++I) {

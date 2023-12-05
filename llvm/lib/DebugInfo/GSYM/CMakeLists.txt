@@ -9,7 +9,7 @@ add_llvm_component_library(LLVMDebugInfoGSYM
   LineTable.cpp
   LookupResult.cpp
   ObjectFileTransformer.cpp
-  ExtractRanges.cpp
+  Range.cpp
 
   ADDITIONAL_HEADER_DIRS
   ${LLVM_MAIN_INCLUDE_DIR}/llvm/DebugInfo/GSYM
@@ -22,6 +22,5 @@ add_llvm_component_library(LLVMDebugInfoGSYM
   MC
   Object
   Support
-  TargetParser
   DebugInfoDWARF
   )

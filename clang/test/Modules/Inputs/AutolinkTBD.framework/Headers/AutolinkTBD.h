@@ -1,1 +1,1 @@
-extern int foo(void);
+extern int foo();

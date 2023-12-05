@@ -27,13 +27,17 @@ public:
 
   static void Terminate();
 
-  static llvm::StringRef GetPluginNameStatic() { return "ThreadSanitizer"; }
+  static lldb_private::ConstString GetPluginNameStatic();
 
   static lldb::InstrumentationRuntimeType GetTypeStatic();
 
-  llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
+  lldb_private::ConstString GetPluginName() override {
+    return GetPluginNameStatic();
+  }
 
   virtual lldb::InstrumentationRuntimeType GetType() { return GetTypeStatic(); }
+
+  uint32_t GetPluginVersion() override { return 1; }
 
   lldb::ThreadCollectionSP
   GetBacktracesFromExtendedStopInfo(StructuredData::ObjectSP info) override;

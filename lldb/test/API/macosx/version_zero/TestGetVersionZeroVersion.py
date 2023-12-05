@@ -3,6 +3,7 @@ Read in a library with a version number of 0.0.0, make sure we produce a good ve
 """
 
 
+
 import lldb
 from lldbsuite.test.decorators import *
 import lldbsuite.test.lldbutil as lldbutil
@@ -10,11 +11,15 @@ from lldbsuite.test.lldbtest import *
 
 
 class TestGetVersionForZero(TestBase):
-    # If your test case doesn't stress debug info, then
+
+    mydir = TestBase.compute_mydir(__file__)
+
+    # If your test case doesn't stress debug info, the
     # set this to true.  That way it won't be run once for
     # each debug info format.
     NO_DEBUG_INFO_TESTCASE = True
 
+    @skipIfReproducer # FIXME: Unexpected packet during (passive) replay
     def test_get_version_zero(self):
         """Read in a library with a version of 0.0.0.  Test SBModule::GetVersion"""
         self.yaml2obj("libDylib.dylib.yaml", self.getBuildArtifact("libDylib.dylib"))
@@ -32,3 +37,4 @@ class TestGetVersionForZero(TestBase):
         for elem in module.GetVersion():
             did_iterate = True
         self.assertTrue(did_iterate, "Didn't get into the GetVersion loop")
+

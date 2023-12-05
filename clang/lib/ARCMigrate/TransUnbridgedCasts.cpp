@@ -146,8 +146,9 @@ private:
             ento::cocoa::isRefType(E->getSubExpr()->getType(), "CF",
                                    FD->getIdentifier()->getName())) {
           StringRef fname = FD->getIdentifier()->getName();
-          if (fname.endswith("Retain") || fname.contains("Create") ||
-              fname.contains("Copy")) {
+          if (fname.endswith("Retain") ||
+              fname.find("Create") != StringRef::npos ||
+              fname.find("Copy") != StringRef::npos) {
             // Do not migrate to couple of bridge transfer casts which
             // cancel each other out. Leave it unchanged so error gets user
             // attention instead.
@@ -167,7 +168,7 @@ private:
             return;
           }
 
-          if (fname.contains("Get")) {
+          if (fname.find("Get") != StringRef::npos) {
             castToObjCObject(E, /*retained=*/false);
             return;
           }
@@ -252,8 +253,7 @@ private:
 
       SourceManager &SM = Pass.Ctx.getSourceManager();
       char PrevChar = *SM.getCharacterData(InsertLoc.getLocWithOffset(-1));
-      if (Lexer::isAsciiIdentifierContinueChar(PrevChar,
-                                               Pass.Ctx.getLangOpts()))
+      if (Lexer::isIdentifierBodyChar(PrevChar, Pass.Ctx.getLangOpts()))
         BridgeCall += ' ';
 
       if (Kind == OBC_BridgeTransfer)

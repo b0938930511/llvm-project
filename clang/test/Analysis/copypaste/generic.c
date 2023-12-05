@@ -4,7 +4,7 @@
 
 int global;
 
-int foo1(void) {
+int foo1() {
   if (global > 0)
     return 0;
   else if (global < 0)
@@ -13,7 +13,7 @@ int foo1(void) {
 }
 
 // Different associated type (int instead of float)
-int foo2(void) {
+int foo2() {
   if (global > 0)
     return 0;
   else if (global < 0)
@@ -22,7 +22,7 @@ int foo2(void) {
 }
 
 // Different number of associated types.
-int foo3(void) {
+int foo3() {
   if (global > 0)
     return 0;
   else if (global < 0)

@@ -9,6 +9,7 @@ int test2() {
   return val ? throw val : val;
 }
 
+// rdar://problem/8608801
 void test3() {
   throw false;
 }
@@ -33,7 +34,7 @@ int test5(bool x, bool y, int z) {
 // CHECK: br i1
 //
 // y.true:
-// CHECK: load i32, ptr
+// CHECK: load i32, i32*
 // CHECK: br label
 //
 // y.false:
@@ -57,7 +58,7 @@ int test6(bool x, bool y, int z) {
 // CHECK: br i1
 //
 // y.true:
-// CHECK: load i32, ptr
+// CHECK: load i32, i32*
 // CHECK: br label
 //
 // y.false:
@@ -76,7 +77,7 @@ namespace DR1560 {
   // CHECK-LABEL: @_ZN6DR15601bE
   const A &r = b ? get() : throw 0;
   // CHECK-NOT: call {{.*}}@_ZN6DR15601AD1Ev
-  // CHECK: call {{.*}} @__cxa_atexit(ptr @_ZN6DR15601AD1Ev, ptr @_ZGRN6DR15601rE
+  // CHECK: call {{.*}} @__cxa_atexit({{.*}} @_ZN6DR15601AD1Ev {{.*}} @_ZGRN6DR15601rE
   // CHECK-NOT: call {{.*}}@_ZN6DR15601AD1Ev
 
   // PR28184
@@ -102,7 +103,7 @@ void test7(bool cond) {
   cond ? throw test7 : val;
 }
 
-// CHECK-LABEL: define{{.*}} nonnull align 4 dereferenceable(4) ptr @_Z5test8b(
+// CHECK-LABEL: define{{.*}} nonnull align 4 dereferenceable(4) i32* @_Z5test8b(
 int &test8(bool cond) {
   // CHECK: br i1
   //
@@ -114,6 +115,6 @@ int &test8(bool cond) {
   // CHECK-NEXT: unreachable
   //
   // end:
-  // CHECK: ret ptr @val
+  // CHECK: ret i32* @val
   return cond ? val : ((throw "foo"));
 }

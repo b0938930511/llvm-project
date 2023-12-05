@@ -8,13 +8,14 @@
 
 #include "TweakTesting.h"
 
+#include "Annotations.h"
 #include "SourceCode.h"
-#include "TestTU.h"
+#include "TestFS.h"
 #include "refactor/Tweak.h"
+#include "clang/Tooling/Core/Replacement.h"
 #include "llvm/Support/Error.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include <optional>
 #include <string>
 
 namespace clang {
@@ -50,25 +51,31 @@ llvm::StringRef unwrap(Context Ctx, llvm::StringRef Outer) {
   return Outer;
 }
 
-llvm::Annotations::Range rangeOrPoint(const llvm::Annotations &A) {
+std::pair<unsigned, unsigned> rangeOrPoint(const Annotations &A) {
+  Range SelectionRng;
   if (A.points().size() != 0) {
     assert(A.ranges().size() == 0 &&
            "both a cursor point and a selection range were specified");
-    return {A.point(), A.point()};
+    SelectionRng = Range{A.point(), A.point()};
+  } else {
+    SelectionRng = A.range();
   }
-  return A.range();
+  return {cantFail(positionToOffset(A.code(), SelectionRng.start)),
+          cantFail(positionToOffset(A.code(), SelectionRng.end))};
 }
 
 // Prepare and apply the specified tweak based on the selection in Input.
-// Returns std::nullopt if and only if prepare() failed.
-std::optional<llvm::Expected<Tweak::Effect>>
-applyTweak(ParsedAST &AST, llvm::Annotations::Range Range, StringRef TweakID,
+// Returns None if and only if prepare() failed.
+llvm::Optional<llvm::Expected<Tweak::Effect>>
+applyTweak(ParsedAST &AST, const Annotations &Input, StringRef TweakID,
            const SymbolIndex *Index, llvm::vfs::FileSystem *FS) {
-  std::optional<llvm::Expected<Tweak::Effect>> Result;
-  SelectionTree::createEach(AST.getASTContext(), AST.getTokens(), Range.Begin,
-                            Range.End, [&](SelectionTree ST) {
-                              Tweak::Selection S(Index, AST, Range.Begin,
-                                                 Range.End, std::move(ST), FS);
+  auto Range = rangeOrPoint(Input);
+  llvm::Optional<llvm::Expected<Tweak::Effect>> Result;
+  SelectionTree::createEach(AST.getASTContext(), AST.getTokens(), Range.first,
+                            Range.second, [&](SelectionTree ST) {
+                              Tweak::Selection S(Index, AST, Range.first,
+                                                 Range.second, std::move(ST),
+                                                 FS);
                               if (auto T = prepareTweak(TweakID, S, nullptr)) {
                                 Result = (*T)->apply(S);
                                 return true;
@@ -80,12 +87,33 @@ applyTweak(ParsedAST &AST, llvm::Annotations::Range Range, StringRef TweakID,
   return Result;
 }
 
+MATCHER_P7(TweakIsAvailable, TweakID, Ctx, Header, ExtraArgs, ExtraFiles, Index,
+           FileName,
+           (TweakID + (negation ? " is unavailable" : " is available")).str()) {
+  std::string WrappedCode = wrap(Ctx, arg);
+  Annotations Input(WrappedCode);
+  TestTU TU;
+  TU.Filename = std::string(FileName);
+  TU.HeaderCode = Header;
+  TU.Code = std::string(Input.code());
+  TU.ExtraArgs = ExtraArgs;
+  TU.AdditionalFiles = std::move(ExtraFiles);
+  ParsedAST AST = TU.build();
+  auto Result = applyTweak(
+      AST, Input, TweakID, Index,
+      &AST.getSourceManager().getFileManager().getVirtualFileSystem());
+  // We only care if prepare() succeeded, but must handle Errors.
+  if (Result && !*Result)
+    consumeError(Result->takeError());
+  return Result.hasValue();
+}
+
 } // namespace
 
 std::string TweakTest::apply(llvm::StringRef MarkedCode,
                              llvm::StringMap<std::string> *EditedFiles) const {
   std::string WrappedCode = wrap(Context, MarkedCode);
-  llvm::Annotations Input(WrappedCode);
+  Annotations Input(WrappedCode);
   TestTU TU;
   TU.Filename = std::string(FileName);
   TU.HeaderCode = Header;
@@ -95,7 +123,7 @@ std::string TweakTest::apply(llvm::StringRef MarkedCode,
   ParsedAST AST = TU.build();
 
   auto Result = applyTweak(
-      AST, rangeOrPoint(Input), TweakID, Index.get(),
+      AST, Input, TweakID, Index.get(),
       &AST.getSourceManager().getFileManager().getVirtualFileSystem());
   if (!Result)
     return "unavailable";
@@ -126,40 +154,28 @@ std::string TweakTest::apply(llvm::StringRef MarkedCode,
   return EditedMainFile;
 }
 
-bool TweakTest::isAvailable(WrappedAST &AST,
-                            llvm::Annotations::Range Range) const {
-  // Adjust range for wrapping offset.
-  Range.Begin += AST.second;
-  Range.End += AST.second;
-  auto Result = applyTweak(
-      AST.first, Range, TweakID, Index.get(),
-      &AST.first.getSourceManager().getFileManager().getVirtualFileSystem());
-  // We only care if prepare() succeeded, but must handle Errors.
-  if (Result && !*Result)
-    consumeError(Result->takeError());
-  return Result.has_value();
+::testing::Matcher<llvm::StringRef> TweakTest::isAvailable() const {
+  return TweakIsAvailable(llvm::StringRef(TweakID), Context, Header, ExtraArgs,
+                          ExtraFiles, Index.get(), FileName);
 }
 
-TweakTest::WrappedAST TweakTest::build(llvm::StringRef Code) const {
-  TestTU TU;
-  TU.Filename = std::string(FileName);
-  TU.HeaderCode = Header;
-  TU.Code = wrap(Context, Code);
-  TU.ExtraArgs = ExtraArgs;
-  TU.AdditionalFiles = std::move(ExtraFiles);
-  return {TU.build(), wrapping(Context).first.size()};
-}
-
-std::string TweakTest::decorate(llvm::StringRef Code, unsigned Point) {
-  return (Code.substr(0, Point) + "^" + Code.substr(Point)).str();
-}
-
-std::string TweakTest::decorate(llvm::StringRef Code,
-                                llvm::Annotations::Range Range) {
-  return (Code.substr(0, Range.Begin) + "[[" +
-          Code.substr(Range.Begin, Range.End - Range.Begin) + "]]" +
-          Code.substr(Range.End))
-      .str();
+std::vector<std::string> TweakTest::expandCases(llvm::StringRef MarkedCode) {
+  Annotations Test(MarkedCode);
+  llvm::StringRef Code = Test.code();
+  std::vector<std::string> Cases;
+  for (const auto &Point : Test.points()) {
+    size_t Offset = llvm::cantFail(positionToOffset(Code, Point));
+    Cases.push_back((Code.substr(0, Offset) + "^" + Code.substr(Offset)).str());
+  }
+  for (const auto &Range : Test.ranges()) {
+    size_t Begin = llvm::cantFail(positionToOffset(Code, Range.start));
+    size_t End = llvm::cantFail(positionToOffset(Code, Range.end));
+    Cases.push_back((Code.substr(0, Begin) + "[[" +
+                     Code.substr(Begin, End - Begin) + "]]" + Code.substr(End))
+                        .str());
+  }
+  assert(!Cases.empty() && "No markings in MarkedCode?");
+  return Cases;
 }
 
 } // namespace clangd

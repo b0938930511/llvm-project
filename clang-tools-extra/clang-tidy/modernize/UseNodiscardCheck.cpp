@@ -14,7 +14,9 @@
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::modernize {
+namespace clang {
+namespace tidy {
+namespace modernize {
 
 static bool doesNoDiscardMacroExist(ASTContext &Context,
                                     const llvm::StringRef &MacroId) {
@@ -89,20 +91,20 @@ void UseNodiscardCheck::registerMatchers(MatchFinder *Finder) {
   // warn on unused result.
   Finder->addMatcher(
       cxxMethodDecl(
-          isConst(), isDefinitionOrInline(),
-          unless(anyOf(
-              returns(voidType()),
-              returns(
-                  hasDeclaration(decl(hasAttr(clang::attr::WarnUnusedResult)))),
-              isNoReturn(), isOverloadedOperator(), isVariadic(),
-              hasTemplateReturnType(), hasClassMutableFields(),
-              isConversionOperator(), hasAttr(clang::attr::WarnUnusedResult),
-              hasType(isInstantiationDependentType()),
-              hasAnyParameter(
-                  anyOf(parmVarDecl(anyOf(hasType(FunctionObj),
+          allOf(isConst(), isDefinitionOrInline(),
+                unless(anyOf(
+                    returns(voidType()),
+                    returns(hasDeclaration(decl(hasAttr(clang::attr::WarnUnusedResult)))),
+                    isNoReturn(), isOverloadedOperator(),
+                    isVariadic(), hasTemplateReturnType(),
+                    hasClassMutableFields(), isConversionOperator(),
+                    hasAttr(clang::attr::WarnUnusedResult),
+                    hasType(isInstantiationDependentType()),
+                    hasAnyParameter(anyOf(
+                        parmVarDecl(anyOf(hasType(FunctionObj),
                                           hasType(references(FunctionObj)))),
                         hasType(isNonConstReferenceOrPointer()),
-                        hasParameterPack())))))
+                        hasParameterPack()))))))
           .bind("no_discard"),
       this);
 }
@@ -129,7 +131,7 @@ void UseNodiscardCheck::check(const MatchFinder::MatchResult &Result) {
   // 1. A const member function which returns a variable which is ignored
   // but performs some external I/O operation and the return value could be
   // ignored.
-  Diag << FixItHint::CreateInsertion(RetLoc, (NoDiscardMacro + " ").str());
+  Diag << FixItHint::CreateInsertion(RetLoc, NoDiscardMacro + " ");
 }
 
 bool UseNodiscardCheck::isLanguageVersionSupported(
@@ -144,4 +146,6 @@ bool UseNodiscardCheck::isLanguageVersionSupported(
   return LangOpts.CPlusPlus;
 }
 
-} // namespace clang::tidy::modernize
+} // namespace modernize
+} // namespace tidy
+} // namespace clang

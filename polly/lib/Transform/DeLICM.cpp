@@ -183,7 +183,7 @@ isl::union_map expandMapping(isl::union_map Relevant, isl::union_set Universe) {
 /// conflict, but overwrite values that might still be required. Another source
 /// of problems are multiple writes to the same element at the same timepoint,
 /// because their order is undefined.
-class Knowledge final {
+class Knowledge {
 private:
   /// { [Element[] -> Zone[]] }
   /// Set of array elements and when they are alive.
@@ -520,7 +520,7 @@ public:
 };
 
 /// Implementation of the DeLICM/DePRE transformation.
-class DeLICMImpl final : public ZoneAlgorithm {
+class DeLICMImpl : public ZoneAlgorithm {
 private:
   /// Knowledge before any transformation took place.
   Knowledge OriginalZone;
@@ -1416,7 +1416,7 @@ static PreservedAnalyses runDeLICMUsingNPM(Scop &S, ScopAnalysisManager &SAM,
   return PA;
 }
 
-class DeLICMWrapperPass final : public ScopPass {
+class DeLICMWrapperPass : public ScopPass {
 private:
   DeLICMWrapperPass(const DeLICMWrapperPass &) = delete;
   const DeLICMWrapperPass &operator=(const DeLICMWrapperPass &) = delete;
@@ -1428,13 +1428,13 @@ public:
   static char ID;
   explicit DeLICMWrapperPass() : ScopPass(ID) {}
 
-  void getAnalysisUsage(AnalysisUsage &AU) const override {
+  virtual void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequiredTransitive<ScopInfoRegionPass>();
     AU.addRequired<LoopInfoWrapperPass>();
     AU.setPreservesAll();
   }
 
-  bool runOnScop(Scop &S) override {
+  virtual bool runOnScop(Scop &S) override {
     // Free resources for previous scop's computation, if not yet done.
     releaseMemory();
 
@@ -1444,7 +1444,7 @@ public:
     return Impl->isModified();
   }
 
-  void printScop(raw_ostream &OS, Scop &S) const override {
+  virtual void printScop(raw_ostream &OS, Scop &S) const override {
     if (!Impl)
       return;
     assert(Impl->getScop() == &S);
@@ -1453,54 +1453,24 @@ public:
     Impl->print(OS);
   }
 
-  void releaseMemory() override { Impl.reset(); }
+  virtual void releaseMemory() override { Impl.reset(); }
 };
 
 char DeLICMWrapperPass::ID;
-
-/// Print result from DeLICMWrapperPass.
-class DeLICMPrinterLegacyPass final : public ScopPass {
-public:
-  static char ID;
-
-  DeLICMPrinterLegacyPass() : DeLICMPrinterLegacyPass(outs()){};
-  explicit DeLICMPrinterLegacyPass(llvm::raw_ostream &OS)
-      : ScopPass(ID), OS(OS) {}
-
-  bool runOnScop(Scop &S) override {
-    DeLICMWrapperPass &P = getAnalysis<DeLICMWrapperPass>();
-
-    OS << "Printing analysis '" << P.getPassName() << "' for region: '"
-       << S.getRegion().getNameStr() << "' in function '"
-       << S.getFunction().getName() << "':\n";
-    P.printScop(OS, S);
-
-    return false;
-  }
-
-  void getAnalysisUsage(AnalysisUsage &AU) const override {
-    ScopPass::getAnalysisUsage(AU);
-    AU.addRequired<DeLICMWrapperPass>();
-    AU.setPreservesAll();
-  }
-
-private:
-  llvm::raw_ostream &OS;
-};
-
-char DeLICMPrinterLegacyPass::ID = 0;
 } // anonymous namespace
 
 Pass *polly::createDeLICMWrapperPass() { return new DeLICMWrapperPass(); }
 
-llvm::Pass *polly::createDeLICMPrinterLegacyPass(llvm::raw_ostream &OS) {
-  return new DeLICMPrinterLegacyPass(OS);
-}
+INITIALIZE_PASS_BEGIN(DeLICMWrapperPass, "polly-delicm", "Polly - DeLICM/DePRE",
+                      false, false)
+INITIALIZE_PASS_DEPENDENCY(ScopInfoWrapperPass)
+INITIALIZE_PASS_DEPENDENCY(LoopInfoWrapperPass)
+INITIALIZE_PASS_END(DeLICMWrapperPass, "polly-delicm", "Polly - DeLICM/DePRE",
+                    false, false)
 
-llvm::PreservedAnalyses polly::DeLICMPass::run(Scop &S,
-                                               ScopAnalysisManager &SAM,
-                                               ScopStandardAnalysisResults &SAR,
-                                               SPMUpdater &U) {
+llvm::PreservedAnalyses DeLICMPass::run(Scop &S, ScopAnalysisManager &SAM,
+                                        ScopStandardAnalysisResults &SAR,
+                                        SPMUpdater &U) {
   return runDeLICMUsingNPM(S, SAM, SAR, U, nullptr);
 }
 
@@ -1524,16 +1494,3 @@ bool polly::isConflicting(
 
   return Knowledge::isConflicting(Existing, Proposed, OS, Indent);
 }
-
-INITIALIZE_PASS_BEGIN(DeLICMWrapperPass, "polly-delicm", "Polly - DeLICM/DePRE",
-                      false, false)
-INITIALIZE_PASS_DEPENDENCY(ScopInfoWrapperPass)
-INITIALIZE_PASS_DEPENDENCY(LoopInfoWrapperPass)
-INITIALIZE_PASS_END(DeLICMWrapperPass, "polly-delicm", "Polly - DeLICM/DePRE",
-                    false, false)
-
-INITIALIZE_PASS_BEGIN(DeLICMPrinterLegacyPass, "polly-print-delicm",
-                      "Polly - Print DeLICM/DePRE", false, false)
-INITIALIZE_PASS_DEPENDENCY(ScopInfoWrapperPass)
-INITIALIZE_PASS_END(DeLICMPrinterLegacyPass, "polly-print-delicm",
-                    "Polly - Print DeLICM/DePRE", false, false)

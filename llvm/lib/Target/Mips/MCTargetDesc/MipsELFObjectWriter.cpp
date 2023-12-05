@@ -62,7 +62,7 @@ public:
 
   unsigned getRelocType(MCContext &Ctx, const MCValue &Target,
                         const MCFixup &Fixup, bool IsPCRel) const override;
-  bool needsRelocateWithSymbol(const MCValue &Val, const MCSymbol &Sym,
+  bool needsRelocateWithSymbol(const MCSymbol &Sym,
                                unsigned Type) const override;
   void sortRelocs(const MCAssembler &Asm,
                   std::vector<ELFRelocationEntry> &Relocs) override;
@@ -220,8 +220,6 @@ unsigned MipsELFObjectWriter::getRelocType(MCContext &Ctx,
                                            bool IsPCRel) const {
   // Determine the type of the relocation.
   unsigned Kind = Fixup.getTargetKind();
-  if (Kind >= FirstLiteralRelocationKind)
-    return Kind - FirstLiteralRelocationKind;
 
   switch (Kind) {
   case FK_NONE:
@@ -505,15 +503,14 @@ void MipsELFObjectWriter::sortRelocs(const MCAssembler &Asm,
     Relocs[CopyTo++] = R.R;
 }
 
-bool MipsELFObjectWriter::needsRelocateWithSymbol(const MCValue &Val,
-                                                  const MCSymbol &Sym,
+bool MipsELFObjectWriter::needsRelocateWithSymbol(const MCSymbol &Sym,
                                                   unsigned Type) const {
   // If it's a compound relocation for N64 then we need the relocation if any
   // sub-relocation needs it.
   if (!isUInt<8>(Type))
-    return needsRelocateWithSymbol(Val, Sym, Type & 0xff) ||
-           needsRelocateWithSymbol(Val, Sym, (Type >> 8) & 0xff) ||
-           needsRelocateWithSymbol(Val, Sym, (Type >> 16) & 0xff);
+    return needsRelocateWithSymbol(Sym, Type & 0xff) ||
+           needsRelocateWithSymbol(Sym, (Type >> 8) & 0xff) ||
+           needsRelocateWithSymbol(Sym, (Type >> 16) & 0xff);
 
   switch (Type) {
   default:
@@ -559,7 +556,7 @@ bool MipsELFObjectWriter::needsRelocateWithSymbol(const MCValue &Val,
   case ELF::R_MIPS_GPREL32:
     if (cast<MCSymbolELF>(Sym).getOther() & ELF::STO_MIPS_MICROMIPS)
       return true;
-    [[fallthrough]];
+    LLVM_FALLTHROUGH;
   case ELF::R_MIPS_26:
   case ELF::R_MIPS_64:
   case ELF::R_MIPS_GPREL16:

@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// UNSUPPORTED: no-random-device
+// UNSUPPORTED: libcpp-has-no-random-device
 
 // <random>
 

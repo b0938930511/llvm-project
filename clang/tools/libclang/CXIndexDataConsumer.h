@@ -332,9 +332,10 @@ class CXIndexDataConsumer : public index::IndexDataConsumer {
 
 public:
   CXIndexDataConsumer(CXClientData clientData, IndexerCallbacks &indexCallbacks,
-                      unsigned indexOptions, CXTranslationUnit cxTU)
-      : Ctx(nullptr), ClientData(clientData), CB(indexCallbacks),
-        IndexOptions(indexOptions), CXTU(cxTU), StrAdapterCount(0) {}
+                  unsigned indexOptions, CXTranslationUnit cxTU)
+    : Ctx(nullptr), ClientData(clientData), CB(indexCallbacks),
+      IndexOptions(indexOptions), CXTU(cxTU),
+      StrScratch(), StrAdapterCount(0) { }
 
   ASTContext &getASTContext() const { return *Ctx; }
   CXTranslationUnit getCXTU() const { return CXTU; }
@@ -360,14 +361,14 @@ public:
 
   bool hasDiagnosticCallback() const { return CB.diagnostic; }
 
-  void enteredMainFile(OptionalFileEntryRef File);
+  void enteredMainFile(const FileEntry *File);
 
-  void ppIncludedFile(SourceLocation hashLoc, StringRef filename,
-                      OptionalFileEntryRef File, bool isImport, bool isAngled,
-                      bool isModuleImport);
+  void ppIncludedFile(SourceLocation hashLoc,
+                      StringRef filename, const FileEntry *File,
+                      bool isImport, bool isAngled, bool isModuleImport);
 
   void importedModule(const ImportDecl *ImportD);
-  void importedPCH(FileEntryRef File);
+  void importedPCH(const FileEntry *File);
 
   void startedTranslationUnit();
 
@@ -408,8 +409,6 @@ public:
   bool handleClassTemplate(const ClassTemplateDecl *D);
   bool handleFunctionTemplate(const FunctionTemplateDecl *D);
   bool handleTypeAliasTemplate(const TypeAliasTemplateDecl *D);
-
-  bool handleConcept(const ConceptDecl *D);
 
   bool handleReference(const NamedDecl *D, SourceLocation Loc, CXCursor Cursor,
                        const NamedDecl *Parent,

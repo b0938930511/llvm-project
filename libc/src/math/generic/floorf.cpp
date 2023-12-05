@@ -7,11 +7,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "src/math/floorf.h"
-#include "src/__support/FPUtil/NearestIntegerOperations.h"
 #include "src/__support/common.h"
+#include "utils/FPUtil/NearestIntegerOperations.h"
 
-namespace LIBC_NAMESPACE {
+namespace __llvm_libc {
 
 LLVM_LIBC_FUNCTION(float, floorf, (float x)) { return fputil::floor(x); }
 
-} // namespace LIBC_NAMESPACE
+} // namespace __llvm_libc

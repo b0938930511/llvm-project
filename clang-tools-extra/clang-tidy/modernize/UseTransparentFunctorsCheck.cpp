@@ -12,7 +12,9 @@
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::modernize {
+namespace clang {
+namespace tidy {
+namespace modernize {
 
 UseTransparentFunctorsCheck::UseTransparentFunctorsCheck(
     StringRef Name, ClangTidyContext *Context)
@@ -94,9 +96,8 @@ void UseTransparentFunctorsCheck::check(
   unsigned ArgNum = 0;
   const auto *FunctorParentType =
       FunctorParentLoc.getType()->castAs<TemplateSpecializationType>();
-  for (; ArgNum < FunctorParentType->template_arguments().size(); ++ArgNum) {
-    const TemplateArgument &Arg =
-        FunctorParentType->template_arguments()[ArgNum];
+  for (; ArgNum < FunctorParentType->getNumArgs(); ++ArgNum) {
+    const TemplateArgument &Arg = FunctorParentType->getArg(ArgNum);
     if (Arg.getKind() != TemplateArgument::Type)
       continue;
     QualType ParentArgType = Arg.getAsType();
@@ -106,7 +107,7 @@ void UseTransparentFunctorsCheck::check(
       break;
   }
   // Functor is a default template argument.
-  if (ArgNum == FunctorParentType->template_arguments().size())
+  if (ArgNum == FunctorParentType->getNumArgs())
     return;
   TemplateArgumentLoc FunctorLoc = FunctorParentLoc.getArgLoc(ArgNum);
   auto FunctorTypeLoc = getInnerTypeLocAs<TemplateSpecializationTypeLoc>(
@@ -122,4 +123,6 @@ void UseTransparentFunctorsCheck::check(
                                   FunctorTypeLoc.getArgLoc(0).getSourceRange());
 }
 
-} // namespace clang::tidy::modernize
+} // namespace modernize
+} // namespace tidy
+} // namespace clang

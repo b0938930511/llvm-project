@@ -22,12 +22,12 @@
 #ifndef LLVM_ANALYSIS_OBJCARCANALYSISUTILS_H
 #define LLVM_ANALYSIS_OBJCARCANALYSISUTILS_H
 
+#include "llvm/ADT/Optional.h"
 #include "llvm/Analysis/ObjCARCInstKind.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/ValueHandle.h"
-#include <optional>
 
 namespace llvm {
 
@@ -78,17 +78,14 @@ inline const Value *GetUnderlyingObjCPtr(const Value *V) {
 }
 
 /// A wrapper for GetUnderlyingObjCPtr used for results memoization.
-inline const Value *GetUnderlyingObjCPtrCached(
-    const Value *V,
-    DenseMap<const Value *, std::pair<WeakVH, WeakTrackingVH>> &Cache) {
-  // The entry is invalid if either value handle is null.
-  auto InCache = Cache.lookup(V);
-  if (InCache.first && InCache.second)
-    return InCache.second;
+inline const Value *
+GetUnderlyingObjCPtrCached(const Value *V,
+                           DenseMap<const Value *, WeakTrackingVH> &Cache) {
+  if (auto InCache = Cache.lookup(V))
+    return InCache;
 
   const Value *Computed = GetUnderlyingObjCPtr(V);
-  Cache[V] =
-      std::make_pair(const_cast<Value *>(V), const_cast<Value *>(Computed));
+  Cache[V] = const_cast<Value *>(Computed);
   return Computed;
 }
 
@@ -171,8 +168,8 @@ bool IsPotentialRetainableObjPtr(const Value *Op, AAResults &AA);
 /// Helper for GetARCInstKind. Determines what kind of construct CS
 /// is.
 inline ARCInstKind GetCallSiteClass(const CallBase &CB) {
-  for (const Use &U : CB.args())
-    if (IsPotentialRetainableObjPtr(U))
+  for (auto I = CB.arg_begin(), E = CB.arg_end(); I != E; ++I)
+    if (IsPotentialRetainableObjPtr(*I))
       return CB.onlyReadsMemory() ? ARCInstKind::User : ARCInstKind::CallOrUser;
 
   return CB.onlyReadsMemory() ? ARCInstKind::None : ARCInstKind::Call;
@@ -207,10 +204,11 @@ inline bool IsObjCIdentifiedObject(const Value *V) {
         return true;
 
       StringRef Section = GV->getSection();
-      if (Section.contains("__message_refs") ||
-          Section.contains("__objc_classrefs") ||
-          Section.contains("__objc_superrefs") ||
-          Section.contains("__objc_methname") || Section.contains("__cstring"))
+      if (Section.find("__message_refs") != StringRef::npos ||
+          Section.find("__objc_classrefs") != StringRef::npos ||
+          Section.find("__objc_superrefs") != StringRef::npos ||
+          Section.find("__objc_methname") != StringRef::npos ||
+          Section.find("__cstring") != StringRef::npos)
         return true;
     }
   }
@@ -229,20 +227,20 @@ class ARCMDKindCache {
   Module *M;
 
   /// The Metadata Kind for clang.imprecise_release metadata.
-  std::optional<unsigned> ImpreciseReleaseMDKind;
+  llvm::Optional<unsigned> ImpreciseReleaseMDKind;
 
   /// The Metadata Kind for clang.arc.copy_on_escape metadata.
-  std::optional<unsigned> CopyOnEscapeMDKind;
+  llvm::Optional<unsigned> CopyOnEscapeMDKind;
 
   /// The Metadata Kind for clang.arc.no_objc_arc_exceptions metadata.
-  std::optional<unsigned> NoObjCARCExceptionsMDKind;
+  llvm::Optional<unsigned> NoObjCARCExceptionsMDKind;
 
 public:
   void init(Module *Mod) {
     M = Mod;
-    ImpreciseReleaseMDKind = std::nullopt;
-    CopyOnEscapeMDKind = std::nullopt;
-    NoObjCARCExceptionsMDKind = std::nullopt;
+    ImpreciseReleaseMDKind = NoneType::None;
+    CopyOnEscapeMDKind = NoneType::None;
+    NoObjCARCExceptionsMDKind = NoneType::None;
   }
 
   unsigned get(ARCMDKindID ID) {

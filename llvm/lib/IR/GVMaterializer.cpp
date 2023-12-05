@@ -14,4 +14,4 @@
 #include "llvm/IR/GVMaterializer.h"
 using namespace llvm;
 
-GVMaterializer::~GVMaterializer() = default;
+GVMaterializer::~GVMaterializer() {}

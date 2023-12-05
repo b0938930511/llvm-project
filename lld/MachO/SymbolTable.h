@@ -16,7 +16,8 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Object/Archive.h"
 
-namespace lld::macho {
+namespace lld {
+namespace macho {
 
 class ArchiveFile;
 class DylibFile;
@@ -38,11 +39,8 @@ class SymbolTable {
 public:
   Defined *addDefined(StringRef name, InputFile *, InputSection *,
                       uint64_t value, uint64_t size, bool isWeakDef,
-                      bool isPrivateExtern, bool isReferencedDynamically,
-                      bool noDeadStrip, bool isWeakDefCanBeHidden);
-
-  Defined *aliasDefined(Defined *src, StringRef target, InputFile *newFile,
-                        bool makePrivateExtern = false);
+                      bool isPrivateExtern, bool isThumb,
+                      bool isReferencedDynamically, bool noDeadStrip);
 
   Symbol *addUndefined(StringRef name, InputFile *, bool isWeakRef);
 
@@ -52,9 +50,8 @@ public:
   Symbol *addDylib(StringRef name, DylibFile *file, bool isWeakDef, bool isTlv);
   Symbol *addDynamicLookup(StringRef name);
 
-  Symbol *addLazyArchive(StringRef name, ArchiveFile *file,
-                         const llvm::object::Archive::Symbol &sym);
-  Symbol *addLazyObject(StringRef name, InputFile &file);
+  Symbol *addLazy(StringRef name, ArchiveFile *file,
+                  const llvm::object::Archive::Symbol &sym);
 
   Defined *addSynthetic(StringRef name, InputSection *, uint64_t value,
                         bool isPrivateExtern, bool includeInSymtab,
@@ -70,16 +67,11 @@ private:
   std::vector<Symbol *> symVector;
 };
 
-void reportPendingUndefinedSymbols();
-void reportPendingDuplicateSymbols();
+void treatUndefinedSymbol(const Undefined &, StringRef source = "");
 
-// Call reportPendingUndefinedSymbols() to emit diagnostics.
-void treatUndefinedSymbol(const Undefined &, StringRef source);
-void treatUndefinedSymbol(const Undefined &, const InputSection *,
-                          uint64_t offset);
+extern SymbolTable *symtab;
 
-extern std::unique_ptr<SymbolTable> symtab;
-
-} // namespace lld::macho
+} // namespace macho
+} // namespace lld
 
 #endif

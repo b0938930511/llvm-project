@@ -28,6 +28,7 @@ namespace llvm {
 }
 
 namespace clang {
+class Decl;
 class FieldDecl;
 class ASTRecordLayout;
 

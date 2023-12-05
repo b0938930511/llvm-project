@@ -24,13 +24,6 @@ using namespace clang;
 
 namespace {
 
-std::string Canonicalize(const Twine &Path) {
-  SmallVector<char, 128> PathVec;
-  Path.toVector(PathVec);
-  llvm::sys::path::remove_dots(PathVec, true);
-  return std::string(PathVec.begin(), PathVec.end());
-}
-
 class ReadCountingInMemoryFileSystem : public vfs::InMemoryFileSystem
 {
   std::map<std::string, unsigned> ReadCounts;
@@ -38,13 +31,16 @@ class ReadCountingInMemoryFileSystem : public vfs::InMemoryFileSystem
 public:
   ErrorOr<std::unique_ptr<vfs::File>> openFileForRead(const Twine &Path) override
   {
-    ++ReadCounts[Canonicalize(Path)];
+    SmallVector<char, 128> PathVec;
+    Path.toVector(PathVec);
+    llvm::sys::path::remove_dots(PathVec, true);
+    ++ReadCounts[std::string(PathVec.begin(), PathVec.end())];
     return InMemoryFileSystem::openFileForRead(Path);
   }
 
   unsigned GetReadCount(const Twine &Path) const
   {
-    auto it = ReadCounts.find(Canonicalize(Path));
+    auto it = ReadCounts.find(Path.str());
     return it == ReadCounts.end() ? 0 : it->second;
   }
 };

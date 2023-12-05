@@ -14,9 +14,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "WebAssemblyDisassemblerEmitter.h"
-#include "CodeGenInstruction.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/TableGen/Record.h"
 
 namespace llvm {
@@ -37,9 +34,8 @@ void emitWebAssemblyDisassemblerTables(
     if (!Def.getValue("Inst"))
       continue;
     auto &Inst = *Def.getValueAsBitsInit("Inst");
-    RecordKeeper &RK = Inst.getRecordKeeper();
-    unsigned Opc = static_cast<unsigned>(
-        cast<IntInit>(Inst.convertInitializerTo(IntRecTy::get(RK)))
+    auto Opc = static_cast<unsigned>(
+        reinterpret_cast<IntInit *>(Inst.convertInitializerTo(IntRecTy::get()))
             ->getValue());
     if (Opc == 0xFFFFFFFF)
       continue; // No opcode defined.
@@ -55,7 +51,11 @@ void emitWebAssemblyDisassemblerTables(
     auto &CGIP = OpcodeTable[Prefix][Opc];
     // All wasm instructions have a StackBased field of type string, we only
     // want the instructions for which this is "true".
-    bool IsStackBased = Def.getValueAsBit("StackBased");
+    auto StackString =
+        Def.getValue("StackBased")->getValue()->getCastTo(StringRecTy::get());
+    auto IsStackBased =
+        StackString &&
+        reinterpret_cast<const StringInit *>(StackString)->getValue() == "true";
     if (!IsStackBased)
       continue;
     if (CGIP.second) {
@@ -63,11 +63,14 @@ void emitWebAssemblyDisassemblerTables(
       // should be the canonical one. This determines which variant gets
       // printed in a disassembly. We want e.g. "call" not "i32.call", and
       // "end" when we don't know if its "end_loop" or "end_block" etc.
-      bool IsCanonicalExisting = CGIP.second->TheDef->getValueAsBit("IsCanonical");
+      auto IsCanonicalExisting = CGIP.second->TheDef->getValue("IsCanonical")
+                                     ->getValue()
+                                     ->getAsString() == "1";
       // We already have one marked explicitly as canonical, so keep it.
       if (IsCanonicalExisting)
         continue;
-      bool IsCanonicalNew = Def.getValueAsBit("IsCanonical");
+      auto IsCanonicalNew =
+          Def.getValue("IsCanonical")->getValue()->getAsString() == "1";
       // If the new one is explicitly marked as canonical, take it.
       if (!IsCanonicalNew) {
         // Neither the existing or new instruction is canonical.

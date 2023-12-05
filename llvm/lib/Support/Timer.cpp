@@ -199,7 +199,7 @@ void Timer::stopTimer() {
   Running = false;
   Time += TimeRecord::getCurrentTime(false);
   Time -= StartTime;
-  Signposts->endInterval(this, getName());
+  Signposts->endInterval(this);
 }
 
 void Timer::clear() {
@@ -393,7 +393,8 @@ void TimerGroup::PrintQueuedTimers(raw_ostream &OS) {
   OS << "  --- Name ---\n";
 
   // Loop through all of the timing data, printing it out.
-  for (const PrintRecord &Record : llvm::reverse(TimersToPrint)) {
+  for (const PrintRecord &Record : make_range(TimersToPrint.rbegin(),
+                                              TimersToPrint.rend())) {
     Record.Time.print(Total, OS);
     OS << Record.Description << '\n';
   }
@@ -499,8 +500,7 @@ const char *TimerGroup::printAllJSONValues(raw_ostream &OS, const char *delim) {
   return delim;
 }
 
-void TimerGroup::constructForStatistics() {
-  (void)getLibSupportInfoOutputFilename();
+void TimerGroup::ConstructTimerLists() {
   (void)*NamedGroupedTimers;
 }
 

@@ -18,9 +18,8 @@ class PassRegistry;
 
 namespace polly {
 llvm::Pass *createIslScheduleOptimizerWrapperPass();
-llvm::Pass *createIslScheduleOptimizerPrinterLegacyPass(llvm::raw_ostream &OS);
 
-struct IslScheduleOptimizerPass final
+struct IslScheduleOptimizerPass
     : llvm::PassInfoMixin<IslScheduleOptimizerPass> {
   IslScheduleOptimizerPass() {}
 
@@ -28,7 +27,7 @@ struct IslScheduleOptimizerPass final
                               ScopStandardAnalysisResults &SAR, SPMUpdater &U);
 };
 
-struct IslScheduleOptimizerPrinterPass final
+struct IslScheduleOptimizerPrinterPass
     : llvm::PassInfoMixin<IslScheduleOptimizerPrinterPass> {
   IslScheduleOptimizerPrinterPass(raw_ostream &OS) : OS(OS) {}
 
@@ -42,7 +41,6 @@ private:
 
 namespace llvm {
 void initializeIslScheduleOptimizerWrapperPassPass(llvm::PassRegistry &);
-void initializeIslScheduleOptimizerPrinterLegacyPassPass(llvm::PassRegistry &);
-} // namespace llvm
+}
 
 #endif // POLLY_SCHEDULEOPTIMIZER_H

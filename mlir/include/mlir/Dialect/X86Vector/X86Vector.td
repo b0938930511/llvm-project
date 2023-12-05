@@ -13,7 +13,6 @@
 #ifndef X86VECTOR_OPS
 #define X86VECTOR_OPS
 
-include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Dialect/LLVMIR/LLVMOpBase.td"
 
@@ -31,11 +30,11 @@ def X86Vector_Dialect : Dialect {
 //===----------------------------------------------------------------------===//
 
 // Operation that is part of the input dialect.
-class AVX512_Op<string mnemonic, list<Trait> traits = []> :
+class AVX512_Op<string mnemonic, list<OpTrait> traits = []> :
   Op<X86Vector_Dialect, "avx512." # mnemonic, traits> {}
 
 // Intrinsic operation used during lowering to LLVM IR.
-class AVX512_IntrOp<string mnemonic, int numResults, list<Trait> traits = []> :
+class AVX512_IntrOp<string mnemonic, int numResults, list<OpTrait> traits = []> :
   LLVM_IntrOpBase<X86Vector_Dialect, "avx512.intr." # mnemonic,
                   "x86_avx512_" # !subst(".", "_", mnemonic),
                   [], [], traits, numResults>;
@@ -43,7 +42,7 @@ class AVX512_IntrOp<string mnemonic, int numResults, list<Trait> traits = []> :
 // Defined by first result overload. May have to be extended for other
 // instructions in the future.
 class AVX512_IntrOverloadedOp<string mnemonic,
-                              list<Trait> traits = []> :
+                              list<OpTrait> traits = []> :
   LLVM_IntrOpBase<X86Vector_Dialect, "avx512.intr." # mnemonic,
                   "x86_avx512_" # !subst(".", "_", mnemonic),
                   /*list<int> overloadedResults=*/[0],
@@ -54,13 +53,13 @@ class AVX512_IntrOverloadedOp<string mnemonic,
 // MaskCompressOp
 //----------------------------------------------------------------------------//
 
-def MaskCompressOp : AVX512_Op<"mask.compress", [Pure,
+def MaskCompressOp : AVX512_Op<"mask.compress", [NoSideEffect,
   // TODO: Support optional arguments in `AllTypesMatch`. "type($src)" could
   // then be removed from assemblyFormat.
   AllTypesMatch<["a", "dst"]>,
   TypesMatchWith<"`k` has the same number of bits as elements in `dst`",
                  "dst", "k",
-                 "VectorType::get({::llvm::cast<VectorType>($_self).getShape()[0]}, "
+                 "VectorType::get({$_self.cast<VectorType>().getShape()[0]}, "
                  "IntegerType::get($_self.getContext(), 1))">]> {
   let summary = "Masked compress op";
   let description = [{
@@ -76,6 +75,7 @@ def MaskCompressOp : AVX512_Op<"mask.compress", [Pure,
   with their respective bit set in writemask `k`) to `dst`, and pass through the
   remaining elements from `src`.
   }];
+  let verifier = [{ return ::verify(*this); }];
   let arguments = (ins VectorOfLengthAndType<[16, 8],
                                              [I1]>:$k,
                    VectorOfLengthAndType<[16, 8],
@@ -87,15 +87,14 @@ def MaskCompressOp : AVX512_Op<"mask.compress", [Pure,
                                             [F32, I32, F64, I64]>:$dst);
   let assemblyFormat = "$k `,` $a (`,` $src^)? attr-dict"
                        " `:` type($dst) (`,` type($src)^)?";
-  let hasVerifier = 1;
 }
 
 def MaskCompressIntrOp : AVX512_IntrOverloadedOp<"mask.compress", [
-  Pure,
+  NoSideEffect,
   AllTypesMatch<["a", "src", "res"]>,
   TypesMatchWith<"`k` has the same number of bits as elements in `res`",
                  "res", "k",
-                 "VectorType::get({::llvm::cast<VectorType>($_self).getShape()[0]}, "
+                 "VectorType::get({$_self.cast<VectorType>().getShape()[0]}, "
                  "IntegerType::get($_self.getContext(), 1))">]> {
   let arguments = (ins VectorOfLengthAndType<[16, 8],
                                              [F32, I32, F64, I64]>:$a,
@@ -109,12 +108,12 @@ def MaskCompressIntrOp : AVX512_IntrOverloadedOp<"mask.compress", [
 // MaskRndScaleOp
 //----------------------------------------------------------------------------//
 
-def MaskRndScaleOp : AVX512_Op<"mask.rndscale", [Pure,
+def MaskRndScaleOp : AVX512_Op<"mask.rndscale", [NoSideEffect,
   AllTypesMatch<["src", "a", "dst"]>,
   TypesMatchWith<"imm has the same number of bits as elements in dst",
                  "dst", "imm",
                  "IntegerType::get($_self.getContext(), "
-                 "(::llvm::cast<VectorType>($_self).getShape()[0]))">]> {
+                 "($_self.cast<VectorType>().getShape()[0]))">]> {
   let summary = "Masked roundscale op";
   let description = [{
     The mask.rndscale op is an AVX512 specific op that can lower to the proper
@@ -142,7 +141,7 @@ def MaskRndScaleOp : AVX512_Op<"mask.rndscale", [Pure,
 }
 
 def MaskRndScalePSIntrOp : AVX512_IntrOp<"mask.rndscale.ps.512", 1, [
-  Pure,
+  NoSideEffect,
   AllTypesMatch<["src", "a", "res"]>]> {
   let arguments = (ins VectorOfLengthAndType<[16], [F32]>:$src,
                    I32:$k,
@@ -152,7 +151,7 @@ def MaskRndScalePSIntrOp : AVX512_IntrOp<"mask.rndscale.ps.512", 1, [
 }
 
 def MaskRndScalePDIntrOp : AVX512_IntrOp<"mask.rndscale.pd.512", 1, [
-  Pure,
+  NoSideEffect,
   AllTypesMatch<["src", "a", "res"]>]> {
   let arguments = (ins VectorOfLengthAndType<[8], [F64]>:$src,
                    I32:$k,
@@ -165,12 +164,12 @@ def MaskRndScalePDIntrOp : AVX512_IntrOp<"mask.rndscale.pd.512", 1, [
 // MaskScaleFOp
 //----------------------------------------------------------------------------//
 
-def MaskScaleFOp : AVX512_Op<"mask.scalef", [Pure,
+def MaskScaleFOp : AVX512_Op<"mask.scalef", [NoSideEffect,
   AllTypesMatch<["src", "a", "b", "dst"]>,
   TypesMatchWith<"k has the same number of bits as elements in dst",
                  "dst", "k",
                  "IntegerType::get($_self.getContext(), "
-                 "(::llvm::cast<VectorType>($_self).getShape()[0]))">]> {
+                 "($_self.cast<VectorType>().getShape()[0]))">]> {
   let summary = "ScaleF op";
   let description = [{
     The `mask.scalef` op is an AVX512 specific op that can lower to the proper
@@ -199,7 +198,7 @@ def MaskScaleFOp : AVX512_Op<"mask.scalef", [Pure,
 }
 
 def MaskScaleFPSIntrOp : AVX512_IntrOp<"mask.scalef.ps.512", 1, [
-  Pure,
+  NoSideEffect,
   AllTypesMatch<["src", "a", "b", "res"]>]> {
   let arguments = (ins VectorOfLengthAndType<[16], [F32]>:$src,
                    VectorOfLengthAndType<[16], [F32]>:$a,
@@ -209,7 +208,7 @@ def MaskScaleFPSIntrOp : AVX512_IntrOp<"mask.scalef.ps.512", 1, [
 }
 
 def MaskScaleFPDIntrOp : AVX512_IntrOp<"mask.scalef.pd.512", 1, [
-  Pure,
+  NoSideEffect,
   AllTypesMatch<["src", "a", "b", "res"]>]> {
   let arguments = (ins VectorOfLengthAndType<[8], [F64]>:$src,
                    VectorOfLengthAndType<[8], [F64]>:$a,
@@ -222,17 +221,17 @@ def MaskScaleFPDIntrOp : AVX512_IntrOp<"mask.scalef.pd.512", 1, [
 // Vp2IntersectOp
 //----------------------------------------------------------------------------//
 
-def Vp2IntersectOp : AVX512_Op<"vp2intersect", [Pure,
+def Vp2IntersectOp : AVX512_Op<"vp2intersect", [NoSideEffect,
   AllTypesMatch<["a", "b"]>,
   TypesMatchWith<"k1 has the same number of bits as elements in a",
                  "a", "k1",
-                 "VectorType::get({::llvm::cast<VectorType>($_self).getShape()[0]}, "
+                 "VectorType::get({$_self.cast<VectorType>().getShape()[0]}, "
                  "IntegerType::get($_self.getContext(), 1))">,
   TypesMatchWith<"k2 has the same number of bits as elements in b",
                  // Should use `b` instead of `a`, but that would require
                  // adding `type($b)` to assemblyFormat.
                  "a", "k2",
-                 "VectorType::get({::llvm::cast<VectorType>($_self).getShape()[0]}, "
+                 "VectorType::get({$_self.cast<VectorType>().getShape()[0]}, "
                  "IntegerType::get($_self.getContext(), 1))">]> {
   let summary = "Vp2Intersect op";
   let description = [{
@@ -260,13 +259,13 @@ def Vp2IntersectOp : AVX512_Op<"vp2intersect", [Pure,
 }
 
 def Vp2IntersectDIntrOp : AVX512_IntrOp<"vp2intersect.d.512", 2, [
-  Pure]> {
+  NoSideEffect]> {
   let arguments = (ins VectorOfLengthAndType<[16], [I32]>:$a,
                    VectorOfLengthAndType<[16], [I32]>:$b);
 }
 
 def Vp2IntersectQIntrOp : AVX512_IntrOp<"vp2intersect.q.512", 2, [
-  Pure]> {
+  NoSideEffect]> {
   let arguments = (ins VectorOfLengthAndType<[8], [I64]>:$a,
                    VectorOfLengthAndType<[8], [I64]>:$b);
 }
@@ -276,17 +275,17 @@ def Vp2IntersectQIntrOp : AVX512_IntrOp<"vp2intersect.q.512", 2, [
 //===----------------------------------------------------------------------===//
 
 // Operation that is part of the input dialect.
-class AVX_Op<string mnemonic, list<Trait> traits = []> :
+class AVX_Op<string mnemonic, list<OpTrait> traits = []> :
   Op<X86Vector_Dialect, "avx." # mnemonic, traits> {}
 
 // Operation that may be part of the input dialect, but whose
 // form is somewhere between the user view of the operation
 // and the actual lower level intrinsic in LLVM IR.
-class AVX_LowOp<string mnemonic, list<Trait> traits = []> :
+class AVX_LowOp<string mnemonic, list<OpTrait> traits = []> :
   Op<X86Vector_Dialect, "avx.intr." # mnemonic, traits> {}
 
 // Intrinsic operation used during lowering to LLVM IR.
-class AVX_IntrOp<string mnemonic, int numResults, list<Trait> traits = []> :
+class AVX_IntrOp<string mnemonic, int numResults, list<OpTrait> traits = []> :
   LLVM_IntrOpBase<X86Vector_Dialect, "avx.intr." # mnemonic,
                   "x86_avx_" # !subst(".", "_", mnemonic),
                   [], [], traits, numResults>;
@@ -295,14 +294,14 @@ class AVX_IntrOp<string mnemonic, int numResults, list<Trait> traits = []> :
 // AVX Rsqrt
 //----------------------------------------------------------------------------//
 
-def RsqrtOp : AVX_Op<"rsqrt", [Pure, SameOperandsAndResultType]> {
+def RsqrtOp : AVX_Op<"rsqrt", [NoSideEffect, SameOperandsAndResultType]> {
   let summary = "Rsqrt";
   let arguments = (ins VectorOfLengthAndType<[8], [F32]>:$a);
   let results = (outs VectorOfLengthAndType<[8], [F32]>:$b);
   let assemblyFormat = "$a attr-dict `:` type($a)";
 }
 
-def RsqrtIntrOp : AVX_IntrOp<"rsqrt.ps.256", 1, [Pure,
+def RsqrtIntrOp : AVX_IntrOp<"rsqrt.ps.256", 1, [NoSideEffect,
   SameOperandsAndResultType]> {
   let arguments = (ins VectorOfLengthAndType<[8], [F32]>:$a);
 }
@@ -311,7 +310,7 @@ def RsqrtIntrOp : AVX_IntrOp<"rsqrt.ps.256", 1, [Pure,
 // AVX Dot
 //----------------------------------------------------------------------------//
 
-def DotOp : AVX_LowOp<"dot", [Pure, SameOperandsAndResultType]> {
+def DotOp : AVX_LowOp<"dot", [NoSideEffect, SameOperandsAndResultType]> {
   let summary = "Dot";
   let description = [{
     Computes the 4-way dot products of the lower and higher parts of the source
@@ -326,7 +325,7 @@ def DotOp : AVX_LowOp<"dot", [Pure, SameOperandsAndResultType]> {
     %0 = x86vector.avx.intr.dot %a, %b : vector<8xf32>
     %1 = vector.extractelement %0[%i0 : i32]: vector<8xf32>
     %2 = vector.extractelement %0[%i4 : i32]: vector<8xf32>
-    %d = arith.addf %1, %2 : f32
+    %d = addf %1, %2 : f32
     ```
   }];
   let arguments = (ins VectorOfLengthAndType<[8], [F32]>:$a,
@@ -335,7 +334,7 @@ def DotOp : AVX_LowOp<"dot", [Pure, SameOperandsAndResultType]> {
   let assemblyFormat = "$a `,` $b attr-dict `:` type($res)";
 }
 
-def DotIntrOp : AVX_IntrOp<"dp.ps.256", 1, [Pure,
+def DotIntrOp : AVX_IntrOp<"dp.ps.256", 1, [NoSideEffect,
     AllTypesMatch<["a", "b", "res"]>]> {
   let arguments = (ins VectorOfLengthAndType<[8], [F32]>:$a,
                        VectorOfLengthAndType<[8], [F32]>:$b, I8:$c);

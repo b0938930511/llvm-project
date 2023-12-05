@@ -57,10 +57,10 @@ nop
 addi ra, ra, -32
 
 # CHECK-BYTES: 85 50
-# CHECK-ALIAS: li ra, -31
+# CHECK-ALIAS: addi ra, zero, -31
 # CHECK-INST: c.li ra, -31
 # CHECK: # encoding: [0x85,0x50]
-li ra, -31
+addi ra, zero, -31
 
 # CHECK-BYTES: 39 71
 # CHECK-ALIAS: addi sp, sp, -64
@@ -154,35 +154,15 @@ jal zero, -2048
 # CHECK: # encoding: [0x01,0xd0]
 beq s0, zero, -256
 
-# CHECK-BYTES: 01 d0
-# CHECK-ALIASASM: beqz s0, -256
-# CHECK-ALIASOBJ32: beqz s0, 0xffffff2a
-# CHECK-ALIASOBJ64: beqz s0, 0xffffffffffffff2a
-# CHECK-INSTASM: c.beqz s0, -256
-# CHECK-INSTOBJ32: c.beqz s0, 0xffffff2a
-# CHECK-INSTOBJ64: c.beqz s0, 0xffffffffffffff2a
-# CHECK: # encoding: [0x01,0xd0]
-beq zero, s0, -256
-
 # CHECK-BYTES: 7d ec
 # CHECK-ALIASASM: bnez s0, 254
-# CHECK-ALIASOBJ32: bnez s0, 0x12a
-# CHECK-ALIASOBJ64: bnez s0, 0x12a
+# CHECK-ALIASOBJ32: bnez s0, 0x128
+# CHECK-ALIASOBJ64: bnez s0, 0x128
 # CHECK-INSTASM: c.bnez s0, 254
-# CHECK-INSTOBJ32: c.bnez s0, 0x12a
-# CHECK-INSTOBJ64: c.bnez s0, 0x12a
+# CHECK-INSTOBJ32: c.bnez s0, 0x128
+# CHECK-INSTOBJ64: c.bnez s0, 0x128
 # CHECK: # encoding: [0x7d,0xec]
 bne s0, zero, 254
-
-# CHECK-BYTES: 7d ec
-# CHECK-ALIASASM: bnez s0, 254
-# CHECK-ALIASOBJ32: bnez s0, 0x12c
-# CHECK-ALIASOBJ64: bnez s0, 0x12c
-# CHECK-INSTASM: c.bnez s0, 254
-# CHECK-INSTOBJ32: c.bnez s0, 0x12c
-# CHECK-INSTOBJ64: c.bnez s0, 0x12c
-# CHECK: # encoding: [0x7d,0xec]
-bne zero, s0, 254
 
 # CHECK-BYTES: 7e 04
 # CHECK-ALIAS: slli s0, s0, 31

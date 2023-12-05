@@ -95,13 +95,13 @@ public:
   protected:
     bool m_has[e_num];
     std::string m_name;
-    lldb::addr_t m_link_map = LLDB_INVALID_ADDRESS;
-    lldb::addr_t m_base = LLDB_INVALID_ADDRESS;
-    bool m_base_is_offset = false;
-    lldb::addr_t m_dynamic = LLDB_INVALID_ADDRESS;
+    lldb::addr_t m_link_map;
+    lldb::addr_t m_base;
+    bool m_base_is_offset;
+    lldb::addr_t m_dynamic;
   };
 
-  LoadedModuleInfoList() = default;
+  LoadedModuleInfoList() : m_list() {}
 
   void add(const LoadedModuleInfo &mod) { m_list.push_back(mod); }
 

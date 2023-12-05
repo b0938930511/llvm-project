@@ -1,5 +1,3 @@
-#import <Foundation/Foundation.h>
-
 #import "TestExt.h"
 #import "Foo.h"
 

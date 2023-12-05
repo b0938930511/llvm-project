@@ -10,11 +10,15 @@
 #define LLVM_CLANG_TOOLS_EXTRA_CLANGD_DIAGNOSTICS_H
 
 #include "Protocol.h"
+#include "support/Path.h"
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/LangOptions.h"
 #include "clang/Basic/SourceLocation.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/None.h"
+#include "llvm/ADT/Optional.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/JSON.h"
@@ -22,7 +26,6 @@
 #include <cassert>
 #include <functional>
 #include <memory>
-#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -61,7 +64,7 @@ struct DiagBase {
   // May be relative, absolute or even artificially constructed.
   std::string File;
   // Absolute path to containing file, if available.
-  std::optional<std::string> AbsFile;
+  llvm::Optional<std::string> AbsFile;
 
   clangd::Range Range;
   DiagnosticsEngine::Level Severity = DiagnosticsEngine::Note;
@@ -69,7 +72,7 @@ struct DiagBase {
   // Since File is only descriptive, we store a separate flag to distinguish
   // diags from the main file.
   bool InsideMainFile = false;
-  unsigned ID = 0; // e.g. member of clang::diag, or clang-tidy assigned ID.
+  unsigned ID; // e.g. member of clang::diag, or clang-tidy assigned ID.
   // Feature modules can make use of this field to propagate data from a
   // diagnostic to a CodeAction request. Each module should only append to the
   // list.
@@ -83,10 +86,6 @@ struct Fix {
   std::string Message;
   /// TextEdits from clang's fix-its. Must be non-empty.
   llvm::SmallVector<TextEdit, 1> Edits;
-
-  /// Annotations for the Edits.
-  llvm::SmallVector<std::pair<ChangeAnnotationIdentifier, ChangeAnnotation>>
-      Annotations;
 };
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Fix &F);
 
@@ -102,7 +101,6 @@ struct Diag : DiagBase {
     Unknown,
     Clang,
     ClangTidy,
-    Clangd,
     ClangdConfig,
   } Source = Unknown;
   /// Elaborate on the problem, usually pointing to a related piece of code.
@@ -124,12 +122,11 @@ void toLSPDiags(
     const Diag &D, const URIForFile &File, const ClangdDiagnosticOptions &Opts,
     llvm::function_ref<void(clangd::Diagnostic, llvm::ArrayRef<Fix>)> OutFn);
 
+/// Convert from Fix to LSP CodeAction.
+CodeAction toCodeAction(const Fix &D, const URIForFile &File);
+
 /// Convert from clang diagnostic level to LSP severity.
 int getSeverity(DiagnosticsEngine::Level L);
-
-/// Returns a URI providing more information about a particular diagnostic.
-std::optional<std::string> getDiagnosticDocURI(Diag::DiagSource, unsigned ID,
-                                               llvm::StringRef Name);
 
 /// StoreDiags collects the diagnostics that can later be reported by
 /// clangd. It groups all notes for a diagnostic into a single Diag
@@ -146,8 +143,6 @@ public:
   void HandleDiagnostic(DiagnosticsEngine::Level DiagLevel,
                         const clang::Diagnostic &Info) override;
 
-  /// When passed a main diagnostic, returns fixes to add to it.
-  /// When passed a note diagnostic, returns fixes to replace it with.
   using DiagFixer = std::function<std::vector<Fix>(DiagnosticsEngine::Level,
                                                    const clang::Diagnostic &)>;
   using LevelAdjuster = std::function<DiagnosticsEngine::Level(
@@ -171,9 +166,9 @@ private:
   LevelAdjuster Adjuster = nullptr;
   DiagCallback DiagCB = nullptr;
   std::vector<Diag> Output;
-  std::optional<LangOptions> LangOpts;
-  std::optional<Diag> LastDiag;
-  std::optional<FullSourceLoc> LastDiagLoc;  // Valid only when LastDiag is set.
+  llvm::Optional<LangOptions> LangOpts;
+  llvm::Optional<Diag> LastDiag;
+  llvm::Optional<FullSourceLoc> LastDiagLoc; // Valid only when LastDiag is set.
   bool LastDiagOriginallyError = false;      // Valid only when LastDiag is set.
   SourceManager *OrigSrcMgr = nullptr;
 
@@ -182,8 +177,7 @@ private:
 
 /// Determine whether a (non-clang-tidy) diagnostic is suppressed by config.
 bool isBuiltinDiagnosticSuppressed(unsigned ID,
-                                   const llvm::StringSet<> &Suppressed,
-                                   const LangOptions &);
+                                   const llvm::StringSet<> &Suppressed);
 /// Take a user-specified diagnostic code, and convert it to a normalized form
 /// stored in the config and consumed by isBuiltinDiagnosticsSuppressed.
 ///

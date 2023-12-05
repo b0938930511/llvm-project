@@ -5,7 +5,7 @@
 
 typedef signed char BOOL;
 
-void rdar_10597458(void) {
+void rdar_10597458() {
   if (__objc_yes)
     return;
   int *p = 0;

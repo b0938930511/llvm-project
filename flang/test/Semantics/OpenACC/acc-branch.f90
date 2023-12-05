@@ -1,8 +1,9 @@
-! RUN: %python %S/../test_errors.py %s %flang -fopenacc -pedantic
+! RUN: %S/../test_errors.sh %s %t %flang -fopenacc
+! REQUIRES: shell
 
 ! Check OpenACC restruction in branch in and out of some construct
 !
-subroutine openacc_clause_validity
+program openacc_clause_validity
 
   implicit none
 
@@ -18,27 +19,6 @@ subroutine openacc_clause_validity
     return
   end do
   !$acc end parallel
-
-  !$acc parallel loop
-  do i = 1, N
-    a(i) = 3.14
-    !ERROR: RETURN statement is not allowed in a PARALLEL LOOP construct
-    return
-  end do
-
-  !$acc serial loop
-  do i = 1, N
-    a(i) = 3.14
-    !ERROR: RETURN statement is not allowed in a SERIAL LOOP construct
-    return
-  end do
-
-  !$acc kernels loop
-  do i = 1, N
-    a(i) = 3.14
-    !ERROR: RETURN statement is not allowed in a KERNELS LOOP construct
-    return
-  end do
 
   !$acc parallel
   !$acc loop
@@ -74,7 +54,6 @@ subroutine openacc_clause_validity
   ! Exit branches out of parallel construct, attached to an OpenACC parallel construct.
   thisblk: BLOCK
     fortname: if (.true.) then
-      !PORTABILITY: The construct name 'name1' should be distinct at the subprogram level
       name1: do k = 1, N
         !$acc parallel
         !ERROR: EXIT to construct 'fortname' outside of PARALLEL construct is not allowed
@@ -115,7 +94,8 @@ subroutine openacc_clause_validity
   do i = 1, N
     a(i) = 3.14
     if(i == N-1) THEN
-      stop 999 ! no error
+      !ERROR: STOP statement is not allowed in a PARALLEL construct
+      stop 999
     end if
   end do
   !$acc end parallel
@@ -141,7 +121,8 @@ subroutine openacc_clause_validity
   do i = 1, N
     a(i) = 3.14
     if(i == N-1) THEN
-      stop 999 ! no error
+      !ERROR: STOP statement is not allowed in a KERNELS construct
+      stop 999
     end if
   end do
   !$acc end kernels
@@ -183,17 +164,10 @@ subroutine openacc_clause_validity
   do i = 1, N
     a(i) = 3.14
     if(i == N-1) THEN
-      stop 999 ! no error
+      !ERROR: STOP statement is not allowed in a SERIAL construct
+      stop 999
     end if
   end do
   !$acc end serial
 
-
-  !$acc data create(a)
-
-  !ERROR: RETURN statement is not allowed in a DATA construct
-  if (size(a) == 10) return
-
-  !$acc end data
-
-end subroutine openacc_clause_validity
+end program openacc_clause_validity

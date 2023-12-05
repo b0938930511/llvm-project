@@ -13,7 +13,6 @@
 #ifndef LLVM_CLANG_LIB_INTERPRETER_INCREMENTALPARSER_H
 #define LLVM_CLANG_LIB_INTERPRETER_INCREMENTALPARSER_H
 
-#include "clang/AST/GlobalDecl.h"
 #include "clang/Interpreter/PartialTranslationUnit.h"
 
 #include "llvm/ADT/ArrayRef.h"
@@ -24,20 +23,21 @@
 #include <memory>
 namespace llvm {
 class LLVMContext;
-} // namespace llvm
+}
 
 namespace clang {
 class ASTConsumer;
-class CodeGenerator;
 class CompilerInstance;
+class CodeGenerator;
+class DeclGroupRef;
+class FrontendAction;
 class IncrementalAction;
-class Interpreter;
 class Parser;
+
 /// Provides support for incremental compilation. Keeps track of the state
 /// changes between the subsequent incremental input.
 ///
 class IncrementalParser {
-protected:
   /// Long-lived, incremental parsing action.
   std::unique_ptr<IncrementalAction> Act;
 
@@ -57,31 +57,17 @@ protected:
   /// of code.
   std::list<PartialTranslationUnit> PTUs;
 
-  IncrementalParser();
-
 public:
-  IncrementalParser(Interpreter &Interp,
-                    std::unique_ptr<CompilerInstance> Instance,
+  IncrementalParser(std::unique_ptr<CompilerInstance> Instance,
                     llvm::LLVMContext &LLVMCtx, llvm::Error &Err);
-  virtual ~IncrementalParser();
+  ~IncrementalParser();
 
-  CompilerInstance *getCI() { return CI.get(); }
-  CodeGenerator *getCodeGen() const;
+  const CompilerInstance *getCI() const { return CI.get(); }
 
   /// Parses incremental input by creating an in-memory file.
   ///\returns a \c PartialTranslationUnit which holds information about the
   /// \c TranslationUnitDecl and \c llvm::Module corresponding to the input.
-  virtual llvm::Expected<PartialTranslationUnit &> Parse(llvm::StringRef Input);
-
-  /// Uses the CodeGenModule mangled name cache and avoids recomputing.
-  ///\returns the mangled name of a \c GD.
-  llvm::StringRef GetMangledName(GlobalDecl GD) const;
-
-  void CleanUpPTU(PartialTranslationUnit &PTU);
-
-  std::list<PartialTranslationUnit> &getPTUs() { return PTUs; }
-
-  std::unique_ptr<llvm::Module> GenModule();
+  llvm::Expected<PartialTranslationUnit &> Parse(llvm::StringRef Input);
 
 private:
   llvm::Expected<PartialTranslationUnit &> ParseOrWrapTopLevelDecl();

@@ -1,7 +1,6 @@
 set(LLVM_LINK_COMPONENTS
   FrontendOpenMP
   Support
-  TargetParser
   )
 
 add_clang_unittest(ASTMatchersTests
@@ -19,12 +18,12 @@ clang_target_link_libraries(ASTMatchersTests
   clangBasic
   clangFrontend
   clangSerialization
+  clangTesting
   clangTooling
   )
 
 target_link_libraries(ASTMatchersTests
   PRIVATE
-  clangTesting
   LLVMTestingSupport
 )
 

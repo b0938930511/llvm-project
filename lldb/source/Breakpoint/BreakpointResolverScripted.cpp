@@ -27,9 +27,10 @@ using namespace lldb_private;
 // BreakpointResolverScripted:
 BreakpointResolverScripted::BreakpointResolverScripted(
     const BreakpointSP &bkpt, const llvm::StringRef class_name,
-    lldb::SearchDepth depth, const StructuredDataImpl &args_data)
+    lldb::SearchDepth depth, StructuredDataImpl *args_data)
     : BreakpointResolver(bkpt, BreakpointResolver::PythonResolver),
-      m_class_name(std::string(class_name)), m_depth(depth), m_args(args_data) {
+      m_class_name(std::string(class_name)), m_depth(depth),
+      m_args_ptr(args_data) {
   CreateImplementationIfNeeded(bkpt);
 }
 
@@ -51,19 +52,20 @@ void BreakpointResolverScripted::CreateImplementationIfNeeded(
     return;
 
   m_implementation_sp = script_interp->CreateScriptedBreakpointResolver(
-      m_class_name.c_str(), m_args, breakpoint_sp);
+      m_class_name.c_str(), m_args_ptr, breakpoint_sp);
 }
 
 void BreakpointResolverScripted::NotifyBreakpointSet() {
   CreateImplementationIfNeeded(GetBreakpoint());
 }
 
-BreakpointResolverSP BreakpointResolverScripted::CreateFromStructuredData(
+BreakpointResolver *
+BreakpointResolverScripted::CreateFromStructuredData(
     const BreakpointSP &bkpt, const StructuredData::Dictionary &options_dict,
     Status &error) {
   llvm::StringRef class_name;
   bool success;
-
+  
   success = options_dict.GetValueForKeyAsString(
       GetKey(OptionNames::PythonClassName), class_name);
   if (!success) {
@@ -73,14 +75,16 @@ BreakpointResolverSP BreakpointResolverScripted::CreateFromStructuredData(
   // The Python function will actually provide the search depth, this is a
   // placeholder.
   lldb::SearchDepth depth = lldb::eSearchDepthTarget;
-
-  StructuredDataImpl args_data_impl;
+  
+  StructuredDataImpl *args_data_impl = new StructuredDataImpl();
   StructuredData::Dictionary *args_dict = nullptr;
-  if (options_dict.GetValueForKeyAsDictionary(GetKey(OptionNames::ScriptArgs),
-                                              args_dict))
-    args_data_impl.SetObjectSP(args_dict->shared_from_this());
-  return std::make_shared<BreakpointResolverScripted>(bkpt, class_name, depth,
-                                                      args_data_impl);
+  success = options_dict.GetValueForKeyAsDictionary(
+    GetKey(OptionNames::ScriptArgs), args_dict);
+  if (success) {
+      args_data_impl->SetObjectSP(args_dict->shared_from_this());
+  }
+  return new BreakpointResolverScripted(bkpt, class_name, depth, 
+                                        args_data_impl);
 }
 
 StructuredData::ObjectSP
@@ -90,9 +94,9 @@ BreakpointResolverScripted::SerializeToStructuredData() {
 
   options_dict_sp->AddStringItem(GetKey(OptionNames::PythonClassName),
                                    m_class_name);
-  if (m_args.IsValid())
-    options_dict_sp->AddItem(GetKey(OptionNames::ScriptArgs),
-                             m_args.GetObjectSP());
+  if (m_args_ptr->IsValid())
+      options_dict_sp->AddItem(GetKey(OptionNames::ScriptArgs),
+          m_args_ptr->GetObjectSP());
 
   return WrapOptionsDict(options_dict_sp);
 }
@@ -147,6 +151,10 @@ void BreakpointResolverScripted::Dump(Stream *s) const {}
 
 lldb::BreakpointResolverSP
 BreakpointResolverScripted::CopyForBreakpoint(BreakpointSP &breakpoint) {
-  return std::make_shared<BreakpointResolverScripted>(breakpoint, m_class_name,
-                                                      m_depth, m_args);
+  // FIXME: Have to make a copy of the arguments from the m_args_ptr and then
+  // pass that to the new resolver.
+  lldb::BreakpointResolverSP ret_sp(
+      new BreakpointResolverScripted(breakpoint, m_class_name, m_depth, 
+                                     nullptr));
+  return ret_sp;
 }

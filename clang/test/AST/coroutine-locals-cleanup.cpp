@@ -1,8 +1,8 @@
-// RUN: %clang_cc1 -triple x86_64-unknown-linux-gnu -std=c++20 -fsyntax-only -ast-dump %s | FileCheck %s
+// RUN: %clang_cc1 -triple x86_64-unknown-linux-gnu -fcoroutines-ts -std=c++14 -fsyntax-only -ast-dump %s | FileCheck %s
 
 #include "Inputs/std-coroutine.h"
 
-using namespace std;
+using namespace std::experimental;
 
 struct Task {
   struct promise_type {
@@ -85,8 +85,7 @@ Task bar() {
 // CHECK:           CaseStmt
 // CHECK:             ExprWithCleanups {{.*}} 'void'
 // CHECK-NEXT:          CoawaitExpr
-// CHECK-NEXT:            CXXBindTemporaryExpr {{.*}} 'Task' (CXXTemporary {{.*}})
-// CHECK:                 MaterializeTemporaryExpr {{.*}} 'Awaiter':'Task::Awaiter'
+// CHECK-NEXT:            MaterializeTemporaryExpr {{.*}} 'Task::Awaiter':'Task::Awaiter'
 // CHECK:                 ExprWithCleanups {{.*}} 'bool'
 // CHECK-NEXT:              CXXMemberCallExpr {{.*}} 'bool'
 // CHECK-NEXT:                MemberExpr {{.*}} .await_ready
@@ -98,8 +97,7 @@ Task bar() {
 // CHECK:           CaseStmt
 // CHECK:             ExprWithCleanups {{.*}} 'void'
 // CHECK-NEXT:          CoawaitExpr
-// CHECK-NEXT:            CXXBindTemporaryExpr {{.*}} 'Task' (CXXTemporary {{.*}})
-// CHECK:                 MaterializeTemporaryExpr {{.*}} 'Awaiter':'Task::Awaiter'
+// CHECK-NEXT:            MaterializeTemporaryExpr {{.*}} 'Task::Awaiter':'Task::Awaiter'
 // CHECK:                 ExprWithCleanups {{.*}} 'bool'
 // CHECK-NEXT:              CXXMemberCallExpr {{.*}} 'bool'
 // CHECK-NEXT:                MemberExpr {{.*}} .await_ready

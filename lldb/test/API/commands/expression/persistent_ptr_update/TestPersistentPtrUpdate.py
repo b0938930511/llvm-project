@@ -3,12 +3,16 @@ Test that we can have persistent pointer variables
 """
 
 
+
 import lldb
 import lldbsuite.test.lldbutil as lldbutil
 from lldbsuite.test.lldbtest import *
 
 
 class PersistentPtrUpdateTestCase(TestBase):
+
+    mydir = TestBase.compute_mydir(__file__)
+
     def test(self):
         """Test that we can have persistent pointer variables"""
         self.build()
@@ -21,7 +25,7 @@ class PersistentPtrUpdateTestCase(TestBase):
 
         self.runCmd("file " + self.getBuildArtifact("a.out"), CURRENT_EXECUTABLE_SET)
 
-        self.runCmd("break set -p here")
+        self.runCmd('break set -p here')
 
         self.runCmd("run", RUN_SUCCEEDED)
 
@@ -29,4 +33,4 @@ class PersistentPtrUpdateTestCase(TestBase):
 
         self.runCmd("continue")
 
-        self.expect("expr $foo", substrs=["$foo", "0x0"])
+        self.expect("expr $foo", substrs=['$foo', '0x0'])

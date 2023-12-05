@@ -11,65 +11,82 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::readability {
+namespace clang {
+namespace tidy {
+namespace readability {
 
 /// Looks for boolean expressions involving boolean constants and simplifies
 /// them to use the appropriate boolean expression directly.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/readability/simplify-boolean-expr.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/readability-simplify-boolean-expr.html
 class SimplifyBooleanExprCheck : public ClangTidyCheck {
 public:
   SimplifyBooleanExprCheck(StringRef Name, ClangTidyContext *Context);
 
-  void storeOptions(ClangTidyOptions::OptionMap &Opts) override;
+  void storeOptions(ClangTidyOptions::OptionMap &Options) override;
   void registerMatchers(ast_matchers::MatchFinder *Finder) override;
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
-  std::optional<TraversalKind> getCheckTraversalKind() const override {
+  llvm::Optional<TraversalKind> getCheckTraversalKind() const override {
     return TK_IgnoreUnlessSpelledInSource;
   }
 
 private:
   class Visitor;
 
-  void reportBinOp(const ASTContext &Context, const BinaryOperator *Op);
+  void reportBinOp(const ast_matchers::MatchFinder::MatchResult &Result,
+                   const BinaryOperator *Op);
 
-  void replaceWithThenStatement(const ASTContext &Context,
-                                const IfStmt *IfStatement,
-                                const Expr *BoolLiteral);
+  void matchBoolCondition(ast_matchers::MatchFinder *Finder, bool Value,
+                          StringRef BooleanId);
 
-  void replaceWithElseStatement(const ASTContext &Context,
-                                const IfStmt *IfStatement,
-                                const Expr *BoolLiteral);
+  void matchTernaryResult(ast_matchers::MatchFinder *Finder, bool Value,
+                          StringRef TernaryId);
 
-  void replaceWithCondition(const ASTContext &Context,
-                            const ConditionalOperator *Ternary, bool Negated);
+  void matchIfReturnsBool(ast_matchers::MatchFinder *Finder, bool Value,
+                          StringRef Id);
 
-  void replaceWithReturnCondition(const ASTContext &Context, const IfStmt *If,
-                                  const Expr *BoolLiteral, bool Negated);
+  void matchIfAssignsBool(ast_matchers::MatchFinder *Finder, bool Value,
+                          StringRef Id);
 
-  void replaceWithAssignment(const ASTContext &Context, const IfStmt *If,
-                             const Expr *Var, SourceLocation Loc, bool Negated);
+  void matchCompoundIfReturnsBool(ast_matchers::MatchFinder *Finder, bool Value,
+                                  StringRef Id);
 
-  void replaceCompoundReturnWithCondition(const ASTContext &Context,
-                                          const ReturnStmt *Ret, bool Negated,
-                                          const IfStmt *If,
-                                          const Expr *ThenReturn);
+  void
+  replaceWithThenStatement(const ast_matchers::MatchFinder::MatchResult &Result,
+                           const Expr *BoolLiteral);
 
-  bool reportDeMorgan(const ASTContext &Context, const UnaryOperator *Outer,
-                      const BinaryOperator *Inner, bool TryOfferFix,
-                      const Stmt *Parent, const ParenExpr *Parens);
+  void
+  replaceWithElseStatement(const ast_matchers::MatchFinder::MatchResult &Result,
+                           const Expr *FalseConditionRemoved);
 
-  void issueDiag(const ASTContext &Context, SourceLocation Loc,
-                 StringRef Description, SourceRange ReplacementRange,
-                 StringRef Replacement);
+  void
+  replaceWithCondition(const ast_matchers::MatchFinder::MatchResult &Result,
+                       const ConditionalOperator *Ternary,
+                       bool Negated = false);
+
+  void replaceWithReturnCondition(
+      const ast_matchers::MatchFinder::MatchResult &Result, const IfStmt *If,
+      bool Negated = false);
+
+  void
+  replaceWithAssignment(const ast_matchers::MatchFinder::MatchResult &Result,
+                        const IfStmt *If, bool Negated = false);
+
+  void replaceCompoundReturnWithCondition(
+      const ast_matchers::MatchFinder::MatchResult &Result,
+      const CompoundStmt *Compound, bool Negated = false);
+
+  void issueDiag(const ast_matchers::MatchFinder::MatchResult &Result,
+                 SourceLocation Loc, StringRef Description,
+                 SourceRange ReplacementRange, StringRef Replacement);
 
   const bool ChainedConditionalReturn;
   const bool ChainedConditionalAssignment;
-  const bool SimplifyDeMorgan;
-  const bool SimplifyDeMorganRelaxed;
 };
 
-} // namespace clang::tidy::readability
+} // namespace readability
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_READABILITY_SIMPLIFY_BOOLEAN_EXPR_H

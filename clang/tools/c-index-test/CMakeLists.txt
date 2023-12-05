@@ -40,7 +40,12 @@ set_target_properties(c-index-test
 
 # If libxml2 is available, make it available for c-index-test.
 if (CLANG_HAVE_LIBXML)
-  target_link_libraries(c-index-test PRIVATE LibXml2::LibXml2)
+  if ((CMAKE_OSX_SYSROOT) AND (EXISTS ${CMAKE_OSX_SYSROOT}/${LIBXML2_INCLUDE_DIR}))
+    include_directories(SYSTEM ${CMAKE_OSX_SYSROOT}/${LIBXML2_INCLUDE_DIR})
+  else()
+    include_directories(SYSTEM ${LIBXML2_INCLUDE_DIR})
+  endif()
+  target_link_libraries(c-index-test PRIVATE ${LIBXML2_LIBRARIES})
 endif()
 
 if (NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
@@ -49,7 +54,7 @@ if (NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
     set_property(TARGET c-index-test APPEND PROPERTY INSTALL_RPATH
        "@executable_path/../../lib")
   else()
-    set(INSTALL_DESTINATION "${CMAKE_INSTALL_BINDIR}")
+    set(INSTALL_DESTINATION bin)
   endif()
 
   install(TARGETS c-index-test

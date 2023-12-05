@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "lldb/API/SBTypeSynthetic.h"
-#include "lldb/Utility/Instrumentation.h"
+#include "SBReproducerPrivate.h"
 
 #include "lldb/API/SBStream.h"
 
@@ -16,47 +16,54 @@
 using namespace lldb;
 using namespace lldb_private;
 
-SBTypeSynthetic::SBTypeSynthetic() { LLDB_INSTRUMENT_VA(this); }
+SBTypeSynthetic::SBTypeSynthetic() : m_opaque_sp() {
+  LLDB_RECORD_CONSTRUCTOR_NO_ARGS(SBTypeSynthetic);
+}
 
 SBTypeSynthetic SBTypeSynthetic::CreateWithClassName(const char *data,
                                                      uint32_t options) {
-  LLDB_INSTRUMENT_VA(data, options);
+  LLDB_RECORD_STATIC_METHOD(lldb::SBTypeSynthetic, SBTypeSynthetic,
+                            CreateWithClassName, (const char *, uint32_t), data,
+                            options);
 
   if (!data || data[0] == 0)
-    return SBTypeSynthetic();
-  return SBTypeSynthetic(ScriptedSyntheticChildrenSP(
-      new ScriptedSyntheticChildren(options, data, "")));
+    return LLDB_RECORD_RESULT(SBTypeSynthetic());
+  return LLDB_RECORD_RESULT(SBTypeSynthetic(ScriptedSyntheticChildrenSP(
+      new ScriptedSyntheticChildren(options, data, ""))));
 }
 
 SBTypeSynthetic SBTypeSynthetic::CreateWithScriptCode(const char *data,
                                                       uint32_t options) {
-  LLDB_INSTRUMENT_VA(data, options);
+  LLDB_RECORD_STATIC_METHOD(lldb::SBTypeSynthetic, SBTypeSynthetic,
+                            CreateWithScriptCode, (const char *, uint32_t),
+                            data, options);
 
   if (!data || data[0] == 0)
-    return SBTypeSynthetic();
-  return SBTypeSynthetic(ScriptedSyntheticChildrenSP(
-      new ScriptedSyntheticChildren(options, "", data)));
+    return LLDB_RECORD_RESULT(SBTypeSynthetic());
+  return LLDB_RECORD_RESULT(SBTypeSynthetic(ScriptedSyntheticChildrenSP(
+      new ScriptedSyntheticChildren(options, "", data))));
 }
 
 SBTypeSynthetic::SBTypeSynthetic(const lldb::SBTypeSynthetic &rhs)
     : m_opaque_sp(rhs.m_opaque_sp) {
-  LLDB_INSTRUMENT_VA(this, rhs);
+  LLDB_RECORD_CONSTRUCTOR(SBTypeSynthetic, (const lldb::SBTypeSynthetic &),
+                          rhs);
 }
 
 SBTypeSynthetic::~SBTypeSynthetic() = default;
 
 bool SBTypeSynthetic::IsValid() const {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_CONST_NO_ARGS(bool, SBTypeSynthetic, IsValid);
   return this->operator bool();
 }
 SBTypeSynthetic::operator bool() const {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_CONST_NO_ARGS(bool, SBTypeSynthetic, operator bool);
 
   return m_opaque_sp.get() != nullptr;
 }
 
 bool SBTypeSynthetic::IsClassCode() {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_NO_ARGS(bool, SBTypeSynthetic, IsClassCode);
 
   if (!IsValid())
     return false;
@@ -65,7 +72,7 @@ bool SBTypeSynthetic::IsClassCode() {
 }
 
 bool SBTypeSynthetic::IsClassName() {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_NO_ARGS(bool, SBTypeSynthetic, IsClassName);
 
   if (!IsValid())
     return false;
@@ -73,32 +80,32 @@ bool SBTypeSynthetic::IsClassName() {
 }
 
 const char *SBTypeSynthetic::GetData() {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_NO_ARGS(const char *, SBTypeSynthetic, GetData);
 
   if (!IsValid())
     return nullptr;
   if (IsClassCode())
-    return ConstString(m_opaque_sp->GetPythonCode()).GetCString();
-
-  return ConstString(m_opaque_sp->GetPythonClassName()).GetCString();
+    return m_opaque_sp->GetPythonCode();
+  else
+    return m_opaque_sp->GetPythonClassName();
 }
 
 void SBTypeSynthetic::SetClassName(const char *data) {
-  LLDB_INSTRUMENT_VA(this, data);
+  LLDB_RECORD_METHOD(void, SBTypeSynthetic, SetClassName, (const char *), data);
 
   if (IsValid() && data && *data)
     m_opaque_sp->SetPythonClassName(data);
 }
 
 void SBTypeSynthetic::SetClassCode(const char *data) {
-  LLDB_INSTRUMENT_VA(this, data);
+  LLDB_RECORD_METHOD(void, SBTypeSynthetic, SetClassCode, (const char *), data);
 
   if (IsValid() && data && *data)
     m_opaque_sp->SetPythonCode(data);
 }
 
 uint32_t SBTypeSynthetic::GetOptions() {
-  LLDB_INSTRUMENT_VA(this);
+  LLDB_RECORD_METHOD_NO_ARGS(uint32_t, SBTypeSynthetic, GetOptions);
 
   if (!IsValid())
     return lldb::eTypeOptionNone;
@@ -106,7 +113,7 @@ uint32_t SBTypeSynthetic::GetOptions() {
 }
 
 void SBTypeSynthetic::SetOptions(uint32_t value) {
-  LLDB_INSTRUMENT_VA(this, value);
+  LLDB_RECORD_METHOD(void, SBTypeSynthetic, SetOptions, (uint32_t), value);
 
   if (!CopyOnWrite_Impl())
     return;
@@ -115,7 +122,9 @@ void SBTypeSynthetic::SetOptions(uint32_t value) {
 
 bool SBTypeSynthetic::GetDescription(lldb::SBStream &description,
                                      lldb::DescriptionLevel description_level) {
-  LLDB_INSTRUMENT_VA(this, description, description_level);
+  LLDB_RECORD_METHOD(bool, SBTypeSynthetic, GetDescription,
+                     (lldb::SBStream &, lldb::DescriptionLevel), description,
+                     description_level);
 
   if (m_opaque_sp) {
     description.Printf("%s\n", m_opaque_sp->GetDescription().c_str());
@@ -126,16 +135,19 @@ bool SBTypeSynthetic::GetDescription(lldb::SBStream &description,
 
 lldb::SBTypeSynthetic &SBTypeSynthetic::
 operator=(const lldb::SBTypeSynthetic &rhs) {
-  LLDB_INSTRUMENT_VA(this, rhs);
+  LLDB_RECORD_METHOD(lldb::SBTypeSynthetic &,
+                     SBTypeSynthetic, operator=,(const lldb::SBTypeSynthetic &),
+                     rhs);
 
   if (this != &rhs) {
     m_opaque_sp = rhs.m_opaque_sp;
   }
-  return *this;
+  return LLDB_RECORD_RESULT(*this);
 }
 
 bool SBTypeSynthetic::operator==(lldb::SBTypeSynthetic &rhs) {
-  LLDB_INSTRUMENT_VA(this, rhs);
+  LLDB_RECORD_METHOD(
+      bool, SBTypeSynthetic, operator==,(lldb::SBTypeSynthetic &), rhs);
 
   if (!IsValid())
     return !rhs.IsValid();
@@ -143,7 +155,8 @@ bool SBTypeSynthetic::operator==(lldb::SBTypeSynthetic &rhs) {
 }
 
 bool SBTypeSynthetic::IsEqualTo(lldb::SBTypeSynthetic &rhs) {
-  LLDB_INSTRUMENT_VA(this, rhs);
+  LLDB_RECORD_METHOD(bool, SBTypeSynthetic, IsEqualTo,
+                     (lldb::SBTypeSynthetic &), rhs);
 
   if (!IsValid())
     return !rhs.IsValid();
@@ -161,7 +174,8 @@ bool SBTypeSynthetic::IsEqualTo(lldb::SBTypeSynthetic &rhs) {
 }
 
 bool SBTypeSynthetic::operator!=(lldb::SBTypeSynthetic &rhs) {
-  LLDB_INSTRUMENT_VA(this, rhs);
+  LLDB_RECORD_METHOD(
+      bool, SBTypeSynthetic, operator!=,(lldb::SBTypeSynthetic &), rhs);
 
   if (!IsValid())
     return !rhs.IsValid();
@@ -194,4 +208,40 @@ bool SBTypeSynthetic::CopyOnWrite_Impl() {
   SetSP(new_sp);
 
   return true;
+}
+
+namespace lldb_private {
+namespace repro {
+
+template <>
+void RegisterMethods<SBTypeSynthetic>(Registry &R) {
+  LLDB_REGISTER_CONSTRUCTOR(SBTypeSynthetic, ());
+  LLDB_REGISTER_STATIC_METHOD(lldb::SBTypeSynthetic, SBTypeSynthetic,
+                              CreateWithClassName, (const char *, uint32_t));
+  LLDB_REGISTER_STATIC_METHOD(lldb::SBTypeSynthetic, SBTypeSynthetic,
+                              CreateWithScriptCode, (const char *, uint32_t));
+  LLDB_REGISTER_CONSTRUCTOR(SBTypeSynthetic, (const lldb::SBTypeSynthetic &));
+  LLDB_REGISTER_METHOD_CONST(bool, SBTypeSynthetic, IsValid, ());
+  LLDB_REGISTER_METHOD_CONST(bool, SBTypeSynthetic, operator bool, ());
+  LLDB_REGISTER_METHOD(bool, SBTypeSynthetic, IsClassCode, ());
+  LLDB_REGISTER_METHOD(bool, SBTypeSynthetic, IsClassName, ());
+  LLDB_REGISTER_METHOD(const char *, SBTypeSynthetic, GetData, ());
+  LLDB_REGISTER_METHOD(void, SBTypeSynthetic, SetClassName, (const char *));
+  LLDB_REGISTER_METHOD(void, SBTypeSynthetic, SetClassCode, (const char *));
+  LLDB_REGISTER_METHOD(uint32_t, SBTypeSynthetic, GetOptions, ());
+  LLDB_REGISTER_METHOD(void, SBTypeSynthetic, SetOptions, (uint32_t));
+  LLDB_REGISTER_METHOD(bool, SBTypeSynthetic, GetDescription,
+                       (lldb::SBStream &, lldb::DescriptionLevel));
+  LLDB_REGISTER_METHOD(
+      lldb::SBTypeSynthetic &,
+      SBTypeSynthetic, operator=,(const lldb::SBTypeSynthetic &));
+  LLDB_REGISTER_METHOD(bool,
+                       SBTypeSynthetic, operator==,(lldb::SBTypeSynthetic &));
+  LLDB_REGISTER_METHOD(bool, SBTypeSynthetic, IsEqualTo,
+                       (lldb::SBTypeSynthetic &));
+  LLDB_REGISTER_METHOD(bool,
+                       SBTypeSynthetic, operator!=,(lldb::SBTypeSynthetic &));
+}
+
+}
 }

@@ -11,15 +11,16 @@
 #define _LIBCPP___ITERATOR_ISTREAMBUF_ITERATOR_H
 
 #include <__config>
-#include <__fwd/istream.h>
-#include <__fwd/streambuf.h>
-#include <__iterator/default_sentinel.h>
 #include <__iterator/iterator.h>
 #include <__iterator/iterator_traits.h>
+#include <iosfwd> // for forward declaration of basic_streambuf
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
-#  pragma GCC system_header
+#pragma GCC system_header
 #endif
+
+_LIBCPP_PUSH_MACROS
+#include <__undef_macros>
 
 _LIBCPP_BEGIN_NAMESPACE_STD
 
@@ -51,15 +52,14 @@ private:
     {
         char_type __keep_;
         streambuf_type* __sbuf_;
-        _LIBCPP_HIDE_FROM_ABI
-        explicit __proxy(char_type __c, streambuf_type* __s)
+        _LIBCPP_INLINE_VISIBILITY __proxy(char_type __c, streambuf_type* __s)
             : __keep_(__c), __sbuf_(__s) {}
         friend class istreambuf_iterator;
     public:
-        _LIBCPP_HIDE_FROM_ABI char_type operator*() const {return __keep_;}
+        _LIBCPP_INLINE_VISIBILITY char_type operator*() const {return __keep_;}
     };
 
-    _LIBCPP_HIDE_FROM_ABI
+    _LIBCPP_INLINE_VISIBILITY
     bool __test_for_eof() const
     {
         if (__sbuf_ && traits_type::eq_int_type(__sbuf_->sgetc(), traits_type::eof()))
@@ -67,54 +67,44 @@ private:
         return __sbuf_ == nullptr;
     }
 public:
-    _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR istreambuf_iterator() _NOEXCEPT : __sbuf_(nullptr) {}
-#if _LIBCPP_STD_VER >= 20
-    _LIBCPP_HIDE_FROM_ABI constexpr istreambuf_iterator(default_sentinel_t) noexcept
-        : istreambuf_iterator() {}
-#endif // _LIBCPP_STD_VER >= 20
-    _LIBCPP_HIDE_FROM_ABI istreambuf_iterator(istream_type& __s) _NOEXCEPT
+    _LIBCPP_INLINE_VISIBILITY _LIBCPP_CONSTEXPR istreambuf_iterator() _NOEXCEPT : __sbuf_(nullptr) {}
+    _LIBCPP_INLINE_VISIBILITY istreambuf_iterator(istream_type& __s) _NOEXCEPT
         : __sbuf_(__s.rdbuf()) {}
-    _LIBCPP_HIDE_FROM_ABI istreambuf_iterator(streambuf_type* __s) _NOEXCEPT
+    _LIBCPP_INLINE_VISIBILITY istreambuf_iterator(streambuf_type* __s) _NOEXCEPT
         : __sbuf_(__s) {}
-    _LIBCPP_HIDE_FROM_ABI istreambuf_iterator(const __proxy& __p) _NOEXCEPT
+    _LIBCPP_INLINE_VISIBILITY istreambuf_iterator(const __proxy& __p) _NOEXCEPT
         : __sbuf_(__p.__sbuf_) {}
 
-    _LIBCPP_HIDE_FROM_ABI char_type  operator*() const
+    _LIBCPP_INLINE_VISIBILITY char_type  operator*() const
         {return static_cast<char_type>(__sbuf_->sgetc());}
-    _LIBCPP_HIDE_FROM_ABI istreambuf_iterator& operator++()
+    _LIBCPP_INLINE_VISIBILITY istreambuf_iterator& operator++()
         {
             __sbuf_->sbumpc();
             return *this;
         }
-    _LIBCPP_HIDE_FROM_ABI __proxy              operator++(int)
+    _LIBCPP_INLINE_VISIBILITY __proxy              operator++(int)
         {
             return __proxy(__sbuf_->sbumpc(), __sbuf_);
         }
 
-    _LIBCPP_HIDE_FROM_ABI bool equal(const istreambuf_iterator& __b) const
+    _LIBCPP_INLINE_VISIBILITY bool equal(const istreambuf_iterator& __b) const
         {return __test_for_eof() == __b.__test_for_eof();}
-
-#if _LIBCPP_STD_VER >= 20
-    friend _LIBCPP_HIDE_FROM_ABI bool operator==(const istreambuf_iterator& __i, default_sentinel_t) {
-      return __i.__test_for_eof();
-    }
-#endif // _LIBCPP_STD_VER >= 20
 };
 
 template <class _CharT, class _Traits>
-inline _LIBCPP_HIDE_FROM_ABI
+inline _LIBCPP_INLINE_VISIBILITY
 bool operator==(const istreambuf_iterator<_CharT,_Traits>& __a,
                 const istreambuf_iterator<_CharT,_Traits>& __b)
                 {return __a.equal(__b);}
 
-#if _LIBCPP_STD_VER <= 17
 template <class _CharT, class _Traits>
-inline _LIBCPP_HIDE_FROM_ABI
+inline _LIBCPP_INLINE_VISIBILITY
 bool operator!=(const istreambuf_iterator<_CharT,_Traits>& __a,
                 const istreambuf_iterator<_CharT,_Traits>& __b)
                 {return !__a.equal(__b);}
-#endif // _LIBCPP_STD_VER <= 17
 
 _LIBCPP_END_NAMESPACE_STD
+
+_LIBCPP_POP_MACROS
 
 #endif // _LIBCPP___ITERATOR_ISTREAMBUF_ITERATOR_H

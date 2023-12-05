@@ -6,6 +6,6 @@
 + (id)new;
 @end
 
-void func(void) {
+void func() {
   id NODEREF obj = [NSObject new]; // expected-warning{{'noderef' can only be used on an array or pointer type}}
 }

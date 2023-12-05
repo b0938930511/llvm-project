@@ -19,17 +19,17 @@
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/TextDiagnosticPrinter.h"
 #include "clang/Index/USRGeneration.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/TargetParser/Triple.h"
 #include <algorithm>
 #include <fstream>
-#include <optional>
 #include <sstream>
 #include <tuple>
 
@@ -149,35 +149,6 @@ std::error_code IndexError::convertToErrorCode() const {
   return std::error_code(static_cast<int>(Code), *Category);
 }
 
-/// Parse one line of the input CTU index file.
-///
-/// @param[in]  LineRef     The input CTU index item in format
-///                         "<USR-Length>:<USR> <File-Path>".
-/// @param[out] LookupName  The lookup name in format "<USR-Length>:<USR>".
-/// @param[out] FilePath    The file path "<File-Path>".
-static bool parseCrossTUIndexItem(StringRef LineRef, StringRef &LookupName,
-                                  StringRef &FilePath) {
-  // `LineRef` is "<USR-Length>:<USR> <File-Path>" now.
-
-  size_t USRLength = 0;
-  if (LineRef.consumeInteger(10, USRLength))
-    return false;
-  assert(USRLength && "USRLength should be greater than zero.");
-
-  if (!LineRef.consume_front(":"))
-    return false;
-
-  // `LineRef` is now just "<USR> <File-Path>".
-
-  // Check LookupName length out of bound and incorrect delimiter.
-  if (USRLength >= LineRef.size() || ' ' != LineRef[USRLength])
-    return false;
-
-  LookupName = LineRef.substr(0, USRLength);
-  FilePath = LineRef.substr(USRLength + 1);
-  return true;
-}
-
 llvm::Expected<llvm::StringMap<std::string>>
 parseCrossTUIndex(StringRef IndexPath) {
   std::ifstream ExternalMapFile{std::string(IndexPath)};
@@ -189,23 +160,24 @@ parseCrossTUIndex(StringRef IndexPath) {
   std::string Line;
   unsigned LineNo = 1;
   while (std::getline(ExternalMapFile, Line)) {
-    // Split lookup name and file path
-    StringRef LookupName, FilePathInIndex;
-    if (!parseCrossTUIndexItem(Line, LookupName, FilePathInIndex))
+    StringRef LineRef{Line};
+    const size_t Delimiter = LineRef.find(' ');
+    if (Delimiter > 0 && Delimiter != std::string::npos) {
+      StringRef LookupName = LineRef.substr(0, Delimiter);
+
+      // Store paths with posix-style directory separator.
+      SmallString<32> FilePath(LineRef.substr(Delimiter + 1));
+      llvm::sys::path::native(FilePath, llvm::sys::path::Style::posix);
+
+      bool InsertionOccured;
+      std::tie(std::ignore, InsertionOccured) =
+          Result.try_emplace(LookupName, FilePath.begin(), FilePath.end());
+      if (!InsertionOccured)
+        return llvm::make_error<IndexError>(
+            index_error_code::multiple_definitions, IndexPath.str(), LineNo);
+    } else
       return llvm::make_error<IndexError>(
           index_error_code::invalid_index_format, IndexPath.str(), LineNo);
-
-    // Store paths with posix-style directory separator.
-    SmallString<32> FilePath(FilePathInIndex);
-    llvm::sys::path::native(FilePath, llvm::sys::path::Style::posix);
-
-    bool InsertionOccured;
-    std::tie(std::ignore, InsertionOccured) =
-        Result.try_emplace(LookupName, FilePath.begin(), FilePath.end());
-    if (!InsertionOccured)
-      return llvm::make_error<IndexError>(
-          index_error_code::multiple_definitions, IndexPath.str(), LineNo);
-
     ++LineNo;
   }
   return Result;
@@ -215,14 +187,18 @@ std::string
 createCrossTUIndexString(const llvm::StringMap<std::string> &Index) {
   std::ostringstream Result;
   for (const auto &E : Index)
-    Result << E.getKey().size() << ':' << E.getKey().str() << ' '
-           << E.getValue() << '\n';
+    Result << E.getKey().str() << " " << E.getValue() << '\n';
   return Result.str();
 }
 
-bool shouldImport(const VarDecl *VD, const ASTContext &ACtx) {
+bool containsConst(const VarDecl *VD, const ASTContext &ACtx) {
   CanQualType CT = ACtx.getCanonicalType(VD->getType());
-  return CT.isConstQualified() && VD->getType().isTrivialType(ACtx);
+  if (!CT.isConstQualified()) {
+    const RecordType *RTy = CT->getAs<RecordType>();
+    if (!RTy || !RTy->hasConstFields())
+      return false;
+  }
+  return true;
 }
 
 static bool hasBodyOrInit(const FunctionDecl *D, const FunctionDecl *&DefD) {
@@ -241,7 +217,7 @@ CrossTranslationUnitContext::CrossTranslationUnitContext(CompilerInstance &CI)
 
 CrossTranslationUnitContext::~CrossTranslationUnitContext() {}
 
-std::optional<std::string>
+llvm::Optional<std::string>
 CrossTranslationUnitContext::getLookupName(const NamedDecl *ND) {
   SmallString<128> DeclUSR;
   bool Ret = index::generateUSRForDecl(ND, DeclUSR);
@@ -267,7 +243,7 @@ CrossTranslationUnitContext::findDefInDeclContext(const DeclContext *DC,
     const T *ResultDecl;
     if (!ND || !hasBodyOrInit(ND, ResultDecl))
       continue;
-    std::optional<std::string> ResultLookupName = getLookupName(ResultDecl);
+    llvm::Optional<std::string> ResultLookupName = getLookupName(ResultDecl);
     if (!ResultLookupName || *ResultLookupName != LookupName)
       continue;
     return ResultDecl;
@@ -283,7 +259,7 @@ llvm::Expected<const T *> CrossTranslationUnitContext::getCrossTUDefinitionImpl(
   assert(!hasBodyOrInit(D) &&
          "D has a body or init in current translation unit!");
   ++NumGetCTUCalled;
-  const std::optional<std::string> LookupName = getLookupName(D);
+  const llvm::Optional<std::string> LookupName = getLookupName(D);
   if (!LookupName)
     return llvm::make_error<IndexError>(
         index_error_code::failed_to_generate_usr);
@@ -392,11 +368,11 @@ void CrossTranslationUnitContext::emitCrossTUDiagnostics(const IndexError &IE) {
 
 CrossTranslationUnitContext::ASTUnitStorage::ASTUnitStorage(
     CompilerInstance &CI)
-    : Loader(CI, CI.getAnalyzerOpts().CTUDir,
-             CI.getAnalyzerOpts().CTUInvocationList),
+    : Loader(CI, CI.getAnalyzerOpts()->CTUDir,
+             CI.getAnalyzerOpts()->CTUInvocationList),
       LoadGuard(CI.getASTContext().getLangOpts().CPlusPlus
-                    ? CI.getAnalyzerOpts().CTUImportCppThreshold
-                    : CI.getAnalyzerOpts().CTUImportThreshold) {}
+                    ? CI.getAnalyzerOpts()->CTUImportCppThreshold
+                    : CI.getAnalyzerOpts()->CTUImportThreshold) {}
 
 llvm::Expected<ASTUnit *>
 CrossTranslationUnitContext::ASTUnitStorage::getASTUnitForFile(
@@ -452,13 +428,13 @@ CrossTranslationUnitContext::ASTUnitStorage::getASTUnitForFunction(
             ensureCTUIndexLoaded(CrossTUDir, IndexName))
       return std::move(IndexLoadError);
 
-    // Check if there is an entry in the index for the function.
+    // Check if there is and entry in the index for the function.
     if (!NameFileMap.count(FunctionName)) {
       ++NumNotInOtherTU;
       return llvm::make_error<IndexError>(index_error_code::missing_definition);
     }
 
-    // Search in the index for the filename where the definition of FunctionName
+    // Search in the index for the filename where the definition of FuncitonName
     // resides.
     if (llvm::Expected<ASTUnit *> FoundForFile =
             getASTUnitForFile(NameFileMap[FunctionName], DisplayCTUProgress)) {
@@ -568,7 +544,7 @@ CrossTranslationUnitContext::ASTLoader::loadFromDump(StringRef ASTDumpPath) {
   return ASTUnit::LoadFromASTFile(
       std::string(ASTDumpPath.str()),
       CI.getPCHContainerOperations()->getRawReader(), ASTUnit::LoadEverything,
-      Diags, CI.getFileSystemOpts(), CI.getHeaderSearchOptsPtr());
+      Diags, CI.getFileSystemOpts());
 }
 
 /// Load the AST from a source-file, which is supposed to be located inside the
@@ -609,10 +585,10 @@ CrossTranslationUnitContext::ASTLoader::loadFromSource(
   IntrusiveRefCntPtr<DiagnosticsEngine> Diags(
       new DiagnosticsEngine{DiagID, &*DiagOpts, DiagClient});
 
-  return ASTUnit::LoadFromCommandLine(CommandLineArgs.begin(),
-                                      (CommandLineArgs.end()),
-                                      CI.getPCHContainerOperations(), Diags,
-                                      CI.getHeaderSearchOpts().ResourceDir);
+  return std::unique_ptr<ASTUnit>(ASTUnit::LoadFromCommandLine(
+      CommandLineArgs.begin(), (CommandLineArgs.end()),
+      CI.getPCHContainerOperations(), Diags,
+      CI.getHeaderSearchOpts().ResourceDir));
 }
 
 llvm::Expected<InvocationListTy>
@@ -660,7 +636,7 @@ parseInvocationList(StringRef FileContent, llvm::sys::path::Style PathStyle) {
 
     StringRef InvocationKey = NativeSourcePath;
 
-    if (InvocationList.contains(InvocationKey))
+    if (InvocationList.find(InvocationKey) != InvocationList.end())
       return llvm::make_error<IndexError>(
           index_error_code::invocation_list_ambiguous);
 
@@ -735,19 +711,20 @@ CrossTranslationUnitContext::importDefinitionImpl(const T *D, ASTUnit *Unit) {
 
   auto ToDeclOrError = Importer.Import(D);
   if (!ToDeclOrError) {
-    handleAllErrors(ToDeclOrError.takeError(), [&](const ASTImportError &IE) {
-      switch (IE.Error) {
-      case ASTImportError::NameConflict:
-        ++NumNameConflicts;
-        break;
-      case ASTImportError::UnsupportedConstruct:
-        ++NumUnsupportedNodeFound;
-        break;
-      case ASTImportError::Unknown:
-        llvm_unreachable("Unknown import error happened.");
-        break;
-      }
-    });
+    handleAllErrors(ToDeclOrError.takeError(),
+                    [&](const ImportError &IE) {
+                      switch (IE.Error) {
+                      case ImportError::NameConflict:
+                        ++NumNameConflicts;
+                         break;
+                      case ImportError::UnsupportedConstruct:
+                        ++NumUnsupportedNodeFound;
+                        break;
+                      case ImportError::Unknown:
+                        llvm_unreachable("Unknown import error happened.");
+                        break;
+                      }
+                    });
     return llvm::make_error<IndexError>(index_error_code::failed_import);
   }
   auto *ToDecl = cast<T>(*ToDeclOrError);
@@ -793,24 +770,11 @@ CrossTranslationUnitContext::getOrCreateASTImporter(ASTUnit *Unit) {
   return *NewImporter;
 }
 
-std::optional<clang::MacroExpansionContext>
+llvm::Optional<clang::MacroExpansionContext>
 CrossTranslationUnitContext::getMacroExpansionContextForSourceLocation(
     const clang::SourceLocation &ToLoc) const {
   // FIXME: Implement: Record such a context for every imported ASTUnit; lookup.
-  return std::nullopt;
-}
-
-bool CrossTranslationUnitContext::isImportedAsNew(const Decl *ToDecl) const {
-  if (!ImporterSharedSt)
-    return false;
-  return ImporterSharedSt->isNewDecl(const_cast<Decl *>(ToDecl));
-}
-
-bool CrossTranslationUnitContext::hasError(const Decl *ToDecl) const {
-  if (!ImporterSharedSt)
-    return false;
-  return static_cast<bool>(
-      ImporterSharedSt->getImportDeclErrorIfAny(const_cast<Decl *>(ToDecl)));
+  return llvm::None;
 }
 
 } // namespace cross_tu

@@ -13,14 +13,18 @@
 #include "lldb/Core/Module.h"
 #include "lldb/Core/PluginManager.h"
 #include "lldb/Core/Section.h"
-#include "lldb/Target/ABI.h"
 #include "lldb/Target/SectionLoadList.h"
 #include "lldb/Target/Target.h"
 
 using namespace lldb;
 using namespace lldb_private;
 
-llvm::StringRef ProcessTrace::GetPluginDescriptionStatic() {
+ConstString ProcessTrace::GetPluginNameStatic() {
+  static ConstString g_name("trace");
+  return g_name;
+}
+
+const char *ProcessTrace::GetPluginDescriptionStatic() {
   return "Trace process plug-in.";
 }
 
@@ -53,6 +57,10 @@ ProcessTrace::~ProcessTrace() {
   Finalize();
 }
 
+ConstString ProcessTrace::GetPluginName() { return GetPluginNameStatic(); }
+
+uint32_t ProcessTrace::GetPluginVersion() { return 1; }
+
 void ProcessTrace::DidAttach(ArchSpec &process_arch) {
   ListenerSP listener_sp(
       Listener::MakeListener("lldb.process_trace.did_attach_listener"));
@@ -63,7 +71,7 @@ void ProcessTrace::DidAttach(ArchSpec &process_arch) {
   SetPrivateState(eStateStopped);
 
   EventSP event_sp;
-  WaitForProcessToStop(std::nullopt, &event_sp, true, listener_sp);
+  WaitForProcessToStop(llvm::None, &event_sp, true, listener_sp);
 
   RestoreProcessEvents();
 
@@ -81,9 +89,6 @@ Status ProcessTrace::DoDestroy() { return Status(); }
 
 size_t ProcessTrace::ReadMemory(addr_t addr, void *buf, size_t size,
                                 Status &error) {
-  if (const ABISP &abi = GetABI())
-    addr = abi->FixAnyAddress(addr);
-
   // Don't allow the caching that lldb_private::Process::ReadMemory does since
   // we have it all cached in the trace files.
   return DoReadMemory(addr, buf, size, error);

@@ -12,8 +12,6 @@
 
 // charT toupper(charT) const;
 
-// XFAIL: no-wide-characters
-
 #include <locale>
 #include <cassert>
 

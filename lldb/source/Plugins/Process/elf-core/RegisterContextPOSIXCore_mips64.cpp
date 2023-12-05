@@ -72,7 +72,7 @@ bool RegisterContextCorePOSIX_mips64::ReadRegister(const RegisterInfo *reg_info,
 }
 
 bool RegisterContextCorePOSIX_mips64::ReadAllRegisterValues(
-    lldb::WritableDataBufferSP &data_sp) {
+    lldb::DataBufferSP &data_sp) {
   return false;
 }
 

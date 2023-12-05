@@ -1,8 +1,9 @@
 //===-- FixupStatepointCallerSaved.cpp - Fixup caller saved registers  ----===//
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//                     The LLVM Compiler Infrastructure
+//
+// This file is distributed under the University of Illinois Open Source
+// License. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -24,7 +25,10 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
+#include "llvm/CodeGen/MachineRegisterInfo.h"
+#include "llvm/CodeGen/Passes.h"
 #include "llvm/CodeGen/StackMaps.h"
+#include "llvm/CodeGen/TargetFrameLowering.h"
 #include "llvm/CodeGen/TargetInstrInfo.h"
 #include "llvm/IR/Statepoint.h"
 #include "llvm/InitializePasses.h"
@@ -153,17 +157,12 @@ static Register performCopyPropagation(Register Reg,
   RI = ++MachineBasicBlock::iterator(Def);
   IsKill = DestSrc->Source->isKill();
 
+  // There are no uses of original register between COPY and STATEPOINT.
+  // There can't be any after STATEPOINT, so we can eliminate Def.
   if (!Use) {
-    // There are no uses of original register between COPY and STATEPOINT.
-    // There can't be any after STATEPOINT, so we can eliminate Def.
     LLVM_DEBUG(dbgs() << "spillRegisters: removing dead copy " << *Def);
     Def->eraseFromParent();
-  } else if (IsKill) {
-    // COPY will remain in place, spill will be inserted *after* it, so it is
-    // not a kill of source anymore.
-    const_cast<MachineOperand *>(DestSrc->Source)->setIsKill(false);
   }
-
   return SrcReg;
 }
 
@@ -388,7 +387,7 @@ public:
       Register Reg = MO.getReg();
       assert(Reg.isPhysical() && "Only physical regs are expected");
 
-      if (isCalleeSaved(Reg) && (AllowGCPtrInCSR || !GCRegs.contains(Reg)))
+      if (isCalleeSaved(Reg) && (AllowGCPtrInCSR || !is_contained(GCRegs, Reg)))
         continue;
 
       LLVM_DEBUG(dbgs() << "Will spill " << printReg(Reg, &TRI) << " at index "
@@ -407,6 +406,7 @@ public:
   void spillRegisters() {
     for (Register Reg : RegsToSpill) {
       int FI = CacheFI.getFrameIndex(Reg, EHPad);
+      const TargetRegisterClass *RC = TRI.getMinimalPhysRegClass(Reg);
 
       NumSpilledRegisters++;
       RegToSlotIdx[Reg] = FI;
@@ -418,11 +418,10 @@ public:
       bool IsKill = true;
       MachineBasicBlock::iterator InsertBefore(MI);
       Reg = performCopyPropagation(Reg, InsertBefore, IsKill, TII, TRI);
-      const TargetRegisterClass *RC = TRI.getMinimalPhysRegClass(Reg);
 
       LLVM_DEBUG(dbgs() << "Insert spill before " << *InsertBefore);
       TII.storeRegToStackSlot(*MI.getParent(), InsertBefore, Reg, IsKill, FI,
-                              RC, &TRI, Register());
+                              RC, &TRI);
     }
   }
 
@@ -431,7 +430,7 @@ public:
     const TargetRegisterClass *RC = TRI.getMinimalPhysRegClass(Reg);
     int FI = RegToSlotIdx[Reg];
     if (It != MBB->end()) {
-      TII.loadRegFromStackSlot(*MBB, It, Reg, FI, RC, &TRI, Register());
+      TII.loadRegFromStackSlot(*MBB, It, Reg, FI, RC, &TRI);
       return;
     }
 
@@ -439,7 +438,7 @@ public:
     // and then swap them.
     assert(!MBB->empty() && "Empty block");
     --It;
-    TII.loadRegFromStackSlot(*MBB, It, Reg, FI, RC, &TRI, Register());
+    TII.loadRegFromStackSlot(*MBB, It, Reg, FI, RC, &TRI);
     MachineInstr *Reload = It->getPrevNode();
     int Dummy = 0;
     (void)Dummy;
@@ -461,8 +460,7 @@ public:
 
       if (EHPad && !RC.hasReload(Reg, RegToSlotIdx[Reg], EHPad)) {
         RC.recordReload(Reg, RegToSlotIdx[Reg], EHPad);
-        auto EHPadInsertPoint =
-            EHPad->SkipPHIsLabelsAndDebug(EHPad->begin(), Reg);
+        auto EHPadInsertPoint = EHPad->SkipPHIsLabelsAndDebug(EHPad->begin());
         insertReloadBefore(Reg, EHPadInsertPoint, EHPad);
         LLVM_DEBUG(dbgs() << "...also reload at EHPad "
                           << printMBBReference(*EHPad) << "\n");

@@ -13,7 +13,6 @@
 #define LLVM_TOOLS_LLVM_XRAY_FUNC_ID_HELPER_H
 
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/DebugInfo/Symbolize/SymbolizableModule.h"
 #include "llvm/DebugInfo/Symbolize/Symbolize.h"
 #include <unordered_map>
 

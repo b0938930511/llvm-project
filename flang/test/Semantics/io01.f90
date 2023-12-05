@@ -1,4 +1,5 @@
-! RUN: %python %S/test_errors.py %s %flang_fc1
+! RUN: %S/test_errors.sh %s %t %flang_fc1
+! REQUIRES: shell
   character(len=20) :: access = "direcT"
   character(len=20) :: access_(2) = (/"direcT", "streaM"/)
   character(len=20) :: action_(2) = (/"reaD ", "writE"/)
@@ -75,8 +76,7 @@
   !ERROR: If NEWUNIT appears, FILE or STATUS must also appear
   open(newunit=n, newunit=nn, iostat=stat4)
 
-  !ERROR: NEWUNIT variable 'const_new_unit' is not definable
-  !BECAUSE: '66_4' is not a variable or pointer
+  !ERROR: NEWUNIT variable 'const_new_unit' must be definable
   open(newunit=const_new_unit, status=cc)
 
   !ERROR: Duplicate UNIT specifier

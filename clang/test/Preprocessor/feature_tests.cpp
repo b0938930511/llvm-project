@@ -1,5 +1,5 @@
 // RUN: %clang_cc1 %s -triple=i686-apple-darwin9 -verify -DVERIFY
-// RUN: %clang_cc1 %s -triple=i686-apple-darwin9 -fms-extensions -DMS -verify -DVERIFY
+// expected-no-diagnostics
 
 #ifndef __has_feature
 #error Should have __has_feature
@@ -24,7 +24,6 @@
 // still return true.
 #if !__has_builtin(__builtin_LINE) || \
     !__has_builtin(__builtin_FILE) || \
-    !__has_builtin(__builtin_FILE_NAME) || \
     !__has_builtin(__builtin_FUNCTION) || \
     !__has_builtin(__builtin_COLUMN) || \
     !__has_builtin(__array_rank) || \
@@ -35,14 +34,6 @@
 #error Clang should have these
 #endif
 
-#ifdef MS
-#if !__has_builtin(__builtin_FUNCSIG)
-#error Clang should have this
-#endif
-#elif __has_builtin(__builtin_FUNCSIG)
-#error Clang should not have this without '-fms-extensions'
-#endif
-
 // This is a C-only builtin.
 #if __has_builtin(__builtin_types_compatible_p)
 #error Clang should not have this in C++ mode
@@ -50,30 +41,4 @@
 
 #if __has_builtin(__builtin_insanity)
 #error Clang should not have this
-#endif
-
-// Check __has_constexpr_builtin
-#if  !__has_constexpr_builtin(__builtin_fmax) || \
-     !__has_constexpr_builtin(__builtin_fmin)
-#error Clang should have these constexpr builtins
-#endif
-
-#if  __has_constexpr_builtin(__builtin_cbrt)
-#error This builtin should not be constexpr in Clang
-#endif
-
-#if  __has_constexpr_builtin(__builtin_insanity)
-#error This is not a builtin in Clang
-#endif
-
-// expected-error@+1 {{missing '(' after '__has_constexpr_builtin'}} expected-error@+1 {{expected value}}
-#if __has_constexpr_builtin
-#endif
-
-// expected-error@+1 {{builtin feature check macro requires a parenthesized identifier}}
-#if  __has_constexpr_builtin("__builtin_fmax")
-#endif
-
-// expected-error@+1 {{too many arguments}}
-#if __has_constexpr_builtin(__builtin_fmax, __builtin_fmin)
 #endif

@@ -16,14 +16,22 @@
 #include "llvm/IR/PassManager.h"
 
 namespace llvm {
+class Function;
+class Loop;
+class LPMUpdater;
+
 // New pass manager boilerplate.
 class WarnMissedTransformationsPass
     : public PassInfoMixin<WarnMissedTransformationsPass> {
 public:
-  explicit WarnMissedTransformationsPass() = default;
+  explicit WarnMissedTransformationsPass() {}
 
   PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
 };
+
+// Legacy pass manager boilerplate.
+Pass *createWarnMissedTransformationsPass();
+void initializeWarnMissedTransformationsLegacyPass(PassRegistry &);
 } // end namespace llvm
 
 #endif // LLVM_TRANSFORMS_SCALAR_WARNMISSEDTRANSFORMS_H

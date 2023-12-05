@@ -1,5 +1,4 @@
 ; RUN: llc -mtriple=arm64-eabi -mattr=+crc -o - %s | FileCheck %s
-; RUN: llc -mtriple=arm64-eabi -mattr=+v8r -o - %s | FileCheck %s
 ; RUN: llc -mtriple=arm64-eabi -mcpu=cortex-a53 -mattr=+crc -o - %s | FileCheck %s
 
 define i32 @test_crc32b(i32 %cur, i8 %next) {

@@ -12,7 +12,6 @@
 #include "lldb/Core/Module.h"
 #include "lldb/Host/OptionParser.h"
 #include "lldb/Interpreter/CommandInterpreter.h"
-#include "lldb/Interpreter/CommandOptionArgumentTable.h"
 #include "lldb/Interpreter/CommandReturnObject.h"
 #include "lldb/Interpreter/OptionArgParser.h"
 #include "lldb/Interpreter/Options.h"
@@ -31,7 +30,8 @@ using namespace lldb_private;
 #define LLDB_OPTIONS_disassemble
 #include "CommandOptions.inc"
 
-CommandObjectDisassemble::CommandOptions::CommandOptions() {
+CommandObjectDisassemble::CommandOptions::CommandOptions()
+    : Options(), func_name(), plugin_name(), flavor_string(), arch() {
   OptionParsingStarting(nullptr);
 }
 
@@ -64,10 +64,6 @@ Status CommandObjectDisassemble::CommandOptions::SetOptionValue(
 
   case 'b':
     show_bytes = true;
-    break;
-
-  case 'k':
-    show_control_flow_kind = true;
     break;
 
   case 's': {
@@ -159,7 +155,6 @@ void CommandObjectDisassemble::CommandOptions::OptionParsingStarting(
     ExecutionContext *execution_context) {
   show_mixed = false;
   show_bytes = false;
-  show_control_flow_kind = false;
   num_lines_context = 0;
   num_instructions = 0;
   func_name.clear();
@@ -204,7 +199,7 @@ Status CommandObjectDisassemble::CommandOptions::OptionParsingFinished(
 
 llvm::ArrayRef<OptionDefinition>
 CommandObjectDisassemble::CommandOptions::GetDefinitions() {
-  return llvm::ArrayRef(g_disassemble_options);
+  return llvm::makeArrayRef(g_disassemble_options);
 }
 
 // CommandObjectDisassemble
@@ -216,7 +211,8 @@ CommandObjectDisassemble::CommandObjectDisassemble(
           "Disassemble specified instructions in the current target.  "
           "Defaults to the current function for the current thread and "
           "stack frame.",
-          "disassemble [<cmd-options>]", eCommandRequiresTarget) {}
+          "disassemble [<cmd-options>]", eCommandRequiresTarget),
+      m_options() {}
 
 CommandObjectDisassemble::~CommandObjectDisassemble() = default;
 
@@ -283,20 +279,11 @@ CommandObjectDisassemble::GetContainingAddressRanges() {
 
 llvm::Expected<std::vector<AddressRange>>
 CommandObjectDisassemble::GetCurrentFunctionRanges() {
-  Process *process = m_exe_ctx.GetProcessPtr();
   StackFrame *frame = m_exe_ctx.GetFramePtr();
   if (!frame) {
-    if (process) {
-      return llvm::createStringError(
-          llvm::inconvertibleErrorCode(),
-          "Cannot disassemble around the current "
-          "function without the process being stopped.\n");
-    } else {
-      return llvm::createStringError(llvm::inconvertibleErrorCode(),
-                                     "Cannot disassemble around the current "
-                                     "function without a selected frame: "
-                                     "no currently running process.\n");
-    }
+    return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                   "Cannot disassemble around the current "
+                                   "function without a selected frame.\n");
   }
   SymbolContext sc(
       frame->GetSymbolContext(eSymbolContextFunction | eSymbolContextSymbol));
@@ -315,20 +302,11 @@ CommandObjectDisassemble::GetCurrentFunctionRanges() {
 
 llvm::Expected<std::vector<AddressRange>>
 CommandObjectDisassemble::GetCurrentLineRanges() {
-  Process *process = m_exe_ctx.GetProcessPtr();
   StackFrame *frame = m_exe_ctx.GetFramePtr();
   if (!frame) {
-    if (process) {
-      return llvm::createStringError(
-          llvm::inconvertibleErrorCode(),
-          "Cannot disassemble around the current "
-          "function without the process being stopped.\n");
-    } else {
-      return llvm::createStringError(llvm::inconvertibleErrorCode(),
-                                     "Cannot disassemble around the current "
-                                     "line without a selected frame: "
-                                     "no currently running process.\n");
-    }
+    return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                   "Cannot disassemble around the current "
+                                   "line without a selected frame.\n");
   }
 
   LineEntry pc_line_entry(
@@ -384,20 +362,11 @@ CommandObjectDisassemble::GetNameRanges(CommandReturnObject &result) {
 
 llvm::Expected<std::vector<AddressRange>>
 CommandObjectDisassemble::GetPCRanges() {
-  Process *process = m_exe_ctx.GetProcessPtr();
   StackFrame *frame = m_exe_ctx.GetFramePtr();
   if (!frame) {
-    if (process) {
-      return llvm::createStringError(
-          llvm::inconvertibleErrorCode(),
-          "Cannot disassemble around the current "
-          "function without the process being stopped.\n");
-    } else {
-      return llvm::createStringError(llvm::inconvertibleErrorCode(),
-                                     "Cannot disassemble around the current "
-                                     "PC without a selected frame: "
-                                     "no currently running process.\n");
-    }
+    return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                   "Cannot disassemble around the current "
+                                   "PC without a selected frame.\n");
   }
 
   if (m_options.num_instructions == 0) {
@@ -437,7 +406,7 @@ CommandObjectDisassemble::GetRangesForSelectedMode(
   return CommandObjectDisassemble::GetPCRanges();
 }
 
-void CommandObjectDisassemble::DoExecute(Args &command,
+bool CommandObjectDisassemble::DoExecute(Args &command,
                                          CommandReturnObject &result) {
   Target *target = &GetSelectedTarget();
 
@@ -447,7 +416,7 @@ void CommandObjectDisassemble::DoExecute(Args &command,
   if (!m_options.arch.IsValid()) {
     result.AppendError(
         "use the --arch option or set the target architecture to disassemble");
-    return;
+    return false;
   }
 
   const char *plugin_name = m_options.GetPluginName();
@@ -466,7 +435,7 @@ void CommandObjectDisassemble::DoExecute(Args &command,
       result.AppendErrorWithFormat(
           "Unable to find Disassembler plug-in for the '%s' architecture.\n",
           m_options.arch.GetArchitectureName());
-    return;
+    return false;
   } else if (flavor_string != nullptr && !disassembler->FlavorValidForArchSpec(
                                              m_options.arch, flavor_string))
     result.AppendWarningWithFormat(
@@ -479,9 +448,9 @@ void CommandObjectDisassemble::DoExecute(Args &command,
         "\"disassemble\" arguments are specified as options.\n");
     const int terminal_width =
         GetCommandInterpreter().GetDebugger().GetTerminalWidth();
-    GetOptions()->GenerateOptionUsage(result.GetErrorStream(), *this,
+    GetOptions()->GenerateOptionUsage(result.GetErrorStream(), this,
                                       terminal_width);
-    return;
+    return false;
   }
 
   if (m_options.show_mixed && m_options.num_lines_context == 0)
@@ -498,9 +467,6 @@ void CommandObjectDisassemble::DoExecute(Args &command,
   if (m_options.show_bytes)
     options |= Disassembler::eOptionShowBytes;
 
-  if (m_options.show_control_flow_kind)
-    options |= Disassembler::eOptionShowControlFlowKind;
-
   if (m_options.raw)
     options |= Disassembler::eOptionRawOuput;
 
@@ -508,7 +474,7 @@ void CommandObjectDisassemble::DoExecute(Args &command,
       GetRangesForSelectedMode(result);
   if (!ranges) {
     result.AppendError(toString(ranges.takeError()));
-    return;
+    return result.Succeeded();
   }
 
   bool print_sc_header = ranges->size() > 1;
@@ -541,4 +507,6 @@ void CommandObjectDisassemble::DoExecute(Args &command,
     if (print_sc_header)
       result.GetOutputStream() << "\n";
   }
+
+  return result.Succeeded();
 }

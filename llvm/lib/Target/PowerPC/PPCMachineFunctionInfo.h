@@ -151,12 +151,7 @@ private:
   std::vector<std::pair<Register, ISD::ArgFlagsTy>> LiveInAttrs;
 
 public:
-  explicit PPCFunctionInfo(const Function &F, const TargetSubtargetInfo *STI);
-
-  MachineFunctionInfo *
-  clone(BumpPtrAllocator &Allocator, MachineFunction &DestMF,
-        const DenseMap<MachineBasicBlock *, MachineBasicBlock *> &Src2DstMBB)
-      const override;
+  explicit PPCFunctionInfo(const MachineFunction &MF);
 
   int getFramePointerSaveIndex() const { return FramePointerSaveIndex; }
   void setFramePointerSaveIndex(int Idx) { FramePointerSaveIndex = Idx; }

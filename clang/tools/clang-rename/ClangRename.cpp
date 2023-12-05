@@ -68,17 +68,17 @@ static cl::OptionCategory ClangRenameOptions("clang-rename common options");
 static cl::list<unsigned> SymbolOffsets(
     "offset",
     cl::desc("Locates the symbol by offset as opposed to <line>:<column>."),
-    cl::cat(ClangRenameOptions));
+    cl::ZeroOrMore, cl::cat(ClangRenameOptions));
 static cl::opt<bool> Inplace("i", cl::desc("Overwrite edited <file>s."),
                              cl::cat(ClangRenameOptions));
 static cl::list<std::string>
     QualifiedNames("qualified-name",
                    cl::desc("The fully qualified name of the symbol."),
-                   cl::cat(ClangRenameOptions));
+                   cl::ZeroOrMore, cl::cat(ClangRenameOptions));
 
 static cl::list<std::string>
     NewNames("new-name", cl::desc("The new name to change the symbol to."),
-             cl::cat(ClangRenameOptions));
+             cl::ZeroOrMore, cl::cat(ClangRenameOptions));
 static cl::opt<bool> PrintName(
     "pn",
     cl::desc("Print the found symbol's name prior to renaming to stderr."),
@@ -228,11 +228,7 @@ int main(int argc, const char **argv) {
 
     Tool.applyAllReplacements(Rewrite);
     for (const auto &File : Files) {
-      auto Entry = FileMgr.getOptionalFileRef(File);
-      if (!Entry) {
-        errs() << "clang-rename: " << File << " does not exist.\n";
-        return 1;
-      }
+      auto Entry = FileMgr.getFile(File);
       const auto ID = Sources.getOrCreateFileID(*Entry, SrcMgr::C_User);
       Rewrite.getEditBuffer(ID).write(outs());
     }

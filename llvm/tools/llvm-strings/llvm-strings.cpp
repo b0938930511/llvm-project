@@ -12,7 +12,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "Opts.inc"
-#include "llvm/ADT/StringExtras.h"
 #include "llvm/Object/Binary.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
@@ -33,38 +32,40 @@ using namespace llvm::object;
 namespace {
 enum ID {
   OPT_INVALID = 0, // This is not an option ID.
-#define OPTION(...) LLVM_MAKE_OPT_ID(__VA_ARGS__),
+#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
+               HELPTEXT, METAVAR, VALUES)                                      \
+  OPT_##ID,
 #include "Opts.inc"
 #undef OPTION
 };
 
-#define PREFIX(NAME, VALUE)                                                    \
-  static constexpr StringLiteral NAME##_init[] = VALUE;                        \
-  static constexpr ArrayRef<StringLiteral> NAME(NAME##_init,                   \
-                                                std::size(NAME##_init) - 1);
+#define PREFIX(NAME, VALUE) const char *const NAME[] = VALUE;
 #include "Opts.inc"
 #undef PREFIX
 
-using namespace llvm::opt;
-static constexpr opt::OptTable::Info InfoTable[] = {
-#define OPTION(...) LLVM_CONSTRUCT_OPT_INFO(__VA_ARGS__),
+static const opt::OptTable::Info InfoTable[] = {
+#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
+               HELPTEXT, METAVAR, VALUES)                                      \
+  {                                                                            \
+      PREFIX,      NAME,      HELPTEXT,                                        \
+      METAVAR,     OPT_##ID,  opt::Option::KIND##Class,                        \
+      PARAM,       FLAGS,     OPT_##GROUP,                                     \
+      OPT_##ALIAS, ALIASARGS, VALUES},
 #include "Opts.inc"
 #undef OPTION
 };
 
-class StringsOptTable : public opt::GenericOptTable {
+class StringsOptTable : public opt::OptTable {
 public:
-  StringsOptTable() : GenericOptTable(InfoTable) {
-    setGroupedShortOptions(true);
-    setDashDashParsing(true);
-  }
+  StringsOptTable() : OptTable(InfoTable) { setGroupedShortOptions(true); }
 };
 } // namespace
 
-static StringRef ToolName;
+const char ToolName[] = "llvm-strings";
 
 static cl::list<std::string> InputFileNames(cl::Positional,
-                                            cl::desc("<input object files>"));
+                                            cl::desc("<input object files>"),
+                                            cl::ZeroOrMore);
 
 static int MinLength = 4;
 static bool PrintFileName;
@@ -128,7 +129,6 @@ int main(int argc, char **argv) {
   BumpPtrAllocator A;
   StringSaver Saver(A);
   StringsOptTable Tbl;
-  ToolName = argv[0];
   opt::InputArgList Args =
       Tbl.parseArgs(argc, argv, OPT_UNKNOWN, Saver,
                     [&](StringRef Msg) { reportCmdLineError(Msg); });

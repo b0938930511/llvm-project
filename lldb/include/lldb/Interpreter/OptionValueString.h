@@ -69,10 +69,6 @@ public:
   void DumpValue(const ExecutionContext *exe_ctx, Stream &strm,
                  uint32_t dump_mask) override;
 
-  llvm::json::Value ToJSON(const ExecutionContext *exe_ctx) override {
-    return m_current_value;
-  }
-
   Status
   SetValueFromString(llvm::StringRef value,
                      VarSetOperationType op = eVarSetOperationAssign) override;
@@ -113,11 +109,6 @@ public:
   bool IsCurrentValueEmpty() const { return m_current_value.empty(); }
 
   bool IsDefaultValueEmpty() const { return m_default_value.empty(); }
-
-  void SetValidator(ValidatorCallback validator, void *baton = nullptr) {
-    m_validator = validator;
-    m_validator_baton = baton;
-  }
 
 protected:
   std::string m_current_value;

@@ -11,10 +11,6 @@
 // demonstration and testing purposes.
 //
 //===----------------------------------------------------------------------===//
-//
-// Coding style: https://mlir.llvm.org/getting_started/DeveloperGuide/
-//
-//===----------------------------------------------------------------------===//
 
 #include "flang/Frontend/CompilerInstance.h"
 #include "flang/Frontend/CompilerInvocation.h"
@@ -24,7 +20,6 @@
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/OptTable.h"
-#include "llvm/Support/TargetSelect.h"
 
 #include <cstdio>
 
@@ -35,8 +30,8 @@ int fc1_main(llvm::ArrayRef<const char *> argv, const char *argv0) {
   std::unique_ptr<CompilerInstance> flang(new CompilerInstance());
 
   // Create DiagnosticsEngine for the frontend driver
-  flang->createDiagnostics();
-  if (!flang->hasDiagnostics())
+  flang->CreateDiagnostics();
+  if (!flang->HasDiagnostics())
     return 1;
 
   // We will buffer diagnostics from argument parsing so that we can output
@@ -50,24 +45,19 @@ int fc1_main(llvm::ArrayRef<const char *> argv, const char *argv0) {
   llvm::IntrusiveRefCntPtr<clang::DiagnosticOptions> diagOpts =
       new clang::DiagnosticOptions();
   clang::DiagnosticsEngine diags(diagID, &*diagOpts, diagsBuffer);
-  bool success = CompilerInvocation::createFromArgs(flang->getInvocation(),
-                                                    argv, diags, argv0);
+  bool success =
+      CompilerInvocation::CreateFromArgs(flang->invocation(), argv, diags);
 
-  // Initialize targets first, so that --version shows registered targets.
-  llvm::InitializeAllTargets();
-  llvm::InitializeAllTargetMCs();
-  llvm::InitializeAllAsmPrinters();
-
-  diagsBuffer->flushDiagnostics(flang->getDiagnostics());
+  diagsBuffer->FlushDiagnostics(flang->diagnostics());
 
   if (!success)
     return 1;
 
   // Execute the frontend actions.
-  success = executeCompilerInvocation(flang.get());
+  success = ExecuteCompilerInvocation(flang.get());
 
   // Delete output files to free Compiler Instance
-  flang->clearOutputFiles(/*EraseFiles=*/false);
+  flang->ClearOutputFiles(/*EraseFiles=*/false);
 
   return !success;
 }

@@ -20,21 +20,18 @@
 #ifndef LLVM_TOOLS_OPT_NEWPMDRIVER_H
 #define LLVM_TOOLS_OPT_NEWPMDRIVER_H
 
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/CommandLine.h"
 
 namespace llvm {
 class StringRef;
 class Module;
-class PassPlugin;
 class TargetMachine;
 class ToolOutputFile;
 class TargetLibraryInfoImpl;
 
 extern cl::opt<bool> DebugifyEach;
 extern cl::opt<std::string> DebugifyExport;
-
-extern cl::opt<bool> VerifyEachDebugInfoPreserve;
-extern cl::opt<std::string> VerifyDIPreserveExport;
 
 namespace opt_tool {
 enum OutputKind {
@@ -43,7 +40,11 @@ enum OutputKind {
   OK_OutputBitcode,
   OK_OutputThinLTOBitcode,
 };
-enum VerifierKind { VK_NoVerifier, VK_VerifyOut, VK_VerifyEachPass };
+enum VerifierKind {
+  VK_NoVerifier,
+  VK_VerifyInAndOut,
+  VK_VerifyEachPass
+};
 enum PGOKind {
   NoPGO,
   InstrGen,
@@ -67,13 +68,12 @@ void printPasses(raw_ostream &OS);
 bool runPassPipeline(StringRef Arg0, Module &M, TargetMachine *TM,
                      TargetLibraryInfoImpl *TLII, ToolOutputFile *Out,
                      ToolOutputFile *ThinLinkOut, ToolOutputFile *OptRemarkFile,
-                     StringRef PassPipeline, ArrayRef<PassPlugin> PassPlugins,
+                     StringRef PassPipeline, ArrayRef<StringRef> PassInfos,
                      opt_tool::OutputKind OK, opt_tool::VerifierKind VK,
                      bool ShouldPreserveAssemblyUseListOrder,
                      bool ShouldPreserveBitcodeUseListOrder,
                      bool EmitSummaryIndex, bool EmitModuleHash,
-                     bool EnableDebugify, bool VerifyDIPreserve,
-                     bool UnifiedLTO = false);
+                     bool EnableDebugify);
 } // namespace llvm
 
 #endif

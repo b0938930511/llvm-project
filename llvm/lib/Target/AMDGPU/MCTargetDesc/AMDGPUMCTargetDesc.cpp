@@ -16,10 +16,8 @@
 #include "AMDGPUInstPrinter.h"
 #include "AMDGPUMCAsmInfo.h"
 #include "AMDGPUTargetStreamer.h"
-#include "R600InstPrinter.h"
-#include "R600MCTargetDesc.h"
+#include "SIDefines.h"
 #include "TargetInfo/AMDGPUTargetInfo.h"
-#include "llvm/MC/LaneBitmask.h"
 #include "llvm/MC/MCAsmBackend.h"
 #include "llvm/MC/MCCodeEmitter.h"
 #include "llvm/MC/MCELFStreamer.h"
@@ -28,15 +26,14 @@
 #include "llvm/MC/MCInstrDesc.h"
 #include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCObjectWriter.h"
-#include "llvm/MC/MCRegisterInfo.h"
+#include "llvm/MC/MCRegister.h"
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSubtargetInfo.h"
-#include "llvm/MC/TargetRegistry.h"
+#include "llvm/Support/TargetRegistry.h"
 
 using namespace llvm;
 
 #define GET_INSTRINFO_MC_DESC
-#define ENABLE_INSTR_PREDICATE_VERIFIER
 #include "AMDGPUGenInstrInfo.inc"
 
 #define GET_SUBTARGETINFO_MC_DESC
@@ -105,10 +102,6 @@ static MCTargetStreamer * createAMDGPUObjectTargetStreamer(
   return new AMDGPUTargetELFStreamer(S, STI);
 }
 
-static MCTargetStreamer *createAMDGPUNullTargetStreamer(MCStreamer &S) {
-  return new AMDGPUTargetStreamer(S);
-}
-
 static MCStreamer *createMCStreamer(const Triple &T, MCContext &Context,
                                     std::unique_ptr<MCAsmBackend> &&MAB,
                                     std::unique_ptr<MCObjectWriter> &&OW,
@@ -128,7 +121,7 @@ public:
   bool evaluateBranch(const MCInst &Inst, uint64_t Addr, uint64_t Size,
                       uint64_t &Target) const override {
     if (Inst.getNumOperands() == 0 || !Inst.getOperand(0).isImm() ||
-        Info->get(Inst.getOpcode()).operands()[0].OperandType !=
+        Info->get(Inst.getOpcode()).OpInfo[0].OperandType !=
             MCOI::OPERAND_PCREL)
       return false;
 
@@ -150,9 +143,8 @@ static MCInstrAnalysis *createAMDGPUMCInstrAnalysis(const MCInstrInfo *Info) {
 extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeAMDGPUTargetMC() {
 
   TargetRegistry::RegisterMCInstrInfo(getTheGCNTarget(), createAMDGPUMCInstrInfo);
-  TargetRegistry::RegisterMCInstrInfo(getTheR600Target(),
-                                      createR600MCInstrInfo);
-  for (Target *T : {&getTheR600Target(), &getTheGCNTarget()}) {
+  TargetRegistry::RegisterMCInstrInfo(getTheAMDGPUTarget(), createR600MCInstrInfo);
+  for (Target *T : {&getTheAMDGPUTarget(), &getTheGCNTarget()}) {
     RegisterMCAsmInfo<AMDGPUMCAsmInfo> X(*T);
 
     TargetRegistry::RegisterMCRegInfo(*T, createAMDGPUMCRegisterInfo);
@@ -164,19 +156,17 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeAMDGPUTargetMC() {
   }
 
   // R600 specific registration
-  TargetRegistry::RegisterMCCodeEmitter(getTheR600Target(),
+  TargetRegistry::RegisterMCCodeEmitter(getTheAMDGPUTarget(),
                                         createR600MCCodeEmitter);
   TargetRegistry::RegisterObjectTargetStreamer(
-      getTheR600Target(), createAMDGPUObjectTargetStreamer);
+      getTheAMDGPUTarget(), createAMDGPUObjectTargetStreamer);
 
   // GCN specific registration
   TargetRegistry::RegisterMCCodeEmitter(getTheGCNTarget(),
-                                        createAMDGPUMCCodeEmitter);
+                                        createSIMCCodeEmitter);
 
   TargetRegistry::RegisterAsmTargetStreamer(getTheGCNTarget(),
                                             createAMDGPUAsmTargetStreamer);
   TargetRegistry::RegisterObjectTargetStreamer(
       getTheGCNTarget(), createAMDGPUObjectTargetStreamer);
-  TargetRegistry::RegisterNullTargetStreamer(getTheGCNTarget(),
-                                             createAMDGPUNullTargetStreamer);
 }

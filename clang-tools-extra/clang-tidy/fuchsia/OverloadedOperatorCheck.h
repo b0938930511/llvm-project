@@ -11,12 +11,14 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::fuchsia {
+namespace clang {
+namespace tidy {
+namespace fuchsia {
 
 /// Overloading operators is disallowed by the Fuchsia coding standard.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/fuchsia/overloaded-operator.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/fuchsia-overloaded-operator.html
 class OverloadedOperatorCheck : public ClangTidyCheck {
 public:
   OverloadedOperatorCheck(StringRef Name, ClangTidyContext *Context)
@@ -25,6 +27,8 @@ public:
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
 };
 
-} // namespace clang::tidy::fuchsia
+} // namespace fuchsia
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_FUCHSIA_OVERLOADED_OPERATOR_H

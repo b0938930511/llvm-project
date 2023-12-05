@@ -1,3 +1,5 @@
+// REQUIRES: x86-registered-target
+
 // Check that PS4 clang doesn't report a warning message when locating
 // system header files (either by looking at the value of SCE_ORBIS_SDK_DIR
 // or relative to the location of the compiler driver), if "-nostdinc",

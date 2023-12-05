@@ -22,7 +22,6 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include <optional>
 
 namespace lldb_private {
 class DataExtractor;
@@ -33,9 +32,9 @@ class Status;
 /// set lldb type.
 class ValueObjectDynamicValue : public ValueObject {
 public:
-  ~ValueObjectDynamicValue() override = default;
+  ~ValueObjectDynamicValue() override;
 
-  std::optional<uint64_t> GetByteSize() override;
+  llvm::Optional<uint64_t> GetByteSize() override;
 
   ConstString GetTypeName() override;
 
@@ -68,6 +67,14 @@ public:
   }
 
   lldb::ValueObjectSP GetStaticValue() override { return m_parent->GetSP(); }
+
+  void SetOwningSP(lldb::ValueObjectSP &owning_sp) {
+    if (m_owning_valobj_sp == owning_sp)
+      return;
+
+    assert(m_owning_valobj_sp.get() == nullptr);
+    m_owning_valobj_sp = owning_sp;
+  }
 
   bool SetValueFromCString(const char *value_str, Status &error) override;
 
@@ -110,6 +117,7 @@ protected:
 
   Address m_address; ///< The variable that this value object is based upon
   TypeAndOrName m_dynamic_type_info; // We can have a type_sp or just a name
+  lldb::ValueObjectSP m_owning_valobj_sp;
   lldb::DynamicValueType m_use_dynamic;
   TypeImpl m_type_impl;
 

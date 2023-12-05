@@ -28,12 +28,11 @@
 #include "clang/StaticAnalyzer/Core/PathSensitive/SymExpr.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/SymbolManager.h"
 #include "llvm/ADT/ImmutableList.h"
+#include "llvm/ADT/Optional.h"
 #include <cstdint>
-#include <optional>
 
 namespace clang {
 
-class AnalyzerOptions;
 class BlockDecl;
 class CXXBoolLiteralExpr;
 class CXXMethodDecl;
@@ -67,19 +66,55 @@ protected:
 
   ProgramStateManager &StateMgr;
 
-  const AnalyzerOptions &AnOpts;
-
   /// The scalar type to use for array indices.
   const QualType ArrayIndexTy;
 
   /// The width of the scalar type used for array indices.
   const unsigned ArrayIndexWidth;
 
+  SVal evalCastKind(UndefinedVal V, QualType CastTy, QualType OriginalTy);
+  SVal evalCastKind(UnknownVal V, QualType CastTy, QualType OriginalTy);
+  SVal evalCastKind(Loc V, QualType CastTy, QualType OriginalTy);
+  SVal evalCastKind(NonLoc V, QualType CastTy, QualType OriginalTy);
+  SVal evalCastSubKind(loc::ConcreteInt V, QualType CastTy,
+                       QualType OriginalTy);
+  SVal evalCastSubKind(loc::GotoLabel V, QualType CastTy, QualType OriginalTy);
+  SVal evalCastSubKind(loc::MemRegionVal V, QualType CastTy,
+                       QualType OriginalTy);
+  SVal evalCastSubKind(nonloc::CompoundVal V, QualType CastTy,
+                       QualType OriginalTy);
+  SVal evalCastSubKind(nonloc::ConcreteInt V, QualType CastTy,
+                       QualType OriginalTy);
+  SVal evalCastSubKind(nonloc::LazyCompoundVal V, QualType CastTy,
+                       QualType OriginalTy);
+  SVal evalCastSubKind(nonloc::LocAsInteger V, QualType CastTy,
+                       QualType OriginalTy);
+  SVal evalCastSubKind(nonloc::SymbolVal V, QualType CastTy,
+                       QualType OriginalTy);
+  SVal evalCastSubKind(nonloc::PointerToMember V, QualType CastTy,
+                       QualType OriginalTy);
+
 public:
   SValBuilder(llvm::BumpPtrAllocator &alloc, ASTContext &context,
-              ProgramStateManager &stateMgr);
+              ProgramStateManager &stateMgr)
+      : Context(context), BasicVals(context, alloc),
+        SymMgr(context, BasicVals, alloc), MemMgr(context, alloc),
+        StateMgr(stateMgr), ArrayIndexTy(context.LongLongTy),
+        ArrayIndexWidth(context.getTypeSize(ArrayIndexTy)) {}
 
   virtual ~SValBuilder() = default;
+
+  bool haveSameType(const SymExpr *Sym1, const SymExpr *Sym2) {
+    return haveSameType(Sym1->getType(), Sym2->getType());
+  }
+
+  bool haveSameType(QualType Ty1, QualType Ty2) {
+    // FIXME: Remove the second disjunct when we support symbolic
+    // truncation/extension.
+    return (Context.getCanonicalType(Ty1) == Context.getCanonicalType(Ty2) ||
+            (Ty1->isIntegralOrEnumerationType() &&
+             Ty2->isIntegralOrEnumerationType()));
+  }
 
   SVal evalCast(SVal V, QualType CastTy, QualType OriginalTy);
 
@@ -87,8 +122,9 @@ public:
   SVal evalIntegralCast(ProgramStateRef state, SVal val, QualType castTy,
                         QualType originalType);
 
-  SVal evalMinus(NonLoc val);
-  SVal evalComplement(NonLoc val);
+  virtual SVal evalMinus(NonLoc val) = 0;
+
+  virtual SVal evalComplement(NonLoc val) = 0;
 
   /// Create a new value which represents a binary expression with two non-
   /// location operands.
@@ -110,14 +146,6 @@ public:
   /// that value is returned. Otherwise, returns NULL.
   virtual const llvm::APSInt *getKnownValue(ProgramStateRef state, SVal val) = 0;
 
-  /// Tries to get the minimal possible (integer) value of a given SVal. If the
-  /// constraint manager cannot provide an useful answer, this returns NULL.
-  virtual const llvm::APSInt *getMinValue(ProgramStateRef state, SVal val) = 0;
-
-  /// Tries to get the maximal possible (integer) value of a given SVal. If the
-  /// constraint manager cannot provide an useful answer, this returns NULL.
-  virtual const llvm::APSInt *getMaxValue(ProgramStateRef state, SVal val) = 0;
-
   /// Simplify symbolic expressions within a given SVal. Return an SVal
   /// that represents the same value, but is hopefully easier to work with
   /// than the original SVal.
@@ -126,9 +154,6 @@ public:
   /// Constructs a symbolic expression for two non-location values.
   SVal makeSymExprValNN(BinaryOperator::Opcode op,
                         NonLoc lhs, NonLoc rhs, QualType resultTy);
-
-  SVal evalUnaryOp(ProgramStateRef state, UnaryOperator::Opcode opc,
-                 SVal operand, QualType type);
 
   SVal evalBinOp(ProgramStateRef state, BinaryOperator::Opcode op,
                  SVal lhs, SVal rhs, QualType type);
@@ -162,8 +187,6 @@ public:
 
   MemRegionManager &getRegionManager() { return MemMgr; }
   const MemRegionManager &getRegionManager() const { return MemMgr; }
-
-  const AnalyzerOptions &getAnalyzerOptions() const { return AnOpts; }
 
   // Forwarding methods to SymbolManager.
 
@@ -223,15 +246,6 @@ public:
                                                 const LocationContext *LCtx,
                                                 QualType type, unsigned Count);
 
-  /// Create an SVal representing the result of an alloca()-like call, that is,
-  /// an AllocaRegion on the stack.
-  ///
-  /// After calling this function, it's a good idea to set the extent of the
-  /// returned AllocaRegion.
-  loc::MemRegionVal getAllocaRegionVal(const Expr *E,
-                                       const LocationContext *LCtx,
-                                       unsigned Count);
-
   DefinedOrUnknownSVal getDerivedRegionValueSymbolVal(
       SymbolRef parentSymbol, const TypedValueRegion *region);
 
@@ -252,8 +266,8 @@ public:
   /// Returns the value of \p E, if it can be determined in a non-path-sensitive
   /// manner.
   ///
-  /// If \p E is not a constant or cannot be modeled, returns \c std::nullopt.
-  std::optional<SVal> getConstantVal(const Expr *E);
+  /// If \p E is not a constant or cannot be modeled, returns \c None.
+  Optional<SVal> getConstantVal(const Expr *E);
 
   NonLoc makeCompoundVal(QualType type, llvm::ImmutableList<SVal> vals) {
     return nonloc::CompoundVal(BasicVals.getCompoundValData(type, vals));
@@ -318,30 +332,26 @@ public:
     return nonloc::ConcreteInt(BasicVals.getIntValue(integer, isUnsigned));
   }
 
-  NonLoc makeIntValWithWidth(QualType ptrType, uint64_t integer) {
-    return nonloc::ConcreteInt(BasicVals.getValue(integer, ptrType));
+  NonLoc makeIntValWithPtrWidth(uint64_t integer, bool isUnsigned) {
+    return nonloc::ConcreteInt(
+        BasicVals.getIntWithPtrWidth(integer, isUnsigned));
   }
 
   NonLoc makeLocAsInteger(Loc loc, unsigned bits) {
     return nonloc::LocAsInteger(BasicVals.getPersistentSValWithData(loc, bits));
   }
 
-  nonloc::SymbolVal makeNonLoc(const SymExpr *lhs, BinaryOperator::Opcode op,
-                               const llvm::APSInt &rhs, QualType type);
+  NonLoc makeNonLoc(const SymExpr *lhs, BinaryOperator::Opcode op,
+                    const llvm::APSInt& rhs, QualType type);
 
-  nonloc::SymbolVal makeNonLoc(const llvm::APSInt &rhs,
-                               BinaryOperator::Opcode op, const SymExpr *lhs,
-                               QualType type);
+  NonLoc makeNonLoc(const llvm::APSInt& rhs, BinaryOperator::Opcode op,
+                    const SymExpr *lhs, QualType type);
 
-  nonloc::SymbolVal makeNonLoc(const SymExpr *lhs, BinaryOperator::Opcode op,
-                               const SymExpr *rhs, QualType type);
-
-  NonLoc makeNonLoc(const SymExpr *operand, UnaryOperator::Opcode op,
-                    QualType type);
+  NonLoc makeNonLoc(const SymExpr *lhs, BinaryOperator::Opcode op,
+                    const SymExpr *rhs, QualType type);
 
   /// Create a NonLoc value for cast.
-  nonloc::SymbolVal makeNonLoc(const SymExpr *operand, QualType fromTy,
-                               QualType toTy);
+  NonLoc makeNonLoc(const SymExpr *operand, QualType fromTy, QualType toTy);
 
   nonloc::ConcreteInt makeTruthVal(bool b, QualType type) {
     return nonloc::ConcreteInt(BasicVals.getTruthValue(b, type));
@@ -354,46 +364,38 @@ public:
   /// Create NULL pointer, with proper pointer bit-width for given address
   /// space.
   /// \param type pointer type.
-  loc::ConcreteInt makeNullWithType(QualType type) {
-    // We cannot use the `isAnyPointerType()`.
-    assert((type->isPointerType() || type->isObjCObjectPointerType() ||
-            type->isBlockPointerType() || type->isNullPtrType() ||
-            type->isReferenceType()) &&
-           "makeNullWithType must use pointer type");
-
-    // The `sizeof(T&)` is `sizeof(T)`, thus we replace the reference with a
-    // pointer. Here we assume that references are actually implemented by
-    // pointers under-the-hood.
-    type = type->isReferenceType()
-               ? Context.getPointerType(type->getPointeeType())
-               : type;
+  Loc makeNullWithType(QualType type) {
     return loc::ConcreteInt(BasicVals.getZeroWithTypeSize(type));
   }
 
-  loc::MemRegionVal makeLoc(SymbolRef sym) {
+  Loc makeNull() {
+    return loc::ConcreteInt(BasicVals.getZeroWithPtrWidth());
+  }
+
+  Loc makeLoc(SymbolRef sym) {
     return loc::MemRegionVal(MemMgr.getSymbolicRegion(sym));
   }
 
-  loc::MemRegionVal makeLoc(const MemRegion *region) {
+  Loc makeLoc(const MemRegion* region) {
     return loc::MemRegionVal(region);
   }
 
-  loc::GotoLabel makeLoc(const AddrLabelExpr *expr) {
+  Loc makeLoc(const AddrLabelExpr *expr) {
     return loc::GotoLabel(expr->getLabel());
   }
 
-  loc::ConcreteInt makeLoc(const llvm::APSInt &integer) {
+  Loc makeLoc(const llvm::APSInt& integer) {
     return loc::ConcreteInt(BasicVals.getValue(integer));
   }
 
-  /// Return MemRegionVal on success cast, otherwise return std::nullopt.
-  std::optional<loc::MemRegionVal>
-  getCastedMemRegionVal(const MemRegion *region, QualType type);
+  /// Return MemRegionVal on success cast, otherwise return None.
+  Optional<loc::MemRegionVal> getCastedMemRegionVal(const MemRegion *region,
+                                                    QualType type);
 
   /// Make an SVal that represents the given symbol. This follows the convention
   /// of representing Loc-type symbols (symbolic pointers and references)
   /// as Loc values wrapping the symbol rather than as plain symbol values.
-  DefinedSVal makeSymbolVal(SymbolRef Sym) {
+  SVal makeSymbolVal(SymbolRef Sym) {
     if (Loc::isLocType(Sym->getType()))
       return makeLoc(Sym);
     return nonloc::SymbolVal(Sym);

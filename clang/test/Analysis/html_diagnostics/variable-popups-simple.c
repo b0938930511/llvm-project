@@ -6,7 +6,7 @@
 
 void bar(int);
 
-void foo2(void) {
+void foo2() {
   int a;
   int b = 1;
   if (b)

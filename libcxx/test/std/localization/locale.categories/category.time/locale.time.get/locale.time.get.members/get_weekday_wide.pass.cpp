@@ -14,8 +14,6 @@
 // get_weekday(iter_type s, iter_type end, ios_base& str,
 //             ios_base::iostate& err, tm* t) const;
 
-// XFAIL: no-wide-characters
-
 #include <locale>
 #include <cassert>
 #include "test_macros.h"
@@ -44,7 +42,7 @@ int main(int, char**)
         err = std::ios_base::goodbit;
         t = std::tm();
         I i = f.get_weekday(I(in), I(in+sizeof(in)/sizeof(in[0])-1), ios, err, &t);
-        assert(base(i) == in+3);
+        assert(i.base() == in+3);
         assert(t.tm_wday == 0);
         assert(err == std::ios_base::eofbit);
     }
@@ -53,7 +51,7 @@ int main(int, char**)
         err = std::ios_base::goodbit;
         t = std::tm();
         I i = f.get_weekday(I(in), I(in+sizeof(in)/sizeof(in[0])-1), ios, err, &t);
-        assert(base(i) == in+3);
+        assert(i.base() == in+3);
         assert(t.tm_wday == 0);
         assert(err == std::ios_base::goodbit);
     }
@@ -62,7 +60,7 @@ int main(int, char**)
         err = std::ios_base::goodbit;
         t = std::tm();
         I i = f.get_weekday(I(in), I(in+sizeof(in)/sizeof(in[0])-1), ios, err, &t);
-        assert(base(i) == in+4);
+        assert(i.base() == in+4);
         assert(t.tm_wday == 0);
         assert(err == (std::ios_base::failbit | std::ios_base::eofbit));
     }
@@ -71,7 +69,7 @@ int main(int, char**)
         err = std::ios_base::goodbit;
         t = std::tm();
         I i = f.get_weekday(I(in), I(in+sizeof(in)/sizeof(in[0])-1), ios, err, &t);
-        assert(base(i) == in+3);
+        assert(i.base() == in+3);
         assert(t.tm_wday == 0);
         assert(err == std::ios_base::eofbit);
     }
@@ -80,7 +78,7 @@ int main(int, char**)
         err = std::ios_base::goodbit;
         t = std::tm();
         I i = f.get_weekday(I(in), I(in+sizeof(in)/sizeof(in[0])-1), ios, err, &t);
-        assert(base(i) == in+6);
+        assert(i.base() == in+6);
         assert(t.tm_wday == 0);
         assert(err == std::ios_base::eofbit);
     }
@@ -89,7 +87,7 @@ int main(int, char**)
         err = std::ios_base::goodbit;
         t = std::tm();
         I i = f.get_weekday(I(in), I(in+sizeof(in)/sizeof(in[0])-1), ios, err, &t);
-        assert(base(i) == in+3);
+        assert(i.base() == in+3);
         assert(t.tm_wday == 1);
         assert(err == std::ios_base::eofbit);
     }
@@ -98,7 +96,7 @@ int main(int, char**)
         err = std::ios_base::goodbit;
         t = std::tm();
         I i = f.get_weekday(I(in), I(in+sizeof(in)/sizeof(in[0])-1), ios, err, &t);
-        assert(base(i) == in+3);
+        assert(i.base() == in+3);
         assert(t.tm_wday == 1);
         assert(err == std::ios_base::goodbit);
     }
@@ -107,7 +105,7 @@ int main(int, char**)
         err = std::ios_base::goodbit;
         t = std::tm();
         I i = f.get_weekday(I(in), I(in+sizeof(in)/sizeof(in[0])-1), ios, err, &t);
-        assert(base(i) == in+4);
+        assert(i.base() == in+4);
         assert(t.tm_wday == 0);
         assert(err == (std::ios_base::failbit | std::ios_base::eofbit));
     }
@@ -116,7 +114,7 @@ int main(int, char**)
         err = std::ios_base::goodbit;
         t = std::tm();
         I i = f.get_weekday(I(in), I(in+sizeof(in)/sizeof(in[0])-1), ios, err, &t);
-        assert(base(i) == in+3);
+        assert(i.base() == in+3);
         assert(t.tm_wday == 1);
         assert(err == std::ios_base::eofbit);
     }
@@ -125,7 +123,7 @@ int main(int, char**)
         err = std::ios_base::goodbit;
         t = std::tm();
         I i = f.get_weekday(I(in), I(in+sizeof(in)/sizeof(in[0])-1), ios, err, &t);
-        assert(base(i) == in+6);
+        assert(i.base() == in+6);
         assert(t.tm_wday == 1);
         assert(err == std::ios_base::eofbit);
     }
@@ -134,7 +132,7 @@ int main(int, char**)
         err = std::ios_base::goodbit;
         t = std::tm();
         I i = f.get_weekday(I(in), I(in+sizeof(in)/sizeof(in[0])-1), ios, err, &t);
-        assert(base(i) == in+3);
+        assert(i.base() == in+3);
         assert(t.tm_wday == 2);
         assert(err == std::ios_base::eofbit);
     }
@@ -143,7 +141,7 @@ int main(int, char**)
         err = std::ios_base::goodbit;
         t = std::tm();
         I i = f.get_weekday(I(in), I(in+sizeof(in)/sizeof(in[0])-1), ios, err, &t);
-        assert(base(i) == in+7);
+        assert(i.base() == in+7);
         assert(t.tm_wday == 2);
         assert(err == std::ios_base::eofbit);
     }
@@ -152,7 +150,7 @@ int main(int, char**)
         err = std::ios_base::goodbit;
         t = std::tm();
         I i = f.get_weekday(I(in), I(in+sizeof(in)/sizeof(in[0])-1), ios, err, &t);
-        assert(base(i) == in+3);
+        assert(i.base() == in+3);
         assert(t.tm_wday == 3);
         assert(err == std::ios_base::eofbit);
     }
@@ -161,7 +159,7 @@ int main(int, char**)
         err = std::ios_base::goodbit;
         t = std::tm();
         I i = f.get_weekday(I(in), I(in+sizeof(in)/sizeof(in[0])-1), ios, err, &t);
-        assert(base(i) == in+9);
+        assert(i.base() == in+9);
         assert(t.tm_wday == 3);
         assert(err == std::ios_base::eofbit);
     }
@@ -170,7 +168,7 @@ int main(int, char**)
         err = std::ios_base::goodbit;
         t = std::tm();
         I i = f.get_weekday(I(in), I(in+sizeof(in)/sizeof(in[0])-1), ios, err, &t);
-        assert(base(i) == in+3);
+        assert(i.base() == in+3);
         assert(t.tm_wday == 4);
         assert(err == std::ios_base::eofbit);
     }
@@ -179,7 +177,7 @@ int main(int, char**)
         err = std::ios_base::goodbit;
         t = std::tm();
         I i = f.get_weekday(I(in), I(in+sizeof(in)/sizeof(in[0])-1), ios, err, &t);
-        assert(base(i) == in+8);
+        assert(i.base() == in+8);
         assert(t.tm_wday == 4);
         assert(err == std::ios_base::eofbit);
     }
@@ -188,7 +186,7 @@ int main(int, char**)
         err = std::ios_base::goodbit;
         t = std::tm();
         I i = f.get_weekday(I(in), I(in+sizeof(in)/sizeof(in[0])-1), ios, err, &t);
-        assert(base(i) == in+3);
+        assert(i.base() == in+3);
         assert(t.tm_wday == 5);
         assert(err == std::ios_base::eofbit);
     }
@@ -197,7 +195,7 @@ int main(int, char**)
         err = std::ios_base::goodbit;
         t = std::tm();
         I i = f.get_weekday(I(in), I(in+sizeof(in)/sizeof(in[0])-1), ios, err, &t);
-        assert(base(i) == in+6);
+        assert(i.base() == in+6);
         assert(t.tm_wday == 5);
         assert(err == std::ios_base::eofbit);
     }
@@ -206,7 +204,7 @@ int main(int, char**)
         err = std::ios_base::goodbit;
         t = std::tm();
         I i = f.get_weekday(I(in), I(in+sizeof(in)/sizeof(in[0])-1), ios, err, &t);
-        assert(base(i) == in+3);
+        assert(i.base() == in+3);
         assert(t.tm_wday == 6);
         assert(err == std::ios_base::eofbit);
     }
@@ -215,7 +213,7 @@ int main(int, char**)
         err = std::ios_base::goodbit;
         t = std::tm();
         I i = f.get_weekday(I(in), I(in+sizeof(in)/sizeof(in[0])-1), ios, err, &t);
-        assert(base(i) == in+8);
+        assert(i.base() == in+8);
         assert(t.tm_wday == 6);
         assert(err == std::ios_base::eofbit);
     }

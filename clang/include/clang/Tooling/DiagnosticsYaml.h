@@ -42,7 +42,8 @@ template <> struct MappingTraits<clang::tooling::DiagnosticMessage> {
     Io.mapOptional("FileOffset", M.FileOffset);
     std::vector<clang::tooling::Replacement> Fixes;
     for (auto &Replacements : M.Fix) {
-      llvm::append_range(Fixes, Replacements.second);
+      for (auto &Replacement : Replacements.second)
+        Fixes.push_back(Replacement);
     }
     Io.mapRequired("Replacements", Fixes);
     for (auto &Fix : Fixes) {

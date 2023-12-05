@@ -12,7 +12,7 @@
 #include "tsan_test_util.h"
 #include "gtest/gtest.h"
 
-TEST_F(ThreadSanitizer, ThreadSync) {
+TEST(ThreadSanitizer, ThreadSync) {
   MainThread t0;
   MemLoc l;
   t0.Write1(l);
@@ -23,13 +23,13 @@ TEST_F(ThreadSanitizer, ThreadSync) {
   t0.Write1(l);
 }
 
-TEST_F(ThreadSanitizer, ThreadDetach1) {
+TEST(ThreadSanitizer, ThreadDetach1) {
   ScopedThread t1(true);
   MemLoc l;
   t1.Write1(l);
 }
 
-TEST_F(ThreadSanitizer, ThreadDetach2) {
+TEST(ThreadSanitizer, ThreadDetach2) {
   ScopedThread t1;
   MemLoc l;
   t1.Write1(l);

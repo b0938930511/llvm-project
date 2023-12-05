@@ -1,16 +1,16 @@
 // RUN: %libomp-compile-and-run | FileCheck %s
 // REQUIRES: ompt
 #include "callback.h"
-#include "omp_testsuite.h"
 
 int main() {
-  go_parallel_nthreads(2);
+#pragma omp parallel num_threads(2)
+  {}
 
   printf("Before ompt_finalize_tool\n");
   ompt_finalize_tool();
   printf("After ompt_finalize_tool\n");
 
-  return get_exit_value();
+  return 0;
 }
 
 // CHECK: 0: NULL_POINTER=[[NULL:.*$]]

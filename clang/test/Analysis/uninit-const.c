@@ -4,7 +4,7 @@
 // RUN:   -analyzer-checker=debug.ExprInspection \
 // RUN:   -analyzer-config core.CallAndMessage:ArgPointeeInitializedness=true
 
-void clang_analyzer_warnIfReached(void);
+void clang_analyzer_warnIfReached();
 
 // Passing uninitialized const data to function
 #include "Inputs/system-header-simulator.h"

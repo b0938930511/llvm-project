@@ -8,22 +8,17 @@
 
 #include "mlir/Conversion/ShapeToStandard/ShapeToStandard.h"
 
-#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "../PassDetail.h"
+#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-#define GEN_PASS_DEF_CONVERTSHAPECONSTRAINTS
-#include "mlir/Conversion/Passes.h.inc"
-} // namespace mlir
-
 using namespace mlir;
-
 namespace {
 #include "ShapeToStandard.cpp.inc"
 } // namespace
@@ -34,7 +29,7 @@ public:
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(shape::CstrRequireOp op,
                                 PatternRewriter &rewriter) const override {
-    rewriter.create<cf::AssertOp>(op.getLoc(), op.getPred(), op.getMsgAttr());
+    rewriter.create<AssertOp>(op.getLoc(), op.pred(), op.msgAttr());
     rewriter.replaceOpWithNewOp<shape::ConstWitnessOp>(op, true);
     return success();
   }
@@ -54,9 +49,9 @@ namespace {
 // is emitted, witnesses are satisfied, so they are replace with
 // `shape.const_witness true`.
 class ConvertShapeConstraints
-    : public impl::ConvertShapeConstraintsBase<ConvertShapeConstraints> {
+    : public ConvertShapeConstraintsBase<ConvertShapeConstraints> {
   void runOnOperation() override {
-    auto *func = getOperation();
+    auto func = getOperation();
     auto *context = &getContext();
 
     RewritePatternSet patterns(context);
@@ -68,6 +63,7 @@ class ConvertShapeConstraints
 };
 } // namespace
 
-std::unique_ptr<Pass> mlir::createConvertShapeConstraintsPass() {
+std::unique_ptr<OperationPass<FuncOp>>
+mlir::createConvertShapeConstraintsPass() {
   return std::make_unique<ConvertShapeConstraints>();
 }

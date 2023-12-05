@@ -11,13 +11,14 @@
 
 namespace Fortran::evaluate {
 
-llvm::raw_ostream &StaticDataObject::AsFortran(
-    llvm::raw_ostream &o, bool bigEndian) const {
+bool StaticDataObject::bigEndian{false};
+
+llvm::raw_ostream &StaticDataObject::AsFortran(llvm::raw_ostream &o) const {
   if (auto string{AsString()}) {
     o << parser::QuoteCharacterLiteral(*string);
-  } else if (auto string{AsU16String(bigEndian)}) {
+  } else if (auto string{AsU16String()}) {
     o << "2_" << parser::QuoteCharacterLiteral(*string);
-  } else if (auto string{AsU32String(bigEndian)}) {
+  } else if (auto string{AsU32String()}) {
     o << "4_" << parser::QuoteCharacterLiteral(*string);
   } else {
     CRASH_NO_CASE;
@@ -25,16 +26,15 @@ llvm::raw_ostream &StaticDataObject::AsFortran(
   return o;
 }
 
-StaticDataObject &StaticDataObject::Push(const std::string &string, bool) {
+StaticDataObject &StaticDataObject::Push(const std::string &string) {
   for (auto ch : string) {
     data_.push_back(static_cast<std::uint8_t>(ch));
   }
   return *this;
 }
 
-StaticDataObject &StaticDataObject::Push(
-    const std::u16string &string, bool bigEndian) {
-  int shift{bigEndian ? 8 : 0};
+StaticDataObject &StaticDataObject::Push(const std::u16string &string) {
+  int shift{bigEndian * 8};
   for (auto ch : string) {
     data_.push_back(static_cast<std::uint8_t>(ch >> shift));
     data_.push_back(static_cast<std::uint8_t>(ch >> (shift ^ 8)));
@@ -42,9 +42,8 @@ StaticDataObject &StaticDataObject::Push(
   return *this;
 }
 
-StaticDataObject &StaticDataObject::Push(
-    const std::u32string &string, bool bigEndian) {
-  int shift{bigEndian ? 24 : 0};
+StaticDataObject &StaticDataObject::Push(const std::u32string &string) {
+  int shift{bigEndian * 24};
   for (auto ch : string) {
     data_.push_back(static_cast<std::uint8_t>(ch >> shift));
     data_.push_back(static_cast<std::uint8_t>(ch >> (shift ^ 8)));
@@ -65,10 +64,9 @@ std::optional<std::string> StaticDataObject::AsString() const {
   return std::nullopt;
 }
 
-std::optional<std::u16string> StaticDataObject::AsU16String(
-    bool bigEndian) const {
+std::optional<std::u16string> StaticDataObject::AsU16String() const {
   if (itemBytes_ == 2) {
-    int shift{bigEndian ? 8 : 0};
+    int shift{bigEndian * 8};
     std::u16string result;
     auto end{data_.cend()};
     for (auto byte{data_.cbegin()}; byte < end;) {
@@ -80,10 +78,9 @@ std::optional<std::u16string> StaticDataObject::AsU16String(
   return std::nullopt;
 }
 
-std::optional<std::u32string> StaticDataObject::AsU32String(
-    bool bigEndian) const {
+std::optional<std::u32string> StaticDataObject::AsU32String() const {
   if (itemBytes_ == 4) {
-    int shift{bigEndian ? 24 : 0};
+    int shift{bigEndian * 24};
     std::u32string result;
     auto end{data_.cend()};
     for (auto byte{data_.cbegin()}; byte < end;) {

@@ -9,6 +9,8 @@
 #include "llvm/DebugInfo/PDB/Native/NativeCompilandSymbol.h"
 #include "llvm/DebugInfo/PDB/Native/NativeSession.h"
 
+#include "llvm/ADT/STLExtras.h"
+
 namespace llvm {
 namespace pdb {
 

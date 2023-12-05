@@ -20,24 +20,22 @@
 
 #include <stdlib.h>
 
-int t;
+extern "C"
+int f(int depth) {
+  if (depth) return f(depth - 1);
 
-extern "C" void f(int depth) {
-  if (depth)
-    return f(depth - 1);
-
-  volatile int x;
-  t = x;
+  int x;
+  int *volatile p = &x;
+  return *p;
 }
 
 int main(int argc, char **argv) {
-  f(1);
-  return t;
+  return f(1);
   // CHECK: WARNING: MemorySanitizer: use-of-uninitialized-value
   // CHECK: {{#0 0x.* in main .*stack-origin2.cpp:}}[[@LINE-2]]
 
-  // CHECK-ORIGINS: Uninitialized value was created by an allocation of 'x' in the stack frame
-  // CHECK-ORIGINS: {{#0 0x.* in f .*stack-origin2.cpp:}}[[@LINE-11]]
+  // CHECK-ORIGINS: Uninitialized value was created by an allocation of 'x' in the stack frame of function 'f'
+  // CHECK-ORIGINS: {{#0 0x.* in f .*stack-origin2.cpp:}}[[@LINE-14]]
 
   // CHECK: SUMMARY: MemorySanitizer: use-of-uninitialized-value {{.*stack-origin2.cpp:.* main}}
 }

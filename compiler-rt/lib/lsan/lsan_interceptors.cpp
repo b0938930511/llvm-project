@@ -13,7 +13,6 @@
 
 #include "interception/interception.h"
 #include "sanitizer_common/sanitizer_allocator.h"
-#include "sanitizer_common/sanitizer_allocator_dlsym.h"
 #include "sanitizer_common/sanitizer_allocator_report.h"
 #include "sanitizer_common/sanitizer_atomic.h"
 #include "sanitizer_common/sanitizer_common.h"
@@ -44,22 +43,6 @@ int pthread_key_create(unsigned *key, void (*destructor)(void* v));
 int pthread_setspecific(unsigned key, const void *v);
 }
 
-struct DlsymAlloc : DlSymAllocator<DlsymAlloc> {
-  static bool UseImpl() { return lsan_init_is_running; }
-  static void OnAllocate(const void *ptr, uptr size) {
-#if CAN_SANITIZE_LEAKS
-    // Suppress leaks from dlerror(). Previously dlsym hack on global array was
-    // used by leak sanitizer as a root region.
-    __lsan_register_root_region(ptr, size);
-#endif
-  }
-  static void OnFree(const void *ptr, uptr size) {
-#if CAN_SANITIZE_LEAKS
-    __lsan_unregister_root_region(ptr, size);
-#endif
-  }
-};
-
 ///// Malloc/free interceptors. /////
 
 namespace std {
@@ -67,36 +50,43 @@ namespace std {
   enum class align_val_t: size_t;
 }
 
-#if !SANITIZER_APPLE
+#if !SANITIZER_MAC
 INTERCEPTOR(void*, malloc, uptr size) {
-  if (DlsymAlloc::Use())
-    return DlsymAlloc::Allocate(size);
   ENSURE_LSAN_INITED;
   GET_STACK_TRACE_MALLOC;
   return lsan_malloc(size, stack);
 }
 
 INTERCEPTOR(void, free, void *p) {
-  if (DlsymAlloc::PointerIsMine(p))
-    return DlsymAlloc::Free(p);
   ENSURE_LSAN_INITED;
   lsan_free(p);
 }
 
 INTERCEPTOR(void*, calloc, uptr nmemb, uptr size) {
-  if (DlsymAlloc::Use())
-    return DlsymAlloc::Callocate(nmemb, size);
+  // This hack is not required for Fuchsia because there are no dlsym calls
+  // involved in setting up interceptors.
+#if !SANITIZER_FUCHSIA
+  if (lsan_init_is_running) {
+    // Hack: dlsym calls calloc before REAL(calloc) is retrieved from dlsym.
+    const uptr kCallocPoolSize = 1024;
+    static uptr calloc_memory_for_dlsym[kCallocPoolSize];
+    static uptr allocated;
+    uptr size_in_words = ((nmemb * size) + kWordSize - 1) / kWordSize;
+    void *mem = (void*)&calloc_memory_for_dlsym[allocated];
+    allocated += size_in_words;
+    CHECK(allocated < kCallocPoolSize);
+    return mem;
+  }
+#endif  // !SANITIZER_FUCHSIA
   ENSURE_LSAN_INITED;
   GET_STACK_TRACE_MALLOC;
   return lsan_calloc(nmemb, size, stack);
 }
 
-INTERCEPTOR(void *, realloc, void *ptr, uptr size) {
-  if (DlsymAlloc::Use() || DlsymAlloc::PointerIsMine(ptr))
-    return DlsymAlloc::Realloc(ptr, size);
+INTERCEPTOR(void*, realloc, void *q, uptr size) {
   ENSURE_LSAN_INITED;
   GET_STACK_TRACE_MALLOC;
-  return lsan_realloc(ptr, size, stack);
+  return lsan_realloc(q, size, stack);
 }
 
 INTERCEPTOR(void*, reallocarray, void *q, uptr nmemb, uptr size) {
@@ -116,7 +106,7 @@ INTERCEPTOR(void*, valloc, uptr size) {
   GET_STACK_TRACE_MALLOC;
   return lsan_valloc(size, stack);
 }
-#endif  // !SANITIZER_APPLE
+#endif  // !SANITIZER_MAC
 
 #if SANITIZER_INTERCEPT_MEMALIGN
 INTERCEPTOR(void*, memalign, uptr alignment, uptr size) {
@@ -197,7 +187,7 @@ INTERCEPTOR(void*, pvalloc, uptr size) {
 #endif // SANITIZER_INTERCEPT_PVALLOC
 
 #if SANITIZER_INTERCEPT_CFREE
-INTERCEPTOR(void, cfree, void *p) ALIAS(WRAP(free));
+INTERCEPTOR(void, cfree, void *p) ALIAS(WRAPPER_NAME(free));
 #define LSAN_MAYBE_INTERCEPT_CFREE INTERCEPT_FUNCTION(cfree)
 #else
 #define LSAN_MAYBE_INTERCEPT_CFREE
@@ -242,7 +232,7 @@ INTERCEPTOR(int, mprobe, void *ptr) {
 // libstdc++, each of has its implementation of new and delete.
 // To make sure that C++ allocation/deallocation operators are overridden on
 // OS X we need to intercept them using their mangled names.
-#if !SANITIZER_APPLE
+#if !SANITIZER_MAC
 
 INTERCEPTOR_ATTRIBUTE
 void *operator new(size_t size) { OPERATOR_NEW_BODY(false /*nothrow*/); }
@@ -301,7 +291,7 @@ INTERCEPTOR_ATTRIBUTE
 void operator delete[](void *ptr, size_t size, std::align_val_t) NOEXCEPT
 { OPERATOR_DELETE_BODY; }
 
-#else  // SANITIZER_APPLE
+#else  // SANITIZER_MAC
 
 INTERCEPTOR(void *, _Znwm, size_t size)
 { OPERATOR_NEW_BODY(false /*nothrow*/); }
@@ -321,7 +311,7 @@ INTERCEPTOR(void, _ZdlPvRKSt9nothrow_t, void *ptr, std::nothrow_t const&)
 INTERCEPTOR(void, _ZdaPvRKSt9nothrow_t, void *ptr, std::nothrow_t const&)
 { OPERATOR_DELETE_BODY; }
 
-#endif  // !SANITIZER_APPLE
+#endif  // !SANITIZER_MAC
 
 
 ///// Thread initialization and finalization. /////
@@ -415,10 +405,16 @@ INTERCEPTOR(char *, strerror, int errnum) {
 
 #if SANITIZER_POSIX
 
-template <bool Detached>
-static void *ThreadStartFunc(void *arg) {
-  u32 parent_tid = (uptr)arg;
-  uptr tid = ThreadCreate(parent_tid, Detached);
+struct ThreadParam {
+  void *(*callback)(void *arg);
+  void *param;
+  atomic_uintptr_t tid;
+};
+
+extern "C" void *__lsan_thread_start_func(void *arg) {
+  ThreadParam *p = (ThreadParam*)arg;
+  void* (*callback)(void *arg) = p->callback;
+  void *param = p->param;
   // Wait until the last iteration to maximize the chance that we are the last
   // destructor to run.
 #if !SANITIZER_NETBSD && !SANITIZER_FREEBSD
@@ -427,105 +423,70 @@ static void *ThreadStartFunc(void *arg) {
     Report("LeakSanitizer: failed to set thread key.\n");
     Die();
   }
-#  endif
+#endif
+  int tid = 0;
+  while ((tid = atomic_load(&p->tid, memory_order_acquire)) == 0)
+    internal_sched_yield();
   ThreadStart(tid, GetTid());
-  auto self = GetThreadSelf();
-  auto args = GetThreadArgRetval().GetArgs(self);
-  void *retval = (*args.routine)(args.arg_retval);
-  GetThreadArgRetval().Finish(self, retval);
-  return retval;
+  atomic_store(&p->tid, 0, memory_order_release);
+  return callback(param);
 }
 
 INTERCEPTOR(int, pthread_create, void *th, void *attr,
             void *(*callback)(void *), void *param) {
   ENSURE_LSAN_INITED;
   EnsureMainThreadIDIsCorrect();
-
-  bool detached = [attr]() {
-    int d = 0;
-    return attr && !pthread_attr_getdetachstate(attr, &d) && IsStateDetached(d);
-  }();
-
   __sanitizer_pthread_attr_t myattr;
   if (!attr) {
     pthread_attr_init(&myattr);
     attr = &myattr;
   }
   AdjustStackSize(attr);
-  uptr this_tid = GetCurrentThreadId();
-  int result;
+  int detached = 0;
+  pthread_attr_getdetachstate(attr, &detached);
+  ThreadParam p;
+  p.callback = callback;
+  p.param = param;
+  atomic_store(&p.tid, 0, memory_order_relaxed);
+  int res;
   {
     // Ignore all allocations made by pthread_create: thread stack/TLS may be
     // stored by pthread for future reuse even after thread destruction, and
     // the linked list it's stored in doesn't even hold valid pointers to the
     // objects, the latter are calculated by obscure pointer arithmetic.
     ScopedInterceptorDisabler disabler;
-    GetThreadArgRetval().Create(detached, {callback, param}, [&]() -> uptr {
-      result = REAL(pthread_create)(
-          th, attr, detached ? ThreadStartFunc<true> : ThreadStartFunc<false>,
-          (void *)this_tid);
-      return result ? 0 : *(uptr *)(th);
-    });
+    res = REAL(pthread_create)(th, attr, __lsan_thread_start_func, &p);
+  }
+  if (res == 0) {
+    int tid = ThreadCreate(GetCurrentThread(), *(uptr *)th,
+                           IsStateDetached(detached));
+    CHECK_NE(tid, kMainTid);
+    atomic_store(&p.tid, tid, memory_order_release);
+    while (atomic_load(&p.tid, memory_order_acquire) != 0)
+      internal_sched_yield();
   }
   if (attr == &myattr)
     pthread_attr_destroy(&myattr);
-  return result;
+  return res;
 }
 
-INTERCEPTOR(int, pthread_join, void *thread, void **retval) {
-  int result;
-  GetThreadArgRetval().Join((uptr)thread, [&]() {
-    result = REAL(pthread_join)(thread, retval);
-    return !result;
-  });
-  return result;
+INTERCEPTOR(int, pthread_join, void *th, void **ret) {
+  ENSURE_LSAN_INITED;
+  int tid = ThreadTid((uptr)th);
+  int res = REAL(pthread_join)(th, ret);
+  if (res == 0)
+    ThreadJoin(tid);
+  return res;
 }
 
-INTERCEPTOR(int, pthread_detach, void *thread) {
-  int result;
-  GetThreadArgRetval().Detach((uptr)thread, [&]() {
-    result = REAL(pthread_detach)(thread);
-    return !result;
-  });
-  return result;
+INTERCEPTOR(int, pthread_detach, void *th) {
+  ENSURE_LSAN_INITED;
+  int tid = ThreadTid((uptr)th);
+  int res = REAL(pthread_detach)(th);
+  if (res == 0)
+    ThreadDetach(tid);
+  return res;
 }
-
-INTERCEPTOR(void, pthread_exit, void *retval) {
-  GetThreadArgRetval().Finish(GetThreadSelf(), retval);
-  REAL(pthread_exit)(retval);
-}
-
-#  if SANITIZER_INTERCEPT_TRYJOIN
-INTERCEPTOR(int, pthread_tryjoin_np, void *thread, void **ret) {
-  int result;
-  GetThreadArgRetval().Join((uptr)thread, [&]() {
-    result = REAL(pthread_tryjoin_np)(thread, ret);
-    return !result;
-  });
-  return result;
-}
-#    define LSAN_MAYBE_INTERCEPT_TRYJOIN INTERCEPT_FUNCTION(pthread_tryjoin_np)
-#  else
-#    define LSAN_MAYBE_INTERCEPT_TRYJOIN
-#  endif  // SANITIZER_INTERCEPT_TRYJOIN
-
-#  if SANITIZER_INTERCEPT_TIMEDJOIN
-INTERCEPTOR(int, pthread_timedjoin_np, void *thread, void **ret,
-            const struct timespec *abstime) {
-  int result;
-  GetThreadArgRetval().Join((uptr)thread, [&]() {
-    result = REAL(pthread_timedjoin_np)(thread, ret, abstime);
-    return !result;
-  });
-  return result;
-}
-#    define LSAN_MAYBE_INTERCEPT_TIMEDJOIN \
-      INTERCEPT_FUNCTION(pthread_timedjoin_np)
-#  else
-#    define LSAN_MAYBE_INTERCEPT_TIMEDJOIN
-#  endif  // SANITIZER_INTERCEPT_TIMEDJOIN
-
-DEFINE_REAL_PTHREAD_FUNCTIONS
 
 INTERCEPTOR(void, _exit, int status) {
   if (status == 0 && HasReportedLeaks()) status = common_flags()->exitcode;
@@ -533,7 +494,6 @@ INTERCEPTOR(void, _exit, int status) {
 }
 
 #define COMMON_INTERCEPT_FUNCTION(name) INTERCEPT_FUNCTION(name)
-#define SIGNAL_INTERCEPTOR_ENTER() ENSURE_LSAN_INITED
 #include "sanitizer_common/sanitizer_signal_interceptors.inc"
 
 #endif  // SANITIZER_POSIX
@@ -560,11 +520,8 @@ void InitializeInterceptors() {
   LSAN_MAYBE_INTERCEPT_MALLINFO;
   LSAN_MAYBE_INTERCEPT_MALLOPT;
   INTERCEPT_FUNCTION(pthread_create);
-  INTERCEPT_FUNCTION(pthread_join);
   INTERCEPT_FUNCTION(pthread_detach);
-  INTERCEPT_FUNCTION(pthread_exit);
-  LSAN_MAYBE_INTERCEPT_TIMEDJOIN;
-  LSAN_MAYBE_INTERCEPT_TRYJOIN;
+  INTERCEPT_FUNCTION(pthread_join);
   INTERCEPT_FUNCTION(_exit);
 
   LSAN_MAYBE_INTERCEPT__LWP_EXIT;

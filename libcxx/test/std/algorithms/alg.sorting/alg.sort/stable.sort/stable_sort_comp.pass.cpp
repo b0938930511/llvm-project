@@ -21,7 +21,6 @@
 #include <cassert>
 #include <cstddef>
 #include <memory>
-#include <utility>
 
 #include "test_macros.h"
 

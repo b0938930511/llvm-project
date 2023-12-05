@@ -15,12 +15,11 @@
 #ifndef LLVM_TOOLS_LLVM_MCA_INSTRUCTIONVIEW_H
 #define LLVM_TOOLS_LLVM_MCA_INSTRUCTIONVIEW_H
 
-#include "llvm/MCA/View.h"
+#include "Views/View.h"
 #include "llvm/Support/JSON.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace llvm {
-class MCInstPrinter;
-
 namespace mca {
 
 // The base class for views that deal with individual machine instructions.

@@ -1,4 +1,5 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s
+// rdar://8191774
 
 @protocol SomeProtocol
 @end
@@ -9,7 +10,7 @@
 @interface SomeObject <SomeProtocol>
 @end
 
-int main (void) {
+int main () {
     Class <SomeProtocol> classA;
     Class <SomeProtocol> classB;
     Class <SomeProtocol, SomeProtocol1> classC;
@@ -27,6 +28,7 @@ int main (void) {
            classA == classD; // expected-warning {{comparison of distinct pointer types ('Class<SomeProtocol>' and 'Class<SomeProtocol1>')}}
 }
 
+// rdar://18491222
 @protocol NSObject @end
 
 @interface NSObject @end

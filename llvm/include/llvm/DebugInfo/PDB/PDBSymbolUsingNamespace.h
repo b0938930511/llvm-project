@@ -14,6 +14,7 @@
 
 namespace llvm {
 
+class raw_ostream;
 namespace pdb {
 
 class PDBSymbolUsingNamespace : public PDBSymbol {
@@ -26,7 +27,7 @@ public:
   FORWARD_SYMBOL_METHOD(getName)
 };
 
-} // namespace pdb
 } // namespace llvm
+}
 
 #endif // LLVM_DEBUGINFO_PDB_PDBSYMBOLUSINGNAMESPACE_H

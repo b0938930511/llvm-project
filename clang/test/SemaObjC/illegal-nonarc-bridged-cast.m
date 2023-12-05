@@ -1,4 +1,5 @@
 // RUN: %clang_cc1 -triple x86_64-apple-darwin11 -fsyntax-only -fblocks -Wcast-qual -verify %s
+// rdar://10597832
 
 typedef const void *CFTypeRef;
 typedef const struct __CFString *CFStringRef;
@@ -7,15 +8,15 @@ typedef const struct __CFString *CFStringRef;
 @interface NSString
 @end
 
-CFTypeRef CFCreateSomething(void);
-CFStringRef CFCreateString(void);
-CFTypeRef CFGetSomething(void);
-CFStringRef CFGetString(void);
+CFTypeRef CFCreateSomething();
+CFStringRef CFCreateString();
+CFTypeRef CFGetSomething();
+CFStringRef CFGetString();
 
-id CreateSomething(void);
-NSString *CreateNSString(void);
+id CreateSomething();
+NSString *CreateNSString();
 
-void from_cf(void) {
+void from_cf() {
   id obj1 = (__bridge_transfer id)CFCreateSomething(); // expected-warning {{'__bridge_transfer' casts have no effect when not using ARC}}
   id obj2 = (__bridge_transfer NSString*)CFCreateString(); // expected-warning {{'__bridge_transfer' casts have no effect when not using ARC}}
   (__bridge int*)CFCreateSomething(); // expected-warning {{expression result unused}} expected-warning {{cast from 'const void *' to 'int *' drops const qualifier}}
@@ -30,7 +31,7 @@ void to_cf(id obj) {
   CFStringRef cf4 = (__bridge CFStringRef)CreateNSString();
 }
 
-void fixits(void) {
+void fixits() {
   id obj1 = (id)CFCreateSomething();
   CFTypeRef cf1 = (CFTypeRef)CreateSomething();
 }
@@ -44,7 +45,7 @@ void to_cf_ignored(id obj) {
 
 // Check that clang doesn't warn about dropping const from Objective-C object
 // types.
-void test_wcast_qual(void) {
+void test_wcast_qual() {
   CFStringRef c;
   NSString *n0 = (NSString *)c;
   NSString **n1 = (NSString **)&c;

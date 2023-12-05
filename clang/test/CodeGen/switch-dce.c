@@ -1,6 +1,6 @@
 // RUN: %clang_cc1 -triple i386-unknown-unknown %s -emit-llvm -o - | FileCheck %s
 
-// PR9322
+// PR9322 and rdar://6970405
 
 // CHECK: @test1
 // CHECK-NOT: switch
@@ -10,9 +10,9 @@
 // CHECK-NOT: @dead
 // CHECK: ret void
 int i;
-void dead(void);
+void dead();
 
-void test1(void) {
+void test1() {
   switch (1)
     case 1:
       ++i;
@@ -30,7 +30,7 @@ void test1(void) {
 // CHECK-NOT: switch
 // CHECK-NOT: @dead
 // CHECK: ret void
-void test2(void) {
+void test2() {
   switch (4) {
   case 1:
     dead();
@@ -49,7 +49,7 @@ void test2(void) {
 // CHECK-NOT: switch
 // CHECK-NOT: @dead
 // CHECK: ret void
-void test3(void) {
+void test3() {
   switch (4) {
   case 1:
     dead();
@@ -68,7 +68,7 @@ void test3(void) {
 // CHECK-NOT: switch
 // CHECK-NOT: @dead
 // CHECK: ret void
-void test4(void) {
+void test4() {
   switch (4) {
     case 1:
       dead();
@@ -82,7 +82,7 @@ void test4(void) {
 
 // This shouldn't crash codegen, but we don't have to optimize out the switch
 // in this case.
-void test5(void) {
+void test5() {
   switch (1) {
     int x;  // eliding var decl?
     case 1:
@@ -96,7 +96,7 @@ void test5(void) {
 // CHECK-NOT: switch
 // CHECK-NOT: @dead
 // CHECK: ret void
-void test6(void) {
+void test6() {
   // Neither case is reachable.
   switch (40) {
   case 1:
@@ -116,7 +116,7 @@ void test6(void) {
 // CHECK-NOT: switch
 // CHECK-NOT: @dead
 // CHECK: ret void
-void test7(void) {
+void test7() {
   switch (4) {
   case 1:
       dead();
@@ -136,7 +136,7 @@ void test7(void) {
 // CHECK-NOT: switch
 // CHECK-NOT: @dead
 // CHECK: ret void
-void test8(void) {
+void test8() {
   switch (4) {
   case 1:
     dead();
@@ -187,7 +187,7 @@ int test10(void) {
 // CHECK: @test11
 // CHECK-NOT: switch
 // CHECK: ret void
-void test11(void) {
+void test11() {
   switch (1) {
     case 1:
       break;
@@ -201,7 +201,7 @@ void test11(void) {
 // CHECK: @test12
 // CHECK-NOT: switch
 // CHECK: ret void
-void test12(void) {
+void test12() {
   switch (1) {
   case 2: {
      int a;   // Ok to skip this vardecl.
@@ -218,11 +218,11 @@ void test12(void) {
 
 // Verify that case 42 only calls test14 once.
 // CHECK: @test13
-// CHECK: call void @test13(i32 noundef 97)
+// CHECK: call void @test13(i32 97)
 // CHECK-NEXT: br label %[[EPILOG2:[0-9.a-z]+]]
 // CHECK: [[EPILOG2]]
 // CHECK-NEXT: br label [[EPILOG:%[0-9.a-z]+]]
-// CHECK: call void @test13(i32 noundef 42)
+// CHECK: call void @test13(i32 42)
 // CHECK-NEXT: br label [[EPILOG]]
 void test13(int x) {
   switch (x) {

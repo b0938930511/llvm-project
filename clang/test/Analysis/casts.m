@@ -1,4 +1,4 @@
-// RUN: %clang_analyze_cc1 -analyzer-checker=core,alpha.core -verify %s
+// RUN: %clang_analyze_cc1 -analyzer-checker=core,alpha.core -analyzer-store=region -verify %s
 // expected-no-diagnostics
 
 // Test function pointer casts.
@@ -18,6 +18,7 @@ void* test2(void *p) {
   return (*fp)();
 }
 
+// <radar://10087620>
 // A cast from int onjective C property reference to int.
 typedef signed char BOOL;
 @protocol NSObject  - (BOOL)isEqual:(id)object; @end
@@ -40,6 +41,6 @@ adium_media_ready_cb(RDR10087620 *InObj)
 
 
 // PR16690
-_Bool testLocAsIntegerToBool(void) {
+_Bool testLocAsIntegerToBool() {
   return (long long)&testLocAsIntegerToBool;
 }

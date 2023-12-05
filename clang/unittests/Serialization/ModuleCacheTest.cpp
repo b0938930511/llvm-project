@@ -10,11 +10,9 @@
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Frontend/FrontendActions.h"
-#include "clang/Frontend/Utils.h"
 #include "clang/Lex/HeaderSearch.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "gtest/gtest.h"
@@ -97,16 +95,13 @@ TEST_F(ModuleCacheTest, CachedModuleNewPath) {
   MCPArg.append(ModuleCachePath);
   IntrusiveRefCntPtr<DiagnosticsEngine> Diags =
       CompilerInstance::createDiagnostics(new DiagnosticOptions());
-  CreateInvocationOptions CIOpts;
-  CIOpts.Diags = Diags;
-  CIOpts.VFS = llvm::vfs::createPhysicalFileSystem();
 
   // First run should pass with no errors
   const char *Args[] = {"clang",        "-fmodules",          "-Fframeworks",
                         MCPArg.c_str(), "-working-directory", TestDir.c_str(),
                         "test.m"};
   std::shared_ptr<CompilerInvocation> Invocation =
-      createInvocation(Args, CIOpts);
+      createInvocationFromCommandLine(Args, Diags);
   ASSERT_TRUE(Invocation);
   CompilerInstance Instance;
   Instance.setDiagnostics(Diags.get());
@@ -129,7 +124,7 @@ TEST_F(ModuleCacheTest, CachedModuleNewPath) {
                          "-Fframeworks",  MCPArg.c_str(), "-working-directory",
                          TestDir.c_str(), "test.m"};
   std::shared_ptr<CompilerInvocation> Invocation2 =
-      createInvocation(Args2, CIOpts);
+      createInvocationFromCommandLine(Args2, Diags);
   ASSERT_TRUE(Invocation2);
   CompilerInstance Instance2(Instance.getPCHContainerOperations(),
                              &Instance.getModuleCache());
@@ -147,16 +142,13 @@ TEST_F(ModuleCacheTest, CachedModuleNewPathAllowErrors) {
   MCPArg.append(ModuleCachePath);
   IntrusiveRefCntPtr<DiagnosticsEngine> Diags =
       CompilerInstance::createDiagnostics(new DiagnosticOptions());
-  CreateInvocationOptions CIOpts;
-  CIOpts.Diags = Diags;
-  CIOpts.VFS = llvm::vfs::createPhysicalFileSystem();
 
   // First run should pass with no errors
   const char *Args[] = {"clang",        "-fmodules",          "-Fframeworks",
                         MCPArg.c_str(), "-working-directory", TestDir.c_str(),
                         "test.m"};
   std::shared_ptr<CompilerInvocation> Invocation =
-      createInvocation(Args, CIOpts);
+      createInvocationFromCommandLine(Args, Diags);
   ASSERT_TRUE(Invocation);
   CompilerInstance Instance;
   Instance.setDiagnostics(Diags.get());
@@ -173,7 +165,7 @@ TEST_F(ModuleCacheTest, CachedModuleNewPathAllowErrors) {
       TestDir.c_str(), "-Xclang",      "-fallow-pcm-with-compiler-errors",
       "test.m"};
   std::shared_ptr<CompilerInvocation> Invocation2 =
-      createInvocation(Args2, CIOpts);
+      createInvocationFromCommandLine(Args2, Diags);
   ASSERT_TRUE(Invocation2);
   CompilerInstance Instance2(Instance.getPCHContainerOperations(),
                              &Instance.getModuleCache());

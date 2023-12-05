@@ -21,6 +21,7 @@
 namespace lldb_private {
 
 class ASTStructExtractor;
+class ClangExpressionParser;
 
 /// \class ClangFunctionCaller ClangFunctionCaller.h
 /// "lldb/Expression/ClangFunctionCaller.h" Encapsulates a function that can
@@ -57,14 +58,11 @@ class ASTStructExtractor;
 class ClangFunctionCaller : public FunctionCaller {
   friend class ASTStructExtractor;
 
-  class ClangFunctionCallerHelper
-      : public llvm::RTTIExtends<ClangFunctionCallerHelper,
-                                 ClangExpressionHelper> {
+  class ClangFunctionCallerHelper : public ClangExpressionHelper {
   public:
-    // LLVM RTTI support
-    static char ID;
-
     ClangFunctionCallerHelper(ClangFunctionCaller &owner) : m_owner(owner) {}
+
+    ~ClangFunctionCallerHelper() override = default;
 
     /// Return the object that the parser should use when resolving external
     /// values.  May be NULL if everything should be self-contained.

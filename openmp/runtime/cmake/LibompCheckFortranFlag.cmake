@@ -19,9 +19,7 @@ function(libomp_check_fortran_flag flag boolean)
            print *, \"Hello World!\"
       end program hello")
 
-    # Compiling as a part of runtimes introduces ARCH-unknown-linux-gnu as a
-    # part of a working directory.  So adding a guard for unknown.
-    set(failed_regexes "[Ee]rror;[Uu]nknown[^-];[Ss]kipping")
+    set(failed_regexes "[Ee]rror;[Uu]nknown;[Ss]kipping")
     include(CheckFortranSourceCompiles)
     check_fortran_source_compiles("${fortran_source}" ${boolean} FAIL_REGEX "${failed_regexes}")
     set(${boolean} ${${boolean}} PARENT_SCOPE)

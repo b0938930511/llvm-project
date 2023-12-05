@@ -14,21 +14,19 @@
 
 #include <memory>
 #include <cassert>
-#include <type_traits>
-
 #include "test_macros.h"
 
 struct Deleter {
-  TEST_CONSTEXPR_CXX23 Deleter() {}
+  Deleter() {}
 
-  TEST_CONSTEXPR_CXX23 void operator()(void*) const {}
+  void operator()(void*) const {}
 
-  TEST_CONSTEXPR_CXX23 int test() { return 5; }
-  TEST_CONSTEXPR_CXX23 int test() const { return 6; }
+  int test() { return 5; }
+  int test() const { return 6; }
 };
 
 template <bool IsArray>
-TEST_CONSTEXPR_CXX23 void test_basic() {
+void test_basic() {
   typedef typename std::conditional<IsArray, int[], int>::type VT;
   {
     std::unique_ptr<int, Deleter> p;
@@ -60,18 +58,9 @@ TEST_CONSTEXPR_CXX23 void test_basic() {
   }
 }
 
-TEST_CONSTEXPR_CXX23 bool test() {
+int main(int, char**) {
   test_basic</*IsArray*/ false>();
   test_basic<true>();
-
-  return true;
-}
-
-int main(int, char**) {
-  test();
-#if TEST_STD_VER >= 23
-  static_assert(test());
-#endif
 
   return 0;
 }

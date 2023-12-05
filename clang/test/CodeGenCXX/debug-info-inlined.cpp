@@ -21,7 +21,9 @@ B::B() : Forward(WithDtor()) {}
 
 // CHECK: define{{.*}}A
 // CHECK-NOT: {{ ret }}
-// CHECK: store ptr %{{.*}}, ptr %{{.*}}, !dbg ![[INL:[0-9]+]]
+// CHECK: store %class.Forward* %
+// CHECK-SAME: %class.Forward** %
+// CHECK-SAME: !dbg ![[INL:[0-9]+]]
 
 // CHECK: ![[INL]] = !DILocation(line: 10, column: 15, scope: ![[SP:[0-9]+]], inlinedAt:
 // CHECK: ![[SP]] = distinct !DISubprogram(name: "Base", {{.*}} DISPFlagDefinition

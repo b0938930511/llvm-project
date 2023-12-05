@@ -5,7 +5,7 @@ struct printf_spec {
   char converter;
 };
 
-void parse_doprnt_spec (void) {
+void parse_doprnt_spec () {
   struct printf_spec spec;
   spec.minus_flag = 1;
 }

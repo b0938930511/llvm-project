@@ -18,7 +18,6 @@
 #include "lldb/Target/Target.h"
 #include "lldb/Utility/ArchSpec.h"
 #include "lldb/Utility/FileSpec.h"
-#include "lldb/Utility/LLDBLog.h"
 #include "lldb/Utility/Log.h"
 #include "lldb/Utility/Status.h"
 #include "lldb/Utility/StreamString.h"
@@ -53,7 +52,7 @@ void PlatformRemoteiOS::Terminate() {
 }
 
 PlatformSP PlatformRemoteiOS::CreateInstance(bool force, const ArchSpec *arch) {
-  Log *log = GetLog(LLDBLog::Platform);
+  Log *log(GetLogIfAllCategoriesSet(LIBLLDB_LOG_PLATFORM));
   if (log) {
     const char *arch_name;
     if (arch && arch->GetArchitectureName())
@@ -126,7 +125,12 @@ PlatformSP PlatformRemoteiOS::CreateInstance(bool force, const ArchSpec *arch) {
   return lldb::PlatformSP();
 }
 
-llvm::StringRef PlatformRemoteiOS::GetDescriptionStatic() {
+lldb_private::ConstString PlatformRemoteiOS::GetPluginNameStatic() {
+  static ConstString g_name("remote-ios");
+  return g_name;
+}
+
+const char *PlatformRemoteiOS::GetDescriptionStatic() {
   return "Remote iOS platform plug-in.";
 }
 
@@ -134,18 +138,9 @@ llvm::StringRef PlatformRemoteiOS::GetDescriptionStatic() {
 PlatformRemoteiOS::PlatformRemoteiOS()
     : PlatformRemoteDarwinDevice() {}
 
-std::vector<ArchSpec> PlatformRemoteiOS::GetSupportedArchitectures(
-    const ArchSpec &process_host_arch) {
-  std::vector<ArchSpec> result;
-  ARMGetSupportedArchitectures(result, llvm::Triple::IOS);
-  return result;
-}
-
-bool PlatformRemoteiOS::CheckLocalSharedCache() const {
-  // You can run iPhone and iPad apps on Mac with Apple Silicon. At the
-  // platform level there's no way to distinguish them from remote iOS
-  // applications. Make sure we still read from our own shared cache.
-  return true;
+bool PlatformRemoteiOS::GetSupportedArchitectureAtIndex(uint32_t idx,
+                                                        ArchSpec &arch) {
+  return ARMGetSupportedArchitectureAtIndex(idx, arch);
 }
 
 llvm::StringRef PlatformRemoteiOS::GetDeviceSupportDirectoryName() {

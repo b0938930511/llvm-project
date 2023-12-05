@@ -11,7 +11,7 @@ unsigned i;
 
 // SANITIZED: @overflow
 // UNSANITIZED: @overflow
-unsigned overflow(void) {
+unsigned overflow() {
   // SANITIZED: call {{.*}}void @__ubsan
   // UNSANITIZED-NOT: call {{.*}}void @__ubsan
   return i * 37;
@@ -19,7 +19,7 @@ unsigned overflow(void) {
 
 // SANITIZED: @cfi
 // UNSANITIZED: @cfi
-void cfi(void (*fp)(void)) {
+void cfi(void (*fp)()) {
   // SANITIZED: llvm.type.test
   // UNSANITIZED-NOT: llvm.type.test
   fp();

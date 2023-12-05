@@ -8,7 +8,10 @@
 
 #include "llvm/DebugInfo/PDB/PDBSymbolTypePointer.h"
 
+#include "llvm/DebugInfo/PDB/IPDBSession.h"
 #include "llvm/DebugInfo/PDB/PDBSymDumper.h"
+
+#include <utility>
 
 using namespace llvm;
 using namespace llvm::pdb;

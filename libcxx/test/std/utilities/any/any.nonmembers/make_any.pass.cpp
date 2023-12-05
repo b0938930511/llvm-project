@@ -8,6 +8,9 @@
 
 // UNSUPPORTED: c++03, c++11, c++14
 
+// Throwing bad_any_cast is supported starting in macosx10.13
+// XFAIL: use_system_cxx_lib && target={{.+}}-apple-macosx10.{{9|10|11|12}} && !no-exceptions
+
 // <any>
 
 // template <class T, class ...Args> any make_any(Args&&...);
@@ -21,6 +24,10 @@
 #include "count_new.h"
 #include "test_macros.h"
 
+using std::any;
+using std::any_cast;
+
+
 template <class Type>
 void test_make_any_type() {
     // constructing from a small type should perform no allocations.
@@ -28,7 +35,7 @@ void test_make_any_type() {
     assert(Type::count == 0);
     Type::reset();
     {
-        std::any a = std::make_any<Type>();
+        any a = std::make_any<Type>();
 
         assert(Type::count == 1);
         assert(Type::copied == 0);
@@ -38,7 +45,7 @@ void test_make_any_type() {
     assert(Type::count == 0);
     Type::reset();
     {
-        std::any a = std::make_any<Type>(101);
+        any a = std::make_any<Type>(101);
 
         assert(Type::count == 1);
         assert(Type::copied == 0);
@@ -48,7 +55,7 @@ void test_make_any_type() {
     assert(Type::count == 0);
     Type::reset();
     {
-        std::any a = std::make_any<Type>(-1, 42, -1);
+        any a = std::make_any<Type>(-1, 42, -1);
 
         assert(Type::count == 1);
         assert(Type::copied == 0);
@@ -64,21 +71,21 @@ void test_make_any_type_tracked() {
     // constructing from a small type should perform no allocations.
     DisableAllocationGuard g(isSmallType<Type>()); ((void)g);
     {
-        std::any a = std::make_any<Type>();
+        any a = std::make_any<Type>();
         assertArgsMatch<Type>(a);
     }
     {
-        std::any a = std::make_any<Type>(-1, 42, -1);
+        any a = std::make_any<Type>(-1, 42, -1);
         assertArgsMatch<Type, int, int, int>(a);
     }
     // initializer_list constructor tests
     {
-        std::any a = std::make_any<Type>({-1, 42, -1});
+        any a = std::make_any<Type>({-1, 42, -1});
         assertArgsMatch<Type, std::initializer_list<int>>(a);
     }
     {
         int x = 42;
-        std::any a  = std::make_any<Type>({-1, 42, -1}, x);
+        any a  = std::make_any<Type>({-1, 42, -1}, x);
         assertArgsMatch<Type, std::initializer_list<int>, int&>(a);
     }
 }

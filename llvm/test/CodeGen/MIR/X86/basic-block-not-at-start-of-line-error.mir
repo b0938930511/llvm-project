@@ -31,11 +31,11 @@ body: |
   ; CHECK: [[@LINE+1]]:8: basic block definition should be located at the start of the line
   less bb.1:
     $eax = MOV32r0 implicit-def dead $eflags
-    RET64 killed $eax
+    RETQ killed $eax
 
   bb.2.exit:
     liveins: $edi
 
     $eax = COPY killed $edi
-    RET64 killed $eax
+    RETQ killed $eax
 ...

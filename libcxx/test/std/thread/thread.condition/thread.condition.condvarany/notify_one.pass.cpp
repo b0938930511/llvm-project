@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// UNSUPPORTED: no-threads
+// UNSUPPORTED: libcpp-has-no-threads
+
 // ALLOW_RETRIES: 2
 
 // <condition_variable>

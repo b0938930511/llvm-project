@@ -106,8 +106,7 @@ function(clang_compile object_file source)
             -o "${object_file}"
             ${source_rpath}
     MAIN_DEPENDENCY ${source}
-    DEPENDS ${SOURCE_DEPS}
-    COMMAND_EXPAND_LISTS)
+    DEPENDS ${SOURCE_DEPS})
 endfunction()
 
 # On Darwin, there are no system-wide C++ headers and the just-built clang is

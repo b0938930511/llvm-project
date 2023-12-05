@@ -17,3 +17,4 @@ move.l	(dst2@GOTOFF,%a5), %d0
 ; INSTR: lea     (dst3@GOTPCREL,%pc), %a5
 ; FIXUP: fixup A - offset: 2, value: dst3@GOTPCREL, kind: FK_PCRel_2
 lea	(dst3@GOTPCREL,%pc), %a5
+

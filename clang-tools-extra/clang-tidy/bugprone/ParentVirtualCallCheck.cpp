@@ -17,7 +17,9 @@
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::bugprone {
+namespace clang {
+namespace tidy {
+namespace bugprone {
 
 using BasesVector = llvm::SmallVector<const CXXRecordDecl *, 5>;
 
@@ -26,11 +28,12 @@ static bool isParentOf(const CXXRecordDecl &Parent,
   if (Parent.getCanonicalDecl() == ThisClass.getCanonicalDecl())
     return true;
   const CXXRecordDecl *ParentCanonicalDecl = Parent.getCanonicalDecl();
-  return llvm::any_of(ThisClass.bases(), [=](const CXXBaseSpecifier &Base) {
-    auto *BaseDecl = Base.getType()->getAsCXXRecordDecl();
-    assert(BaseDecl);
-    return ParentCanonicalDecl == BaseDecl->getCanonicalDecl();
-  });
+  return ThisClass.bases_end() !=
+         llvm::find_if(ThisClass.bases(), [=](const CXXBaseSpecifier &Base) {
+           auto *BaseDecl = Base.getType()->getAsCXXRecordDecl();
+           assert(BaseDecl);
+           return ParentCanonicalDecl == BaseDecl->getCanonicalDecl();
+         });
 }
 
 static BasesVector getParentsByGrandParent(const CXXRecordDecl &GrandParent,
@@ -70,9 +73,11 @@ static std::string getNameAsString(const NamedDecl *Decl) {
 static std::string getExprAsString(const clang::Expr &E,
                                    clang::ASTContext &AC) {
   std::string Text = tooling::fixit::getText(E, AC).str();
-  llvm::erase_if(Text, [](char C) {
-    return llvm::isSpace(static_cast<unsigned char>(C));
-  });
+  Text.erase(
+      llvm::remove_if(
+          Text,
+          [](char C) { return llvm::isSpace(static_cast<unsigned char>(C)); }),
+      Text.end());
   return Text;
 }
 
@@ -145,4 +150,6 @@ void ParentVirtualCallCheck::check(const MatchFinder::MatchResult &Result) {
         getNameAsString(Parents.front()) + "::");
 }
 
-} // namespace clang::tidy::bugprone
+} // namespace bugprone
+} // namespace tidy
+} // namespace clang

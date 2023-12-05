@@ -122,7 +122,7 @@ void _dispatch_object_validate(dispatch_object_t object);
 
 int buf[1024];
 
-void libdispatch_leaked_data(void) {
+void libdispatch_leaked_data() {
   dispatch_data_t data = dispatch_data_create(buf, 1024,
                                               dispatch_get_main_queue(), ^{});
 }
@@ -132,7 +132,7 @@ void libdispatch_leaked_data(void) {
   // expected-note@-4{{Object leaked: object allocated and stored into 'data' is not referenced later in this execution path and has a retain count of +1}}
 #endif
 
-void libdispatch_dispatch_released_data(void) {
+void libdispatch_dispatch_released_data() {
   dispatch_data_t data = dispatch_data_create(buf, 1024,
                                               dispatch_get_main_queue(), ^{});
 #if !HAS_ARC
@@ -140,7 +140,7 @@ void libdispatch_dispatch_released_data(void) {
 #endif
 }
 
-void libdispatch_objc_released_data(void) {
+void libdispatch_objc_released_data() {
   dispatch_data_t data = dispatch_data_create(buf, 1024,
                                               dispatch_get_main_queue(), ^{});
 #if !HAS_ARC
@@ -148,7 +148,7 @@ void libdispatch_objc_released_data(void) {
 #endif
 }
 
-void libdispatch_leaked_retained_data(void) {
+void libdispatch_leaked_retained_data() {
   dispatch_data_t data = dispatch_data_create(buf, 1024,
                                               dispatch_get_main_queue(), ^{});
 #if !HAS_ARC

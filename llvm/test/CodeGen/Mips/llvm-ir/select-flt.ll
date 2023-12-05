@@ -189,7 +189,6 @@ define float @tst_select_fcmp_olt_float(float %x, float %y) {
 ; M2-LABEL: tst_select_fcmp_olt_float:
 ; M2:       # %bb.0: # %entry
 ; M2-NEXT:    c.olt.s $f12, $f14
-; M2-NEXT:    nop
 ; M2-NEXT:    bc1t $BB2_2
 ; M2-NEXT:    mov.s $f0, $f12
 ; M2-NEXT:  # %bb.1: # %entry
@@ -221,7 +220,6 @@ define float @tst_select_fcmp_olt_float(float %x, float %y) {
 ; M3-LABEL: tst_select_fcmp_olt_float:
 ; M3:       # %bb.0: # %entry
 ; M3-NEXT:    c.olt.s $f12, $f13
-; M3-NEXT:    nop
 ; M3-NEXT:    bc1t .LBB2_2
 ; M3-NEXT:    mov.s $f0, $f12
 ; M3-NEXT:  # %bb.1: # %entry
@@ -265,7 +263,6 @@ define float @tst_select_fcmp_ole_float(float %x, float %y) {
 ; M2-LABEL: tst_select_fcmp_ole_float:
 ; M2:       # %bb.0: # %entry
 ; M2-NEXT:    c.ole.s $f12, $f14
-; M2-NEXT:    nop
 ; M2-NEXT:    bc1t $BB3_2
 ; M2-NEXT:    mov.s $f0, $f12
 ; M2-NEXT:  # %bb.1: # %entry
@@ -297,7 +294,6 @@ define float @tst_select_fcmp_ole_float(float %x, float %y) {
 ; M3-LABEL: tst_select_fcmp_ole_float:
 ; M3:       # %bb.0: # %entry
 ; M3-NEXT:    c.ole.s $f12, $f13
-; M3-NEXT:    nop
 ; M3-NEXT:    bc1t .LBB3_2
 ; M3-NEXT:    mov.s $f0, $f12
 ; M3-NEXT:  # %bb.1: # %entry
@@ -341,7 +337,6 @@ define float @tst_select_fcmp_ogt_float(float %x, float %y) {
 ; M2-LABEL: tst_select_fcmp_ogt_float:
 ; M2:       # %bb.0: # %entry
 ; M2-NEXT:    c.ule.s $f12, $f14
-; M2-NEXT:    nop
 ; M2-NEXT:    bc1f $BB4_2
 ; M2-NEXT:    mov.s $f0, $f12
 ; M2-NEXT:  # %bb.1: # %entry
@@ -373,7 +368,6 @@ define float @tst_select_fcmp_ogt_float(float %x, float %y) {
 ; M3-LABEL: tst_select_fcmp_ogt_float:
 ; M3:       # %bb.0: # %entry
 ; M3-NEXT:    c.ule.s $f12, $f13
-; M3-NEXT:    nop
 ; M3-NEXT:    bc1f .LBB4_2
 ; M3-NEXT:    mov.s $f0, $f12
 ; M3-NEXT:  # %bb.1: # %entry
@@ -417,7 +411,6 @@ define float @tst_select_fcmp_oge_float(float %x, float %y) {
 ; M2-LABEL: tst_select_fcmp_oge_float:
 ; M2:       # %bb.0: # %entry
 ; M2-NEXT:    c.ult.s $f12, $f14
-; M2-NEXT:    nop
 ; M2-NEXT:    bc1f $BB5_2
 ; M2-NEXT:    mov.s $f0, $f12
 ; M2-NEXT:  # %bb.1: # %entry
@@ -449,7 +442,6 @@ define float @tst_select_fcmp_oge_float(float %x, float %y) {
 ; M3-LABEL: tst_select_fcmp_oge_float:
 ; M3:       # %bb.0: # %entry
 ; M3-NEXT:    c.ult.s $f12, $f13
-; M3-NEXT:    nop
 ; M3-NEXT:    bc1f .LBB5_2
 ; M3-NEXT:    mov.s $f0, $f12
 ; M3-NEXT:  # %bb.1: # %entry
@@ -493,7 +485,6 @@ define float @tst_select_fcmp_oeq_float(float %x, float %y) {
 ; M2-LABEL: tst_select_fcmp_oeq_float:
 ; M2:       # %bb.0: # %entry
 ; M2-NEXT:    c.eq.s $f12, $f14
-; M2-NEXT:    nop
 ; M2-NEXT:    bc1t $BB6_2
 ; M2-NEXT:    mov.s $f0, $f12
 ; M2-NEXT:  # %bb.1: # %entry
@@ -525,7 +516,6 @@ define float @tst_select_fcmp_oeq_float(float %x, float %y) {
 ; M3-LABEL: tst_select_fcmp_oeq_float:
 ; M3:       # %bb.0: # %entry
 ; M3-NEXT:    c.eq.s $f12, $f13
-; M3-NEXT:    nop
 ; M3-NEXT:    bc1t .LBB6_2
 ; M3-NEXT:    mov.s $f0, $f12
 ; M3-NEXT:  # %bb.1: # %entry
@@ -569,7 +559,6 @@ define float @tst_select_fcmp_one_float(float %x, float %y) {
 ; M2-LABEL: tst_select_fcmp_one_float:
 ; M2:       # %bb.0: # %entry
 ; M2-NEXT:    c.ueq.s $f12, $f14
-; M2-NEXT:    nop
 ; M2-NEXT:    bc1f $BB7_2
 ; M2-NEXT:    mov.s $f0, $f12
 ; M2-NEXT:  # %bb.1: # %entry
@@ -604,7 +593,6 @@ define float @tst_select_fcmp_one_float(float %x, float %y) {
 ; M3-LABEL: tst_select_fcmp_one_float:
 ; M3:       # %bb.0: # %entry
 ; M3-NEXT:    c.ueq.s $f12, $f13
-; M3-NEXT:    nop
 ; M3-NEXT:    bc1f .LBB7_2
 ; M3-NEXT:    mov.s $f0, $f12
 ; M3-NEXT:  # %bb.1: # %entry

@@ -15,7 +15,7 @@
 
 #include "msan_allocator.h"
 #include "sanitizer_common/sanitizer_common.h"
-#include "sanitizer_common/sanitizer_posix.h"
+
 namespace __msan {
 
 class MsanThread {
@@ -45,7 +45,6 @@ class MsanThread {
   MsanThreadLocalMallocStorage &malloc_storage() { return malloc_storage_; }
 
   int destructor_iterations_;
-  __sanitizer_sigset_t starting_sigset_;
 
  private:
   // NOTE: There is no MsanThread constructor. It is allocated

@@ -9,10 +9,9 @@
 #ifndef LLDB_INTERPRETER_OPTIONVALUEDICTIONARY_H
 #define LLDB_INTERPRETER_OPTIONVALUEDICTIONARY_H
 
-#include "lldb/Interpreter/OptionValue.h"
-#include "lldb/lldb-private-types.h"
+#include <map>
 
-#include "llvm/ADT/StringMap.h"
+#include "lldb/Interpreter/OptionValue.h"
 
 namespace lldb_private {
 
@@ -20,10 +19,8 @@ class OptionValueDictionary
     : public Cloneable<OptionValueDictionary, OptionValue> {
 public:
   OptionValueDictionary(uint32_t type_mask = UINT32_MAX,
-                        OptionEnumValues enum_values = OptionEnumValues(),
                         bool raw_value_dump = true)
-      : m_type_mask(type_mask), m_enum_values(enum_values),
-        m_raw_value_dump(raw_value_dump) {}
+      : m_type_mask(type_mask), m_raw_value_dump(raw_value_dump) {}
 
   ~OptionValueDictionary() override = default;
 
@@ -33,8 +30,6 @@ public:
 
   void DumpValue(const ExecutionContext *exe_ctx, Stream &strm,
                  uint32_t dump_mask) override;
-
-  llvm::json::Value ToJSON(const ExecutionContext *exe_ctx) override;
 
   Status
   SetValueFromString(llvm::StringRef value,
@@ -58,28 +53,29 @@ public:
 
   size_t GetNumValues() const { return m_values.size(); }
 
-  lldb::OptionValueSP GetValueForKey(llvm::StringRef key) const;
+  lldb::OptionValueSP GetValueForKey(ConstString key) const;
 
   lldb::OptionValueSP GetSubValue(const ExecutionContext *exe_ctx,
-                                  llvm::StringRef name,
+                                  llvm::StringRef name, bool will_modify,
                                   Status &error) const override;
 
   Status SetSubValue(const ExecutionContext *exe_ctx, VarSetOperationType op,
                      llvm::StringRef name, llvm::StringRef value) override;
 
-  bool SetValueForKey(llvm::StringRef key, const lldb::OptionValueSP &value_sp,
+  bool SetValueForKey(ConstString key,
+                      const lldb::OptionValueSP &value_sp,
                       bool can_replace = true);
 
-  bool DeleteValueForKey(llvm::StringRef key);
+  bool DeleteValueForKey(ConstString key);
 
   size_t GetArgs(Args &args) const;
 
   Status SetArgs(const Args &args, VarSetOperationType op);
 
 protected:
+  typedef std::map<ConstString, lldb::OptionValueSP> collection;
   uint32_t m_type_mask;
-  OptionEnumValues m_enum_values;
-  llvm::StringMap<lldb::OptionValueSP> m_values;
+  collection m_values;
   bool m_raw_value_dump;
 };
 

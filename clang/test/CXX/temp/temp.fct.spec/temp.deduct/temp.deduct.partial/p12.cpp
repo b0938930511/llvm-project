@@ -1,4 +1,5 @@
 // RUN: %clang_cc1 -std=c++11 -fsyntax-only -verify %s
+// expected-no-diagnostics
 
 // Note: Partial ordering of function templates containing template
 // parameter packs is independent of the number of deduced arguments
@@ -25,15 +26,3 @@ void test_h() {
   double &dr1 = h((int(*)(int, float&))0);
   double &dr2 = h((int(*)(int))0);
 }
-
-namespace test_j {
-
-template <int I> struct ref {};
-
-template <int... L> void map(ref<L>...);
-template <int head, int... tail> void map(ref<head> x, ref<tail>... xs); // expected-note {{here}}
-
-template void map<0, 1>(ref<0>, ref<1>);
-// expected-error@-1 {{explicit instantiation of undefined function template 'map'}}
-
-} // namespace test_j

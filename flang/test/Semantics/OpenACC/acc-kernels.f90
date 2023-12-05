@@ -1,4 +1,5 @@
-! RUN: %python %S/../test_errors.py %s %flang -fopenacc
+! RUN: %S/../test_errors.sh %s %t %flang -fopenacc
+! REQUIRES: shell
 
 ! Check OpenACC clause validity for the following construct and directive:
 !   2.5.3 Kernels
@@ -122,10 +123,10 @@ program openacc_kernels_validity
   !$acc kernels device_type(*)
   !$acc end kernels
 
-  !$acc kernels device_type(default)
+  !$acc kernels device_type(1)
   !$acc end kernels
 
-  !$acc kernels device_type(default, host)
+  !$acc kernels device_type(1, 3)
   !$acc end kernels
 
   !$acc kernels device_type(*) async wait num_gangs(8) num_workers(8) vector_length(128)
@@ -141,19 +142,6 @@ program openacc_kernels_validity
   !$acc kernels device_type(*) if(.TRUE.)
   do i = 1, N
     a(i) = 3.14
-  end do
-  !$acc end kernels
-
-  do i = 1, 100
-    !$acc kernels
-    !ERROR: CYCLE to construct outside of KERNELS construct is not allowed
-    if (i == 10) cycle
-    !$acc end kernels
-  end do
-
-  !$acc kernels
-  do i = 1, 100
-    if (i == 10) cycle
   end do
   !$acc end kernels
 

@@ -8,6 +8,9 @@
 
 // UNSUPPORTED: c++03, c++11, c++14
 
+// Throwing bad_optional_access is supported starting in macosx10.13
+// XFAIL: use_system_cxx_lib && target={{.+}}-apple-macosx10.{{9|10|11|12}} && !no-exceptions
+
 // <optional>
 //
 // template <class T>
@@ -22,32 +25,29 @@
 
 int main(int, char**)
 {
+    using std::optional;
+    using std::make_optional;
     {
-        int arr[10];
-        auto opt = std::make_optional(arr);
-        ASSERT_SAME_TYPE(decltype(opt), std::optional<int*>);
-        assert(*opt == arr);
+        int arr[10]; ((void)arr);
+        ASSERT_SAME_TYPE(decltype(make_optional(arr)), optional<int*>);
     }
     {
-        constexpr auto opt = std::make_optional(2);
-        ASSERT_SAME_TYPE(decltype(opt), const std::optional<int>);
+        constexpr auto opt = make_optional(2);
+        ASSERT_SAME_TYPE(decltype(opt), const optional<int>);
         static_assert(opt.value() == 2);
     }
     {
-        auto opt = std::make_optional(2);
-        ASSERT_SAME_TYPE(decltype(opt), std::optional<int>);
+        optional<int> opt = make_optional(2);
         assert(*opt == 2);
     }
     {
-        const std::string s = "123";
-        auto opt = std::make_optional(s);
-        ASSERT_SAME_TYPE(decltype(opt), std::optional<std::string>);
-        assert(*opt == "123");
+        std::string s("123");
+        optional<std::string> opt = make_optional(s);
+        assert(*opt == s);
     }
     {
-        std::unique_ptr<int> s = std::make_unique<int>(3);
-        auto opt = std::make_optional(std::move(s));
-        ASSERT_SAME_TYPE(decltype(opt), std::optional<std::unique_ptr<int>>);
+        std::unique_ptr<int> s(new int(3));
+        optional<std::unique_ptr<int>> opt = make_optional(std::move(s));
         assert(**opt == 3);
         assert(s == nullptr);
     }

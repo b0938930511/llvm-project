@@ -11,11 +11,9 @@ body:             |
   bb.0:
     liveins: $vgpr0_vgpr1
     ; GCN-LABEL: name: waitcnt_kill
-    ; GCN: liveins: $vgpr0_vgpr1
-    ; GCN-NEXT: {{  $}}
-    ; GCN-NEXT: S_WAITCNT 0
-    ; GCN-NEXT: $vgpr0 = GLOBAL_LOAD_DWORD $vgpr0_vgpr1, 0, 0, implicit $exec
-    ; GCN-NEXT: KILL $vgpr0
+    ; GCN: S_WAITCNT 0
+    ; GCN: $vgpr0 = GLOBAL_LOAD_DWORD $vgpr0_vgpr1, 0, 0, implicit $exec
+    ; GCN: KILL $vgpr0
     $vgpr0 = GLOBAL_LOAD_DWORD $vgpr0_vgpr1, 0, 0, implicit $exec
     KILL $vgpr0
 ...
@@ -28,11 +26,9 @@ body:             |
   bb.0:
     liveins: $vgpr0_vgpr1
     ; GCN-LABEL: name: waitcnt_implicit_def
-    ; GCN: liveins: $vgpr0_vgpr1
-    ; GCN-NEXT: {{  $}}
-    ; GCN-NEXT: S_WAITCNT 0
-    ; GCN-NEXT: $vgpr0 = GLOBAL_LOAD_DWORD $vgpr0_vgpr1, 0, 0, implicit $exec
-    ; GCN-NEXT: $vgpr0 = IMPLICIT_DEF
+    ; GCN: S_WAITCNT 0
+    ; GCN: $vgpr0 = GLOBAL_LOAD_DWORD $vgpr0_vgpr1, 0, 0, implicit $exec
+    ; GCN: $vgpr0 = IMPLICIT_DEF
     $vgpr0 = GLOBAL_LOAD_DWORD $vgpr0_vgpr1, 0, 0, implicit $exec
     $vgpr0 = IMPLICIT_DEF
 ...
@@ -45,11 +41,9 @@ body:             |
   bb.0:
     liveins: $vgpr0_vgpr1, $vgpr2
     ; GCN-LABEL: name: waitcnt_eh_label
-    ; GCN: liveins: $vgpr0_vgpr1, $vgpr2
-    ; GCN-NEXT: {{  $}}
-    ; GCN-NEXT: S_WAITCNT 0
-    ; GCN-NEXT: $vgpr0 = GLOBAL_LOAD_DWORD $vgpr0_vgpr1, 0, 0, implicit $exec
-    ; GCN-NEXT: EH_LABEL <mcsymbol Ltmp0>, implicit $vgpr0
+    ; GCN: S_WAITCNT 0
+    ; GCN: $vgpr0 = GLOBAL_LOAD_DWORD $vgpr0_vgpr1, 0, 0, implicit $exec
+    ; GCN: EH_LABEL <mcsymbol Ltmp0>, implicit $vgpr0
     $vgpr0 = GLOBAL_LOAD_DWORD $vgpr0_vgpr1, 0, 0, implicit $exec
     EH_LABEL <mcsymbol Ltmp0>, implicit $vgpr0
 
@@ -63,11 +57,9 @@ body:             |
   bb.0:
     liveins: $vgpr0_vgpr1, $vgpr2
     ; GCN-LABEL: name: waitcnt_cfi
-    ; GCN: liveins: $vgpr0_vgpr1, $vgpr2
-    ; GCN-NEXT: {{  $}}
-    ; GCN-NEXT: S_WAITCNT 0
-    ; GCN-NEXT: $vgpr0 = GLOBAL_LOAD_DWORD $vgpr0_vgpr1, 0, 0, implicit $exec
-    ; GCN-NEXT: CFI_INSTRUCTION offset $vgpr0_lo16, 16
+    ; GCN: S_WAITCNT 0
+    ; GCN: $vgpr0 = GLOBAL_LOAD_DWORD $vgpr0_vgpr1, 0, 0, implicit $exec
+    ; GCN: CFI_INSTRUCTION offset $vgpr0_lo16, 16
     $vgpr0 = GLOBAL_LOAD_DWORD $vgpr0_vgpr1, 0, 0, implicit $exec
     CFI_INSTRUCTION offset $vgpr0, 16
 

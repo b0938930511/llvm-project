@@ -9,9 +9,9 @@
 #include "lldb/Target/ThreadPlanStepInstruction.h"
 #include "lldb/Target/Process.h"
 #include "lldb/Target/RegisterContext.h"
+#include "lldb/Target/RegisterContext.h"
 #include "lldb/Target/StopInfo.h"
 #include "lldb/Target/Target.h"
-#include "lldb/Utility/LLDBLog.h"
 #include "lldb/Utility/Log.h"
 #include "lldb/Utility/Stream.h"
 
@@ -96,7 +96,7 @@ bool ThreadPlanStepInstruction::DoPlanExplainsStop(Event *event_ptr) {
 }
 
 bool ThreadPlanStepInstruction::IsPlanStale() {
-  Log *log = GetLog(LLDBLog::Step);
+  Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_STEP));
   Thread &thread = GetThread();
   StackID cur_frame_id = thread.GetStackFrameAtIndex(0)->GetStackID();
   if (cur_frame_id == m_stack_id) {
@@ -128,7 +128,7 @@ bool ThreadPlanStepInstruction::IsPlanStale() {
 bool ThreadPlanStepInstruction::ShouldStop(Event *event_ptr) {
   Thread &thread = GetThread();
   if (m_step_over) {
-    Log *log = GetLog(LLDBLog::Step);
+    Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_STEP));
     StackFrameSP cur_frame_sp = thread.GetStackFrameAtIndex(0);
     if (!cur_frame_sp) {
       LLDB_LOGF(
@@ -244,7 +244,7 @@ bool ThreadPlanStepInstruction::WillStop() { return true; }
 
 bool ThreadPlanStepInstruction::MischiefManaged() {
   if (IsPlanComplete()) {
-    Log *log = GetLog(LLDBLog::Step);
+    Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_STEP));
     LLDB_LOGF(log, "Completed single instruction step plan.");
     ThreadPlan::MischiefManaged();
     return true;

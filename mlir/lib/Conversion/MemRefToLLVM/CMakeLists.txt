@@ -15,8 +15,7 @@ add_mlir_conversion_library(MLIRMemRefToLLVM
   MLIRAnalysis
   MLIRDataLayoutInterfaces
   MLIRLLVMCommonConversion
-  MLIRMemRefDialect
-  MLIRMemRefUtils
-  MLIRLLVMDialect
+  MLIRMemRef
+  MLIRLLVMIR
   MLIRTransforms
   )

@@ -23,9 +23,6 @@ HWASAN_FLAG(bool, tag_in_free, true, "")
 HWASAN_FLAG(bool, print_stats, false, "")
 HWASAN_FLAG(bool, halt_on_error, true, "")
 HWASAN_FLAG(bool, atexit, false, "")
-HWASAN_FLAG(
-    bool, print_live_threads_info, true,
-    "If set, prints the remaining threads in report as an extra information.")
 
 // Test only flag to disable malloc/realloc/free memory tagging on startup.
 // Tagging can be reenabled with __hwasan_enable_allocator_tagging().
@@ -42,7 +39,7 @@ HWASAN_FLAG(
 
 HWASAN_FLAG(bool, free_checks_tail_magic, 1,
     "If set, free() will check the magic values "
-    "after the allocated object "
+    "to the right of the allocated object "
     "if the allocation size is not a divident of the granule size")
 HWASAN_FLAG(
     int, max_free_fill_size, 0,

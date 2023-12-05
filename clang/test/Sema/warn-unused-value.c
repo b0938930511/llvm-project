@@ -5,35 +5,35 @@
 int i = 0;
 int j = 0;
 
-void foo(void);
+void foo();
 
 // PR4806
-void pr4806(void) {
-  1,foo();          // expected-warning {{left operand of comma operator has no effect}}
+void pr4806() {
+  1,foo();          // expected-warning {{expression result unused}}
 
   // other
   foo();
   i;                // expected-warning {{expression result unused}}
 
-  i,foo();          // expected-warning {{left operand of comma operator has no effect}}
+  i,foo();          // expected-warning {{expression result unused}}
   foo(),i;          // expected-warning {{expression result unused}}
 
-  i,j,foo();        // expected-warning 2{{left operand of comma operator has no effect}}
-  i,foo(),j;        // expected-warning {{left operand of comma operator has no effect}} expected-warning {{expression result unused}}
-  foo(),i,j;        // expected-warning {{expression result unused}} expected-warning {{left operand of comma operator has no effect}}
+  i,j,foo();        // expected-warning {{expression result unused}} expected-warning {{expression result unused}}
+  i,foo(),j;        // expected-warning {{expression result unused}} expected-warning {{expression result unused}}
+  foo(),i,j;        // expected-warning {{expression result unused}} expected-warning {{expression result unused}}
 
   i++;
 
   i++,foo();
   foo(),i++;
 
-  i++,j,foo();      // expected-warning {{left operand of comma operator has no effect}}
+  i++,j,foo();      // expected-warning {{expression result unused}}
   i++,foo(),j;      // expected-warning {{expression result unused}}
   foo(),i++,j;      // expected-warning {{expression result unused}}
 
-  i,j++,foo();      // expected-warning {{left operand of comma operator has no effect}}
-  i,foo(),j++;      // expected-warning {{left operand of comma operator has no effect}}
-  foo(),i,j++;      // expected-warning {{left operand of comma operator has no effect}}
+  i,j++,foo();      // expected-warning {{expression result unused}}
+  i,foo(),j++;      // expected-warning {{expression result unused}}
+  foo(),i,j++;      // expected-warning {{expression result unused}}
 
   i++,j++,foo();
   i++,foo(),j++;
@@ -58,10 +58,10 @@ void pr4806(void) {
 }
 
 // Don't warn about unused '||', '&&' expressions that contain assignments.
-int test_logical_foo1(void);
-int test_logical_foo2(void);
-int test_logical_foo3(void);
-int test_logical_bar(void) {
+int test_logical_foo1();
+int test_logical_foo2();
+int test_logical_foo3();
+int test_logical_bar() {
   int x = 0;
   (x = test_logical_foo1()) ||  // no-warning
   (x = test_logical_foo2()) ||  // no-warning
@@ -85,7 +85,8 @@ struct s0 { int f0; };
 
 void f0(int a);
 void f1(struct s0 *a) {
-  f0((int)(a->f0 + 1, 10)); // expected-warning {{left operand of comma operator has no effect}}
+  // rdar://8139785
+  f0((int)(a->f0 + 1, 10)); // expected-warning {{expression result unused}}
 }
 
 void blah(int a);
@@ -98,14 +99,10 @@ void unevaluated_operands(void) {
   (void)_Generic(val++, default : 0); // expected-warning {{expression with side effects has no effect in an unevaluated context}}
   (void)_Alignof(val++);  // expected-warning {{expression with side effects has no effect in an unevaluated context}} expected-warning {{'_Alignof' applied to an expression is a GNU extension}}
 
-  // VLAs can have side effects so long as it's part of the type and not an
-  // expression, except for sizeof() where it can also have a side effect if
-  // the operand is of VLA type.
+  // VLAs can have side effects so long as it's part of the type and not
+  // an expression.
   (void)sizeof(int[++val]); // Ok
   (void)_Alignof(int[++val]); // Ok
-
-  int GH48010[val];
-  (void)sizeof(*(val = 1, &GH48010)); // Ok
 
   // Side effects as part of macro expansion are ok.
   GenTest(val++);

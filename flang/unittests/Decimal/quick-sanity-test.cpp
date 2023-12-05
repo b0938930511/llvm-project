@@ -53,8 +53,7 @@ void testReadback(float x, int flags) {
       ++expo;
     }
     if (q >= buffer && q < buffer + sizeof buffer) {
-      std::snprintf(q + result.length,
-          buffer + sizeof buffer - (q + result.length), "e%d", expo);
+      std::sprintf(q + result.length, "e%d", expo);
     }
     const char *p{q};
     auto rflags{ConvertDecimalToFloat(&p, &y, RoundNearest)};
@@ -62,15 +61,13 @@ void testReadback(float x, int flags) {
     if (!(x == x)) {
       if (y == y || *p != '\0' || (rflags & Invalid)) {
         u.x = y;
-        (failed(x) << " (NaN) " << flags << ": -> '" << result.str << "' -> 0x")
-                .write_hex(u.u)
-            << " '" << p << "' " << rflags << '\n';
+        failed(x) << " (NaN) " << flags << ": -> '" << result.str << "' -> 0x";
+        failed(x).write_hex(u.u) << " '" << p << "' " << rflags << '\n';
       }
     } else if (x != y || *p != '\0' || (rflags & Invalid)) {
-      u.x = x;
-      (failed(x) << ' ' << flags << ": -> '" << result.str << "' -> 0x")
-              .write_hex(u.u)
-          << " '" << p << "' " << rflags << '\n';
+      u.x = y;
+      failed(x) << ' ' << flags << ": -> '" << result.str << "' -> 0x";
+      failed(x).write_hex(u.u) << " '" << p << "' " << rflags << '\n';
     }
   }
 }

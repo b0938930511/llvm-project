@@ -12,3 +12,4 @@ ext.l	%d0
 ; CHECK:      ext.l  %d7
 ; CHECK-SAME: encoding: [0x48,0xc7]
 ext.l	%d7
+

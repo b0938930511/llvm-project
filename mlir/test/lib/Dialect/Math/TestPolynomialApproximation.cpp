@@ -11,11 +11,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
-#include "mlir/Dialect/Vector/IR/VectorOps.h"
-#include "mlir/Dialect/X86Vector/X86VectorDialect.h"
+#include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -23,21 +22,11 @@ using namespace mlir;
 
 namespace {
 struct TestMathPolynomialApproximationPass
-    : public PassWrapper<TestMathPolynomialApproximationPass, OperationPass<>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(
-      TestMathPolynomialApproximationPass)
-
-  TestMathPolynomialApproximationPass() = default;
-  TestMathPolynomialApproximationPass(
-      const TestMathPolynomialApproximationPass &pass)
-      : PassWrapper(pass) {}
-
-  void runOnOperation() override;
+    : public PassWrapper<TestMathPolynomialApproximationPass, FunctionPass> {
+  void runOnFunction() override;
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithDialect, math::MathDialect,
-                    vector::VectorDialect>();
-    if (enableAvx2)
-      registry.insert<x86vector::X86VectorDialect>();
+    registry
+        .insert<vector::VectorDialect, math::MathDialect, LLVM::LLVMDialect>();
   }
   StringRef getArgument() const final {
     return "test-math-polynomial-approximation";
@@ -45,20 +34,12 @@ struct TestMathPolynomialApproximationPass
   StringRef getDescription() const final {
     return "Test math polynomial approximations";
   }
-
-  Option<bool> enableAvx2{
-      *this, "enable-avx2",
-      llvm::cl::desc("Enable approximations that emit AVX2 intrinsics via the "
-                     "X86Vector dialect"),
-      llvm::cl::init(false)};
 };
-} // namespace
+} // end anonymous namespace
 
-void TestMathPolynomialApproximationPass::runOnOperation() {
+void TestMathPolynomialApproximationPass::runOnFunction() {
   RewritePatternSet patterns(&getContext());
-  MathPolynomialApproximationOptions approxOptions;
-  approxOptions.enableAvx2 = enableAvx2;
-  populateMathPolynomialApproximationPatterns(patterns, approxOptions);
+  populateMathPolynomialApproximationPatterns(patterns);
   (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
 }
 

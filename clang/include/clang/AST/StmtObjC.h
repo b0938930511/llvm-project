@@ -162,14 +162,8 @@ public:
 };
 
 /// Represents Objective-C's \@try ... \@catch ... \@finally statement.
-class ObjCAtTryStmt final
-    : public Stmt,
-      private llvm::TrailingObjects<ObjCAtTryStmt, Stmt *> {
-  friend TrailingObjects;
-  size_t numTrailingObjects(OverloadToken<Stmt *>) const {
-    return 1 + NumCatchStmts + HasFinally;
-  }
-
+class ObjCAtTryStmt : public Stmt {
+private:
   // The location of the @ in the \@try.
   SourceLocation AtTryLoc;
 
@@ -184,8 +178,10 @@ class ObjCAtTryStmt final
   /// The order of the statements in memory follows the order in the source,
   /// with the \@try body first, followed by the \@catch statements (if any)
   /// and, finally, the \@finally (if it exists).
-  Stmt **getStmts() { return getTrailingObjects<Stmt *>(); }
-  Stmt *const *getStmts() const { return getTrailingObjects<Stmt *>(); }
+  Stmt **getStmts() { return reinterpret_cast<Stmt **> (this + 1); }
+  const Stmt* const *getStmts() const {
+    return reinterpret_cast<const Stmt * const*> (this + 1);
+  }
 
   ObjCAtTryStmt(SourceLocation atTryLoc, Stmt *atTryStmt,
                 Stmt **CatchStmts, unsigned NumCatchStmts,
@@ -261,33 +257,12 @@ public:
   }
 
   child_range children() {
-    return child_range(
-        getStmts(), getStmts() + numTrailingObjects(OverloadToken<Stmt *>()));
+    return child_range(getStmts(),
+                       getStmts() + 1 + NumCatchStmts + HasFinally);
   }
 
   const_child_range children() const {
     return const_child_range(const_cast<ObjCAtTryStmt *>(this)->children());
-  }
-
-  using catch_stmt_iterator = CastIterator<ObjCAtCatchStmt>;
-  using const_catch_stmt_iterator = ConstCastIterator<ObjCAtCatchStmt>;
-  using catch_range = llvm::iterator_range<catch_stmt_iterator>;
-  using catch_const_range = llvm::iterator_range<const_catch_stmt_iterator>;
-
-  catch_stmt_iterator catch_stmts_begin() { return getStmts() + 1; }
-  catch_stmt_iterator catch_stmts_end() {
-    return catch_stmts_begin() + NumCatchStmts;
-  }
-  catch_range catch_stmts() {
-    return catch_range(catch_stmts_begin(), catch_stmts_end());
-  }
-
-  const_catch_stmt_iterator catch_stmts_begin() const { return getStmts() + 1; }
-  const_catch_stmt_iterator catch_stmts_end() const {
-    return catch_stmts_begin() + NumCatchStmts;
-  }
-  catch_const_range catch_stmts() const {
-    return catch_const_range(catch_stmts_begin(), catch_stmts_end());
   }
 };
 

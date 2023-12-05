@@ -11,14 +11,16 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::objc {
+namespace clang {
+namespace tidy {
+namespace objc {
 
 /// Finds implementations of -dealloc in Objective-C categories. The category
 /// implementation will override any dealloc in the class implementation,
 /// potentially causing issues.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/objc/dealloc-in-category.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/objc-dealloc-in-category.html
 class DeallocInCategoryCheck final : public ClangTidyCheck {
 public:
   DeallocInCategoryCheck(StringRef Name, ClangTidyContext *Context)
@@ -30,6 +32,8 @@ public:
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
 };
 
-} // namespace clang::tidy::objc
+} // namespace objc
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_OBJC_DEALLOCINCATEGORYCHECK_H

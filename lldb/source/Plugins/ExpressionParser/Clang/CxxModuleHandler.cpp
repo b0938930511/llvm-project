@@ -9,11 +9,9 @@
 #include "Plugins/ExpressionParser/Clang/CxxModuleHandler.h"
 #include "Plugins/TypeSystem/Clang/TypeSystemClang.h"
 
-#include "lldb/Utility/LLDBLog.h"
 #include "lldb/Utility/Log.h"
 #include "clang/Sema/Lookup.h"
 #include "llvm/Support/Error.h"
-#include <optional>
 
 using namespace lldb_private;
 using namespace clang;
@@ -140,7 +138,7 @@ getEqualLocalDeclContext(Sema &sema, DeclContext *foreign_ctxt) {
 
   // We currently only support building namespaces.
   if (foreign_ctxt->isNamespace()) {
-    NamedDecl *ns = llvm::cast<NamedDecl>(foreign_ctxt);
+    NamedDecl *ns = llvm::dyn_cast<NamedDecl>(foreign_ctxt);
     llvm::StringRef ns_name = ns->getName();
 
     auto lookup_result = emulateLookupInCtxt(sema, ns_name, *parent);
@@ -181,27 +179,27 @@ T *createDecl(ASTImporter &importer, Decl *from_d, Args &&... args) {
   return to_d;
 }
 
-std::optional<Decl *> CxxModuleHandler::tryInstantiateStdTemplate(Decl *d) {
-  Log *log = GetLog(LLDBLog::Expressions);
+llvm::Optional<Decl *> CxxModuleHandler::tryInstantiateStdTemplate(Decl *d) {
+  Log *log = lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_EXPRESSIONS);
 
   // If we don't have a template to instiantiate, then there is nothing to do.
   auto td = dyn_cast<ClassTemplateSpecializationDecl>(d);
   if (!td)
-    return std::nullopt;
+    return llvm::None;
 
   // We only care about templates in the std namespace.
   if (!td->getDeclContext()->isStdNamespace())
-    return std::nullopt;
+    return llvm::None;
 
   // We have a list of supported template names.
   if (!m_supported_templates.contains(td->getName()))
-    return std::nullopt;
+    return llvm::None;
 
   // Early check if we even support instantiating this template. We do this
   // before we import anything into the target AST.
   auto &foreign_args = td->getTemplateInstantiationArgs();
   if (!templateArgsAreSupported(foreign_args.asArray()))
-    return std::nullopt;
+    return llvm::None;
 
   // Find the local DeclContext that corresponds to the DeclContext of our
   // decl we want to import.
@@ -212,7 +210,7 @@ std::optional<Decl *> CxxModuleHandler::tryInstantiateStdTemplate(Decl *d) {
                    "Got error while searching equal local DeclContext for decl "
                    "'{1}':\n{0}",
                    td->getName());
-    return std::nullopt;
+    return llvm::None;
   }
 
   // Look up the template in our local context.
@@ -225,7 +223,7 @@ std::optional<Decl *> CxxModuleHandler::tryInstantiateStdTemplate(Decl *d) {
       break;
   }
   if (!new_class_template)
-    return std::nullopt;
+    return llvm::None;
 
   // Import the foreign template arguments.
   llvm::SmallVector<TemplateArgument, 4> imported_args;
@@ -237,10 +235,9 @@ std::optional<Decl *> CxxModuleHandler::tryInstantiateStdTemplate(Decl *d) {
       llvm::Expected<QualType> type = m_importer->Import(arg.getAsType());
       if (!type) {
         LLDB_LOG_ERROR(log, type.takeError(), "Couldn't import type: {0}");
-        return std::nullopt;
+        return llvm::None;
       }
-      imported_args.push_back(
-          TemplateArgument(*type, /*isNullPtr*/ false, arg.getIsDefaulted()));
+      imported_args.push_back(TemplateArgument(*type));
       break;
     }
     case TemplateArgument::Integral: {
@@ -249,10 +246,10 @@ std::optional<Decl *> CxxModuleHandler::tryInstantiateStdTemplate(Decl *d) {
           m_importer->Import(arg.getIntegralType());
       if (!type) {
         LLDB_LOG_ERROR(log, type.takeError(), "Couldn't import type: {0}");
-        return std::nullopt;
+        return llvm::None;
       }
-      imported_args.push_back(TemplateArgument(d->getASTContext(), integral,
-                                               *type, arg.getIsDefaulted()));
+      imported_args.push_back(
+          TemplateArgument(d->getASTContext(), integral, *type));
       break;
     }
     default:
@@ -289,7 +286,7 @@ std::optional<Decl *> CxxModuleHandler::tryInstantiateStdTemplate(Decl *d) {
   return result;
 }
 
-std::optional<Decl *> CxxModuleHandler::Import(Decl *d) {
+llvm::Optional<Decl *> CxxModuleHandler::Import(Decl *d) {
   if (!isValid())
     return {};
 

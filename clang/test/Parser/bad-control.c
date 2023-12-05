@@ -1,10 +1,10 @@
 /* RUN: %clang_cc1 -fsyntax-only -verify %s
 */
-void foo(void) { 
+void foo() { 
   break; /* expected-error {{'break' statement not in loop or switch statement}} */
 }
 
-void foo2(void) { 
+void foo2() { 
   continue; /* expected-error {{'continue' statement not in loop statement}} */
 }
 
@@ -15,10 +15,10 @@ int pr8880_9 (int first) {
   }
 }
 
-void pr8880_24(void) {
+void pr8880_24() {
   for (({break;});;); // expected-error {{'break' statement not in loop or switch statement}}
 }
 
-void pr8880_25(void) {
+void pr8880_25() {
   for (({continue;});;); // expected-error {{'continue' statement not in loop statement}}
 }

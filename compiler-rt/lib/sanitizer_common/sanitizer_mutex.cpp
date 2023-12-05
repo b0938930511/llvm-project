@@ -174,7 +174,7 @@ struct InternalDeadlockDetector {
     if (max_idx != MutexInvalid && !mutex_can_lock[max_idx][type]) {
       Printf("%s: internal deadlock: can't lock %s under %s mutex\n", SanitizerToolName,
              mutex_meta[type].name, mutex_meta[max_idx].name);
-      PrintMutexPC(locked[max_idx].pc);
+      PrintMutexPC(pc);
       CHECK(0);
     }
     locked[type].seq = ++sequence;

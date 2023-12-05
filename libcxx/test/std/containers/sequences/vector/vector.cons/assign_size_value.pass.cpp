@@ -18,10 +18,10 @@
 #include "min_allocator.h"
 #include "asan_testing.h"
 
-TEST_CONSTEXPR bool is6(int x) { return x == 6; }
+bool is6(int x) { return x == 6; }
 
 template <typename Vec>
-TEST_CONSTEXPR_CXX20 void test(Vec &v)
+void test ( Vec &v )
 {
     v.assign(5, 6);
     assert(v.size() == 5);
@@ -29,7 +29,8 @@ TEST_CONSTEXPR_CXX20 void test(Vec &v)
     assert(std::all_of(v.begin(), v.end(), is6));
 }
 
-TEST_CONSTEXPR_CXX20 bool tests() {
+int main(int, char**)
+{
     {
     typedef std::vector<int> V;
     V d1;
@@ -38,12 +39,7 @@ TEST_CONSTEXPR_CXX20 bool tests() {
     test(d1);
     test(d2);
     }
-    {
-    std::vector<int> vec;
-    vec.reserve(32);
-    vec.resize(16); // destruction during assign
-    test(vec);
-    }
+
 #if TEST_STD_VER >= 11
     {
     typedef std::vector<int, min_allocator<int>> V;
@@ -55,14 +51,5 @@ TEST_CONSTEXPR_CXX20 bool tests() {
     }
 #endif
 
-    return true;
-}
-
-int main(int, char**)
-{
-    tests();
-#if TEST_STD_VER > 17
-    static_assert(tests());
-#endif
-    return 0;
+  return 0;
 }

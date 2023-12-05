@@ -17,6 +17,7 @@
 #ifndef LLVM_ANALYSIS_DOMINANCEFRONTIERIMPL_H
 #define LLVM_ANALYSIS_DOMINANCEFRONTIERIMPL_H
 
+#include "llvm/ADT/GraphTraits.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Analysis/DominanceFrontier.h"
 #include "llvm/Config/llvm-config.h"
@@ -49,7 +50,7 @@ template <class BlockT, bool IsPostDom>
 void DominanceFrontierBase<BlockT, IsPostDom>::removeBlock(BlockT *BB) {
   assert(find(BB) != end() && "Block is not in DominanceFrontier!");
   for (iterator I = begin(), E = end(); I != E; ++I)
-    I->second.remove(BB);
+    I->second.erase(BB);
   Frontiers.erase(BB);
 }
 
@@ -57,7 +58,8 @@ template <class BlockT, bool IsPostDom>
 void DominanceFrontierBase<BlockT, IsPostDom>::addToFrontier(iterator I,
                                                              BlockT *Node) {
   assert(I != end() && "BB is not in DominanceFrontier!");
-  I->second.insert(Node);
+  assert(I->second.count(Node) && "Node is not in DominanceFrontier of BB");
+  I->second.erase(Node);
 }
 
 template <class BlockT, bool IsPostDom>
@@ -65,7 +67,7 @@ void DominanceFrontierBase<BlockT, IsPostDom>::removeFromFrontier(
     iterator I, BlockT *Node) {
   assert(I != end() && "BB is not in DominanceFrontier!");
   assert(I->second.count(Node) && "Node is not in DominanceFrontier of BB");
-  I->second.remove(Node);
+  I->second.erase(Node);
 }
 
 template <class BlockT, bool IsPostDom>
@@ -133,7 +135,7 @@ void DominanceFrontierBase<BlockT, IsPostDom>::print(raw_ostream &OS) const {
       OS << " <<exit node>>";
     OS << " is:\t";
 
-    const SetVector<BlockT *> &BBs = I->second;
+    const std::set<BlockT *> &BBs = I->second;
 
     for (const BlockT *BB : BBs) {
       OS << ' ';

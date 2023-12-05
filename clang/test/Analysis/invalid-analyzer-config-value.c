@@ -77,4 +77,4 @@
 
 // expected-no-diagnostics
 
-int main(void) {}
+int main() {}

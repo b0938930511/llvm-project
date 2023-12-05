@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14
+// XFAIL: libc++
 
 // <functional>
 
@@ -32,8 +33,8 @@
 
 
 #include <algorithm>
-#include <cassert>
 #include <functional>
+#include <cassert>
 
 #include "test_macros.h"
 #include "test_iterators.h"

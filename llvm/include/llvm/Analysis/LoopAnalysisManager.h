@@ -29,6 +29,7 @@
 #ifndef LLVM_ANALYSIS_LOOPANALYSISMANAGER_H
 #define LLVM_ANALYSIS_LOOPANALYSISMANAGER_H
 
+#include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/IR/PassManager.h"
 
 namespace llvm {
@@ -57,7 +58,6 @@ struct LoopStandardAnalysisResults {
   TargetLibraryInfo &TLI;
   TargetTransformInfo &TTI;
   BlockFrequencyInfo *BFI;
-  BranchProbabilityInfo *BPI;
   MemorySSA *MSSA;
 };
 
@@ -86,7 +86,7 @@ typedef InnerAnalysisManagerProxy<LoopAnalysisManager, Function>
 template <> class LoopAnalysisManagerFunctionProxy::Result {
 public:
   explicit Result(LoopAnalysisManager &InnerAM, LoopInfo &LI)
-      : InnerAM(&InnerAM), LI(&LI) {}
+      : InnerAM(&InnerAM), LI(&LI), MSSAUsed(false) {}
   Result(Result &&Arg)
       : InnerAM(std::move(Arg.InnerAM)), LI(Arg.LI), MSSAUsed(Arg.MSSAUsed) {
     // We have to null out the analysis manager in the moved-from state
@@ -135,7 +135,7 @@ public:
 private:
   LoopAnalysisManager *InnerAM;
   LoopInfo *LI;
-  bool MSSAUsed = false;
+  bool MSSAUsed;
 };
 
 /// Provide a specialized run method for the \c LoopAnalysisManagerFunctionProxy

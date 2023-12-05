@@ -24,7 +24,6 @@ add_clang_library(clangdSupport
   MemoryTree.cpp
   Path.cpp
   Shutdown.cpp
-  ThreadCrashReporter.cpp
   Threading.cpp
   ThreadsafeFS.cpp
   Trace.cpp

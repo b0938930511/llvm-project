@@ -1,5 +1,4 @@
-// RUN: %clang_cc1 -fsyntax-only -verify=expected,precxx17 %std_cxx11-14 %s
-// RUN: %clang_cc1 -fsyntax-only -verify=expected,cxx17 %std_cxx17- %s
+// RUN: %clang_cc1 -fsyntax-only -verify %s
 
 void f(int i, int j, int k = 3);
 void f(int i, int j, int k);
@@ -106,10 +105,10 @@ void test_Z(const Z& z) {
 struct ZZ {
   static ZZ g(int = 17);
 
-  void f(ZZ z = g()); // precxx17-error{{no matching constructor for initialization}} \
-  // precxx17-note{{passing argument to parameter 'z' here}}
+  void f(ZZ z = g()); // expected-error{{no matching constructor for initialization}} \
+  // expected-note{{passing argument to parameter 'z' here}}
 
-  ZZ(ZZ&, int = 17); // precxx17-note{{candidate constructor}}
+  ZZ(ZZ&, int = 17); // expected-note{{candidate constructor}}
 };
 
 // http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_active.html#325

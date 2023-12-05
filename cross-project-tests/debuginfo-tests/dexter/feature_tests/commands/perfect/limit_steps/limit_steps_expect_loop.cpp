@@ -2,8 +2,9 @@
 //      Check the DexLimit steps only gathers step info for 2 iterations of a
 //      for loop.
 //
-// RUN: %dexter_regression_test_build %s -o %t
-// RUN: %dexter_regression_test_run --binary %t -- %s | FileCheck %s
+// REQUIRES: system-linux
+//
+// RUN: %dexter_regression_test -- %s | FileCheck %s
 // CHECK: limit_steps_expect_loop.cpp:
 
 int main(const int argc, const char * argv[]) {

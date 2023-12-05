@@ -19,7 +19,7 @@ BOOL b;
 #define NO __objc_no
 #endif
 
-int main(void) {
+int main() {
   p("%d", b);
   p("%hd", b);
 #ifdef TYPE_CONF

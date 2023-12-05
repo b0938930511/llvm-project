@@ -14,6 +14,7 @@
 
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Identifier.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/TypeRange.h"
@@ -31,7 +32,7 @@ struct IntegerTypeStorage : public TypeStorage {
       : width(width), signedness(signedness) {}
 
   /// The hash key used for uniquing.
-  using KeyTy = std::tuple<unsigned, IntegerType::SignednessSemantics>;
+  using KeyTy = std::pair<unsigned, IntegerType::SignednessSemantics>;
 
   static llvm::hash_code hashKey(const KeyTy &key) {
     return llvm::hash_value(key);
@@ -44,10 +45,8 @@ struct IntegerTypeStorage : public TypeStorage {
   static IntegerTypeStorage *construct(TypeStorageAllocator &allocator,
                                        KeyTy key) {
     return new (allocator.allocate<IntegerTypeStorage>())
-        IntegerTypeStorage(std::get<0>(key), std::get<1>(key));
+        IntegerTypeStorage(key.first, key.second);
   }
-
-  KeyTy getAsKey() const { return KeyTy(width, signedness); }
 
   unsigned width : 30;
   IntegerType::SignednessSemantics signedness : 2;
@@ -61,7 +60,7 @@ struct FunctionTypeStorage : public TypeStorage {
         inputsAndResults(inputsAndResults) {}
 
   /// The hash key used for uniquing.
-  using KeyTy = std::tuple<TypeRange, TypeRange>;
+  using KeyTy = std::pair<TypeRange, TypeRange>;
   bool operator==(const KeyTy &key) const {
     if (std::get<0>(key) == getInputs())
       return std::get<1>(key) == getResults();
@@ -71,7 +70,7 @@ struct FunctionTypeStorage : public TypeStorage {
   /// Construction.
   static FunctionTypeStorage *construct(TypeStorageAllocator &allocator,
                                         const KeyTy &key) {
-    auto [inputs, results] = key;
+    TypeRange inputs = key.first, results = key.second;
 
     // Copy the inputs and results into the bump pointer.
     SmallVector<Type, 16> types;
@@ -92,8 +91,6 @@ struct FunctionTypeStorage : public TypeStorage {
     return ArrayRef<Type>(inputsAndResults + numInputs, numResults);
   }
 
-  KeyTy getAsKey() const { return KeyTy(getInputs(), getResults()); }
-
   unsigned numInputs;
   unsigned numResults;
   Type const *inputsAndResults;
@@ -112,8 +109,8 @@ struct TupleTypeStorage final
                                      TypeRange key) {
     // Allocate a new storage instance.
     auto byteSize = TupleTypeStorage::totalSizeToAlloc<Type>(key.size());
-    auto *rawMem = allocator.allocate(byteSize, alignof(TupleTypeStorage));
-    auto *result = ::new (rawMem) TupleTypeStorage(key.size());
+    auto rawMem = allocator.allocate(byteSize, alignof(TupleTypeStorage));
+    auto result = ::new (rawMem) TupleTypeStorage(key.size());
 
     // Copy in the element types into the trailing storage.
     std::uninitialized_copy(key.begin(), key.end(),
@@ -130,8 +127,6 @@ struct TupleTypeStorage final
   ArrayRef<Type> getTypes() const {
     return {getTrailingObjects<Type>(), size()};
   }
-
-  KeyTy getAsKey() const { return getTypes(); }
 
   /// The number of tuple elements.
   unsigned numElements;

@@ -1,1 +1,1 @@
-#define BARFOO void g(void);
+#define BARFOO void g();

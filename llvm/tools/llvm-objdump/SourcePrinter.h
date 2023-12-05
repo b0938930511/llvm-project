@@ -13,8 +13,6 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/DebugInfo/DWARF/DWARFContext.h"
 #include "llvm/DebugInfo/Symbolize/Symbolize.h"
-#include "llvm/MC/MCRegisterInfo.h"
-#include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/Support/FormattedStream.h"
 #include <unordered_map>
 #include <vector>
@@ -82,7 +80,7 @@ class LiveVariablePrinter {
 
 public:
   LiveVariablePrinter(const MCRegisterInfo &MRI, const MCSubtargetInfo &STI)
-      : ActiveCols(Column()), MRI(MRI), STI(STI) {}
+      : LiveVariables(), ActiveCols(Column()), MRI(MRI), STI(STI) {}
 
   void dump() const;
 
@@ -150,10 +148,6 @@ private:
   void printSources(formatted_raw_ostream &OS, const DILineInfo &LineInfo,
                     StringRef ObjectFilename, StringRef Delimiter,
                     LiveVariablePrinter &LVP);
-
-  // Returns line source code corresponding to `LineInfo`.
-  // Returns empty string if source code cannot be found.
-  StringRef getLine(const DILineInfo &LineInfo, StringRef ObjectFilename);
 
 public:
   SourcePrinter() = default;

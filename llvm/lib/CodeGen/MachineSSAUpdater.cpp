@@ -126,9 +126,7 @@ MachineInstrBuilder InsertNewDef(unsigned Opcode,
 }
 
 /// GetValueInMiddleOfBlock - Construct SSA form, materializing a value that
-/// is live in the middle of the specified block. If ExistingValueOnly is
-/// true then this will only return an existing value or $noreg; otherwise new
-/// instructions may be inserted to materialize a value.
+/// is live in the middle of the specified block.
 ///
 /// GetValueInMiddleOfBlock is the same as GetValueAtEndOfBlock except in one
 /// important case: if there is a definition of the rewritten value after the
@@ -145,18 +143,14 @@ MachineInstrBuilder InsertNewDef(unsigned Opcode,
 /// their respective blocks.  However, the use of X happens in the *middle* of
 /// a block.  Because of this, we need to insert a new PHI node in SomeBB to
 /// merge the appropriate values, and this value isn't live out of the block.
-Register MachineSSAUpdater::GetValueInMiddleOfBlock(MachineBasicBlock *BB,
-                                                    bool ExistingValueOnly) {
+Register MachineSSAUpdater::GetValueInMiddleOfBlock(MachineBasicBlock *BB) {
   // If there is no definition of the renamed variable in this block, just use
   // GetValueAtEndOfBlock to do our work.
   if (!HasValueForBlock(BB))
-    return GetValueAtEndOfBlockInternal(BB, ExistingValueOnly);
+    return GetValueAtEndOfBlockInternal(BB);
 
   // If there are no predecessors, just return undef.
   if (BB->pred_empty()) {
-    // If we cannot insert new instructions, just return $noreg.
-    if (ExistingValueOnly)
-      return Register();
     // Insert an implicit_def to represent an undef value.
     MachineInstr *NewDef = InsertNewDef(TargetOpcode::IMPLICIT_DEF,
                                         BB, BB->getFirstTerminator(),
@@ -171,7 +165,7 @@ Register MachineSSAUpdater::GetValueInMiddleOfBlock(MachineBasicBlock *BB,
 
   bool isFirstPred = true;
   for (MachineBasicBlock *PredBB : BB->predecessors()) {
-    Register PredVal = GetValueAtEndOfBlockInternal(PredBB, ExistingValueOnly);
+    Register PredVal = GetValueAtEndOfBlockInternal(PredBB);
     PredValues.push_back(std::make_pair(PredBB, PredVal));
 
     // Compute SingularValue.
@@ -190,10 +184,6 @@ Register MachineSSAUpdater::GetValueInMiddleOfBlock(MachineBasicBlock *BB,
   Register DupPHI = LookForIdenticalPHI(BB, PredValues);
   if (DupPHI)
     return DupPHI;
-
-  // If we cannot create new instructions, return $noreg now.
-  if (ExistingValueOnly)
-    return Register();
 
   // Otherwise, we do need a PHI: insert one now.
   MachineBasicBlock::iterator Loc = BB->empty() ? BB->end() : BB->begin();
@@ -360,13 +350,10 @@ public:
 /// for the specified BB and if so, return it.  If not, construct SSA form by
 /// first calculating the required placement of PHIs and then inserting new
 /// PHIs where needed.
-Register
-MachineSSAUpdater::GetValueAtEndOfBlockInternal(MachineBasicBlock *BB,
-                                                bool ExistingValueOnly) {
+Register MachineSSAUpdater::GetValueAtEndOfBlockInternal(MachineBasicBlock *BB){
   AvailableValsTy &AvailableVals = getAvailableVals(AV);
-  Register ExistingVal = AvailableVals.lookup(BB);
-  if (ExistingVal || ExistingValueOnly)
-    return ExistingVal;
+  if (Register V = AvailableVals[BB])
+    return V;
 
   SSAUpdaterImpl<MachineSSAUpdater> Impl(this, &AvailableVals, InsertedPHIs);
   return Impl.GetValue(BB);

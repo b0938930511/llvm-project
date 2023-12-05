@@ -39,16 +39,17 @@ STATISTIC(MCNumEmitted, "Number of MC instructions emitted");
 namespace {
 
 class VEMCCodeEmitter : public MCCodeEmitter {
+  const MCInstrInfo &MCII;
   MCContext &Ctx;
 
 public:
-  VEMCCodeEmitter(const MCInstrInfo &, MCContext &ctx)
-      : Ctx(ctx) {}
+  VEMCCodeEmitter(const MCInstrInfo &mcii, MCContext &ctx)
+      : MCII(mcii), Ctx(ctx) {}
   VEMCCodeEmitter(const VEMCCodeEmitter &) = delete;
   VEMCCodeEmitter &operator=(const VEMCCodeEmitter &) = delete;
   ~VEMCCodeEmitter() override = default;
 
-  void encodeInstruction(const MCInst &MI, SmallVectorImpl<char> &CB,
+  void encodeInstruction(const MCInst &MI, raw_ostream &OS,
                          SmallVectorImpl<MCFixup> &Fixups,
                          const MCSubtargetInfo &STI) const override;
 
@@ -73,16 +74,24 @@ public:
   uint64_t getRDOpValue(const MCInst &MI, unsigned OpNo,
                         SmallVectorImpl<MCFixup> &Fixups,
                         const MCSubtargetInfo &STI) const;
+
+private:
+  FeatureBitset computeAvailableFeatures(const FeatureBitset &FB) const;
+  void
+  verifyInstructionPredicates(const MCInst &MI,
+                              const FeatureBitset &AvailableFeatures) const;
 };
 
 } // end anonymous namespace
 
-void VEMCCodeEmitter::encodeInstruction(const MCInst &MI,
-                                        SmallVectorImpl<char> &CB,
+void VEMCCodeEmitter::encodeInstruction(const MCInst &MI, raw_ostream &OS,
                                         SmallVectorImpl<MCFixup> &Fixups,
                                         const MCSubtargetInfo &STI) const {
+  verifyInstructionPredicates(MI,
+                              computeAvailableFeatures(STI.getFeatureBits()));
+
   uint64_t Bits = getBinaryCodeForInstr(MI, Fixups, STI);
-  support::endian::write<uint64_t>(CB, Bits, llvm::endianness::little);
+  support::endian::write<uint64_t>(OS, Bits, support::little);
 
   ++MCNumEmitted; // Keep track of the # of mi's emitted.
 }
@@ -93,11 +102,11 @@ unsigned VEMCCodeEmitter::getMachineOpValue(const MCInst &MI,
                                             const MCSubtargetInfo &STI) const {
   if (MO.isReg())
     return Ctx.getRegisterInfo()->getEncodingValue(MO.getReg());
+
   if (MO.isImm())
-    return static_cast<unsigned>(MO.getImm());
+    return MO.getImm();
 
   assert(MO.isExpr());
-
   const MCExpr *Expr = MO.getExpr();
   if (const VEMCExpr *SExpr = dyn_cast<VEMCExpr>(Expr)) {
     MCFixupKind Kind = (MCFixupKind)SExpr->getFixupKind();
@@ -122,7 +131,7 @@ VEMCCodeEmitter::getBranchTargetOpValue(const MCInst &MI, unsigned OpNo,
     return getMachineOpValue(MI, MO, Fixups, STI);
 
   Fixups.push_back(
-      MCFixup::create(0, MO.getExpr(), (MCFixupKind)VE::fixup_ve_srel32));
+      MCFixup::create(0, MO.getExpr(), (MCFixupKind)VE::fixup_ve_pc_lo32));
   return 0;
 }
 
@@ -146,9 +155,11 @@ uint64_t VEMCCodeEmitter::getRDOpValue(const MCInst &MI, unsigned OpNo,
   return 0;
 }
 
+#define ENABLE_INSTR_PREDICATE_VERIFIER
 #include "VEGenMCCodeEmitter.inc"
 
 MCCodeEmitter *llvm::createVEMCCodeEmitter(const MCInstrInfo &MCII,
+                                           const MCRegisterInfo &MRI,
                                            MCContext &Ctx) {
   return new VEMCCodeEmitter(MCII, Ctx);
 }

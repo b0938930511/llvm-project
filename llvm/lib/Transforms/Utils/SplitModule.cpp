@@ -24,6 +24,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalAlias.h"
 #include "llvm/IR/GlobalObject.h"
+#include "llvm/IR/GlobalIndirectSymbol.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Instruction.h"
@@ -64,8 +65,9 @@ static void addNonConstUser(ClusterMapType &GVtoClusterMap,
   if (const Instruction *I = dyn_cast<Instruction>(U)) {
     const GlobalValue *F = I->getParent()->getParent();
     GVtoClusterMap.unionSets(GV, F);
-  } else if (const GlobalValue *GVU = dyn_cast<GlobalValue>(U)) {
-    GVtoClusterMap.unionSets(GV, GVU);
+  } else if (isa<GlobalIndirectSymbol>(U) || isa<Function>(U) ||
+             isa<GlobalVariable>(U)) {
+    GVtoClusterMap.unionSets(GV, cast<GlobalValue>(U));
   } else {
     llvm_unreachable("Underimplemented use case");
   }
@@ -74,7 +76,7 @@ static void addNonConstUser(ClusterMapType &GVtoClusterMap,
 // Adds all GlobalValue users of V to the same cluster as GV.
 static void addAllGlobalValueUsers(ClusterMapType &GVtoClusterMap,
                                    const GlobalValue *GV, const Value *V) {
-  for (const auto *U : V->users()) {
+  for (auto *U : V->users()) {
     SmallVector<const User *, 4> Worklist;
     Worklist.push_back(U);
     while (!Worklist.empty()) {
@@ -87,13 +89,6 @@ static void addAllGlobalValueUsers(ClusterMapType &GVtoClusterMap,
       addNonConstUser(GVtoClusterMap, GV, UU);
     }
   }
-}
-
-static const GlobalObject *getGVPartitioningRoot(const GlobalValue *GV) {
-  const GlobalObject *GO = GV->getAliaseeObject();
-  if (const auto *GI = dyn_cast_or_null<GlobalIFunc>(GO))
-    GO = GI->getResolverFunction();
-  return GO;
 }
 
 // Find partitions for module in the way that no locals need to be
@@ -128,11 +123,12 @@ static void findPartitions(Module &M, ClusterIDMapType &ClusterIDMap,
         Member = &GV;
     }
 
-    // Aliases should not be separated from their aliasees and ifuncs should
-    // not be separated from their resolvers regardless of linkage.
-    if (const GlobalObject *Root = getGVPartitioningRoot(&GV))
-      if (&GV != Root)
-        GVtoClusterMap.unionSets(&GV, Root);
+    // For aliases we should not separate them from their aliasees regardless
+    // of linkage.
+    if (auto *GIS = dyn_cast<GlobalIndirectSymbol>(&GV)) {
+      if (const GlobalObject *Base = GIS->getBaseObject())
+        GVtoClusterMap.unionSets(&GV, Base);
+    }
 
     if (const Function *F = dyn_cast<Function>(&GV)) {
       for (const BasicBlock &BB : *F) {
@@ -229,8 +225,9 @@ static void externalize(GlobalValue *GV) {
 
 // Returns whether GV should be in partition (0-based) I of N.
 static bool isInPartition(const GlobalValue *GV, unsigned I, unsigned N) {
-  if (const GlobalObject *Root = getGVPartitioningRoot(GV))
-    GV = Root;
+  if (auto *GIS = dyn_cast<GlobalIndirectSymbol>(GV))
+    if (const GlobalObject *Base = GIS->getBaseObject())
+      GV = Base;
 
   StringRef Name;
   if (const Comdat *C = GV->getComdat())

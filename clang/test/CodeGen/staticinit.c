@@ -1,4 +1,5 @@
-// RUN: %clang_cc1 -triple i386-pc-linux-gnu -emit-llvm -o - %s | FileCheck %s
+// RUN: %clang_cc1 -triple i386-pc-linux-gnu -emit-llvm -o %t %s
+// RUN: grep "g.b = internal global i8. getelementptr" %t
 
 struct AStruct { 
   int i;
@@ -6,7 +7,7 @@ struct AStruct {
   double d;
 };
 
-void f(void) {
+void f() {
   static int i = 42;
   static int is[] = { 1, 2, 3, 4 };
   static char* str = "forty-two";
@@ -14,8 +15,7 @@ void f(void) {
   static struct AStruct myStruct = { 1, "two", 3.0 };
 }
 
-// CHECK: @g.b = internal global ptr @g.a
-void g(void) {
+void g() {
   static char a[10];
   static char *b = a;
 }
@@ -26,7 +26,7 @@ void foo(void) {
   static struct s var = {((void*)&((char*)0)[0])};
 }
 
-// CHECK: @f1.l0 = internal global i32 ptrtoint (ptr @f1 to i32)
+// RUN: grep "f1.l0 = internal global i32 ptrtoint (i32 ()\* @f1 to i32)" %t
 int f1(void) { static int l0 = (unsigned) f1; }
 
 // PR7044

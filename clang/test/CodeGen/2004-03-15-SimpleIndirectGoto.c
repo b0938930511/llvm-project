@@ -17,7 +17,7 @@ void bar(int *pc) {
  end:
   return;
 }
-int main(void) {
+int main() {
   bar(code);
   return 0;
 }

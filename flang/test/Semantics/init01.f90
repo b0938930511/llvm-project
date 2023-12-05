@@ -1,4 +1,5 @@
-! RUN: %python %S/test_errors.py %s %flang_fc1
+! RUN: %S/test_errors.sh %s %t %flang_fc1
+! REQUIRES: shell
 ! Initializer error tests
 
 subroutine objectpointers(j)
@@ -46,8 +47,7 @@ subroutine dataobjects(j)
   real :: x10(2,3) = reshape([real::(k,k=1,6)], [3, 2])
 end subroutine
 
-subroutine components(n)
-  integer, intent(in) :: n
+subroutine components
   real, target, save :: a1(3)
   real, target :: a2
   real, save :: a3
@@ -65,7 +65,7 @@ subroutine components(n)
 !ERROR: Dimension 1 of initialized object has extent 2, but initialization expression has extent 3
     real :: x2(kind) = [1., 2., 3.]
 !ERROR: Dimension 1 of initialized object has extent 2, but initialization expression has extent 3
-!ERROR: Shape of initialized object 'x3' must be constant
+!ERROR: An automatic variable or component must not be initialized
     real :: x3(len) = [1., 2., 3.]
     real, pointer :: p1(:) => a1
 !ERROR: An initial data target may not be a reference to an object 'a2' that lacks the SAVE attribute
@@ -81,8 +81,8 @@ subroutine components(n)
 !ERROR: Pointer has rank 1 but target has rank 0
     real, pointer :: p5(:) => a4
   end type
-  type(t2(3,2)) :: o1
-  type(t2(2,n)) :: o2
+  type(t2(3,3)) :: o1
+  type(t2(2,2)) :: o2
   type :: t3
     real :: x
   end type
@@ -94,15 +94,4 @@ subroutine components(n)
       real, pointer :: p12 => a2
     end block
   end associate
-end subroutine
-
-subroutine notObjects
-!ERROR: 'x1' is not an object that can be initialized
-  real, external :: x1 = 1.
-!ERROR: 'x2' is not a pointer but is initialized like one
-  real, external :: x2 => sin
-!ERROR: 'x3' is not an object that can be initialized
-  real, intrinsic :: x3 = 1.
-!ERROR: 'x4' is not a pointer but is initialized like one
-  real, intrinsic :: x4 => cos
 end subroutine

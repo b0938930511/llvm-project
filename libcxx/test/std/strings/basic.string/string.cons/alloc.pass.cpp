@@ -8,7 +8,7 @@
 
 // <string>
 
-// explicit basic_string(const Allocator& a = Allocator()); // constexpr since C++20
+// explicit basic_string(const Allocator& a = Allocator());
 
 #include <string>
 #include <cassert>
@@ -18,12 +18,14 @@
 #include "min_allocator.h"
 
 template <class S>
-TEST_CONSTEXPR_CXX20 void test() {
-  {
+void
+test()
+{
+    {
 #if TEST_STD_VER > 14
-    static_assert((noexcept(S{})), "");
+    static_assert((noexcept(S{})), "" );
 #elif TEST_STD_VER >= 11
-    static_assert((noexcept(S()) == noexcept(typename S::allocator_type())), "");
+    static_assert((noexcept(S()) == noexcept(typename S::allocator_type())), "" );
 #endif
     S s;
     LIBCPP_ASSERT(s.__invariants());
@@ -31,14 +33,12 @@ TEST_CONSTEXPR_CXX20 void test() {
     assert(s.size() == 0);
     assert(s.capacity() >= s.size());
     assert(s.get_allocator() == typename S::allocator_type());
-  }
-  {
+    }
+    {
 #if TEST_STD_VER > 14
-    static_assert((noexcept(S{typename S::allocator_type{}})), "");
+    static_assert((noexcept(S{typename S::allocator_type{}})), "" );
 #elif TEST_STD_VER >= 11
-    static_assert((noexcept(S(typename S::allocator_type())) ==
-                   std::is_nothrow_copy_constructible<typename S::allocator_type>::value),
-                  "");
+    static_assert((noexcept(S(typename S::allocator_type())) == std::is_nothrow_copy_constructible<typename S::allocator_type>::value), "" );
 #endif
     S s(typename S::allocator_type(5));
     LIBCPP_ASSERT(s.__invariants());
@@ -46,59 +46,51 @@ TEST_CONSTEXPR_CXX20 void test() {
     assert(s.size() == 0);
     assert(s.capacity() >= s.size());
     assert(s.get_allocator() == typename S::allocator_type(5));
-  }
+    }
 }
 
 #if TEST_STD_VER >= 11
 
 template <class S>
-TEST_CONSTEXPR_CXX20 void test2() {
-  {
-#  if TEST_STD_VER > 14
-    static_assert((noexcept(S{})), "");
-#  elif TEST_STD_VER >= 11
-    static_assert((noexcept(S()) == noexcept(typename S::allocator_type())), "");
-#  endif
+void
+test2()
+{
+    {
+#if TEST_STD_VER > 14
+    static_assert((noexcept(S{})), "" );
+#elif TEST_STD_VER >= 11
+    static_assert((noexcept(S()) == noexcept(typename S::allocator_type())), "" );
+#endif
     S s;
     LIBCPP_ASSERT(s.__invariants());
     assert(s.data());
     assert(s.size() == 0);
     assert(s.capacity() >= s.size());
     assert(s.get_allocator() == typename S::allocator_type());
-  }
-  {
-#  if TEST_STD_VER > 14
-    static_assert((noexcept(S{typename S::allocator_type{}})), "");
-#  elif TEST_STD_VER >= 11
-    static_assert((noexcept(S(typename S::allocator_type())) ==
-                   std::is_nothrow_copy_constructible<typename S::allocator_type>::value),
-                  "");
-#  endif
+    }
+    {
+#if TEST_STD_VER > 14
+    static_assert((noexcept(S{typename S::allocator_type{}})), "" );
+#elif TEST_STD_VER >= 11
+    static_assert((noexcept(S(typename S::allocator_type())) == std::is_nothrow_copy_constructible<typename S::allocator_type>::value), "" );
+#endif
     S s(typename S::allocator_type{});
     LIBCPP_ASSERT(s.__invariants());
     assert(s.data());
     assert(s.size() == 0);
     assert(s.capacity() >= s.size());
     assert(s.get_allocator() == typename S::allocator_type());
-  }
+    }
 }
 
 #endif
 
-TEST_CONSTEXPR_CXX20 bool test() {
-  test<std::basic_string<char, std::char_traits<char>, test_allocator<char> > >();
+int main(int, char**)
+{
+    test<std::basic_string<char, std::char_traits<char>, test_allocator<char> > >();
 #if TEST_STD_VER >= 11
-  test2<std::basic_string<char, std::char_traits<char>, min_allocator<char> > >();
-  test2<std::basic_string<char, std::char_traits<char>, explicit_allocator<char> > >();
-#endif
-
-  return true;
-}
-
-int main(int, char**) {
-  test();
-#if TEST_STD_VER > 17
-  static_assert(test());
+    test2<std::basic_string<char, std::char_traits<char>, min_allocator<char> > >();
+    test2<std::basic_string<char, std::char_traits<char>, explicit_allocator<char> > >();
 #endif
 
   return 0;

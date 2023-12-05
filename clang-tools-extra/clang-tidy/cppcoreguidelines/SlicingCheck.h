@@ -11,7 +11,9 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::cppcoreguidelines {
+namespace clang {
+namespace tidy {
+namespace cppcoreguidelines {
 
 /// Flags slicing (incomplete copying of an object's state) of member variables
 /// or vtable. See:
@@ -21,7 +23,7 @@ namespace clang::tidy::cppcoreguidelines {
 ///     for the latter
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/cppcoreguidelines/slicing.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/cppcoreguidelines-slicing.html
 class SlicingCheck : public ClangTidyCheck {
 public:
   SlicingCheck(StringRef Name, ClangTidyContext *Context)
@@ -30,11 +32,13 @@ public:
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
 
 private:
-  void diagnoseSlicedOverriddenMethods(const Expr &Call,
+  void DiagnoseSlicedOverriddenMethods(const Expr &call,
                                        const CXXRecordDecl &DerivedDecl,
                                        const CXXRecordDecl &BaseDecl);
 };
 
-} // namespace clang::tidy::cppcoreguidelines
+} // namespace cppcoreguidelines
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_CPPCOREGUIDELINES_SLICING_H

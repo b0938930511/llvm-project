@@ -1,4 +1,4 @@
-//===-- runtime/stop.cpp --------------------------------------------------===//
+//===-- runtime/stop.cpp ----------------------------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,8 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "flang/Runtime/stop.h"
-#include "environment.h"
+#include "stop.h"
 #include "file.h"
 #include "io-error.h"
 #include "terminator.h"
@@ -53,9 +52,6 @@ static void CloseAllExternalUnits(const char *why) {
 [[noreturn]] void RTNAME(StopStatement)(
     int code, bool isErrorStop, bool quiet) {
   CloseAllExternalUnits("STOP statement");
-  if (Fortran::runtime::executionEnvironment.noStopMessage && code == 0) {
-    quiet = true;
-  }
   if (!quiet) {
     std::fprintf(stderr, "Fortran %s", isErrorStop ? "ERROR STOP" : "STOP");
     if (code != EXIT_SUCCESS) {
@@ -71,19 +67,11 @@ static void CloseAllExternalUnits(const char *why) {
     const char *code, std::size_t length, bool isErrorStop, bool quiet) {
   CloseAllExternalUnits("STOP statement");
   if (!quiet) {
-    if (Fortran::runtime::executionEnvironment.noStopMessage && !isErrorStop) {
-      std::fprintf(stderr, "%.*s\n", static_cast<int>(length), code);
-    } else {
-      std::fprintf(stderr, "Fortran %s: %.*s\n",
-          isErrorStop ? "ERROR STOP" : "STOP", static_cast<int>(length), code);
-    }
+    std::fprintf(stderr, "Fortran %s: %.*s\n",
+        isErrorStop ? "ERROR STOP" : "STOP", static_cast<int>(length), code);
     DescribeIEEESignaledExceptions();
   }
-  if (isErrorStop) {
-    std::exit(EXIT_FAILURE);
-  } else {
-    std::exit(EXIT_SUCCESS);
-  }
+  std::exit(EXIT_FAILURE);
 }
 
 static bool StartPause() {
@@ -135,20 +123,5 @@ void RTNAME(PauseStatementText)(const char *code, std::size_t length) {
 [[noreturn]] void RTNAME(ProgramEndStatement)() {
   CloseAllExternalUnits("END statement");
   std::exit(EXIT_SUCCESS);
-}
-
-[[noreturn]] void RTNAME(Exit)(int status) {
-  CloseAllExternalUnits("CALL EXIT()");
-  std::exit(status);
-}
-
-[[noreturn]] void RTNAME(Abort)() {
-  // TODO: Add backtrace call, unless with `-fno-backtrace`.
-  std::abort();
-}
-
-[[noreturn]] void RTNAME(ReportFatalUserError)(
-    const char *message, const char *source, int line) {
-  Fortran::runtime::Terminator{source, line}.Crash(message);
 }
 }

@@ -19,7 +19,7 @@
    to use it as a potentially faster version of BSF. */
 #define __RELAXED_FN_ATTRS __attribute__((__always_inline__, __nodebug__))
 
-#define _tzcnt_u16 __tzcnt_u16
+#define _tzcnt_u16(a)     (__tzcnt_u16((a)))
 
 /// Counts the number of trailing zero bits in the operand.
 ///
@@ -47,7 +47,6 @@ __tzcnt_u16(unsigned short __X)
 ///    An unsigned 32-bit integer whose trailing zeros are to be counted.
 /// \returns An unsigned 32-bit integer containing the number of trailing zero
 ///    bits in the operand.
-/// \see _mm_tzcnt_32
 static __inline__ unsigned int __RELAXED_FN_ATTRS
 __tzcnt_u32(unsigned int __X)
 {
@@ -64,14 +63,13 @@ __tzcnt_u32(unsigned int __X)
 ///    An unsigned 32-bit integer whose trailing zeros are to be counted.
 /// \returns An 32-bit integer containing the number of trailing zero bits in
 ///    the operand.
-/// \see __tzcnt_u32
 static __inline__ int __RELAXED_FN_ATTRS
 _mm_tzcnt_32(unsigned int __X)
 {
-  return (int)__builtin_ia32_tzcnt_u32(__X);
+  return __builtin_ia32_tzcnt_u32(__X);
 }
 
-#define _tzcnt_u32 __tzcnt_u32
+#define _tzcnt_u32(a)     (__tzcnt_u32((a)))
 
 #ifdef __x86_64__
 
@@ -85,7 +83,6 @@ _mm_tzcnt_32(unsigned int __X)
 ///    An unsigned 64-bit integer whose trailing zeros are to be counted.
 /// \returns An unsigned 64-bit integer containing the number of trailing zero
 ///    bits in the operand.
-/// \see _mm_tzcnt_64
 static __inline__ unsigned long long __RELAXED_FN_ATTRS
 __tzcnt_u64(unsigned long long __X)
 {
@@ -102,14 +99,13 @@ __tzcnt_u64(unsigned long long __X)
 ///    An unsigned 64-bit integer whose trailing zeros are to be counted.
 /// \returns An 64-bit integer containing the number of trailing zero bits in
 ///    the operand.
-/// \see __tzcnt_u64
 static __inline__ long long __RELAXED_FN_ATTRS
 _mm_tzcnt_64(unsigned long long __X)
 {
-  return (long long)__builtin_ia32_tzcnt_u64(__X);
+  return __builtin_ia32_tzcnt_u64(__X);
 }
 
-#define _tzcnt_u64 __tzcnt_u64
+#define _tzcnt_u64(a)     (__tzcnt_u64((a)))
 
 #endif /* __x86_64__ */
 
@@ -121,14 +117,14 @@ _mm_tzcnt_64(unsigned long long __X)
 /* Define the default attributes for the functions in this file. */
 #define __DEFAULT_FN_ATTRS __attribute__((__always_inline__, __nodebug__, __target__("bmi")))
 
-#define _andn_u32 __andn_u32
+#define _andn_u32(a, b)   (__andn_u32((a), (b)))
 
 /* _bextr_u32 != __bextr_u32 */
-#define _blsi_u32 __blsi_u32
+#define _blsi_u32(a)      (__blsi_u32((a)))
 
-#define _blsmsk_u32 __blsmsk_u32
+#define _blsmsk_u32(a)    (__blsmsk_u32((a)))
 
-#define _blsr_u32 __blsr_u32
+#define _blsr_u32(a)      (__blsr_u32((a)))
 
 /// Performs a bitwise AND of the second operand with the one's
 ///    complement of the first operand.
@@ -272,14 +268,14 @@ __blsr_u32(unsigned int __X)
 
 #ifdef __x86_64__
 
-#define _andn_u64 __andn_u64
+#define _andn_u64(a, b)   (__andn_u64((a), (b)))
 
 /* _bextr_u64 != __bextr_u64 */
-#define _blsi_u64 __blsi_u64
+#define _blsi_u64(a)      (__blsi_u64((a)))
 
-#define _blsmsk_u64 __blsmsk_u64
+#define _blsmsk_u64(a)    (__blsmsk_u64((a)))
 
-#define _blsr_u64 __blsr_u64
+#define _blsr_u64(a)      (__blsr_u64((a)))
 
 /// Performs a bitwise AND of the second operand with the one's
 ///    complement of the first operand.

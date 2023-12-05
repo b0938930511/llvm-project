@@ -12,12 +12,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "sanitizer_common/sanitizer_platform.h"
-#if SANITIZER_APPLE
+#if SANITIZER_MAC
 
 #include "sanitizer_common/sanitizer_errno.h"
 #include "tsan_interceptors.h"
 #include "tsan_stack_trace.h"
-#include "tsan_mman.h"
 
 using namespace __tsan;
 #define COMMON_MALLOC_ZONE_NAME "tsan"
@@ -30,30 +29,16 @@ using namespace __tsan;
       user_memalign(cur_thread(), StackTrace::GetCurrentPc(), alignment, size)
 #define COMMON_MALLOC_MALLOC(size)                             \
   if (in_symbolizer()) return InternalAlloc(size);             \
-  void *p = 0;                                                 \
-  {                                                            \
-    SCOPED_INTERCEPTOR_RAW(malloc, size);                      \
-    p = user_alloc(thr, pc, size);                             \
-  }                                                            \
-  invoke_malloc_hook(p, size)
+  SCOPED_INTERCEPTOR_RAW(malloc, size);                        \
+  void *p = user_alloc(thr, pc, size)
 #define COMMON_MALLOC_REALLOC(ptr, size)                              \
   if (in_symbolizer()) return InternalRealloc(ptr, size);             \
-  if (ptr)                                                            \
-    invoke_free_hook(ptr);                                            \
-  void *p = 0;                                                        \
-  {                                                                   \
-    SCOPED_INTERCEPTOR_RAW(realloc, ptr, size);                       \
-    p = user_realloc(thr, pc, ptr, size);                             \
-  }                                                                   \
-  invoke_malloc_hook(p, size)
+  SCOPED_INTERCEPTOR_RAW(realloc, ptr, size);                         \
+  void *p = user_realloc(thr, pc, ptr, size)
 #define COMMON_MALLOC_CALLOC(count, size)                              \
   if (in_symbolizer()) return InternalCalloc(count, size);             \
-  void *p = 0;                                                         \
-  {                                                                    \
-    SCOPED_INTERCEPTOR_RAW(calloc, size, count);                       \
-    p = user_calloc(thr, pc, size, count);                             \
-  }                                                                    \
-  invoke_malloc_hook(p, size * count)
+  SCOPED_INTERCEPTOR_RAW(calloc, size, count);                         \
+  void *p = user_calloc(thr, pc, size, count)
 #define COMMON_MALLOC_POSIX_MEMALIGN(memptr, alignment, size)      \
   if (in_symbolizer()) {                                           \
     void *p = InternalAlloc(size, nullptr, alignment);             \
@@ -70,7 +55,6 @@ using namespace __tsan;
   void *p = user_valloc(thr, pc, size)
 #define COMMON_MALLOC_FREE(ptr)                              \
   if (in_symbolizer()) return InternalFree(ptr);             \
-  invoke_free_hook(ptr);                                     \
   SCOPED_INTERCEPTOR_RAW(free, ptr);                         \
   user_free(thr, pc, ptr)
 #define COMMON_MALLOC_SIZE(ptr) uptr size = user_alloc_usable_size(ptr);

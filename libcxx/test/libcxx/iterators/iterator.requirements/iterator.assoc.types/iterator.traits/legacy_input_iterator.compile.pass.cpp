@@ -7,20 +7,17 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
-
-// This test uses iterator types from std::filesystem
-// XFAIL: availability-filesystem-missing
+// UNSUPPORTED: libcpp-no-concepts
+// UNSUPPORTED: gcc-10
 
 // template<class I>
 // concept __iterator_traits_detail::__cpp17_input_iterator;
-
-#include "test_macros.h"
 
 #include <iterator>
 
 #include <array>
 #include <deque>
-#ifndef TEST_HAS_NO_FILESYSTEM
+#ifndef _LIBCPP_HAS_NO_FILESYSTEM_LIBRARY
 #include <filesystem>
 #endif
 #include <forward_list>
@@ -61,7 +58,7 @@ static_assert(std::__iterator_traits_detail::__cpp17_input_iterator<std::deque<i
 static_assert(std::__iterator_traits_detail::__cpp17_input_iterator<std::deque<int>::const_reverse_iterator>);
 
 // <filesystem>
-#ifndef TEST_HAS_NO_FILESYSTEM
+#ifndef _LIBCPP_HAS_NO_FILESYSTEM_LIBRARY
 static_assert(std::__iterator_traits_detail::__cpp17_input_iterator<std::filesystem::directory_iterator>);
 static_assert(std::__iterator_traits_detail::__cpp17_input_iterator<std::filesystem::recursive_directory_iterator>);
 #endif

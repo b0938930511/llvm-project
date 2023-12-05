@@ -26,15 +26,11 @@ extern char
 COMPILER_RT_VISIBILITY
 extern char NamesEnd __asm("section$end$__DATA$" INSTR_PROF_NAME_SECT_NAME);
 COMPILER_RT_VISIBILITY
-extern char
+extern uint64_t
     CountersStart __asm("section$start$__DATA$" INSTR_PROF_CNTS_SECT_NAME);
 COMPILER_RT_VISIBILITY
-extern char CountersEnd __asm("section$end$__DATA$" INSTR_PROF_CNTS_SECT_NAME);
-COMPILER_RT_VISIBILITY
-extern char
-    BitmapStart __asm("section$start$__DATA$" INSTR_PROF_BITS_SECT_NAME);
-COMPILER_RT_VISIBILITY
-extern char BitmapEnd __asm("section$end$__DATA$" INSTR_PROF_BITS_SECT_NAME);
+extern uint64_t
+    CountersEnd __asm("section$end$__DATA$" INSTR_PROF_CNTS_SECT_NAME);
 COMPILER_RT_VISIBILITY
 extern uint32_t
     OrderFileStart __asm("section$start$__DATA$" INSTR_PROF_ORDERFILE_SECT_NAME);
@@ -57,13 +53,9 @@ const char *__llvm_profile_begin_names(void) { return &NamesStart; }
 COMPILER_RT_VISIBILITY
 const char *__llvm_profile_end_names(void) { return &NamesEnd; }
 COMPILER_RT_VISIBILITY
-char *__llvm_profile_begin_counters(void) { return &CountersStart; }
+uint64_t *__llvm_profile_begin_counters(void) { return &CountersStart; }
 COMPILER_RT_VISIBILITY
-char *__llvm_profile_end_counters(void) { return &CountersEnd; }
-COMPILER_RT_VISIBILITY
-char *__llvm_profile_begin_bitmap(void) { return &BitmapStart; }
-COMPILER_RT_VISIBILITY
-char *__llvm_profile_end_bitmap(void) { return &BitmapEnd; }
+uint64_t *__llvm_profile_end_counters(void) { return &CountersEnd; }
 COMPILER_RT_VISIBILITY
 uint32_t *__llvm_profile_begin_orderfile(void) { return &OrderFileStart; }
 

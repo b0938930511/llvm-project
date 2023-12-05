@@ -13,23 +13,20 @@
 #include "Symbols.h"
 #include "lld/Common/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Option/ArgList.h"
 #include <vector>
 
-namespace lld::coff {
-class COFFLinkerContext;
+namespace lld {
+namespace coff {
 
 // Logic for deciding what symbols to export, when exporting all
 // symbols for MinGW.
 class AutoExporter {
 public:
-  AutoExporter(COFFLinkerContext &ctx,
-               const llvm::DenseSet<StringRef> &manualExcludeSymbols);
+  AutoExporter();
 
   void addWholeArchive(StringRef path);
-  void addExcludedSymbol(StringRef symbol);
 
   llvm::StringSet<> excludeSymbols;
   llvm::StringSet<> excludeSymbolPrefixes;
@@ -37,15 +34,10 @@ public:
   llvm::StringSet<> excludeLibs;
   llvm::StringSet<> excludeObjects;
 
-  const llvm::DenseSet<StringRef> &manualExcludeSymbols;
-
   bool shouldExport(Defined *sym) const;
-
-private:
-  COFFLinkerContext &ctx;
 };
 
-void writeDefFile(StringRef name, const std::vector<Export> &exports);
+void writeDefFile(StringRef name);
 
 // The -wrap option is a feature to rename symbols so that you can write
 // wrappers for existing functions. If you pass `-wrap:foo`, all
@@ -61,11 +53,11 @@ struct WrappedSymbol {
   Symbol *wrap;
 };
 
-std::vector<WrappedSymbol> addWrappedSymbols(COFFLinkerContext &ctx,
-                                             llvm::opt::InputArgList &args);
+std::vector<WrappedSymbol> addWrappedSymbols(llvm::opt::InputArgList &args);
 
-void wrapSymbols(COFFLinkerContext &ctx, ArrayRef<WrappedSymbol> wrapped);
+void wrapSymbols(ArrayRef<WrappedSymbol> wrapped);
 
-} // namespace lld::coff
+} // namespace coff
+} // namespace lld
 
 #endif

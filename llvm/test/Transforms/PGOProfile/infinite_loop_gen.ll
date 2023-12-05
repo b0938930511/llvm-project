@@ -1,4 +1,4 @@
-; RUN: opt < %s -passes=pgo-instr-gen -S | FileCheck %s
+; RUN: opt < %s -pgo-instr-gen -S -o -   | FileCheck %s
 
 define void @foo() {
 entry:

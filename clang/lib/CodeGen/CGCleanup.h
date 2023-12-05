@@ -23,6 +23,7 @@ namespace llvm {
 class BasicBlock;
 class Value;
 class ConstantInt;
+class AllocaInst;
 }
 
 namespace clang {
@@ -241,7 +242,7 @@ class alignas(8) EHCleanupScope : public EHScope {
 
   /// An optional i1 variable indicating whether this cleanup has been
   /// activated yet.
-  Address ActiveFlag;
+  llvm::AllocaInst *ActiveFlag;
 
   /// Extra information required for cleanups that have resolved
   /// branches through them.  This has to be allocated on the side
@@ -289,8 +290,7 @@ public:
                  EHScopeStack::stable_iterator enclosingEH)
       : EHScope(EHScope::Cleanup, enclosingEH),
         EnclosingNormal(enclosingNormal), NormalBlock(nullptr),
-        ActiveFlag(Address::invalid()), ExtInfo(nullptr),
-        FixupDepth(fixupDepth) {
+        ActiveFlag(nullptr), ExtInfo(nullptr), FixupDepth(fixupDepth) {
     CleanupBits.IsNormalCleanup = isNormal;
     CleanupBits.IsEHCleanup = isEH;
     CleanupBits.IsActive = true;
@@ -320,13 +320,13 @@ public:
   bool isLifetimeMarker() const { return CleanupBits.IsLifetimeMarker; }
   void setLifetimeMarker() { CleanupBits.IsLifetimeMarker = true; }
 
-  bool hasActiveFlag() const { return ActiveFlag.isValid(); }
+  bool hasActiveFlag() const { return ActiveFlag != nullptr; }
   Address getActiveFlag() const {
-    return ActiveFlag;
+    return Address(ActiveFlag, CharUnits::One());
   }
   void setActiveFlag(Address Var) {
     assert(Var.getAlignment().isOne());
-    ActiveFlag = Var;
+    ActiveFlag = cast<llvm::AllocaInst>(Var.getPointer());
   }
 
   void setTestFlagInNormalCleanup() {

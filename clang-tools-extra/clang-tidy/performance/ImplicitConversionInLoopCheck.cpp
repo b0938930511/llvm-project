@@ -16,10 +16,12 @@
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::performance {
+namespace clang {
+namespace tidy {
+namespace performance {
 
 // Checks if the stmt is a ImplicitCastExpr with a CastKind that is not a NoOp.
-// The subtlety is that in some cases (user defined conversions), we can
+// The subtelty is that in some cases (user defined conversions), we can
 // get to ImplicitCastExpr inside each other, with the outer one a NoOp. In this
 // case we skip the first cast expr.
 static bool isNonTrivialImplicitCast(const Stmt *ST) {
@@ -80,12 +82,12 @@ void ImplicitConversionInLoopCheck::check(
   // is a reference. This situation is fine (it probably produces the same
   // code at the end).
   if (isNonTrivialImplicitCast(Materialized->getSubExpr()))
-    reportAndFix(Result.Context, VD, OperatorCall);
+    ReportAndFix(Result.Context, VD, OperatorCall);
 }
 
-void ImplicitConversionInLoopCheck::reportAndFix(const ASTContext *Context,
-                                                 const VarDecl *VD,
-                                                 const Expr *OperatorCall) {
+void ImplicitConversionInLoopCheck::ReportAndFix(
+    const ASTContext *Context, const VarDecl *VD,
+    const Expr *OperatorCall) {
   // We only match on const ref, so we should print a const ref version of the
   // type.
   QualType ConstType = OperatorCall->getType().withConst();
@@ -99,4 +101,6 @@ void ImplicitConversionInLoopCheck::reportAndFix(const ASTContext *Context,
   diag(VD->getBeginLoc(), Message) << VD << ConstRefType;
 }
 
-} // namespace clang::tidy::performance
+} // namespace performance
+} // namespace tidy
+} // namespace clang

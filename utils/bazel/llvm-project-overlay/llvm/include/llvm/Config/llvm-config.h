@@ -74,16 +74,16 @@
 #define LLVM_USE_PERF 0
 
 /* Major version of the LLVM API */
-/* #undef LLVM_VERSION_MAJOR */
+#define LLVM_VERSION_MAJOR 13
 
 /* Minor version of the LLVM API */
-/* #undef LLVM_VERSION_MINOR */
+#define LLVM_VERSION_MINOR 0
 
 /* Patch version of the LLVM API */
-/* #undef LLVM_VERSION_PATCH */
+#define LLVM_VERSION_PATCH 0
 
 /* LLVM version string */
-/* #undef LLVM_VERSION_STRING */
+#define LLVM_VERSION_STRING "13.0.0git"
 
 /* Whether LLVM records statistics for use with GetStatistics(),
  * PrintStatistics() or PrintStatisticsJSON()
@@ -93,11 +93,8 @@
 /* Define if we have z3 and want to build it */
 /* #undef LLVM_WITH_Z3 */
 
-/* Define if we have curl and want to use it */
-/* #undef LLVM_ENABLE_CURL */
-
-/* Define if we have cpp-httplib and want to use it */
-/* #undef LLVM_ENABLE_HTTPLIB */
+/* Define if LLVM was built with a dependency to the libtensorflow dynamic library */
+/* #undef LLVM_HAVE_TF_API */
 
 /* Define if LLVM was built with a dependency to the tensorflow compiler */
 /* #undef LLVM_HAVE_TF_AOT */
@@ -105,23 +102,13 @@
 /* Define to 1 if you have the <sysexits.h> header file. */
 /* HAVE_SYSEXITS_H defined in Bazel */
 
+/* Define to 1 to enable the experimental new pass manager by default */
+#define LLVM_ENABLE_NEW_PASS_MANAGER 0
+
 /* Define if the xar_open() function is supported this platform. */
 /* #undef HAVE_LIBXAR */
 
-/* Define if building libLLVM shared library */
-/* #undef LLVM_BUILD_LLVM_DYLIB */
-
-/* Define if building LLVM with BUILD_SHARED_LIBS */
-/* #undef LLVM_BUILD_SHARED_LIBS */
-
-/* Define if building LLVM with LLVM_FORCE_USE_OLD_TOOLCHAIN_LIBS */
-/* #undef LLVM_FORCE_USE_OLD_TOOLCHAIN ${LLVM_FORCE_USE_OLD_TOOLCHAIN} */
-
-/* Define if llvm_unreachable should be optimized with undefined behavior
- * in non assert builds */
-#define LLVM_UNREACHABLE_OPTIMIZE 1
-
-/* Define to 1 if you have the DIA SDK installed, and to 0 if you don't. */
-#define LLVM_ENABLE_DIA_SDK 0
+/* Whether Timers signpost passes in Xcode Instruments */
+#define LLVM_SUPPORT_XCODE_SIGNPOSTS 0
 
 #endif

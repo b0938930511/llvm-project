@@ -27,14 +27,13 @@ namespace {
 class Action : public clang::ASTFrontendAction {
 public:
   explicit Action(SymbolIndexManager &SymbolIndexMgr, bool MinimizeIncludePaths)
-      : SemaSource(new IncludeFixerSemaSource(SymbolIndexMgr,
-                                              MinimizeIncludePaths,
-                                              /*GenerateDiagnostics=*/false)) {}
+      : SemaSource(SymbolIndexMgr, MinimizeIncludePaths,
+                   /*GenerateDiagnostics=*/false) {}
 
   std::unique_ptr<clang::ASTConsumer>
   CreateASTConsumer(clang::CompilerInstance &Compiler,
                     StringRef InFile) override {
-    SemaSource->setFilePath(InFile);
+    SemaSource.setFilePath(InFile);
     return std::make_unique<clang::ASTConsumer>();
   }
 
@@ -52,8 +51,8 @@ public:
       CompletionConsumer = &Compiler->getCodeCompletionConsumer();
 
     Compiler->createSema(getTranslationUnitKind(), CompletionConsumer);
-    SemaSource->setCompilerInstance(Compiler);
-    Compiler->getSema().addExternalSource(SemaSource.get());
+    SemaSource.setCompilerInstance(Compiler);
+    Compiler->getSema().addExternalSource(&SemaSource);
 
     clang::ParseAST(Compiler->getSema(), Compiler->getFrontendOpts().ShowStats,
                     Compiler->getFrontendOpts().SkipFunctionBodies);
@@ -62,12 +61,12 @@ public:
   IncludeFixerContext
   getIncludeFixerContext(const clang::SourceManager &SourceManager,
                          clang::HeaderSearch &HeaderSearch) const {
-    return SemaSource->getIncludeFixerContext(SourceManager, HeaderSearch,
-                                              SemaSource->getMatchedSymbols());
+    return SemaSource.getIncludeFixerContext(SourceManager, HeaderSearch,
+                                             SemaSource.getMatchedSymbols());
   }
 
 private:
-  IntrusiveRefCntPtr<IncludeFixerSemaSource> SemaSource;
+  IncludeFixerSemaSource SemaSource;
 };
 
 } // namespace
@@ -246,7 +245,7 @@ clang::TypoCorrection IncludeFixerSemaSource::CorrectTypo(
     // parent_path.
     // FIXME: Don't rely on source text.
     const char *End = Source.end();
-    while (isAsciiIdentifierContinue(*End) || *End == ':')
+    while (isIdentifierBody(*End) || *End == ':')
       ++End;
 
     return std::string(Source.begin(), End);
@@ -307,19 +306,18 @@ std::string IncludeFixerSemaSource::minimizeInclude(
 
   // Get the FileEntry for the include.
   StringRef StrippedInclude = Include.trim("\"<>");
-  auto Entry =
-      SourceManager.getFileManager().getOptionalFileRef(StrippedInclude);
+  auto Entry = SourceManager.getFileManager().getFile(StrippedInclude);
 
   // If the file doesn't exist return the path from the database.
   // FIXME: This should never happen.
   if (!Entry)
     return std::string(Include);
 
-  bool IsAngled = false;
+  bool IsSystem = false;
   std::string Suggestion =
-      HeaderSearch.suggestPathToFileForDiagnostics(*Entry, "", &IsAngled);
+      HeaderSearch.suggestPathToFileForDiagnostics(*Entry, "", &IsSystem);
 
-  return IsAngled ? '<' + Suggestion + '>' : '"' + Suggestion + '"';
+  return IsSystem ? '<' + Suggestion + '>' : '"' + Suggestion + '"';
 }
 
 /// Get the include fixer context for the queried symbol.

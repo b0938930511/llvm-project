@@ -41,7 +41,7 @@ struct D {
 
 @end
 
-int main(void) {
+int main() {
   id xx = [[Car alloc] init]; // expected-warning {{incompatible types assigning 'int' to 'id'}}
 
   [xx method:4];

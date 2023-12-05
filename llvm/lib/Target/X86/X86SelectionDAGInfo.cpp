@@ -46,7 +46,7 @@ bool X86SelectionDAGInfo::isBaseRegConflictPossible(
 
 SDValue X86SelectionDAGInfo::EmitTargetCodeForMemset(
     SelectionDAG &DAG, const SDLoc &dl, SDValue Chain, SDValue Dst, SDValue Val,
-    SDValue Size, Align Alignment, bool isVolatile, bool AlwaysInline,
+    SDValue Size, Align Alignment, bool isVolatile,
     MachinePointerInfo DstPtrInfo) const {
   ConstantSDNode *ConstantSize = dyn_cast<ConstantSDNode>(Size);
   const X86Subtarget &Subtarget =
@@ -67,15 +67,47 @@ SDValue X86SelectionDAGInfo::EmitTargetCodeForMemset(
   // The libc version is likely to be faster for these cases. It can use the
   // address value and run time information about the CPU.
   if (Alignment < Align(4) || !ConstantSize ||
-      ConstantSize->getZExtValue() > Subtarget.getMaxInlineSizeThreshold()) 
+      ConstantSize->getZExtValue() > Subtarget.getMaxInlineSizeThreshold()) {
+    // Check to see if there is a specialized entry-point for memory zeroing.
+    ConstantSDNode *ValC = dyn_cast<ConstantSDNode>(Val);
+
+    if (const char *bzeroName = (ValC && ValC->isNullValue())
+        ? DAG.getTargetLoweringInfo().getLibcallName(RTLIB::BZERO)
+        : nullptr) {
+      const TargetLowering &TLI = DAG.getTargetLoweringInfo();
+      EVT IntPtr = TLI.getPointerTy(DAG.getDataLayout());
+      Type *IntPtrTy = DAG.getDataLayout().getIntPtrType(*DAG.getContext());
+      TargetLowering::ArgListTy Args;
+      TargetLowering::ArgListEntry Entry;
+      Entry.Node = Dst;
+      Entry.Ty = IntPtrTy;
+      Args.push_back(Entry);
+      Entry.Node = Size;
+      Args.push_back(Entry);
+
+      TargetLowering::CallLoweringInfo CLI(DAG);
+      CLI.setDebugLoc(dl)
+          .setChain(Chain)
+          .setLibCallee(CallingConv::C, Type::getVoidTy(*DAG.getContext()),
+                        DAG.getExternalSymbol(bzeroName, IntPtr),
+                        std::move(Args))
+          .setDiscardResult();
+
+      std::pair<SDValue,SDValue> CallResult = TLI.LowerCallTo(CLI);
+      return CallResult.second;
+    }
+
+    // Otherwise have the target-independent code call memset.
     return SDValue();
+  }
 
   uint64_t SizeVal = ConstantSize->getZExtValue();
-  SDValue InGlue;
+  SDValue InFlag;
   EVT AVT;
   SDValue Count;
+  ConstantSDNode *ValC = dyn_cast<ConstantSDNode>(Val);
   unsigned BytesLeft = 0;
-  if (auto *ValC = dyn_cast<ConstantSDNode>(Val)) {
+  if (ValC) {
     unsigned ValReg;
     uint64_t Val = ValC->getZExtValue() & 255;
 
@@ -110,25 +142,25 @@ SDValue X86SelectionDAGInfo::EmitTargetCodeForMemset(
     }
 
     Chain = DAG.getCopyToReg(Chain, dl, ValReg, DAG.getConstant(Val, dl, AVT),
-                             InGlue);
-    InGlue = Chain.getValue(1);
+                             InFlag);
+    InFlag = Chain.getValue(1);
   } else {
     AVT = MVT::i8;
     Count  = DAG.getIntPtrConstant(SizeVal, dl);
-    Chain  = DAG.getCopyToReg(Chain, dl, X86::AL, Val, InGlue);
-    InGlue = Chain.getValue(1);
+    Chain  = DAG.getCopyToReg(Chain, dl, X86::AL, Val, InFlag);
+    InFlag = Chain.getValue(1);
   }
 
   bool Use64BitRegs = Subtarget.isTarget64BitLP64();
   Chain = DAG.getCopyToReg(Chain, dl, Use64BitRegs ? X86::RCX : X86::ECX,
-                           Count, InGlue);
-  InGlue = Chain.getValue(1);
+                           Count, InFlag);
+  InFlag = Chain.getValue(1);
   Chain = DAG.getCopyToReg(Chain, dl, Use64BitRegs ? X86::RDI : X86::EDI,
-                           Dst, InGlue);
-  InGlue = Chain.getValue(1);
+                           Dst, InFlag);
+  InFlag = Chain.getValue(1);
 
   SDVTList Tys = DAG.getVTList(MVT::Other, MVT::Glue);
-  SDValue Ops[] = { Chain, DAG.getValueType(AVT), InGlue };
+  SDValue Ops[] = { Chain, DAG.getValueType(AVT), InFlag };
   Chain = DAG.getNode(X86ISD::REP_STOS, dl, Tys, Ops);
 
   if (BytesLeft) {
@@ -142,8 +174,7 @@ SDValue X86SelectionDAGInfo::EmitTargetCodeForMemset(
                       DAG.getNode(ISD::ADD, dl, AddrVT, Dst,
                                   DAG.getConstant(Offset, dl, AddrVT)),
                       Val, DAG.getConstant(BytesLeft, dl, SizeVT), Alignment,
-                      isVolatile, AlwaysInline,
-                      /* isTailCall */ false, DstPtrInfo.getWithOffset(Offset));
+                      isVolatile, false, DstPtrInfo.getWithOffset(Offset));
   }
 
   // TODO: Use a Tokenfactor, as in memcpy, instead of a single chain.
@@ -159,16 +190,16 @@ static SDValue emitRepmovs(const X86Subtarget &Subtarget, SelectionDAG &DAG,
   const unsigned DI = Use64BitRegs ? X86::RDI : X86::EDI;
   const unsigned SI = Use64BitRegs ? X86::RSI : X86::ESI;
 
-  SDValue InGlue;
-  Chain = DAG.getCopyToReg(Chain, dl, CX, Size, InGlue);
-  InGlue = Chain.getValue(1);
-  Chain = DAG.getCopyToReg(Chain, dl, DI, Dst, InGlue);
-  InGlue = Chain.getValue(1);
-  Chain = DAG.getCopyToReg(Chain, dl, SI, Src, InGlue);
-  InGlue = Chain.getValue(1);
+  SDValue InFlag;
+  Chain = DAG.getCopyToReg(Chain, dl, CX, Size, InFlag);
+  InFlag = Chain.getValue(1);
+  Chain = DAG.getCopyToReg(Chain, dl, DI, Dst, InFlag);
+  InFlag = Chain.getValue(1);
+  Chain = DAG.getCopyToReg(Chain, dl, SI, Src, InFlag);
+  InFlag = Chain.getValue(1);
 
   SDVTList Tys = DAG.getVTList(MVT::Other, MVT::Glue);
-  SDValue Ops[] = {Chain, DAG.getValueType(AVT), InGlue};
+  SDValue Ops[] = {Chain, DAG.getValueType(AVT), InFlag};
   return DAG.getNode(X86ISD::REP_MOVS, dl, Tys, Ops);
 }
 
@@ -182,8 +213,7 @@ static SDValue emitRepmovsB(const X86Subtarget &Subtarget, SelectionDAG &DAG,
 
 /// Returns the best type to use with repmovs depending on alignment.
 static MVT getOptimalRepmovsType(const X86Subtarget &Subtarget,
-                                 Align Alignment) {
-  uint64_t Align = Alignment.value();
+                                 uint64_t Align) {
   assert((Align != 0) && "Align is normalized");
   assert(isPowerOf2_64(Align) && "Align is a power of 2");
   switch (Align) {
@@ -205,7 +235,7 @@ static MVT getOptimalRepmovsType(const X86Subtarget &Subtarget,
 static SDValue emitConstantSizeRepmov(
     SelectionDAG &DAG, const X86Subtarget &Subtarget, const SDLoc &dl,
     SDValue Chain, SDValue Dst, SDValue Src, uint64_t Size, EVT SizeVT,
-    Align Alignment, bool isVolatile, bool AlwaysInline,
+    unsigned Align, bool isVolatile, bool AlwaysInline,
     MachinePointerInfo DstPtrInfo, MachinePointerInfo SrcPtrInfo) {
 
   /// TODO: Revisit next line: big copy with ERMSB on march >= haswell are very
@@ -220,10 +250,10 @@ static SDValue emitConstantSizeRepmov(
   assert(!Subtarget.hasERMSB() && "No efficient RepMovs");
   /// We assume runtime memcpy will do a better job for unaligned copies when
   /// ERMS is not present.
-  if (!AlwaysInline && (Alignment.value() & 3) != 0)
+  if (!AlwaysInline && (Align & 3) != 0)
     return SDValue();
 
-  const MVT BlockType = getOptimalRepmovsType(Subtarget, Alignment);
+  const MVT BlockType = getOptimalRepmovsType(Subtarget, Align);
   const uint64_t BlockBytes = BlockType.getSizeInBits() / 8;
   const uint64_t BlockCount = Size / BlockBytes;
   const uint64_t BytesLeft = Size % BlockBytes;
@@ -252,7 +282,7 @@ static SDValue emitConstantSizeRepmov(
       Chain, dl,
       DAG.getNode(ISD::ADD, dl, DstVT, Dst, DAG.getConstant(Offset, dl, DstVT)),
       DAG.getNode(ISD::ADD, dl, SrcVT, Src, DAG.getConstant(Offset, dl, SrcVT)),
-      DAG.getConstant(BytesLeft, dl, SizeVT), Alignment, isVolatile,
+      DAG.getConstant(BytesLeft, dl, SizeVT), llvm::Align(Align), isVolatile,
       /*AlwaysInline*/ true, /*isTailCall*/ false,
       DstPtrInfo.getWithOffset(Offset), SrcPtrInfo.getWithOffset(Offset)));
   return DAG.getNode(ISD::TokenFactor, dl, MVT::Other, Results);
@@ -282,10 +312,10 @@ SDValue X86SelectionDAGInfo::EmitTargetCodeForMemcpy(
 
   /// Handle constant sizes,
   if (ConstantSDNode *ConstantSize = dyn_cast<ConstantSDNode>(Size))
-    return emitConstantSizeRepmov(DAG, Subtarget, dl, Chain, Dst, Src,
-                                  ConstantSize->getZExtValue(),
-                                  Size.getValueType(), Alignment, isVolatile,
-                                  AlwaysInline, DstPtrInfo, SrcPtrInfo);
+    return emitConstantSizeRepmov(
+        DAG, Subtarget, dl, Chain, Dst, Src, ConstantSize->getZExtValue(),
+        Size.getValueType(), Alignment.value(), isVolatile, AlwaysInline,
+        DstPtrInfo, SrcPtrInfo);
 
   return SDValue();
 }

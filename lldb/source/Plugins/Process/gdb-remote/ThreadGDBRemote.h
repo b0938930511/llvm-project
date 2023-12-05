@@ -115,9 +115,6 @@ protected:
   void SetStopInfoFromPacket(StringExtractor &stop_packet, uint32_t stop_id);
 
   bool CalculateStopInfo() override;
-
-  llvm::Expected<std::unique_ptr<llvm::MemoryBuffer>>
-  GetSiginfo(size_t max_size) const override;
 };
 
 } // namespace process_gdb_remote

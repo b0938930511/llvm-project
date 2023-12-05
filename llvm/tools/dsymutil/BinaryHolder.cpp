@@ -168,21 +168,24 @@ BinaryHolder::ArchiveEntry::getObjectEntry(StringRef Filename,
   StringRef ArchiveFilename;
   StringRef ObjectFilename;
   std::tie(ArchiveFilename, ObjectFilename) = getArchiveAndObjectName(Filename);
-  KeyTy Key = {ObjectFilename, Timestamp};
 
   // Try the cache first.
-  std::lock_guard<std::mutex> Lock(MemberCacheMutex);
-  if (MemberCache.count(Key))
-    return *MemberCache[Key];
+  KeyTy Key = {ObjectFilename, Timestamp};
+
+  {
+    std::lock_guard<std::mutex> Lock(MemberCacheMutex);
+    if (MemberCache.count(Key))
+      return MemberCache[Key];
+  }
 
   // Create a new ObjectEntry, but don't add it to the cache yet. Loading of
   // the archive members might fail and we don't want to lock the whole archive
   // during this operation.
-  auto OE = std::make_unique<ObjectEntry>();
+  ObjectEntry OE;
 
   for (const auto &Archive : Archives) {
     Error Err = Error::success();
-    for (const auto &Child : Archive->children(Err)) {
+    for (auto Child : Archive->children(Err)) {
       if (auto NameOrErr = Child.getName()) {
         if (*NameOrErr == ObjectFilename) {
           auto ModTimeOrErr = Child.getLastModified();
@@ -213,7 +216,7 @@ BinaryHolder::ArchiveEntry::getObjectEntry(StringRef Filename,
           if (!ErrOrObjectFile)
             return ErrOrObjectFile.takeError();
 
-          OE->Objects.push_back(std::move(*ErrOrObjectFile));
+          OE.Objects.push_back(std::move(*ErrOrObjectFile));
         }
       }
     }
@@ -221,11 +224,12 @@ BinaryHolder::ArchiveEntry::getObjectEntry(StringRef Filename,
       return std::move(Err);
   }
 
-  if (OE->Objects.empty())
+  if (OE.Objects.empty())
     return errorCodeToError(errc::no_such_file_or_directory);
 
-  MemberCache[Key] = std::move(OE);
-  return *MemberCache[Key];
+  std::lock_guard<std::mutex> Lock(MemberCacheMutex);
+  MemberCache.try_emplace(Key, std::move(OE));
+  return MemberCache[Key];
 }
 
 Expected<const BinaryHolder::ObjectEntry &>
@@ -238,20 +242,19 @@ BinaryHolder::getObjectEntry(StringRef Filename, TimestampTy Timestamp) {
   if (isArchive(Filename)) {
     StringRef ArchiveFilename = getArchiveAndObjectName(Filename).first;
     std::lock_guard<std::mutex> Lock(ArchiveCacheMutex);
-    ArchiveRefCounter[ArchiveFilename]++;
     if (ArchiveCache.count(ArchiveFilename)) {
-      return ArchiveCache[ArchiveFilename]->getObjectEntry(Filename, Timestamp,
-                                                           Verbose);
+      return ArchiveCache[ArchiveFilename].getObjectEntry(Filename, Timestamp,
+                                                          Verbose);
     } else {
-      auto AE = std::make_unique<ArchiveEntry>();
-      auto Err = AE->load(VFS, Filename, Timestamp, Verbose);
+      ArchiveEntry &AE = ArchiveCache[ArchiveFilename];
+      auto Err = AE.load(VFS, Filename, Timestamp, Verbose);
       if (Err) {
+        ArchiveCache.erase(ArchiveFilename);
         // Don't return the error here: maybe the file wasn't an archive.
         llvm::consumeError(std::move(Err));
       } else {
-        ArchiveCache[ArchiveFilename] = std::move(AE);
-        return ArchiveCache[ArchiveFilename]->getObjectEntry(
-            Filename, Timestamp, Verbose);
+        return ArchiveCache[ArchiveFilename].getObjectEntry(Filename, Timestamp,
+                                                            Verbose);
       }
     }
   }
@@ -259,16 +262,16 @@ BinaryHolder::getObjectEntry(StringRef Filename, TimestampTy Timestamp) {
   // If this is an object, we might have it cached. If not we'll have to load
   // it from the file system and cache it now.
   std::lock_guard<std::mutex> Lock(ObjectCacheMutex);
-  ObjectRefCounter[Filename]++;
   if (!ObjectCache.count(Filename)) {
-    auto OE = std::make_unique<ObjectEntry>();
-    auto Err = OE->load(VFS, Filename, Timestamp, Verbose);
-    if (Err)
+    ObjectEntry &OE = ObjectCache[Filename];
+    auto Err = OE.load(VFS, Filename, Timestamp, Verbose);
+    if (Err) {
+      ObjectCache.erase(Filename);
       return std::move(Err);
-    ObjectCache[Filename] = std::move(OE);
+    }
   }
 
-  return *ObjectCache[Filename];
+  return ObjectCache[Filename];
 }
 
 void BinaryHolder::clear() {
@@ -276,25 +279,6 @@ void BinaryHolder::clear() {
   std::lock_guard<std::mutex> ObjectLock(ObjectCacheMutex);
   ArchiveCache.clear();
   ObjectCache.clear();
-}
-
-void BinaryHolder::eraseObjectEntry(StringRef Filename) {
-  if (Verbose)
-    WithColor::note() << "erasing '" << Filename << "' from cache\n";
-
-  if (isArchive(Filename)) {
-    StringRef ArchiveFilename = getArchiveAndObjectName(Filename).first;
-    std::lock_guard<std::mutex> Lock(ArchiveCacheMutex);
-    ArchiveRefCounter[ArchiveFilename]--;
-    if (ArchiveRefCounter[ArchiveFilename] == 0)
-      ArchiveCache.erase(ArchiveFilename);
-    return;
-  }
-
-  std::lock_guard<std::mutex> Lock(ObjectCacheMutex);
-  ObjectRefCounter[Filename]--;
-  if (ObjectRefCounter[Filename] == 0)
-    ObjectCache.erase(Filename);
 }
 
 } // namespace dsymutil

@@ -2,10 +2,10 @@
 
 // expected-no-diagnostics
 
-id _Nonnull conjure_nonnull(void);
+id _Nonnull conjure_nonnull();
 void use_nullable(_Nullable id x);
 
-id _Nonnull foo(void) {
+id _Nonnull foo() {
   void *j = conjure_nonnull();
   use_nullable(j);
   return j; // no-warning

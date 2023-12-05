@@ -27,7 +27,7 @@ CRT_FE_ROUND_MODE __attribute__((weak)) __arm_fe_default_rmode =
     CRT_FE_TONEAREST;
 #endif
 
-CRT_FE_ROUND_MODE __fe_getround(void) {
+CRT_FE_ROUND_MODE __fe_getround() {
 #ifdef __ARM_FP
   uint32_t fpscr;
   __asm__ __volatile__("vmrs  %0, fpscr" : "=r" (fpscr));
@@ -48,7 +48,7 @@ CRT_FE_ROUND_MODE __fe_getround(void) {
 #endif
 }
 
-int __fe_raise_inexact(void) {
+int __fe_raise_inexact() {
 #ifdef __ARM_FP
   uint32_t fpscr;
   __asm__ __volatile__("vmrs  %0, fpscr" : "=r" (fpscr));

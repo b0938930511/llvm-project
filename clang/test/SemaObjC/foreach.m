@@ -11,11 +11,13 @@ void f(NSArray *a) {
   
   /* This should be ok, 'thisKey' should be scoped to the loop in question,
    * and no diagnostics even in pedantic mode should happen.
+   * rdar://6814674
    */
   for (id thisKey in keys); /* expected-warning {{unused variable 'thisKey'}} */
   for (id thisKey in keys); /* expected-warning {{unused variable 'thisKey'}} */
 }
 
+/* // rdar://9072298 */
 @protocol NSObject @end
 
 @interface NSObject <NSObject> {
@@ -36,7 +38,7 @@ typedef struct {
 
 @end
 
-int main (void)
+int main ()
 {
  NSObject<NSFastEnumeration>* collection = ((void*)0);
  for (id thing in collection) { } /* expected-warning {{unused variable 'thing'}} */
@@ -44,6 +46,7 @@ int main (void)
  return 0;
 }
 
+/* rdar://problem/11068137 */
 @interface Test2
 @property (assign) id prop;
 @end
@@ -53,7 +56,7 @@ void test2(NSObject<NSFastEnumeration> *collection) {
   }
 }
 
-int cond(void);
+int cond();
 
 void test3(NSObject<NSFastEnumeration> *a0, NSObject<NSFastEnumeration> *a1) {
   for (id i in a0) { /* expected-note 2 {{jump enters Objective-C fast enumeration loop}} */

@@ -14,7 +14,6 @@
 #ifndef TOY_COMBINE
 #define TOY_COMBINE
 
-include "mlir/IR/PatternBase.td"
 include "toy/Ops.td"
 
 /// Note: The DRR definition used for defining patterns is shown below:
@@ -22,7 +21,6 @@ include "toy/Ops.td"
 /// class Pattern<
 ///    dag sourcePattern, list<dag> resultPatterns,
 ///    list<dag> additionalConstraints = [],
-//     list<dag> supplementalPatterns = [],
 ///    dag benefitsAdded = (addBenefit 0)
 /// >;
 
@@ -43,7 +41,7 @@ def ReshapeReshapeOptPattern : Pat<(ReshapeOp(ReshapeOp $arg)),
 
 // Reshape(Constant(x)) = x'
 def ReshapeConstant :
-  NativeCodeCall<"$0.reshape(::llvm::cast<ShapedType>($1.getType()))">;
+  NativeCodeCall<"$0.reshape(($1.getType()).cast<ShapedType>())">;
 def FoldConstantReshapeOptPattern : Pat<
   (ReshapeOp:$res (ConstantOp $arg)),
   (ConstantOp (ReshapeConstant $arg, $res))>;

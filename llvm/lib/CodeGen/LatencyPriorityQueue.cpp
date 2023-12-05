@@ -73,9 +73,11 @@ void LatencyPriorityQueue::push(SUnit *SU) {
   // Look at all of the successors of this node.  Count the number of nodes that
   // this node is the sole unscheduled node for.
   unsigned NumNodesBlocking = 0;
-  for (const SDep &Succ : SU->Succs)
-    if (getSingleUnscheduledPred(Succ.getSUnit()) == SU)
+  for (SUnit::const_succ_iterator I = SU->Succs.begin(), E = SU->Succs.end();
+       I != E; ++I) {
+    if (getSingleUnscheduledPred(I->getSUnit()) == SU)
       ++NumNodesBlocking;
+  }
   NumNodesSolelyBlocking[SU->NodeNum] = NumNodesBlocking;
 
   Queue.push_back(SU);

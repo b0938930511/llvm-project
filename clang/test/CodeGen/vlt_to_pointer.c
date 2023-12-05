@@ -17,7 +17,7 @@ int test(int n, int (*(*fn)(void))[n]) {
 }
 
 // CHECK-LABEL: @main
-int main(void)
+int main()
 {
     int m = 3;
     int (*d)[3*2] = c;

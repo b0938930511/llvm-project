@@ -2,6 +2,6 @@
 
    struct fu;
    void foo(struct fu);
-   void bar(void) {
+   void bar() {
       foo;
    }

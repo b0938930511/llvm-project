@@ -27,9 +27,9 @@ body: |
 
   bb.1.less:
     $eax = MOV32r0 implicit-def $eflags
-    RET64 $eax
+    RETQ $eax
 
   bb.2.exit:
     $eax = COPY $edi
-    RET64 $eax
+    RETQ $eax
 ...

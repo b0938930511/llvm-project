@@ -5,10 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-///
-/// \file
-/// This file defines the DenseMap class.
-///
+//
+// This file defines the DenseMap class.
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef LLVM_ADT_DENSEMAP_H
@@ -95,7 +94,9 @@ public:
     return makeConstIterator(getBucketsEnd(), getBucketsEnd(), *this, true);
   }
 
-  [[nodiscard]] bool empty() const { return getNumEntries() == 0; }
+  LLVM_NODISCARD bool empty() const {
+    return getNumEntries() == 0;
+  }
   unsigned size() const { return getNumEntries(); }
 
   /// Grow the densemap so that it can contain at least \p NumEntries items
@@ -135,21 +136,15 @@ public:
         }
       }
       assert(NumEntries == 0 && "Node count imbalance!");
-      (void)NumEntries;
     }
     setNumEntries(0);
     setNumTombstones(0);
   }
 
-  /// Return true if the specified key is in the map, false otherwise.
-  bool contains(const_arg_type_t<KeyT> Val) const {
-    const BucketT *TheBucket;
-    return LookupBucketFor(Val, TheBucket);
-  }
-
   /// Return 1 if the specified key is in the map, 0 otherwise.
   size_type count(const_arg_type_t<KeyT> Val) const {
-    return contains(Val) ? 1 : 0;
+    const BucketT *TheBucket;
+    return LookupBucketFor(Val, TheBucket) ? 1 : 0;
   }
 
   iterator find(const_arg_type_t<KeyT> Val) {
@@ -204,14 +199,6 @@ public:
     if (LookupBucketFor(Val, TheBucket))
       return TheBucket->getSecond();
     return ValueT();
-  }
-
-  /// at - Return the entry for the specified key, or abort if no such
-  /// entry exists.
-  const ValueT &at(const_arg_type_t<KeyT> Val) const {
-    auto Iter = this->find(std::move(Val));
-    assert(Iter != this->end() && "DenseMap::at failed due to a missing key");
-    return Iter->second;
   }
 
   // Inserts key,value pair into the map if the key isn't already in the map.
@@ -310,20 +297,6 @@ public:
   void insert(InputIt I, InputIt E) {
     for (; I != E; ++I)
       insert(*I);
-  }
-
-  /// Returns the value associated to the key in the map if it exists. If it
-  /// does not exist, emplace a default value for the key and returns a
-  /// reference to the newly created value.
-  ValueT &getOrInsertDefault(KeyT &&Key) {
-    return try_emplace(Key).first->second;
-  }
-
-  /// Returns the value associated to the key in the map if it exists. If it
-  /// does not exist, emplace a default value for the key and returns a
-  /// reference to the newly created value.
-  ValueT &getOrInsertDefault(const KeyT &Key) {
-    return try_emplace(Key).first->second;
   }
 
   bool erase(const KeyT &Val) {
@@ -932,8 +905,6 @@ class SmallDenseMap
 
 public:
   explicit SmallDenseMap(unsigned NumInitBuckets = 0) {
-    if (NumInitBuckets > InlineBuckets)
-      NumInitBuckets = llvm::bit_ceil(NumInitBuckets);
     init(NumInitBuckets);
   }
 
@@ -1224,7 +1195,8 @@ class DenseMapIterator : DebugEpochBase::HandleBase {
 
 public:
   using difference_type = ptrdiff_t;
-  using value_type = std::conditional_t<IsConst, const Bucket, Bucket>;
+  using value_type =
+      typename std::conditional<IsConst, const Bucket, Bucket>::type;
   using pointer = value_type *;
   using reference = value_type &;
   using iterator_category = std::forward_iterator_tag;

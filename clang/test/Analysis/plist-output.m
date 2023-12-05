@@ -50,8 +50,8 @@ void test_assumptions(int a, int b)
   *p = 0xDEADBEEF;
 }
 
-int *bar_cond_assign(void);
-int test_cond_assign(void) {
+int *bar_cond_assign();
+int test_cond_assign() {
   int *p;
   if (p = bar_cond_assign())
     return 1;
@@ -59,6 +59,7 @@ int test_cond_assign(void) {
 }
 
 // The following previously crashed when generating extensive diagnostics.
+// <rdar://problem/10797980>
 @interface RDar10797980_help
 @property (readonly) int x;
 @end
@@ -79,7 +80,7 @@ int test_cond_assign(void) {
 
 // The original source for the above Radar contains another problem:
 // if the end-of-path node is an implicit statement, it may not have a valid
-// source location.
+// source location. <rdar://problem/12446776>
 - (void)test2 {
   if (bar_cond_assign()) {
     id foo = [[RDar10797980 alloc] init]; // leak
@@ -90,7 +91,7 @@ int test_cond_assign(void) {
 @end
 
 // Test that loops are documented in the path.
-void rdar12280665(void) {
+void rdar12280665() {
   for (unsigned i = 0; i < 2; ++i) {
 	  if (i == 1) {
 		  int *p = 0;
@@ -100,7 +101,7 @@ void rdar12280665(void) {
 }
 
 // Test for a "loop executed 0 times" diagnostic.
-int *radar12322528_bar(void);
+int *radar12322528_bar();
 
 void radar12322528_for(int x) {
   int *p = 0;
@@ -120,7 +121,7 @@ void radar12322528_while(int x) {
   *p = 0xDEADBEEF;
 }
 
-void radar12322528_foo_2(void) {
+void radar12322528_foo_2() {
   int *p = 0;
   for (unsigned i = 0; i < 2; ++i) {
     if (i == 1)
@@ -129,13 +130,13 @@ void radar12322528_foo_2(void) {
   *p = 0xDEADBEEF;
 }
 
-void test_loop_diagnostics(void) {
+void test_loop_diagnostics() {
   int *p = 0;
   for (int i = 0; i < 2; ++i) { p = 0; }
   *p = 1;
 }
 
-void test_loop_diagnostics_2(void) {
+void test_loop_diagnostics_2() {
   int *p = 0;
   for (int i = 0; i < 2; ) {
     ++i;
@@ -144,7 +145,7 @@ void test_loop_diagnostics_2(void) {
   *p = 1;
 }
 
-void test_loop_diagnostics_3(void) {
+void test_loop_diagnostics_3() {
   int *p = 0;
   int i = 0;
   while (i < 2) {
@@ -177,7 +178,7 @@ void RDar13295437_f(void *i) __attribute__((__nonnull__));
 
 struct  RDar13295437_S { int *i; };
 
-int  RDar13295437(void) {
+int  RDar13295437() {
   struct RDar13295437_S s = {0};
   struct RDar13295437_S *sp = &s;
   RDar13295437_f(sp->i);

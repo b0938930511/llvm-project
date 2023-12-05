@@ -38,7 +38,7 @@ Option::Option(const OptTable::Info *info, const OptTable *owner)
   }
 }
 
-void Option::print(raw_ostream &O, bool AddNewLine) const {
+void Option::print(raw_ostream &O) const {
   O << "<";
   switch (getKind()) {
 #define P(N) case N: O << #N; break
@@ -58,10 +58,11 @@ void Option::print(raw_ostream &O, bool AddNewLine) const {
 #undef P
   }
 
-  if (!Info->Prefixes.empty()) {
+  if (Info->Prefixes) {
     O << " Prefixes:[";
-    for (size_t I = 0, N = Info->Prefixes.size(); I != N; ++I)
-      O << '"' << Info->Prefixes[I] << (I == N - 1 ? "\"" : "\", ");
+    for (const char *const *Pre = Info->Prefixes; *Pre != nullptr; ++Pre) {
+      O << '"' << *Pre << (*(Pre + 1) == nullptr ? "\"" : "\", ");
+    }
     O << ']';
   }
 
@@ -70,21 +71,19 @@ void Option::print(raw_ostream &O, bool AddNewLine) const {
   const Option Group = getGroup();
   if (Group.isValid()) {
     O << " Group:";
-    Group.print(O, /*AddNewLine=*/false);
+    Group.print(O);
   }
 
   const Option Alias = getAlias();
   if (Alias.isValid()) {
     O << " Alias:";
-    Alias.print(O, /*AddNewLine=*/false);
+    Alias.print(O);
   }
 
   if (getKind() == MultiArgClass)
     O << " NumArgs:" << getNumArgs();
 
-  O << ">";
-  if (AddNewLine)
-    O << "\n";
+  O << ">\n";
 }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
@@ -107,25 +106,23 @@ bool Option::matches(OptSpecifier Opt) const {
   return false;
 }
 
-std::unique_ptr<Arg> Option::acceptInternal(const ArgList &Args,
-                                            StringRef Spelling,
-                                            unsigned &Index) const {
-  const size_t SpellingSize = Spelling.size();
-  const size_t ArgStringSize = StringRef(Args.getArgString(Index)).size();
+Arg *Option::acceptInternal(const ArgList &Args, StringRef Spelling,
+                            unsigned &Index) const {
+  size_t ArgSize = Spelling.size();
   switch (getKind()) {
   case FlagClass: {
-    if (SpellingSize != ArgStringSize)
+    if (ArgSize != strlen(Args.getArgString(Index)))
       return nullptr;
-    return std::make_unique<Arg>(*this, Spelling, Index++);
+    return new Arg(*this, Spelling, Index++);
   }
   case JoinedClass: {
-    const char *Value = Args.getArgString(Index) + SpellingSize;
-    return std::make_unique<Arg>(*this, Spelling, Index++, Value);
+    const char *Value = Args.getArgString(Index) + ArgSize;
+    return new Arg(*this, Spelling, Index++, Value);
   }
   case CommaJoinedClass: {
     // Always matches.
-    const char *Str = Args.getArgString(Index) + SpellingSize;
-    auto A = std::make_unique<Arg>(*this, Spelling, Index++);
+    const char *Str = Args.getArgString(Index) + ArgSize;
+    Arg *A = new Arg(*this, Spelling, Index++);
 
     // Parse out the comma separated values.
     const char *Prev = Str;
@@ -152,7 +149,8 @@ std::unique_ptr<Arg> Option::acceptInternal(const ArgList &Args,
   }
   case SeparateClass:
     // Matches iff this is an exact match.
-    if (SpellingSize != ArgStringSize)
+    // FIXME: Avoid strlen.
+    if (ArgSize != strlen(Args.getArgString(Index)))
       return nullptr;
 
     Index += 2;
@@ -160,28 +158,29 @@ std::unique_ptr<Arg> Option::acceptInternal(const ArgList &Args,
         Args.getArgString(Index - 1) == nullptr)
       return nullptr;
 
-    return std::make_unique<Arg>(*this, Spelling, Index - 2,
-                                 Args.getArgString(Index - 1));
+    return new Arg(*this, Spelling, Index - 2, Args.getArgString(Index - 1));
   case MultiArgClass: {
     // Matches iff this is an exact match.
-    if (SpellingSize != ArgStringSize)
+    // FIXME: Avoid strlen.
+    if (ArgSize != strlen(Args.getArgString(Index)))
       return nullptr;
 
     Index += 1 + getNumArgs();
     if (Index > Args.getNumInputArgStrings())
       return nullptr;
 
-    auto A = std::make_unique<Arg>(*this, Spelling, Index - 1 - getNumArgs(),
-                                   Args.getArgString(Index - getNumArgs()));
+    Arg *A = new Arg(*this, Spelling, Index - 1 - getNumArgs(),
+                     Args.getArgString(Index - getNumArgs()));
     for (unsigned i = 1; i != getNumArgs(); ++i)
       A->getValues().push_back(Args.getArgString(Index - getNumArgs() + i));
     return A;
   }
   case JoinedOrSeparateClass: {
     // If this is not an exact match, it is a joined arg.
-    if (SpellingSize != ArgStringSize) {
-      const char *Value = Args.getArgString(Index) + SpellingSize;
-      return std::make_unique<Arg>(*this, Spelling, Index++, Value);
+    // FIXME: Avoid strlen.
+    if (ArgSize != strlen(Args.getArgString(Index))) {
+      const char *Value = Args.getArgString(Index) + ArgSize;
+      return new Arg(*this, Spelling, Index++, Value);
     }
 
     // Otherwise it must be separate.
@@ -190,8 +189,7 @@ std::unique_ptr<Arg> Option::acceptInternal(const ArgList &Args,
         Args.getArgString(Index - 1) == nullptr)
       return nullptr;
 
-    return std::make_unique<Arg>(*this, Spelling, Index - 2,
-                                 Args.getArgString(Index - 1));
+    return new Arg(*this, Spelling, Index - 2, Args.getArgString(Index - 1));
   }
   case JoinedAndSeparateClass:
     // Always matches.
@@ -200,24 +198,25 @@ std::unique_ptr<Arg> Option::acceptInternal(const ArgList &Args,
         Args.getArgString(Index - 1) == nullptr)
       return nullptr;
 
-    return std::make_unique<Arg>(*this, Spelling, Index - 2,
-                                 Args.getArgString(Index - 2) + SpellingSize,
-                                 Args.getArgString(Index - 1));
+    return new Arg(*this, Spelling, Index - 2,
+                   Args.getArgString(Index - 2) + ArgSize,
+                   Args.getArgString(Index - 1));
   case RemainingArgsClass: {
     // Matches iff this is an exact match.
-    if (SpellingSize != ArgStringSize)
+    // FIXME: Avoid strlen.
+    if (ArgSize != strlen(Args.getArgString(Index)))
       return nullptr;
-    auto A = std::make_unique<Arg>(*this, Spelling, Index++);
+    Arg *A = new Arg(*this, Spelling, Index++);
     while (Index < Args.getNumInputArgStrings() &&
            Args.getArgString(Index) != nullptr)
       A->getValues().push_back(Args.getArgString(Index++));
     return A;
   }
   case RemainingArgsJoinedClass: {
-    auto A = std::make_unique<Arg>(*this, Spelling, Index);
-    if (SpellingSize != ArgStringSize) {
+    Arg *A = new Arg(*this, Spelling, Index);
+    if (ArgSize != strlen(Args.getArgString(Index))) {
       // An inexact match means there is a joined arg.
-      A->getValues().push_back(Args.getArgString(Index) + SpellingSize);
+      A->getValues().push_back(Args.getArgString(Index) + ArgSize);
     }
     Index++;
     while (Index < Args.getNumInputArgStrings() &&
@@ -231,18 +230,17 @@ std::unique_ptr<Arg> Option::acceptInternal(const ArgList &Args,
   }
 }
 
-std::unique_ptr<Arg> Option::accept(const ArgList &Args, StringRef CurArg,
-                                    bool GroupedShortOption,
-                                    unsigned &Index) const {
-  auto A(GroupedShortOption && getKind() == FlagClass
-                             ? std::make_unique<Arg>(*this, CurArg, Index)
+Arg *Option::accept(const ArgList &Args, StringRef CurArg,
+                    bool GroupedShortOption, unsigned &Index) const {
+  std::unique_ptr<Arg> A(GroupedShortOption && getKind() == FlagClass
+                             ? new Arg(*this, CurArg, Index)
                              : acceptInternal(Args, CurArg, Index));
   if (!A)
     return nullptr;
 
   const Option &UnaliasedOption = getUnaliasedOption();
   if (getID() == UnaliasedOption.getID())
-    return A;
+    return A.release();
 
   // "A" is an alias for a different flag. For most clients it's more convenient
   // if this function returns unaliased Args, so create an unaliased arg for
@@ -261,8 +259,7 @@ std::unique_ptr<Arg> Option::accept(const ArgList &Args, StringRef CurArg,
   // Due to this, ArgList::getArgString(A->getIndex()) will return the spelling
   // of the aliased arg always, while A->getSpelling() returns either the
   // unaliased or the aliased arg, depending on which Arg object it's called on.
-  auto UnaliasedA =
-      std::make_unique<Arg>(UnaliasedOption, UnaliasedSpelling, A->getIndex());
+  Arg *UnaliasedA = new Arg(UnaliasedOption, UnaliasedSpelling, A->getIndex());
   Arg *RawA = A.get();
   UnaliasedA->setAlias(std::move(A));
 

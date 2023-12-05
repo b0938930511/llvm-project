@@ -28,19 +28,19 @@ typedef struct {
     int x, y, z;
 } point;
 
-void testStruct(void) {
+void testStruct() {
     point p = { 0, 0, 0 };
     id boxed = @(p);    // expected-error {{illegal type 'point' used in a boxed expression}}
 }
 
-void testPointers(void) {
+void testPointers() {
     void *null = 0;
     id boxed_null = @(null);        // expected-error {{illegal type 'void *' used in a boxed expression}}
     int numbers[] = { 0, 1, 2 };
     id boxed_numbers = @(numbers);  // expected-error {{illegal type 'int *' used in a boxed expression}}
 }
 
-void testInvalid(void) {
+void testInvalid() {
   @(not_defined); // expected-error {{use of undeclared identifier 'not_defined'}}
 }
 
@@ -60,7 +60,7 @@ void testEnum(void *p) {
 @interface NSString
 @end
 
-void testStringLiteral(void) {
+void testStringLiteral() {
   NSString *s;
   s = @("abc");
   s = @(u8"abc");
@@ -70,6 +70,7 @@ void testStringLiteral(void) {
   s = @("\pabc"); // expected-error {{illegal type 'unsigned char *' used in a boxed expression}}
 }
 
+// rdar://13333205
 @class NSMutableDictionary;
 
 @interface NSMutableArray

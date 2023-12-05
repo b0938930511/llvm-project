@@ -12,7 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "sanitizer_common/sanitizer_platform.h"
-#if SANITIZER_APPLE
+#if SANITIZER_MAC
 
 #include "lsan.h"
 #include "lsan_allocator.h"
@@ -56,4 +56,4 @@ using namespace __lsan;
 
 #include "sanitizer_common/sanitizer_malloc_mac.inc"
 
-#endif // SANITIZER_APPLE
+#endif // SANITIZER_MAC

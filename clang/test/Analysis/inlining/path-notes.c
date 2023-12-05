@@ -26,9 +26,9 @@ void testCheck(int *a) {
 }
 
 
-int *getPointer(void);
+int *getPointer();
 
-void testInitCheck(void) {
+void testInitCheck() {
   int *a = getPointer();
   // expected-note@-1 {{'a' initialized here}}
   if (a) {
@@ -53,7 +53,7 @@ void testStoreCheck(int *a) {
 }
 
 
-int *getZero(void) {
+int *getZero() {
   int *p = 0;
   // expected-note@-1 + {{'p' initialized to a null pointer value}}
   // ^ This note checks that we add a second visitor for the return value.
@@ -61,21 +61,21 @@ int *getZero(void) {
   // expected-note@-1 + {{Returning null pointer (loaded from 'p')}}
 }
 
-void testReturnZero(void) {
+void testReturnZero() {
   *getZero() = 1; // expected-warning{{Dereference of null pointer}}
   // expected-note@-1 {{Calling 'getZero'}}
   // expected-note@-2 {{Returning from 'getZero'}}
   // expected-note@-3 {{Dereference of null pointer}}
 }
 
-int testReturnZero2(void) {
+int testReturnZero2() {
   return *getZero(); // expected-warning{{Dereference of null pointer}}
   // expected-note@-1 {{Calling 'getZero'}}
   // expected-note@-2 {{Returning from 'getZero'}}
   // expected-note@-3 {{Dereference of null pointer}}
 }
 
-void testInitZero(void) {
+void testInitZero() {
   int *a = getZero();
   // expected-note@-1 {{Calling 'getZero'}}
   // expected-note@-2 {{Returning from 'getZero'}}
@@ -98,7 +98,7 @@ void usePointer(int *p) {
   // expected-note@-1 {{Dereference of null pointer}}
 }
 
-void testUseOfNullPointer(void) {
+void testUseOfNullPointer() {
   // Test the case where an argument expression is itself a call.
   usePointer(getZero());
   // expected-note@-1 {{Calling 'getZero'}}
@@ -140,7 +140,7 @@ void test4(int **p) {
            // expected-note@-1 {{Dereference of null pointer}}
 }
 
-void boringCallee(void) {
+void boringCallee() {
 }
 
 void interestingCallee(int *x) {
@@ -148,7 +148,7 @@ void interestingCallee(int *x) {
   boringCallee(); // no-note
 }
 
-int testBoringCalleeOfInterestingCallee(void) {
+int testBoringCalleeOfInterestingCallee() {
   int x;
   interestingCallee(&x); // expected-note{{Calling 'interestingCallee'}}
                          // expected-note@-1{{Returning from 'interestingCallee'}}

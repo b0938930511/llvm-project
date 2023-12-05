@@ -12,7 +12,7 @@
 
 // template<class Y> auto_ptr& operator=(auto_ptr<Y>& a) throw();
 
-// ADDITIONAL_COMPILE_FLAGS: -D_LIBCPP_DISABLE_DEPRECATION_WARNINGS
+#define _LIBCPP_DISABLE_DEPRECATION_WARNINGS
 
 #include <memory>
 #include <cassert>

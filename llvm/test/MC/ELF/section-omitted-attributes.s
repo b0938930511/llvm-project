@@ -4,7 +4,6 @@
 
 # CHECK: .section        .foo,"aM",@progbits,1
 # CHECK: .section        .rodata.cst8,"aM",@progbits,8
-# CHECK: .section        .lds_bss,"w",@nobits
 
 .section .foo,"aM",@progbits,1
 
@@ -16,7 +15,3 @@
 .section .rodata.cst8,"aM",@progbits,8
 
 .section .rodata.cst8
-
-# Likewise for Type changes
-.section        .lds_bss,"w",@nobits
-.section        .lds_bss

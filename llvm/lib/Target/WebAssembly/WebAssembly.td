@@ -25,9 +25,6 @@ include "llvm/Target/Target.td"
 def FeatureSIMD128 : SubtargetFeature<"simd128", "SIMDLevel", "SIMD128",
                                       "Enable 128-bit SIMD">;
 
-def FeatureRelaxedSIMD : SubtargetFeature<"relaxed-simd", "SIMDLevel", "RelaxedSIMD",
-                                      "Enable relaxed-simd instructions">;
-
 def FeatureAtomics : SubtargetFeature<"atomics", "HasAtomics", "true",
                                       "Enable Atomics">;
 
@@ -67,14 +64,6 @@ def FeatureReferenceTypes :
       SubtargetFeature<"reference-types", "HasReferenceTypes", "true",
                        "Enable reference types">;
 
-def FeatureExtendedConst :
-      SubtargetFeature<"extended-const", "HasExtendedConst", "true",
-                       "Enable extended const expressions">;
-
-def FeatureMultiMemory :
-      SubtargetFeature<"multimemory", "HasMultiMemory", "true",
-                       "Enable multiple memories">;
-
 //===----------------------------------------------------------------------===//
 // Architectures.
 //===----------------------------------------------------------------------===//
@@ -101,13 +90,7 @@ def WebAssemblyInstrInfo : InstrInfo;
 def : ProcessorModel<"mvp", NoSchedModel, []>;
 
 // Generic processor: latest stable version.
-//
-// This includes features that have achieved phase 4 of the standards process,
-// and that are expected to work for most users in the current time, with
-// consideration given to available support in relevant engines and tools, and
-// the importance of the features.
-def : ProcessorModel<"generic", NoSchedModel,
-                      [FeatureSignExt, FeatureMutableGlobals]>;
+def : ProcessorModel<"generic", NoSchedModel, []>;
 
 // Latest and greatest experimental version of WebAssembly. Bugs included!
 def : ProcessorModel<"bleeding-edge", NoSchedModel,

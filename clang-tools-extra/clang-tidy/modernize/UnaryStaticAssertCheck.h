@@ -11,13 +11,15 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::modernize {
+namespace clang {
+namespace tidy {
+namespace modernize {
 
 /// Replaces a static_assert declaration with an empty message
 /// with the unary version.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/modernize/unary-static-assert.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/modernize-unary-static-assert.html
 class UnaryStaticAssertCheck : public ClangTidyCheck {
 public:
   UnaryStaticAssertCheck(StringRef Name, ClangTidyContext *Context)
@@ -29,6 +31,8 @@ public:
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
 };
 
-} // namespace clang::tidy::modernize
+} // namespace modernize
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_MODERNIZE_UNARY_STATIC_ASSERT_H

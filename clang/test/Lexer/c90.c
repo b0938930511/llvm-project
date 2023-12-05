@@ -11,7 +11,7 @@ b;}
 
 // comment accepted as extension    /* expected-error {{// comments are not allowed in this language}}
 
-void test2(void) {
+void test2() {
   const char * str =
     "sdjflksdjf lksdjf skldfjsdkljflksdjf kldsjflkdsj fldks jflsdkjfds" // expected-error{{string literal of length 845 exceeds maximum length 509 that C90 compilers are required to support}}
     "sdjflksdjf lksdjf skldfjsdkljflksdjf kldsjflkdsj fldks jflsdkjfds"
@@ -28,13 +28,13 @@ void test2(void) {
     "sdjflksdjf lksdjf skldfjsdkljflksdjf kldsjflkdsj fldks jflsdkjfds";
 }
 
-void test3(void) {
+void test3() {
   (void)L"\u1234";  // expected-error {{universal character names are only valid in C99 or C++}}
   (void)L'\u1234';  // expected-error {{universal character names are only valid in C99 or C++}}
 }
 
 #define PREFIX(x) foo ## x
-int test4(void) {
+int test4() {
   int PREFIX(0p) = 0;
   int *p = &PREFIX(0p+1);
   return p[-1];

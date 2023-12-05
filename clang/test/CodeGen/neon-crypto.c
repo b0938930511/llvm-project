@@ -8,13 +8,13 @@
 // RUN: not %clang_cc1 -triple arm64-none-linux-gnu -target-feature +neon \
 // RUN:   -S -O3 -o - %s 2>&1 | FileCheck --check-prefix=CHECK-NO-CRYPTO %s
 
-// REQUIRES: aarch64-registered-target || arm-registered-target
+// Test new aarch64 intrinsics and types
 
 #include <arm_neon.h>
 
 uint8x16_t test_vaeseq_u8(uint8x16_t data, uint8x16_t key) {
   // CHECK-LABEL: @test_vaeseq_u8
-  // CHECK-NO-CRYPTO: error: always_inline function 'vaeseq_u8' requires target feature 'aes'
+  // CHECK-NO-CRYPTO: warning: implicit declaration of function 'vaeseq_u8' is invalid in C99
   return vaeseq_u8(data, key);
   // CHECK: call <16 x i8> @llvm.{{arm.neon|aarch64.crypto}}.aese(<16 x i8> %data, <16 x i8> %key)
 }

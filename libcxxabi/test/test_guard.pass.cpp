@@ -1,4 +1,4 @@
-//===----------------------------------------------------------------------===//
+//===----------------------------- test_guard.cpp -------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,15 +6,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "cxxabi.h"
+
 #include <cassert>
-#include <cxxabi.h>
+
+#ifndef _LIBCXXABI_HAS_NO_THREADS
+#include <thread>
+#include "make_test_thread.h"
+#endif
 
 #include "test_macros.h"
-
-#ifndef TEST_HAS_NO_THREADS
-#   include <thread>
-#   include "make_test_thread.h"
-#endif
 
 // Ensure that we initialize each variable once and only once.
 namespace test1 {
@@ -82,7 +83,7 @@ namespace test3 {
     }
 }
 
-#ifndef TEST_HAS_NO_THREADS
+#ifndef _LIBCXXABI_HAS_NO_THREADS
 // A simple thread test of two threads racing to initialize a variable. This
 // isn't guaranteed to catch any particular threading problems.
 namespace test4 {
@@ -135,14 +136,14 @@ namespace test5 {
         assert(run_count == 1);
     }
 }
-#endif /* TEST_HAS_NO_THREADS */
+#endif /* _LIBCXXABI_HAS_NO_THREADS */
 
 int main(int, char**)
 {
     test1::test();
     test2::test();
     test3::test();
-#ifndef TEST_HAS_NO_THREADS
+#ifndef _LIBCXXABI_HAS_NO_THREADS
     test4::test();
     test5::test();
 #endif

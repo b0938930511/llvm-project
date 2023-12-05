@@ -10,13 +10,13 @@ struct S {
 };
 
 static struct S var_01 = {0x1.000001p0};
-struct S *func_01(void) {
+struct S *func_01() {
   return &var_01;
 }
 
 struct S var_02 = {0x1.000001p0};
 
-struct S *func_03(void) {
+struct S *func_03() {
   static struct S var_03 = {0x1.000001p0};
   return &var_03;
 }
@@ -28,13 +28,13 @@ struct S *func_03(void) {
 #pragma STDC FENV_ROUND FE_UPWARD
 
 static struct S var_04 = {0x1.000001p0};
-struct S *func_04(void) {
+struct S *func_04() {
   return &var_04;
 }
 
 struct S var_05 = {0x1.000001p0};
 
-struct S *func_06(void) {
+struct S *func_06() {
   static struct S var_06 = {0x1.000001p0};
   return &var_06;
 }

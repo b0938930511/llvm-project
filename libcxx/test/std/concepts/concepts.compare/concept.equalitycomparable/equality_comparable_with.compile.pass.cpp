@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
+// UNSUPPORTED: libcpp-no-concepts
 
 // template<class T, class U>
 // concept equality_comparable_with = // see below
@@ -19,17 +20,12 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <set>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
-#include "test_macros.h"
-
-#ifndef TEST_HAS_NO_THREADS
-#  include <mutex>
-#endif
 
 #include "compare_types.h"
 
@@ -1059,7 +1055,7 @@ static_assert(
 static_assert(
     !check_equality_comparable_with<std::list<int>, std::vector<int> >());
 
-#ifndef TEST_HAS_NO_THREADS
+#ifndef _LIBCPP_HAS_NO_THREADS
 static_assert(!check_equality_comparable_with<std::lock_guard<std::mutex>,
                                               std::lock_guard<std::mutex> >());
 static_assert(!check_equality_comparable_with<std::lock_guard<std::mutex>,
@@ -1120,3 +1116,5 @@ static_assert(
 static_assert(
     !check_equality_comparable_with<one_way_ne, explicit_operators>());
 } // namespace types_fit_for_purpose
+
+int main(int, char**) { return 0; }

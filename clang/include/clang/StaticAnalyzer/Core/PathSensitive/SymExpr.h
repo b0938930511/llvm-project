@@ -17,7 +17,6 @@
 #include "clang/Basic/LLVM.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/iterator_range.h"
 #include <cassert>
 
 namespace clang {
@@ -84,9 +83,8 @@ public:
     bool operator!=(const symbol_iterator &X) const;
   };
 
-  llvm::iterator_range<symbol_iterator> symbols() const {
-    return llvm::make_range(symbol_iterator(this), symbol_iterator());
-  }
+  symbol_iterator symbol_begin() const { return symbol_iterator(this); }
+  static symbol_iterator symbol_end() { return symbol_iterator(); }
 
   virtual unsigned computeComplexity() const = 0;
 
@@ -100,7 +98,6 @@ public:
   /// the beginning of the analysis, and SymbolDerived which denotes the value
   /// of a certain memory region after its super region (a memory space or
   /// a larger record region) is default-bound with a certain symbol.
-  /// It might return null.
   virtual const MemRegion *getOriginRegion() const { return nullptr; }
 };
 

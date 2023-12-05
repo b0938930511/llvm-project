@@ -14,7 +14,7 @@
 
 #include "xray_interface_internal.h"
 
-#include <cinttypes>
+#include <cstdint>
 #include <cstdio>
 #include <errno.h>
 #include <limits>
@@ -46,16 +46,12 @@ static const int16_t cSledLength = 12;
 static const int16_t cSledLength = 32;
 #elif defined(__arm__)
 static const int16_t cSledLength = 28;
-#elif SANITIZER_LOONGARCH64
-static const int16_t cSledLength = 48;
 #elif SANITIZER_MIPS32
 static const int16_t cSledLength = 48;
 #elif SANITIZER_MIPS64
 static const int16_t cSledLength = 64;
 #elif defined(__powerpc64__)
 static const int16_t cSledLength = 8;
-#elif defined(__hexagon__)
-static const int16_t cSledLength = 20;
 #else
 #error "Unsupported CPU Architecture"
 #endif /* CPU architecture */
@@ -173,8 +169,7 @@ bool patchSled(const XRaySledEntry &Sled, bool Enable,
     Success = patchTypedEvent(Enable, FuncId, Sled);
     break;
   default:
-    Report("Unsupported sled kind '%" PRIu64 "' @%04x\n", Sled.Address,
-           int(Sled.Kind));
+    Report("Unsupported sled kind '%d' @%04x\n", Sled.Address, int(Sled.Kind));
     return false;
   }
   return Success;
@@ -185,7 +180,7 @@ findFunctionSleds(int32_t FuncId,
                   const XRaySledMap &InstrMap) XRAY_NEVER_INSTRUMENT {
   int32_t CurFn = 0;
   uint64_t LastFnAddr = 0;
-  XRayFunctionSledIndex Index = {nullptr, 0};
+  XRayFunctionSledIndex Index = {nullptr, nullptr};
 
   for (std::size_t I = 0; I < InstrMap.Entries && CurFn <= FuncId; I++) {
     const auto &Sled = InstrMap.Sleds[I];
@@ -198,9 +193,11 @@ findFunctionSleds(int32_t FuncId,
     if (CurFn == FuncId) {
       if (Index.Begin == nullptr)
         Index.Begin = &Sled;
-      Index.Size = &Sled - Index.Begin + 1;
+      Index.End = &Sled;
     }
   }
+
+  Index.End += 1;
 
   return Index;
 }
@@ -235,17 +232,13 @@ XRayPatchingStatus patchFunction(int32_t FuncId,
   }
 
   // Now we patch ths sleds for this specific function.
-  XRayFunctionSledIndex SledRange;
-  if (InstrMap.SledsIndex) {
-    SledRange = {InstrMap.SledsIndex[FuncId - 1].fromPCRelative(),
-                 InstrMap.SledsIndex[FuncId - 1].Size};
-  } else {
-    SledRange = findFunctionSleds(FuncId, InstrMap);
-  }
+  auto SledRange = InstrMap.SledsIndex ? InstrMap.SledsIndex[FuncId - 1]
+                                       : findFunctionSleds(FuncId, InstrMap);
   auto *f = SledRange.Begin;
+  auto *e = SledRange.End;
   bool SucceedOnce = false;
-  for (size_t i = 0; i != SledRange.Size; ++i)
-    SucceedOnce |= patchSled(f[i], Enable, FuncId);
+  while (f != e)
+    SucceedOnce |= patchSled(*f++, Enable, FuncId);
 
   atomic_store(&XRayPatching, false,
                             memory_order_release);
@@ -312,7 +305,7 @@ XRayPatchingStatus controlPatching(bool Enable) XRAY_NEVER_INSTRUMENT {
                               ? flags()->xray_page_size_override
                               : GetPageSizeCached();
   if ((PageSize == 0) || ((PageSize & (PageSize - 1)) != 0)) {
-    Report("System page size is not a power of two: %zu\n", PageSize);
+    Report("System page size is not a power of two: %lld\n", PageSize);
     return XRayPatchingStatus::FAILED;
   }
 
@@ -363,23 +356,18 @@ XRayPatchingStatus mprotectAndPatchFunction(int32_t FuncId,
                               ? flags()->xray_page_size_override
                               : GetPageSizeCached();
   if ((PageSize == 0) || ((PageSize & (PageSize - 1)) != 0)) {
-    Report("Provided page size is not a power of two: %zu\n", PageSize);
+    Report("Provided page size is not a power of two: %lld\n", PageSize);
     return XRayPatchingStatus::FAILED;
   }
 
-  // Here we compute the minimum sled and maximum sled associated with a
+  // Here we compute the minumum sled and maximum sled associated with a
   // particular function ID.
-  XRayFunctionSledIndex SledRange;
-  if (InstrMap.SledsIndex) {
-    SledRange = {InstrMap.SledsIndex[FuncId - 1].fromPCRelative(),
-                 InstrMap.SledsIndex[FuncId - 1].Size};
-  } else {
-    SledRange = findFunctionSleds(FuncId, InstrMap);
-  }
+  auto SledRange = InstrMap.SledsIndex ? InstrMap.SledsIndex[FuncId - 1]
+                                       : findFunctionSleds(FuncId, InstrMap);
   auto *f = SledRange.Begin;
-  auto *e = SledRange.Begin + SledRange.Size;
+  auto *e = SledRange.End;
   auto *MinSled = f;
-  auto *MaxSled = e - 1;
+  auto *MaxSled = (SledRange.End - 1);
   while (f != e) {
     if (f->address() < MinSled->address())
       MinSled = f;
@@ -435,8 +423,8 @@ int __xray_set_customevent_handler(void (*entry)(void *, size_t))
   return 0;
 }
 
-int __xray_set_typedevent_handler(void (*entry)(size_t, const void *,
-                                                size_t)) XRAY_NEVER_INSTRUMENT {
+int __xray_set_typedevent_handler(void (*entry)(
+    uint16_t, const void *, size_t)) XRAY_NEVER_INSTRUMENT {
   if (atomic_load(&XRayInitialized,
                                memory_order_acquire)) {
     atomic_store(&__xray::XRayPatchedTypedEvent,
@@ -511,9 +499,9 @@ uintptr_t __xray_function_address(int32_t FuncId) XRAY_NEVER_INSTRUMENT {
 
   if (FuncId <= 0 || static_cast<size_t>(FuncId) > InstrMap.Functions)
     return 0;
-  const XRaySledEntry *Sled =
-      InstrMap.SledsIndex ? InstrMap.SledsIndex[FuncId - 1].fromPCRelative()
-                          : findFunctionSleds(FuncId, InstrMap).Begin;
+  const XRaySledEntry *Sled = InstrMap.SledsIndex
+                                  ? InstrMap.SledsIndex[FuncId - 1].Begin
+                                  : findFunctionSleds(FuncId, InstrMap).Begin;
   return Sled->function()
 // On PPC, function entries are always aligned to 16 bytes. The beginning of a
 // sled might be a local entry, which is always +8 based on the global entry.

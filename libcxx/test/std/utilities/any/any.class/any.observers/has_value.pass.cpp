@@ -20,13 +20,15 @@
 
 int main(int, char**)
 {
+    using std::any;
+    // noexcept test
     {
-        std::any a;
-        ASSERT_NOEXCEPT(a.has_value());
+        any a;
+        static_assert(noexcept(a.has_value()), "any::has_value() must be noexcept");
     }
     // empty
     {
-        std::any a;
+        any a;
         assert(!a.has_value());
 
         a.reset();
@@ -37,24 +39,26 @@ int main(int, char**)
     }
     // small object
     {
-        std::any a = small(1);
+        small const s(1);
+        any a(s);
         assert(a.has_value());
 
         a.reset();
         assert(!a.has_value());
 
-        a = small(1);
+        a = s;
         assert(a.has_value());
     }
     // large object
     {
-        std::any a = large(1);
+        large const l(1);
+        any a(l);
         assert(a.has_value());
 
         a.reset();
         assert(!a.has_value());
 
-        a = large(1);
+        a = l;
         assert(a.has_value());
     }
 

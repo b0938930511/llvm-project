@@ -140,8 +140,10 @@ void testArrayInvalidation() {
     IntWrapper arr[2];
 
     // There should be no undefined value warnings here.
-    clang_analyzer_eval(arr[0].x == 0); // expected-warning{{TRUE}}
-    clang_analyzer_eval(arr[1].x == 0); // expected-warning{{TRUE}}
+    // Eventually these should be TRUE as well, but right now
+    // we can't handle array constructors.
+    clang_analyzer_eval(arr[0].x == 0); // expected-warning{{UNKNOWN}}
+    clang_analyzer_eval(arr[1].x == 0); // expected-warning{{UNKNOWN}}
 
     arr[0].x = &i;
     arr[1].x = &j;
@@ -212,7 +214,7 @@ namespace DestructorVirtualCalls {
       C obj;
       clang_analyzer_eval(obj.get() == 3); // expected-warning{{TRUE}}
 
-      // Correctness check for devirtualization.
+      // Sanity check for devirtualization.
       A *base = &obj;
       clang_analyzer_eval(base->get() == 3); // expected-warning{{TRUE}}
 
@@ -310,8 +312,10 @@ namespace MultidimensionalArrays {
       IntWrapper arr[2][2];
 
       // There should be no undefined value warnings here.
-      clang_analyzer_eval(arr[0][0].x == 0); // expected-warning{{TRUE}}
-      clang_analyzer_eval(arr[1][1].x == 0); // expected-warning{{TRUE}}
+      // Eventually these should be TRUE as well, but right now
+      // we can't handle array constructors.
+      clang_analyzer_eval(arr[0][0].x == 0); // expected-warning{{UNKNOWN}}
+      clang_analyzer_eval(arr[1][1].x == 0); // expected-warning{{UNKNOWN}}
 
       arr[0][0].x = &i;
       arr[1][1].x = &j;
@@ -566,32 +570,3 @@ void testAutoDtor() {
   // no-crash
 }
 } // namespace dtor_over_loc_concrete_int
-
-// Test overriden new/delete operators
-struct CustomOperators {
-  void *operator new(size_t count) {
-    return malloc(count);
-  }
-
-  void operator delete(void *addr) {
-    free(addr);
-  }
-
-private:
-  int i;
-};
-
-void compliant() {
-  auto *a = new CustomOperators();
-  delete a;
-}
-
-void overrideLeak() {
-  auto *a = new CustomOperators();
-} // expected-warning{{Potential leak of memory pointed to by 'a'}}
-
-void overrideDoubleDelete() {
-  auto *a = new CustomOperators();
-  delete a;
-  delete a; // expected-warning@577 {{Attempt to free released memory}}
-}

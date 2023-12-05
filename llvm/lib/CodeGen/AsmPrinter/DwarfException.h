@@ -21,26 +21,28 @@ namespace llvm {
 class MachineFunction;
 class ARMTargetStreamer;
 
-class LLVM_LIBRARY_VISIBILITY DwarfCFIException : public EHStreamer {
-  /// Per-function flag to indicate if .cfi_personality should be emitted.
-  bool shouldEmitPersonality = false;
-
-  /// Per-function flag to indicate if .cfi_personality must be emitted.
-  bool forceEmitPersonality = false;
-
-  /// Per-function flag to indicate if .cfi_lsda should be emitted.
-  bool shouldEmitLSDA = false;
+class LLVM_LIBRARY_VISIBILITY DwarfCFIExceptionBase : public EHStreamer {
+protected:
+  DwarfCFIExceptionBase(AsmPrinter *A);
 
   /// Per-function flag to indicate if frame CFI info should be emitted.
-  bool shouldEmitCFI = false;
-
+  bool shouldEmitCFI;
   /// Per-module flag to indicate if .cfi_section has beeen emitted.
-  bool hasEmittedCFISections = false;
+  bool hasEmittedCFISections;
 
-  /// Vector of all personality functions seen so far in the module.
-  std::vector<const GlobalValue *> Personalities;
+  void markFunctionEnd() override;
+  void endFragment() override;
+};
 
-  void addPersonality(const GlobalValue *Personality);
+class LLVM_LIBRARY_VISIBILITY DwarfCFIException : public DwarfCFIExceptionBase {
+  /// Per-function flag to indicate if .cfi_personality should be emitted.
+  bool shouldEmitPersonality;
+
+  /// Per-function flag to indicate if .cfi_personality must be emitted.
+  bool forceEmitPersonality;
+
+  /// Per-function flag to indicate if .cfi_lsda should be emitted.
+  bool shouldEmitLSDA;
 
 public:
   //===--------------------------------------------------------------------===//
@@ -59,17 +61,14 @@ public:
   /// Gather and emit post-function exception information.
   void endFunction(const MachineFunction *) override;
 
-  void beginBasicBlockSection(const MachineBasicBlock &MBB) override;
-  void endBasicBlockSection(const MachineBasicBlock &MBB) override;
+  void beginFragment(const MachineBasicBlock *MBB,
+                     ExceptionSymbolProvider ESP) override;
+
+  void beginBasicBlock(const MachineBasicBlock &MBB) override;
+  void endBasicBlock(const MachineBasicBlock &MBB) override;
 };
 
-class LLVM_LIBRARY_VISIBILITY ARMException : public EHStreamer {
-  /// Per-function flag to indicate if frame CFI info should be emitted.
-  bool shouldEmitCFI = false;
-
-  /// Per-module flag to indicate if .cfi_section has beeen emitted.
-  bool hasEmittedCFISections = false;
-
+class LLVM_LIBRARY_VISIBILITY ARMException : public DwarfCFIExceptionBase {
   void emitTypeInfos(unsigned TTypeEncoding, MCSymbol *TTBaseLabel) override;
   ARMTargetStreamer &getTargetStreamer();
 
@@ -89,11 +88,9 @@ public:
 
   /// Gather and emit post-function exception information.
   void endFunction(const MachineFunction *) override;
-
-  void markFunctionEnd() override;
 };
 
-class LLVM_LIBRARY_VISIBILITY AIXException : public EHStreamer {
+class LLVM_LIBRARY_VISIBILITY AIXException : public DwarfCFIExceptionBase {
   /// This is AIX's compat unwind section, which unwinder would use
   /// to find the location of LSDA area and personality rountine.
   void emitExceptionInfoTable(const MCSymbol *LSDA, const MCSymbol *PerSym);
@@ -103,6 +100,7 @@ public:
 
   void endModule() override {}
   void beginFunction(const MachineFunction *MF) override {}
+
   void endFunction(const MachineFunction *MF) override;
 };
 } // End of namespace llvm

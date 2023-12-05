@@ -1,4 +1,5 @@
-//===- TestLiveness.cpp - Test liveness construction and information ------===//
+//===- TestLiveness.cpp - Test liveness construction and information
+//-------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -12,28 +13,24 @@
 //===----------------------------------------------------------------------===//
 
 #include "mlir/Analysis/Liveness.h"
-#include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
 
 using namespace mlir;
 
 namespace {
 
-struct TestLivenessPass
-    : public PassWrapper<TestLivenessPass, InterfacePass<SymbolOpInterface>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TestLivenessPass)
-
+struct TestLivenessPass : public PassWrapper<TestLivenessPass, FunctionPass> {
   StringRef getArgument() const final { return "test-print-liveness"; }
   StringRef getDescription() const final {
     return "Print the contents of a constructed liveness information.";
   }
-  void runOnOperation() override {
-    llvm::errs() << "Testing : " << getOperation().getName() << "\n";
+  void runOnFunction() override {
+    llvm::errs() << "Testing : " << getFunction().getName() << "\n";
     getAnalysis<Liveness>().print(llvm::errs());
   }
 };
 
-} // namespace
+} // end anonymous namespace
 
 namespace mlir {
 namespace test {

@@ -30,19 +30,18 @@ class EntryStage final : public Stage {
   unsigned NumRetired;
 
   // Updates the program counter, and sets 'CurrentInstruction'.
-  Error getNextInstruction();
+  void getNextInstruction();
 
   EntryStage(const EntryStage &Other) = delete;
   EntryStage &operator=(const EntryStage &Other) = delete;
 
 public:
-  EntryStage(SourceMgr &SM) : SM(SM), NumRetired(0) {}
+  EntryStage(SourceMgr &SM) : CurrentInstruction(), SM(SM), NumRetired(0) { }
 
   bool isAvailable(const InstRef &IR) const override;
   bool hasWorkToComplete() const override;
   Error execute(InstRef &IR) override;
   Error cycleStart() override;
-  Error cycleResume() override;
   Error cycleEnd() override;
 };
 

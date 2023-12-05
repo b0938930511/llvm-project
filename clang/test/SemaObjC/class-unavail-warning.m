@@ -1,4 +1,5 @@
 // RUN: %clang_cc1  -fsyntax-only -fblocks -triple x86_64-apple-darwin10 -verify %s
+// rdar://9092208
 
 __attribute__((unavailable("not available")))
 @interface MyClass { // expected-note 7 {{'MyClass' has been explicitly marked unavailable here}}
@@ -30,7 +31,7 @@ __attribute__((unavailable("not available")))
 @implementation MyClass (Cat2) // no error.
 @end
 
-int main(void) {
+int main() {
  [MyClass new]; // expected-error {{'MyClass' is unavailable: not available}}
  [MyClass self]; // expected-error {{'MyClass' is unavailable: not available}}
  [MyClass addObject:((void *)0)]; // expected-error {{'MyClass' is unavailable: not available}}
@@ -40,6 +41,7 @@ int main(void) {
  return 0;
 }
 
+// rdar://16681279
 @interface NSObject @end
 
 __attribute__((visibility("default"))) __attribute__((availability(macosx,unavailable)))
@@ -62,7 +64,7 @@ Foo *g_foo = 0; // expected-error {{'Foo' is unavailable}}
 @class Foo;
 @class Foo;
 @class Foo;
-Foo * f_func(void) { // expected-error {{'Foo' is unavailable}}
+Foo * f_func() { // expected-error {{'Foo' is unavailable}}
   return 0; 
 }
 

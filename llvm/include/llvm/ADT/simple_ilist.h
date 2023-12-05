@@ -92,18 +92,10 @@ public:
   using reference = typename OptionsT::reference;
   using const_pointer = typename OptionsT::const_pointer;
   using const_reference = typename OptionsT::const_reference;
-  using iterator =
-      typename ilist_select_iterator_type<OptionsT::has_iterator_bits, OptionsT,
-                                          false, false>::type;
-  using const_iterator =
-      typename ilist_select_iterator_type<OptionsT::has_iterator_bits, OptionsT,
-                                          false, true>::type;
-  using reverse_iterator =
-      typename ilist_select_iterator_type<OptionsT::has_iterator_bits, OptionsT,
-                                          true, false>::type;
-  using const_reverse_iterator =
-      typename ilist_select_iterator_type<OptionsT::has_iterator_bits, OptionsT,
-                                          true, true>::type;
+  using iterator = ilist_iterator<OptionsT, false, false>;
+  using const_iterator = ilist_iterator<OptionsT, false, true>;
+  using reverse_iterator = ilist_iterator<OptionsT, true, false>;
+  using const_reverse_iterator = ilist_iterator<OptionsT, true, true>;
   using size_type = size_t;
   using difference_type = ptrdiff_t;
 
@@ -136,10 +128,12 @@ public:
   }
 
   /// Check if the list is empty in constant time.
-  [[nodiscard]] bool empty() const { return Sentinel.empty(); }
+  LLVM_NODISCARD bool empty() const { return Sentinel.empty(); }
 
   /// Calculate the size of the list in linear time.
-  [[nodiscard]] size_type size() const { return std::distance(begin(), end()); }
+  LLVM_NODISCARD size_type size() const {
+    return std::distance(begin(), end());
+  }
 
   reference front() { return *begin(); }
   const_reference front() const { return *begin(); }

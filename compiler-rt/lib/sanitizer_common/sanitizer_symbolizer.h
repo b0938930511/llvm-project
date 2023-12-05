@@ -32,8 +32,6 @@ struct AddressInfo {
   char *module;
   uptr module_offset;
   ModuleArch module_arch;
-  u8 uuid[kModuleUUIDSize];
-  uptr uuid_size;
 
   static const uptr kUnknown = ~(uptr)0;
   char *function;
@@ -47,8 +45,6 @@ struct AddressInfo {
   // Deletes all strings and resets all fields.
   void Clear();
   void FillModuleInfo(const char *mod_name, uptr mod_offset, ModuleArch arch);
-  void FillModuleInfo(const LoadedModule &mod);
-  uptr module_base() const { return address - module_offset; }
 };
 
 // Linked list of symbolized frames (each frame is described by AddressInfo).
@@ -136,7 +132,7 @@ class Symbolizer final {
 
   // Release internal caches (if any).
   void Flush();
-  // Attempts to demangle the provided C++ mangled name. Never returns nullptr.
+  // Attempts to demangle the provided C++ mangled name.
   const char *Demangle(const char *name);
 
   // Allow user to install hooks that would be called before/after Symbolizer
@@ -153,8 +149,6 @@ class Symbolizer final {
   const LoadedModule *FindModuleForAddress(uptr address);
 
   void InvalidateModuleList();
-
-  const ListOfModules &GetRefreshedListOfModules();
 
  private:
   // GetModuleNameAndOffsetForPC has to return a string to the caller.
@@ -189,7 +183,7 @@ class Symbolizer final {
   // If stale, need to reload the modules before looking up addresses.
   bool modules_fresh_;
 
-  // Platform-specific default demangler, returns nullptr on failure.
+  // Platform-specific default demangler, must not return nullptr.
   const char *PlatformDemangle(const char *name);
 
   static Symbolizer *symbolizer_;
@@ -214,8 +208,10 @@ class Symbolizer final {
     ~SymbolizerScope();
    private:
     const Symbolizer *sym_;
-    int errno_;  // Backup errno in case symbolizer change the value.
   };
+
+  // Calls `LateInitialize()` on all items in `tools_`.
+  void LateInitializeTools();
 };
 
 #ifdef SANITIZER_WINDOWS

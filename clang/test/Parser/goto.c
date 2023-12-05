@@ -1,12 +1,12 @@
 /* RUN: %clang_cc1 -fsyntax-only -verify %s
 */
 
-void test1(void) { 
+void test1() { 
   goto ; /* expected-error {{expected identifier}} */
 }
 
 
-void test2(void) {
+void test2() {
   l:  /* expected-note {{previous definition is here}} */
   
   {
@@ -20,7 +20,8 @@ void test2(void) {
   l: goto l;
   }
 
-  /* PR3429 */
+  /* PR3429 & rdar://8287027
+   */
   {
   l:  /* expected-error {{redefinition of label 'l'}} */
     ;

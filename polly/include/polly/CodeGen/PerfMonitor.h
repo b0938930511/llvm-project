@@ -13,7 +13,7 @@
 
 namespace polly {
 
-class PerfMonitor final {
+class PerfMonitor {
 public:
   /// Create a new performance monitor.
   ///

@@ -19,7 +19,6 @@
 #include "clang/Sema/DelayedDiagnostic.h"
 #include "clang/Sema/ScopeInfo.h"
 #include "clang/Sema/Sema.h"
-#include <optional>
 
 using namespace clang;
 using namespace sema;
@@ -58,7 +57,7 @@ static const AvailabilityAttr *getAttrForPlatform(ASTContext &Context,
 /// \param D The declaration to check.
 /// \param Message If non-null, this will be populated with the message from
 /// the availability attribute that is selected.
-/// \param ClassReceiver If we're checking the method of a class message
+/// \param ClassReceiver If we're checking the the method of a class message
 /// send, the class. Otherwise nullptr.
 static std::pair<AvailabilityResult, const NamedDecl *>
 ShouldDiagnoseAvailabilityOfDecl(Sema &S, const NamedDecl *D,
@@ -122,18 +121,6 @@ ShouldDiagnoseAvailabilityInContext(Sema &S, AvailabilityResult K,
                                     VersionTuple DeclVersion, Decl *Ctx,
                                     const NamedDecl *OffendingDecl) {
   assert(K != AR_Available && "Expected an unavailable declaration here!");
-
-  // If this was defined using CF_OPTIONS, etc. then ignore the diagnostic.
-  auto DeclLoc = Ctx->getBeginLoc();
-  // This is only a problem in Foundation's C++ implementation for CF_OPTIONS.
-  if (DeclLoc.isMacroID() && S.getLangOpts().CPlusPlus &&
-      isa<TypedefDecl>(OffendingDecl)) {
-    StringRef MacroName = S.getPreprocessor().getImmediateMacroName(DeclLoc);
-    if (MacroName == "CF_OPTIONS" || MacroName == "OBJC_OPTIONS" ||
-        MacroName == "SWIFT_OPTIONS" || MacroName == "NS_OPTIONS") {
-      return false;
-    }
-  }
 
   // Checks if we should emit the availability diagnostic in the context of C.
   auto CheckContext = [&](const Decl *C) {
@@ -205,9 +192,6 @@ shouldDiagnoseAvailabilityByDefault(const ASTContext &Context,
   case llvm::Triple::MacOSX:
     ForceAvailabilityFromVersion = VersionTuple(/*Major=*/10, /*Minor=*/13);
     break;
-  case llvm::Triple::ShaderModel:
-    // Always enable availability diagnostics for shader models.
-    return true;
   default:
     // New targets should always warn about availability.
     return Triple.getVendor() == llvm::Triple::Apple;
@@ -257,16 +241,16 @@ struct AttributeInsertion {
 /// attribute argument.
 /// \param SlotNames The vector that will be populated with slot names. In case
 /// of unsuccessful parsing can contain invalid data.
-/// \returns A number of method parameters if parsing was successful,
-/// std::nullopt otherwise.
-static std::optional<unsigned>
+/// \returns A number of method parameters if parsing was successful, None
+/// otherwise.
+static Optional<unsigned>
 tryParseObjCMethodName(StringRef Name, SmallVectorImpl<StringRef> &SlotNames,
                        const LangOptions &LangOpts) {
   // Accept replacements starting with - or + as valid ObjC method names.
   if (!Name.empty() && (Name.front() == '-' || Name.front() == '+'))
     Name = Name.drop_front(1);
   if (Name.empty())
-    return std::nullopt;
+    return None;
   Name.split(SlotNames, ':');
   unsigned NumParams;
   if (Name.back() == ':') {
@@ -276,7 +260,7 @@ tryParseObjCMethodName(StringRef Name, SmallVectorImpl<StringRef> &SlotNames,
   } else {
     if (SlotNames.size() != 1)
       // Not a valid method name, just a colon-separated string.
-      return std::nullopt;
+      return None;
     NumParams = 0;
   }
   // Verify all slot names are valid.
@@ -284,29 +268,29 @@ tryParseObjCMethodName(StringRef Name, SmallVectorImpl<StringRef> &SlotNames,
   for (StringRef S : SlotNames) {
     if (S.empty())
       continue;
-    if (!isValidAsciiIdentifier(S, AllowDollar))
-      return std::nullopt;
+    if (!isValidIdentifier(S, AllowDollar))
+      return None;
   }
   return NumParams;
 }
 
 /// Returns a source location in which it's appropriate to insert a new
 /// attribute for the given declaration \D.
-static std::optional<AttributeInsertion>
+static Optional<AttributeInsertion>
 createAttributeInsertion(const NamedDecl *D, const SourceManager &SM,
                          const LangOptions &LangOpts) {
   if (isa<ObjCPropertyDecl>(D))
     return AttributeInsertion::createInsertionAfter(D);
   if (const auto *MD = dyn_cast<ObjCMethodDecl>(D)) {
     if (MD->hasBody())
-      return std::nullopt;
+      return None;
     return AttributeInsertion::createInsertionAfter(D);
   }
   if (const auto *TD = dyn_cast<TagDecl>(D)) {
     SourceLocation Loc =
         Lexer::getLocForEndOfToken(TD->getInnerLocStart(), 0, SM, LangOpts);
     if (Loc.isInvalid())
-      return std::nullopt;
+      return None;
     // Insert after the 'struct'/whatever keyword.
     return AttributeInsertion::createInsertionAfter(Loc);
   }
@@ -413,7 +397,7 @@ static void DoEmitAvailabilityWarning(Sema &S, AvailabilityResult K,
         return;
       if (!S.getPreprocessor().isMacroDefined("API_AVAILABLE"))
         return;
-      std::optional<AttributeInsertion> Insertion = createAttributeInsertion(
+      Optional<AttributeInsertion> Insertion = createAttributeInsertion(
           Enclosing, S.getSourceManager(), S.getLangOpts());
       if (!Insertion)
         return;
@@ -515,9 +499,9 @@ static void DoEmitAvailabilityWarning(Sema &S, AvailabilityResult K,
       if (const auto *MethodDecl = dyn_cast<ObjCMethodDecl>(ReferringDecl)) {
         Selector Sel = MethodDecl->getSelector();
         SmallVector<StringRef, 12> SelectorSlotNames;
-        std::optional<unsigned> NumParams = tryParseObjCMethodName(
+        Optional<unsigned> NumParams = tryParseObjCMethodName(
             Replacement, SelectorSlotNames, S.getLangOpts());
-        if (NumParams && *NumParams == Sel.getNumArgs()) {
+        if (NumParams && NumParams.getValue() == Sel.getNumArgs()) {
           assert(SelectorSlotNames.size() == Locs.size());
           for (unsigned I = 0; I < Locs.size(); ++I) {
             if (!Sel.getNameForSlot(I).empty()) {
@@ -535,29 +519,6 @@ static void DoEmitAvailabilityWarning(Sema &S, AvailabilityResult K,
         FixIts.push_back(FixItHint::CreateReplacement(UseRange, Replacement));
     }
   }
-
-  // We emit deprecation warning for deprecated specializations
-  // when their instantiation stacks originate outside
-  // of a system header, even if the diagnostics is suppresed at the
-  // point of definition.
-  SourceLocation InstantiationLoc =
-      S.getTopMostPointOfInstantiation(ReferringDecl);
-  bool ShouldAllowWarningInSystemHeader =
-      InstantiationLoc != Loc &&
-      !S.getSourceManager().isInSystemHeader(InstantiationLoc);
-  struct AllowWarningInSystemHeaders {
-    AllowWarningInSystemHeaders(DiagnosticsEngine &E,
-                                bool AllowWarningInSystemHeaders)
-        : Engine(E), Prev(E.getSuppressSystemWarnings()) {
-      E.setSuppressSystemWarnings(!AllowWarningInSystemHeaders);
-    }
-    ~AllowWarningInSystemHeaders() { Engine.setSuppressSystemWarnings(Prev); }
-
-  private:
-    DiagnosticsEngine &Engine;
-    bool Prev;
-  } SystemWarningOverrideRAII(S.getDiagnostics(),
-                              ShouldAllowWarningInSystemHeader);
 
   if (!Message.empty()) {
     S.Diag(Loc, diag_message) << ReferringDecl << Message << FixIts;
@@ -669,7 +630,8 @@ public:
                                               const CompoundStmt *Scope) {
     LastDeclUSEFinder Visitor;
     Visitor.D = D;
-    for (const Stmt *S : llvm::reverse(Scope->body())) {
+    for (auto I = Scope->body_rbegin(), E = Scope->body_rend(); I != E; ++I) {
+      const Stmt *S = *I;
       if (!Visitor.TraverseStmt(const_cast<Stmt *>(S)))
         return S;
     }
@@ -934,11 +896,6 @@ void Sema::DiagnoseUnguardedAvailabilityViolations(Decl *D) {
       return;
 
     Body = FD->getBody();
-
-    if (auto *CD = dyn_cast<CXXConstructorDecl>(FD))
-      for (const CXXCtorInitializer *CI : CD->inits())
-        DiagnoseUnguardedAvailability(*this, D).IssueDiagnostics(CI->getInit());
-
   } else if (auto *MD = dyn_cast<ObjCMethodDecl>(D))
     Body = MD->getBody();
   else if (auto *BD = dyn_cast<BlockDecl>(D))

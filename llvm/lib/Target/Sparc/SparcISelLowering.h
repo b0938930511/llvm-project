@@ -21,44 +21,33 @@ namespace llvm {
   class SparcSubtarget;
 
   namespace SPISD {
-  enum NodeType : unsigned {
-    FIRST_NUMBER = ISD::BUILTIN_OP_END,
-    CMPICC,    // Compare two GPR operands, set icc+xcc.
-    CMPFCC,    // Compare two FP operands, set fcc.
-    CMPFCC_V9, // Compare two FP operands, set fcc (v9 variant).
-    BRICC,     // Branch to dest on icc condition
-    BPICC,    // Branch to dest on icc condition, with prediction (64-bit only).
-    BPXCC,    // Branch to dest on xcc condition, with prediction (64-bit only).
-    BRFCC,    // Branch to dest on fcc condition
-    BRFCC_V9, // Branch to dest on fcc condition (v9 variant).
-    BR_REG,   // Branch to dest using the comparison of a register with zero.
-    SELECT_ICC, // Select between two values using the current ICC flags.
-    SELECT_XCC, // Select between two values using the current XCC flags.
-    SELECT_FCC, // Select between two values using the current FCC flags.
-    SELECT_REG, // Select between two values using the comparison of a register
-                // with zero.
+    enum NodeType : unsigned {
+      FIRST_NUMBER = ISD::BUILTIN_OP_END,
+      CMPICC,      // Compare two GPR operands, set icc+xcc.
+      CMPFCC,      // Compare two FP operands, set fcc.
+      BRICC,       // Branch to dest on icc condition
+      BRXCC,       // Branch to dest on xcc condition (64-bit only).
+      BRFCC,       // Branch to dest on fcc condition
+      SELECT_ICC,  // Select between two values using the current ICC flags.
+      SELECT_XCC,  // Select between two values using the current XCC flags.
+      SELECT_FCC,  // Select between two values using the current FCC flags.
 
-    Hi,
-    Lo, // Hi/Lo operations, typically on a global address.
+      Hi, Lo,      // Hi/Lo operations, typically on a global address.
 
-    FTOI, // FP to Int within a FP register.
-    ITOF, // Int to FP within a FP register.
-    FTOX, // FP to Int64 within a FP register.
-    XTOF, // Int64 to FP within a FP register.
+      FTOI,        // FP to Int within a FP register.
+      ITOF,        // Int to FP within a FP register.
+      FTOX,        // FP to Int64 within a FP register.
+      XTOF,        // Int64 to FP within a FP register.
 
-    CALL,            // A call instruction.
-    RET_GLUE,        // Return with a glue operand.
-    GLOBAL_BASE_REG, // Global base reg for PIC.
-    FLUSHW,          // FLUSH register windows to stack.
+      CALL,        // A call instruction.
+      RET_FLAG,    // Return with a flag operand.
+      GLOBAL_BASE_REG, // Global base reg for PIC.
+      FLUSHW,      // FLUSH register windows to stack.
 
-    TAIL_CALL, // Tail call
-
-    TLS_ADD, // For Thread Local Storage (TLS).
-    TLS_LD,
-    TLS_CALL,
-
-    LOAD_GDOP, // Load operation w/ gdop relocation.
-  };
+      TLS_ADD,     // For Thread Local Storage (TLS).
+      TLS_LD,
+      TLS_CALL
+    };
   }
 
   class SparcTargetLowering : public TargetLowering {
@@ -88,7 +77,8 @@ namespace llvm {
     ConstraintWeight
     getSingleConstraintMatchWeight(AsmOperandInfo &info,
                                    const char *constraint) const override;
-    void LowerAsmOperandForConstraint(SDValue Op, StringRef Constraint,
+    void LowerAsmOperandForConstraint(SDValue Op,
+                                      std::string &Constraint,
                                       std::vector<SDValue> &Ops,
                                       SelectionDAG &DAG) const override;
 
@@ -150,11 +140,6 @@ namespace llvm {
     SDValue LowerCall_64(TargetLowering::CallLoweringInfo &CLI,
                          SmallVectorImpl<SDValue> &InVals) const;
 
-    bool CanLowerReturn(CallingConv::ID CallConv, MachineFunction &MF,
-                        bool isVarArg,
-                        const SmallVectorImpl<ISD::OutputArg> &Outs,
-                        LLVMContext &Context) const override;
-
     SDValue LowerReturn(SDValue Chain, CallingConv::ID CallConv, bool isVarArg,
                         const SmallVectorImpl<ISD::OutputArg> &Outs,
                         const SmallVectorImpl<SDValue> &OutVals,
@@ -197,10 +182,6 @@ namespace llvm {
 
     SDValue PerformDAGCombine(SDNode *N, DAGCombinerInfo &DCI) const override;
 
-    bool IsEligibleForTailCallOptimization(CCState &CCInfo,
-                                           CallLoweringInfo &CLI,
-                                           MachineFunction &MF) const;
-
     bool ShouldShrinkFPConstant(EVT VT) const override {
       // Do not shrink FP constpool if VT == MVT::f128.
       // (ldd, call _Q_fdtoq) is more expensive than two ldds.
@@ -222,10 +203,7 @@ namespace llvm {
 
     MachineBasicBlock *expandSelectCC(MachineInstr &MI, MachineBasicBlock *BB,
                                       unsigned BROpcode) const;
-
-    void AdjustInstrPostInstrSelection(MachineInstr &MI,
-                                       SDNode *Node) const override;
   };
 } // end namespace llvm
 
-#endif // LLVM_LIB_TARGET_SPARC_SPARCISELLOWERING_H
+#endif    // SPARC_ISELLOWERING_H

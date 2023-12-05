@@ -44,7 +44,7 @@ typedef union BOXABLE _BoxableUnion {
   int dummy;
 } BoxableUnion;
 
-void checkNSValueDiagnostic(void) {
+void checkNSValueDiagnostic() {
   NSRect rect;
   id value = @(rect); // expected-error{{definition of class NSValue must be available to use Objective-C boxed expressions}}
 }
@@ -53,7 +53,7 @@ void checkNSValueDiagnostic(void) {
 + (NSValue *)valueWithBytes:(const void *)value objCType:(const char *)type;
 @end
 
-int main(void) {
+int main() {
   NSPoint ns_point;
   id ns_point_value = @(ns_point);
 
@@ -85,17 +85,17 @@ int main(void) {
   id err = @(s); // expected-error{{illegal type 'SomeStruct' (aka 'struct _SomeStruct') used in a boxed expression}}
 }
 
-CGRect getRect(void) {
+CGRect getRect() {
   CGRect r;
   return r;
 }
 
-SomeStruct getSomeStruct(void) {
+SomeStruct getSomeStruct() {
   SomeStruct s;
   return s;
 }
 
-void rvalue(void) {
+void rvalue() {
   id rv_rect = @(getRect());
   id rv_some_struct = @(getSomeStruct()); // expected-error {{illegal type 'SomeStruct' (aka 'struct _SomeStruct') used in a boxed expression}}
 }

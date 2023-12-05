@@ -13,25 +13,26 @@ using namespace mlir;
 using namespace mlir::detail;
 
 //===----------------------------------------------------------------------===//
-// AbstractAttribute
+// AttributeStorage
 //===----------------------------------------------------------------------===//
 
-void AbstractAttribute::walkImmediateSubElements(
-    Attribute attr, function_ref<void(Attribute)> walkAttrsFn,
-    function_ref<void(Type)> walkTypesFn) const {
-  walkImmediateSubElementsFn(attr, walkAttrsFn, walkTypesFn);
-}
+AttributeStorage::AttributeStorage(Type type)
+    : type(type.getAsOpaquePointer()) {}
+AttributeStorage::AttributeStorage() : type(nullptr) {}
 
-Attribute
-AbstractAttribute::replaceImmediateSubElements(Attribute attr,
-                                               ArrayRef<Attribute> replAttrs,
-                                               ArrayRef<Type> replTypes) const {
-  return replaceImmediateSubElementsFn(attr, replAttrs, replTypes);
+Type AttributeStorage::getType() const {
+  return Type::getFromOpaquePointer(type);
+}
+void AttributeStorage::setType(Type newType) {
+  type = newType.getAsOpaquePointer();
 }
 
 //===----------------------------------------------------------------------===//
 // Attribute
 //===----------------------------------------------------------------------===//
+
+/// Return the type of this attribute.
+Type Attribute::getType() const { return impl->getType(); }
 
 /// Return the context this attribute belongs to.
 MLIRContext *Attribute::getContext() const { return getDialect().getContext(); }
@@ -40,29 +41,14 @@ MLIRContext *Attribute::getContext() const { return getDialect().getContext(); }
 // NamedAttribute
 //===----------------------------------------------------------------------===//
 
-NamedAttribute::NamedAttribute(StringAttr name, Attribute value)
-    : name(name), value(value) {
-  assert(name && value && "expected valid attribute name and value");
-  assert(!name.empty() && "expected valid attribute name");
+bool mlir::operator<(const NamedAttribute &lhs, const NamedAttribute &rhs) {
+  return strcmp(lhs.first.data(), rhs.first.data()) < 0;
 }
-
-StringAttr NamedAttribute::getName() const {
-  return llvm::cast<StringAttr>(name);
-}
-
-Dialect *NamedAttribute::getNameDialect() const {
-  return getName().getReferencedDialect();
-}
-
-void NamedAttribute::setName(StringAttr newName) {
-  assert(name && "expected valid attribute name");
-  name = newName;
-}
-
-bool NamedAttribute::operator<(const NamedAttribute &rhs) const {
-  return getName().compare(rhs.getName()) < 0;
-}
-
-bool NamedAttribute::operator<(StringRef rhs) const {
-  return getName().getValue().compare(rhs) < 0;
+bool mlir::operator<(const NamedAttribute &lhs, StringRef rhs) {
+  // This is correct even when attr.first.data()[name.size()] is not a zero
+  // string terminator, because we only care about a less than comparison.
+  // This can't use memcmp, because it doesn't guarantee that it will stop
+  // reading both buffers if one is shorter than the other, even if there is
+  // a difference.
+  return strncmp(lhs.first.data(), rhs.data(), rhs.size()) < 0;
 }

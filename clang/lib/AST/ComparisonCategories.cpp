@@ -17,11 +17,10 @@
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/Type.h"
 #include "llvm/ADT/SmallVector.h"
-#include <optional>
 
 using namespace clang;
 
-std::optional<ComparisonCategoryType>
+Optional<ComparisonCategoryType>
 clang::getComparisonCategoryForBuiltinCmp(QualType T) {
   using CCT = ComparisonCategoryType;
 
@@ -38,7 +37,7 @@ clang::getComparisonCategoryForBuiltinCmp(QualType T) {
     return CCT::StrongOrdering;
 
   // TODO: Extend support for operator<=> to ObjC types.
-  return std::nullopt;
+  return llvm::None;
 }
 
 bool ComparisonCategoryInfo::ValueInfo::hasValidIntValue() const {
@@ -58,7 +57,7 @@ bool ComparisonCategoryInfo::ValueInfo::hasValidIntValue() const {
 
 /// Attempt to determine the integer value used to represent the comparison
 /// category result by evaluating the initializer for the specified VarDecl as
-/// a constant expression and retrieving the value of the class's first
+/// a constant expression and retreiving the value of the class's first
 /// (and only) field.
 ///
 /// Note: The STL types are expected to have the form:

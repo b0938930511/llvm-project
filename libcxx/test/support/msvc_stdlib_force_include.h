@@ -62,6 +62,9 @@ const AssertionDialogAvoider assertion_dialog_avoider{};
     #pragma warning(disable: 28251) // Inconsistent annotation for 'new': this instance has no annotations.
 #endif // !defined(__clang__)
 
+// MSVC doesn't have __int128_t.
+#define _LIBCPP_HAS_NO_INT128
+
 #ifndef _LIBCXX_IN_DEVCRT
     // atomic_is_lock_free.pass.cpp needs this VS 2015 Update 2 fix.
     #define _ENABLE_ATOMIC_ALIGNMENT_FIX
@@ -69,24 +72,18 @@ const AssertionDialogAvoider assertion_dialog_avoider{};
     // Restore features that are removed in C++20.
     #define _HAS_FEATURES_REMOVED_IN_CXX20 1
 
-    // Silence warnings about the unspecified complex<non-floating-point>
-    #define _SILENCE_NONFLOATING_COMPLEX_DEPRECATION_WARNING
-
-    // Silence warnings about features that are deprecated in non-default language modes.
+    // Silence warnings about features that are deprecated in C++17 and C++20.
     #define _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS
     #define _SILENCE_ALL_CXX20_DEPRECATION_WARNINGS
-    #define _SILENCE_ALL_CXX23_DEPRECATION_WARNINGS
 #endif // _LIBCXX_IN_DEVCRT
 
 #include <version>
 
-#if _HAS_CXX23
+#if _HAS_CXX20
     #define TEST_STD_VER 99
-#elif _HAS_CXX20
-    #define TEST_STD_VER 20
 #elif _HAS_CXX17
     #define TEST_STD_VER 17
-#else
+#else // !(_HAS_CXX20 || _HAS_CXX17)
     #define TEST_STD_VER 14
 #endif
 

@@ -19,6 +19,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Analysis/MemoryLocation.h"
 #include "llvm/Analysis/MemorySSA.h"
 #include "llvm/Analysis/MemorySSAUpdater.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
@@ -30,8 +31,9 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Function.h"
-#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Pass.h"
@@ -171,10 +173,10 @@ class Polynomial {
   };
 
   /// Number of Error Bits e
-  unsigned ErrorMSBs = (unsigned)-1;
+  unsigned ErrorMSBs;
 
   /// Value
-  Value *V = nullptr;
+  Value *V;
 
   /// Coefficient B
   SmallVector<std::pair<BOps, APInt>, 4> B;
@@ -183,7 +185,7 @@ class Polynomial {
   APInt A;
 
 public:
-  Polynomial(Value *V) : V(V) {
+  Polynomial(Value *V) : ErrorMSBs((unsigned)-1), V(V), B(), A() {
     IntegerType *Ty = dyn_cast<IntegerType>(V->getType());
     if (Ty) {
       ErrorMSBs = 0;
@@ -193,12 +195,12 @@ public:
   }
 
   Polynomial(const APInt &A, unsigned ErrorMSBs = 0)
-      : ErrorMSBs(ErrorMSBs), A(A) {}
+      : ErrorMSBs(ErrorMSBs), V(NULL), B(), A(A) {}
 
   Polynomial(unsigned BitWidth, uint64_t A, unsigned ErrorMSBs = 0)
-      : ErrorMSBs(ErrorMSBs), A(BitWidth, A) {}
+      : ErrorMSBs(ErrorMSBs), V(NULL), B(), A(BitWidth, A) {}
 
-  Polynomial() = default;
+  Polynomial() : ErrorMSBs((unsigned)-1), V(NULL), B(), A() {}
 
   /// Increment and clamp the number of undefined bits.
   void incErrorMSBs(unsigned amt) {
@@ -306,19 +308,19 @@ public:
     }
 
     // Multiplying by one is a no-op.
-    if (C.isOne()) {
+    if (C.isOneValue()) {
       return *this;
     }
 
     // Multiplying by zero removes the coefficient B and defines all bits.
-    if (C.isZero()) {
+    if (C.isNullValue()) {
       ErrorMSBs = 0;
       deleteB();
     }
 
     // See Proof(2): Trailing zero bits indicate a left shift. This removes
     // leading bits from the result even if they are undefined.
-    decErrorMSBs(C.countr_zero());
+    decErrorMSBs(C.countTrailingZeros());
 
     A *= C;
     pushBOperation(Mul, C);
@@ -462,7 +464,7 @@ public:
       return *this;
     }
 
-    if (C.isZero())
+    if (C.isNullValue())
       return *this;
 
     // Test if the result will be zero
@@ -475,7 +477,7 @@ public:
     //
     // If this can be proven add shiftAmt to the error counter
     // `ErrorMSBs`. Otherwise set all bits as undefined.
-    if (A.countr_zero() < shiftAmt)
+    if (A.countTrailingZeros() < shiftAmt)
       ErrorMSBs = A.getBitWidth();
     else
       incErrorMSBs(shiftAmt);
@@ -528,8 +530,8 @@ public:
     if (B.size() != o.B.size())
       return false;
 
-    auto *ob = o.B.begin();
-    for (const auto &b : B) {
+    auto ob = o.B.begin();
+    for (auto &b : B) {
       if (b != *ob)
         return false;
       ob++;
@@ -569,7 +571,7 @@ public:
   bool isProvenEqualTo(const Polynomial &o) {
     // Subtract both polynomials and test if it is fully defined and zero.
     Polynomial r = *this - o;
-    return (r.ErrorMSBs == 0) && (!r.isFirstOrder()) && (r.A.isZero());
+    return (r.ErrorMSBs == 0) && (!r.isFirstOrder()) && (r.A.isNullValue());
   }
 
   /// Print the polynomial into a stream.
@@ -628,7 +630,7 @@ static raw_ostream &operator<<(raw_ostream &OS, const Polynomial &S) {
 /// VectorInfo stores abstract the following information for each vector
 /// element:
 ///
-/// 1) The memory address loaded into the element as Polynomial
+/// 1) The the memory address loaded into the element as Polynomial
 /// 2) a set of load instruction necessary to construct the vector,
 /// 3) a set of all other instructions that are necessary to create the vector and
 /// 4) a pointer value that can be used as relative base for all elements.
@@ -654,10 +656,10 @@ public:
   };
 
   /// Basic-block the load instructions are within
-  BasicBlock *BB = nullptr;
+  BasicBlock *BB;
 
   /// Pointer value of all participation load instructions
-  Value *PV = nullptr;
+  Value *PV;
 
   /// Participating load instructions
   std::set<LoadInst *> LIs;
@@ -666,7 +668,7 @@ public:
   std::set<Instruction *> Is;
 
   /// Final shuffle-vector instruction
-  ShuffleVectorInst *SVI = nullptr;
+  ShuffleVectorInst *SVI;
 
   /// Information of the offset for each vector element
   ElementInfo *EI;
@@ -674,11 +676,10 @@ public:
   /// Vector Type
   FixedVectorType *const VTy;
 
-  VectorInfo(FixedVectorType *VTy) : VTy(VTy) {
+  VectorInfo(FixedVectorType *VTy)
+      : BB(nullptr), PV(nullptr), LIs(), Is(), SVI(nullptr), VTy(VTy) {
     EI = new ElementInfo[VTy->getNumElements()];
   }
-
-  VectorInfo &operator=(const VectorInfo &other) = delete;
 
   virtual ~VectorInfo() { delete[] EI; }
 
@@ -889,7 +890,7 @@ public:
           ConstantInt::get(Type::getInt32Ty(LI->getContext()), 0),
           ConstantInt::get(Type::getInt32Ty(LI->getContext()), i),
       };
-      int64_t Ofs = DL.getIndexedOffsetInType(Result.VTy, ArrayRef(Idx, 2));
+      int64_t Ofs = DL.getIndexedOffsetInType(Result.VTy, makeArrayRef(Idx, 2));
       Result.EI[i] = ElementInfo(Offset + Ofs, i == 0 ? LI : nullptr);
     }
 
@@ -1130,7 +1131,6 @@ bool InterleavedLoadCombineImpl::combine(std::list<VectorInfo> &InterleavedLoad,
 
   InstructionCost InterleavedCost;
   InstructionCost InstructionCost = 0;
-  const TTI::TargetCostKind CostKind = TTI::TCK_SizeAndLatency;
 
   // Get the interleave factor
   unsigned Factor = InterleavedLoad.size();
@@ -1156,9 +1156,10 @@ bool InterleavedLoadCombineImpl::combine(std::list<VectorInfo> &InterleavedLoad,
   // Test if all participating instruction will be dead after the
   // transformation. If intermediate results are used, no performance gain can
   // be expected. Also sum the cost of the Instructions beeing left dead.
-  for (const auto &I : Is) {
+  for (auto &I : Is) {
     // Compute the old cost
-    InstructionCost += TTI.getInstructionCost(I, CostKind);
+    InstructionCost +=
+        TTI.getInstructionCost(I, TargetTransformInfo::TCK_Latency);
 
     // The final SVIs are allowed not to be dead, all uses will be replaced
     if (SVIs.find(I) != SVIs.end())
@@ -1184,7 +1185,7 @@ bool InterleavedLoadCombineImpl::combine(std::list<VectorInfo> &InterleavedLoad,
   // that the corresponding defining access dominates first LI. This guarantees
   // that there are no aliasing stores in between the loads.
   auto FMA = MSSA.getMemoryAccess(First);
-  for (auto *LI : LIs) {
+  for (auto LI : LIs) {
     auto MADef = MSSA.getMemoryAccess(LI)->getDefiningAccess();
     if (!MSSA.dominates(MADef, FMA))
       return false;
@@ -1206,23 +1207,29 @@ bool InterleavedLoadCombineImpl::combine(std::list<VectorInfo> &InterleavedLoad,
           ->getNumElements();
   FixedVectorType *ILTy = FixedVectorType::get(ETy, Factor * ElementsPerSVI);
 
-  auto Indices = llvm::to_vector<4>(llvm::seq<unsigned>(0, Factor));
+  SmallVector<unsigned, 4> Indices;
+  for (unsigned i = 0; i < Factor; i++)
+    Indices.push_back(i);
   InterleavedCost = TTI.getInterleavedMemoryOpCost(
       Instruction::Load, ILTy, Factor, Indices, InsertionPoint->getAlign(),
-      InsertionPoint->getPointerAddressSpace(), CostKind);
+      InsertionPoint->getPointerAddressSpace());
 
   if (InterleavedCost >= InstructionCost) {
     return false;
   }
 
+  // Create a pointer cast for the wide load.
+  auto CI = Builder.CreatePointerCast(InsertionPoint->getOperand(0),
+                                      ILTy->getPointerTo(),
+                                      "interleaved.wide.ptrcast");
+
   // Create the wide load and update the MemorySSA.
-  auto Ptr = InsertionPoint->getPointerOperand();
-  auto LI = Builder.CreateAlignedLoad(ILTy, Ptr, InsertionPoint->getAlign(),
+  auto LI = Builder.CreateAlignedLoad(ILTy, CI, InsertionPoint->getAlign(),
                                       "interleaved.wide.load");
   auto MSSAU = MemorySSAUpdater(&MSSA);
   MemoryUse *MSSALoad = cast<MemoryUse>(MSSAU.createMemoryAccessBefore(
       LI, nullptr, MSSA.getMemoryAccess(InsertionPoint)));
-  MSSAU.insertUse(MSSALoad, /*RenameUses=*/ true);
+  MSSAU.insertUse(MSSALoad);
 
   // Create the final SVIs and replace all uses.
   int i = 0;

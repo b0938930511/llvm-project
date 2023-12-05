@@ -120,9 +120,8 @@ void TrackingStatistic::RegisterStatistic() {
 }
 
 StatisticInfo::StatisticInfo() {
-  // Ensure that necessary timer global objects are created first so they are
-  // destructed after us.
-  TimerGroup::constructForStatistics();
+  // Ensure timergroup lists are created first so they are destructed after us.
+  TimerGroup::ConstructTimerLists();
 }
 
 // Print information when destroyed, iff command line option is specified.
@@ -178,10 +177,11 @@ void llvm::PrintStatistics(raw_ostream &OS) {
 
   // Figure out how long the biggest Value and Name fields are.
   unsigned MaxDebugTypeLen = 0, MaxValLen = 0;
-  for (TrackingStatistic *Stat : Stats.Stats) {
-    MaxValLen = std::max(MaxValLen, (unsigned)utostr(Stat->getValue()).size());
-    MaxDebugTypeLen =
-        std::max(MaxDebugTypeLen, (unsigned)std::strlen(Stat->getDebugType()));
+  for (size_t i = 0, e = Stats.Stats.size(); i != e; ++i) {
+    MaxValLen = std::max(MaxValLen,
+                         (unsigned)utostr(Stats.Stats[i]->getValue()).size());
+    MaxDebugTypeLen = std::max(MaxDebugTypeLen,
+                         (unsigned)std::strlen(Stats.Stats[i]->getDebugType()));
   }
 
   Stats.sort();
@@ -192,9 +192,11 @@ void llvm::PrintStatistics(raw_ostream &OS) {
      << "===" << std::string(73, '-') << "===\n\n";
 
   // Print all of the statistics.
-  for (TrackingStatistic *Stat : Stats.Stats)
-    OS << format("%*" PRIu64 " %-*s - %s\n", MaxValLen, Stat->getValue(),
-                 MaxDebugTypeLen, Stat->getDebugType(), Stat->getDesc());
+  for (size_t i = 0, e = Stats.Stats.size(); i != e; ++i)
+    OS << format("%*u %-*s - %s\n",
+                 MaxValLen, Stats.Stats[i]->getValue(),
+                 MaxDebugTypeLen, Stats.Stats[i]->getDebugType(),
+                 Stats.Stats[i]->getDesc());
 
   OS << '\n';  // Flush the output stream.
   OS.flush();
@@ -254,9 +256,9 @@ void llvm::PrintStatistics() {
 #endif
 }
 
-std::vector<std::pair<StringRef, uint64_t>> llvm::GetStatistics() {
+const std::vector<std::pair<StringRef, unsigned>> llvm::GetStatistics() {
   sys::SmartScopedLock<true> Reader(*StatLock);
-  std::vector<std::pair<StringRef, uint64_t>> ReturnStats;
+  std::vector<std::pair<StringRef, unsigned>> ReturnStats;
 
   for (const auto &Stat : StatInfo->statistics())
     ReturnStats.emplace_back(Stat->getName(), Stat->getValue());

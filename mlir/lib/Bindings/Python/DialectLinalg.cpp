@@ -6,23 +6,25 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Dialects.h"
+#include "IRModule.h"
 #include "mlir-c/Dialect/Linalg.h"
 #include "mlir-c/IR.h"
-#include "mlir/Bindings/Python/PybindAdaptors.h"
+
+// TODO: Port this to operate only on the public PybindAdaptors.h
+#include "PybindUtils.h"
 
 namespace py = pybind11;
+using namespace mlir;
+using namespace mlir::python;
 
-static void populateDialectLinalgSubmodule(py::module m) {
+void mlir::python::populateDialectLinalgSubmodule(py::module m) {
   m.def(
       "fill_builtin_region",
-      [](MlirOperation op) { mlirLinalgFillBuiltinNamedOpRegion(op); },
-      py::arg("op"),
+      [](PyDialectDescriptor &dialect, PyOperation &op) {
+        mlirLinalgFillBuiltinNamedOpRegion(dialect.get(), op.get());
+      },
+      py::arg("dialect"), py::arg("op"),
       "Fill the region for `op`, which is assumed to be a builtin named Linalg "
       "op.");
-}
-
-PYBIND11_MODULE(_mlirDialectsLinalg, m) {
-  m.doc() = "MLIR Linalg dialect.";
-
-  populateDialectLinalgSubmodule(m);
 }

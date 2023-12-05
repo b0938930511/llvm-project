@@ -10,9 +10,9 @@
 #include "clang/Basic/SourceManager.h"
 #include "clang/Lex/Lexer.h"
 #include <algorithm>
-#include <optional>
 
-namespace clang::tidy {
+namespace clang {
+namespace tidy {
 namespace utils {
 
 namespace {
@@ -84,14 +84,15 @@ determineIncludeKind(StringRef CanonicalFile, StringRef IncludeFile,
   if ((Style == IncludeSorter::IS_Google) ||
       (Style == IncludeSorter::IS_Google_ObjC)) {
     std::pair<StringRef, StringRef> Parts = CanonicalInclude.split("/public/");
-    StringRef FileCopy = CanonicalFile;
-    if (FileCopy.consume_front(Parts.first) &&
-        FileCopy.consume_back(Parts.second)) {
-      // Determine the kind of this inclusion.
-      if (FileCopy.equals("/internal/") ||
-          FileCopy.equals("/proto/")) {
-        return IncludeSorter::IK_MainTUInclude;
-      }
+    std::string AltCanonicalInclude =
+        Parts.first.str() + "/internal/" + Parts.second.str();
+    std::string ProtoCanonicalInclude =
+        Parts.first.str() + "/proto/" + Parts.second.str();
+
+    // Determine the kind of this inclusion.
+    if (CanonicalFile.equals(AltCanonicalInclude) ||
+        CanonicalFile.equals(ProtoCanonicalInclude)) {
+      return IncludeSorter::IK_MainTUInclude;
     }
   }
   if (Style == IncludeSorter::IS_Google_ObjC) {
@@ -128,19 +129,18 @@ IncludeSorter::IncludeSorter(const SourceManager *SourceMgr,
     : SourceMgr(SourceMgr), Style(Style), CurrentFileID(FileID),
       CanonicalFile(makeCanonicalName(FileName, Style)) {}
 
-void IncludeSorter::addInclude(StringRef FileName, bool IsAngled,
+void IncludeSorter::AddInclude(StringRef FileName, bool IsAngled,
                                SourceLocation HashLocation,
                                SourceLocation EndLocation) {
   int Offset = findNextLine(SourceMgr->getCharacterData(EndLocation));
 
   // Record the relevant location information for this inclusion directive.
-  auto &IncludeLocation = IncludeLocations[FileName];
-  IncludeLocation.push_back(
+  IncludeLocations[FileName].push_back(
       SourceRange(HashLocation, EndLocation.getLocWithOffset(Offset)));
-  SourceLocations.push_back(IncludeLocation.back());
+  SourceLocations.push_back(IncludeLocations[FileName].back());
 
   // Stop if this inclusion is a duplicate.
-  if (IncludeLocation.size() > 1)
+  if (IncludeLocations[FileName].size() > 1)
     return;
 
   // Add the included file's name to the appropriate bucket.
@@ -150,8 +150,8 @@ void IncludeSorter::addInclude(StringRef FileName, bool IsAngled,
     IncludeBucket[Kind].push_back(FileName.str());
 }
 
-std::optional<FixItHint>
-IncludeSorter::createIncludeInsertion(StringRef FileName, bool IsAngled) {
+Optional<FixItHint> IncludeSorter::CreateIncludeInsertion(StringRef FileName,
+                                                          bool IsAngled) {
   std::string IncludeStmt;
   if (Style == IncludeStyle::IS_Google_ObjC) {
     IncludeStmt = IsAngled
@@ -180,7 +180,7 @@ IncludeSorter::createIncludeInsertion(StringRef FileName, bool IsAngled) {
         return FixItHint::CreateInsertion(Location.getBegin(), IncludeStmt);
       }
       if (FileName == IncludeEntry) {
-        return std::nullopt;
+        return llvm::None;
       }
     }
     // FileName comes after all include entries in bucket, insert it after
@@ -204,7 +204,7 @@ IncludeSorter::createIncludeInsertion(StringRef FileName, bool IsAngled) {
     }
   }
   if (NonEmptyKind == IK_InvalidInclude) {
-    return std::nullopt;
+    return llvm::None;
   }
 
   if (NonEmptyKind < IncludeKind) {
@@ -231,6 +231,7 @@ OptionEnumMapping<utils::IncludeSorter::IncludeStyle>::getEnumMapping() {
       Mapping[] = {{utils::IncludeSorter::IS_LLVM, "llvm"},
                    {utils::IncludeSorter::IS_Google, "google"},
                    {utils::IncludeSorter::IS_Google_ObjC, "google-objc"}};
-  return {Mapping};
+  return makeArrayRef(Mapping);
 }
-} // namespace clang::tidy
+} // namespace tidy
+} // namespace clang

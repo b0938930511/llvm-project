@@ -2,7 +2,6 @@ static_library("Demangle") {
   output_name = "LLVMDemangle"
 
   sources = [
-    "DLangDemangle.cpp",
     "Demangle.cpp",
     "ItaniumDemangle.cpp",
     "MicrosoftDemangle.cpp",

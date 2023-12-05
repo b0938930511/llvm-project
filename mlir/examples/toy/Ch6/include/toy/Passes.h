@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef TOY_PASSES_H
-#define TOY_PASSES_H
+#ifndef MLIR_TUTORIAL_TOY_PASSES_H
+#define MLIR_TUTORIAL_TOY_PASSES_H
 
 #include <memory>
 
@@ -29,7 +29,7 @@ std::unique_ptr<mlir::Pass> createLowerToAffinePass();
 /// well as `Affine` and `Std`, to the LLVM dialect for codegen.
 std::unique_ptr<mlir::Pass> createLowerToLLVMPass();
 
-} // namespace toy
-} // namespace mlir
+} // end namespace toy
+} // end namespace mlir
 
-#endif // TOY_PASSES_H
+#endif // MLIR_TUTORIAL_TOY_PASSES_H

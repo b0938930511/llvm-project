@@ -1,7 +1,7 @@
 // RUN: %clang %s -O0 -emit-llvm -S -o - | FileCheck %s
 
-void foo(void);
-void bar(void);
+void foo();
+void bar();
 
 void fold_if(int a, int b) {
   // CHECK: define {{.*}} @fold_if(

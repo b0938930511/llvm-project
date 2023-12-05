@@ -45,8 +45,8 @@ void rdar_7631278(NSObject *x) {
 // This test case issuing a bogus warning for the declaration of 'isExec'
 // because the compound statement for the @synchronized was being visited
 // twice by the LiveVariables analysis.
-BOOL baz_rdar8527823(void);
-void foo_rdar8527823(void);
+BOOL baz_rdar8527823();
+void foo_rdar8527823();
 @interface RDar8527823
 - (void) bar_rbar8527823;
 @end
@@ -83,9 +83,9 @@ void foo_rdar8527823(void);
 @property (assign) int x;
 @end
 
-RDar10591355 *rdar10591355_aux(void);
+RDar10591355 *rdar10591355_aux();
 
-void rdar10591355(void) {
+void rdar10591355() {
   RDar10591355 *p = rdar10591355_aux();
   ^{ (void) p.x; }();
 }
@@ -110,8 +110,8 @@ Radar11059352_1 *_Path;
 }
 @end
 
-id test_objc_precise_lifetime_foo(void);
-void test_objc_precise_lifetime(void) {
+id test_objc_precise_lifetime_foo();
+void test_objc_precise_lifetime() {
   __attribute__((objc_precise_lifetime)) id dead = test_objc_precise_lifetime_foo(); // no-warning
   dead = 0;
   dead = test_objc_precise_lifetime_foo(); // no-warning

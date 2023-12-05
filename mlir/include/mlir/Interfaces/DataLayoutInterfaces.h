@@ -18,12 +18,11 @@
 #include "mlir/IR/DialectInterface.h"
 #include "mlir/IR/OpDefinition.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/Support/TypeSize.h"
 
 namespace mlir {
 class DataLayout;
 class DataLayoutEntryInterface;
-using DataLayoutEntryKey = llvm::PointerUnion<Type, StringAttr>;
+using DataLayoutEntryKey = llvm::PointerUnion<Type, Identifier>;
 // Using explicit SmallVector size because we cannot infer the size from the
 // forward declaration, and we need the typedef in the actual declaration.
 using DataLayoutEntryList = llvm::SmallVector<DataLayoutEntryInterface, 4>;
@@ -35,35 +34,27 @@ class ModuleOp;
 namespace detail {
 /// Default handler for the type size request. Computes results for built-in
 /// types and dispatches to the DataLayoutTypeInterface for other types.
-llvm::TypeSize getDefaultTypeSize(Type type, const DataLayout &dataLayout,
-                                  DataLayoutEntryListRef params);
+unsigned getDefaultTypeSize(Type type, const DataLayout &dataLayout,
+                            DataLayoutEntryListRef params);
 
 /// Default handler for the type size in bits request. Computes results for
 /// built-in types and dispatches to the DataLayoutTypeInterface for other
 /// types.
-llvm::TypeSize getDefaultTypeSizeInBits(Type type, const DataLayout &dataLayout,
-                                        DataLayoutEntryListRef params);
+unsigned getDefaultTypeSizeInBits(Type type, const DataLayout &dataLayout,
+                                  DataLayoutEntryListRef params);
 
-/// Default handler for the required alignment request. Computes results for
+/// Default handler for the required alignemnt request. Computes results for
 /// built-in types and dispatches to the DataLayoutTypeInterface for other
 /// types.
-uint64_t getDefaultABIAlignment(Type type, const DataLayout &dataLayout,
+unsigned getDefaultABIAlignment(Type type, const DataLayout &dataLayout,
                                 ArrayRef<DataLayoutEntryInterface> params);
 
-/// Default handler for the preferred alignment request. Computes results for
+/// Default handler for the preferred alignemnt request. Computes results for
 /// built-in types and dispatches to the DataLayoutTypeInterface for other
 /// types.
-uint64_t
+unsigned
 getDefaultPreferredAlignment(Type type, const DataLayout &dataLayout,
                              ArrayRef<DataLayoutEntryInterface> params);
-
-/// Default handler for alloca memory space request. Dispatches to the
-/// DataLayoutInterface if specified, otherwise returns the default.
-Attribute getDefaultAllocaMemorySpace(DataLayoutEntryInterface entry);
-
-/// Default handler for the stack alignment request. Dispatches to the
-/// DataLayoutInterface if specified, otherwise returns the default.
-uint64_t getDefaultStackAlignment(DataLayoutEntryInterface entry);
 
 /// Given a list of data layout entries, returns a new list containing the
 /// entries with keys having the given type ID, i.e. belonging to the same type
@@ -74,7 +65,7 @@ DataLayoutEntryList filterEntriesForType(DataLayoutEntryListRef entries,
 /// Given a list of data layout entries, returns the entry that has the given
 /// identifier as key, if such an entry exists in the list.
 DataLayoutEntryInterface
-filterEntryForIdentifier(DataLayoutEntryListRef entries, StringAttr id);
+filterEntryForIdentifier(DataLayoutEntryListRef entries, Identifier id);
 
 /// Verifies that the operation implementing the data layout interface, or a
 /// module operation, is valid. This calls the verifier of the spec attribute
@@ -86,10 +77,6 @@ LogicalResult verifyDataLayoutOp(Operation *op);
 /// entry verifiers, and then to the verifiers implemented by the relevant type
 /// and dialect interfaces for type and identifier keys respectively.
 LogicalResult verifyDataLayoutSpec(DataLayoutSpecInterface spec, Location loc);
-
-/// Divides the known min value of the numerator by the denominator and rounds
-/// the result up to the next integer. Preserves the scalable flag.
-llvm::TypeSize divideCeil(llvm::TypeSize numerator, uint64_t denominator);
 } // namespace detail
 } // namespace mlir
 
@@ -161,25 +148,16 @@ public:
   static DataLayout closest(Operation *op);
 
   /// Returns the size of the given type in the current scope.
-  llvm::TypeSize getTypeSize(Type t) const;
+  unsigned getTypeSize(Type t) const;
 
   /// Returns the size in bits of the given type in the current scope.
-  llvm::TypeSize getTypeSizeInBits(Type t) const;
+  unsigned getTypeSizeInBits(Type t) const;
 
   /// Returns the required alignment of the given type in the current scope.
-  uint64_t getTypeABIAlignment(Type t) const;
+  unsigned getTypeABIAlignment(Type t) const;
 
   /// Returns the preferred of the given type in the current scope.
-  uint64_t getTypePreferredAlignment(Type t) const;
-
-  /// Returns the memory space used for AllocaOps.
-  Attribute getAllocaMemorySpace() const;
-
-  /// Returns the natural alignment of the stack in bits. Alignment promotion of
-  /// stack variables should be limited to the natural stack alignment to
-  /// prevent dynamic stack alignment. Returns zero if the stack alignment is
-  /// unspecified.
-  uint64_t getStackAlignment() const;
+  unsigned getTypePreferredAlignment(Type t) const;
 
 private:
   /// Combined layout spec at the given scope.
@@ -195,19 +173,15 @@ private:
   void checkValid() const;
 
   /// Operation defining the scope of requests.
-  Operation *scope;
+  // TODO: this is mutable because the generated interface method are not const.
+  // Update the generator to support const methods and change this to const.
+  mutable Operation *scope;
 
   /// Caches for individual requests.
-  mutable DenseMap<Type, llvm::TypeSize> sizes;
-  mutable DenseMap<Type, llvm::TypeSize> bitsizes;
-  mutable DenseMap<Type, uint64_t> abiAlignments;
-  mutable DenseMap<Type, uint64_t> preferredAlignments;
-
-  /// Cache for alloca memory space.
-  mutable std::optional<Attribute> allocaMemorySpace;
-
-  /// Cache for stack alignment.
-  mutable std::optional<uint64_t> stackAlignment;
+  mutable DenseMap<Type, unsigned> sizes;
+  mutable DenseMap<Type, unsigned> bitsizes;
+  mutable DenseMap<Type, unsigned> abiAlignments;
+  mutable DenseMap<Type, unsigned> preferredAlignments;
 };
 
 } // namespace mlir

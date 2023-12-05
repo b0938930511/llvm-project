@@ -7,13 +7,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "src/fenv/fetestexcept.h"
-#include "src/__support/FPUtil/FEnvImpl.h"
 #include "src/__support/common.h"
+#include "utils/FPUtil/FEnvUtils.h"
 
-namespace LIBC_NAMESPACE {
+namespace __llvm_libc {
 
-LLVM_LIBC_FUNCTION(int, fetestexcept, (int e)) {
-  return fputil::test_except(e);
-}
+LLVM_LIBC_FUNCTION(int, fetestexcept, (int e)) { return fputil::testExcept(e); }
 
-} // namespace LIBC_NAMESPACE
+} // namespace __llvm_libc

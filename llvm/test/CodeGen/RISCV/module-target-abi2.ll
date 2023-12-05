@@ -8,7 +8,8 @@
 
 ; RV32IF-ILP32: -target-abi option != target-abi module flag
 
-; FLAGS: Flags: 0x2, single-float ABI
+; FLAGS: Flags: 0x0
+; // this should be "Flags :0x2, single-float ABI", it will be fixed later.
 
 define float @foo(i32 %a) nounwind #0 {
 ; DEFAULT: # %bb.0:

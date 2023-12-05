@@ -31,7 +31,7 @@ void f6(void) {
   }
 }
 
-void f7(void) {
+void f7() {
   int y;
   #pragma unused(undeclared, undefined, y) // expected-warning{{undeclared variable 'undeclared' used as an argument for '#pragma unused'}} expected-warning{{undeclared variable 'undefined' used as an argument for '#pragma unused'}}
 }
@@ -60,5 +60,6 @@ int f12(int x) {
   return y;
 }
 
+// rdar://8793832
 static int glob_var = 0;
 #pragma unused(glob_var)

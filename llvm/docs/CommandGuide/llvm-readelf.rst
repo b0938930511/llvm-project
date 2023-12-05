@@ -20,7 +20,7 @@ input. Otherwise, it will read from the specified ``filenames``.
 OPTIONS
 -------
 
-.. option:: --all, -a
+.. option:: --all
 
  Equivalent to specifying all the main display options relevant to the file
  format.
@@ -41,10 +41,6 @@ OPTIONS
 .. option:: --demangle, -C
 
  Display demangled symbol names in the output.
-
-.. option:: --dependent-libraries
-
- Display the dependent libraries section.
 
 .. option:: --dyn-relocations
 
@@ -72,14 +68,9 @@ OPTIONS
 
 .. option:: --elf-output-style=<value>
 
- Format ELF information in the specified style. Valid options are ``LLVM``,
- ``GNU``, and ``JSON``. ``LLVM`` output is an expanded and structured format.
- ``GNU`` (the default) output mimics the equivalent GNU :program:`readelf`
- output. ``JSON`` is JSON formatted output intended for machine consumption.
-
-.. option:: --extra-sym-info
-
- Display extra information (section name) when showing symbols.
+ Format ELF information in the specified style. Valid options are ``LLVM`` and
+ ``GNU``. ``LLVM`` output is an expanded and structured format, whilst ``GNU``
+ (the default) output mimics the equivalent GNU :program:`readelf` output.
 
 .. option:: --section-groups, -g
 
@@ -120,28 +111,13 @@ OPTIONS
  Display the specified section(s) as hexadecimal bytes. ``section`` may be a
  section index or section name.
 
-.. option:: --memtag
-
- Display information about memory tagging present in the binary. This includes
- various memtag-specific dynamic entries, decoded global descriptor sections,
- and decoded Android-specific ELF notes.
-
 .. option:: --needed-libs
 
  Display the needed libraries.
 
-.. option:: --no-demangle
-
- Do not display demangled symbol names in the output. On by default.
-
 .. option:: --notes, -n
 
  Display all notes.
-
-.. option:: --pretty-print
-
- When used with :option:`--elf-output-style`, JSON output will be formatted in
- a more readable format.
 
 .. option:: --program-headers, --segments, -l
 
@@ -199,7 +175,7 @@ OPTIONS
 
 .. option:: --symbols, --syms, -s
 
- Display the symbol table. Also display the dynamic symbol table when using GNU output style for ELF.
+ Display the symbol table.
 
 .. option:: --unwind, -u
 
@@ -212,10 +188,6 @@ OPTIONS
 .. option:: --version-info, -V
 
  Display version sections.
-
-.. option:: --wide, -W
-
- Ignored for GNU readelf compatibility. The output is already similar to when using -W with GNU readelf.
 
 .. option:: @<FILE>
 

@@ -3,13 +3,13 @@
 // RUN: %clang_analyze_cc1 -analyzer-checker=core -analyzer-config avoid-suppressing-null-argument-paths=true -DSUPPRESSED=1 -DNULL_ARGS=1 -verify %s
 
 int opaquePropertyCheck(void *object);
-int coin(void);
+int coin();
 
-int *getNull(void) {
+int *getNull() {
   return 0;
 }
 
-int* getPtr(void);
+int* getPtr();
 
 int *dynCastToInt(void *ptr) {
   if (opaquePropertyCheck(ptr))
@@ -85,10 +85,10 @@ void testMultipleStore(void *p) {
 }
 
 // Test that div by zero does not get suppressed. This is a policy choice.
-int retZero(void) {
+int retZero() {
   return 0;
 }
-int triggerDivZero (void) {
+int triggerDivZero () {
   int y = retZero();
   return 5/y; // expected-warning {{Division by zero}}
 }
@@ -183,7 +183,7 @@ int testDifferentMacro(int *p) {
 // "Suppression suppression"
 // --------------------------
 
-void testDynCastOrNullOfNull(void) {
+void testDynCastOrNullOfNull() {
   // Don't suppress when one of the arguments is NULL.
   int *casted = dynCastOrNull(0);
   *casted = 1;
@@ -192,7 +192,7 @@ void testDynCastOrNullOfNull(void) {
 #endif
 }
 
-void testDynCastOfNull(void) {
+void testDynCastOfNull() {
   // Don't suppress when one of the arguments is NULL.
   int *casted = dynCastToInt(0);
   *casted = 1;
@@ -208,7 +208,7 @@ int *lookUpInt(int unused) {
   return &x;
 }
 
-void testZeroIsNotNull(void) {
+void testZeroIsNotNull() {
   // /Do/ suppress when the argument is 0 (an integer).
   int *casted = lookUpInt(0);
   *casted = 1;
@@ -217,7 +217,7 @@ void testZeroIsNotNull(void) {
 #endif
 }
 
-void testTrackNull(void) {
+void testTrackNull() {
   // /Do/ suppress if the null argument came from another call returning null.
   int *casted = dynCastOrNull(getNull());
   *casted = 1;
@@ -226,7 +226,7 @@ void testTrackNull(void) {
 #endif
 }
 
-void testTrackNullVariable(void) {
+void testTrackNullVariable() {
   // /Do/ suppress if the null argument came from another call returning null.
   int *ptr;
   ptr = getNull();
@@ -253,7 +253,8 @@ void inlinedIsDifferent(int inlined) {
 #endif
 }
 
-void testInlinedIsDifferent(void) {
+void testInlinedIsDifferent() {
+  // <rdar://problem/13787723>
   inlinedIsDifferent(0);
 }
 
@@ -262,7 +263,7 @@ void testInlinedIsDifferent(void) {
 // FALSE NEGATIVES (over-suppression)
 // ---------------------------------------
 
-void testNoArguments(void) {
+void testNoArguments() {
   // In this case the function has no branches, and MUST return null.
   int *casted = getNull();
   *casted = 1;

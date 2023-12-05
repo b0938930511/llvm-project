@@ -18,12 +18,19 @@ using namespace lldb_private;
 TEST(RichManglingContextTest, Basic) {
   RichManglingContext RMC;
   ConstString mangled("_ZN3foo3barEv");
-
   EXPECT_TRUE(RMC.FromItaniumName(mangled));
+
+  EXPECT_TRUE(RMC.IsFunction());
   EXPECT_FALSE(RMC.IsCtorOrDtor());
-  EXPECT_EQ("foo", RMC.ParseFunctionDeclContextName());
-  EXPECT_EQ("bar", RMC.ParseFunctionBaseName());
-  EXPECT_EQ("foo::bar()", RMC.ParseFullName());
+
+  RMC.ParseFunctionDeclContextName();
+  EXPECT_EQ("foo", RMC.GetBufferRef());
+
+  RMC.ParseFunctionBaseName();
+  EXPECT_EQ("bar", RMC.GetBufferRef());
+
+  RMC.ParseFullName();
+  EXPECT_EQ("foo::bar()", RMC.GetBufferRef());
 }
 
 TEST(RichManglingContextTest, FromCxxMethodName) {
@@ -35,17 +42,28 @@ TEST(RichManglingContextTest, FromCxxMethodName) {
   ConstString demangled("foo::bar()");
   EXPECT_TRUE(CxxMethodRMC.FromCxxMethodName(demangled));
 
-  EXPECT_EQ(ItaniumRMC.IsCtorOrDtor(), CxxMethodRMC.IsCtorOrDtor());
-  EXPECT_EQ(ItaniumRMC.ParseFunctionDeclContextName(),
-            CxxMethodRMC.ParseFunctionDeclContextName());
-  EXPECT_EQ(ItaniumRMC.ParseFunctionBaseName(),
-            CxxMethodRMC.ParseFunctionBaseName());
-  EXPECT_EQ(ItaniumRMC.ParseFullName(), CxxMethodRMC.ParseFullName());
+  EXPECT_TRUE(ItaniumRMC.IsFunction() == CxxMethodRMC.IsFunction());
+  EXPECT_TRUE(ItaniumRMC.IsCtorOrDtor() == CxxMethodRMC.IsCtorOrDtor());
+
+  ItaniumRMC.ParseFunctionDeclContextName();
+  CxxMethodRMC.ParseFunctionDeclContextName();
+  EXPECT_TRUE(ItaniumRMC.GetBufferRef() == CxxMethodRMC.GetBufferRef());
+
+  ItaniumRMC.ParseFunctionBaseName();
+  CxxMethodRMC.ParseFunctionBaseName();
+  EXPECT_TRUE(ItaniumRMC.GetBufferRef() == CxxMethodRMC.GetBufferRef());
+
+  ItaniumRMC.ParseFullName();
+  CxxMethodRMC.ParseFullName();
+  EXPECT_TRUE(ItaniumRMC.GetBufferRef() == CxxMethodRMC.GetBufferRef());
 
   // Construct with a random name.
   {
     RichManglingContext CxxMethodRMC;
     EXPECT_TRUE(CxxMethodRMC.FromCxxMethodName(ConstString("X")));
+
+    // We expect it is not a function.
+    EXPECT_FALSE(CxxMethodRMC.IsFunction());
   }
 
   // Construct with a function without a context.
@@ -54,8 +72,12 @@ TEST(RichManglingContextTest, FromCxxMethodName) {
     EXPECT_TRUE(CxxMethodRMC.FromCxxMethodName(
         ConstString("void * operator new(unsigned __int64)")));
 
+    // We expect it is a function.
+    EXPECT_TRUE(CxxMethodRMC.IsFunction());
+
     // We expect its context is empty.
-    EXPECT_TRUE(CxxMethodRMC.ParseFunctionDeclContextName().empty());
+    CxxMethodRMC.ParseFunctionDeclContextName();
+    EXPECT_TRUE(CxxMethodRMC.GetBufferRef().empty());
   }
 }
 
@@ -65,13 +87,16 @@ TEST(RichManglingContextTest, SwitchProvider) {
   llvm::StringRef demangled = "foo::bar()";
 
   EXPECT_TRUE(RMC.FromItaniumName(ConstString(mangled)));
-  EXPECT_EQ("foo::bar()", RMC.ParseFullName());
+  RMC.ParseFullName();
+  EXPECT_EQ("foo::bar()", RMC.GetBufferRef());
 
   EXPECT_TRUE(RMC.FromCxxMethodName(ConstString(demangled)));
-  EXPECT_EQ("foo::bar()", RMC.ParseFullName());
+  RMC.ParseFullName();
+  EXPECT_EQ("foo::bar()", RMC.GetBufferRef());
 
   EXPECT_TRUE(RMC.FromItaniumName(ConstString(mangled)));
-  EXPECT_EQ("foo::bar()", RMC.ParseFullName());
+  RMC.ParseFullName();
+  EXPECT_EQ("foo::bar()", RMC.GetBufferRef());
 }
 
 TEST(RichManglingContextTest, IPDRealloc) {
@@ -99,11 +124,13 @@ TEST(RichManglingContextTest, IPDRealloc) {
 
   // Demangle the short one.
   EXPECT_TRUE(RMC.FromItaniumName(ConstString(ShortMangled)));
-  const char *ShortDemangled = RMC.ParseFullName().data();
+  RMC.ParseFullName();
+  const char *ShortDemangled = RMC.GetBufferRef().data();
 
   // Demangle the long one.
   EXPECT_TRUE(RMC.FromItaniumName(ConstString(LongMangled)));
-  const char *LongDemangled = RMC.ParseFullName().data();
+  RMC.ParseFullName();
+  const char *LongDemangled = RMC.GetBufferRef().data();
 
   // Make sure a new buffer was allocated or the default buffer was extended.
   bool AllocatedNewBuffer = (ShortDemangled != LongDemangled);

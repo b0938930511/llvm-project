@@ -51,6 +51,6 @@ protected:
   DialectReductionPatternInterface(Dialect *dialect) : Base(dialect) {}
 };
 
-} // namespace mlir
+} // end namespace mlir
 
 #endif // MLIR_REDUCER_REDUCTIONPATTERNINTERFACE_H

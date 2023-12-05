@@ -11,7 +11,9 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::objc {
+namespace clang {
+namespace tidy {
+namespace objc {
 
 /// Finds Objective-C property declarations which
 /// are not in Lower Camel Case.
@@ -20,7 +22,7 @@ namespace clang::tidy::objc {
 /// @property(nonatomic) NSString *lowerCamelCase;
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/objc/property-declaration.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/objc-property-declaration.html
 class PropertyDeclarationCheck : public ClangTidyCheck {
 public:
   PropertyDeclarationCheck(StringRef Name, ClangTidyContext *Context)
@@ -32,6 +34,8 @@ public:
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
 };
 
-} // namespace clang::tidy::objc
+} // namespace objc
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_OBJC_PROPERTY_DECLARATION_H

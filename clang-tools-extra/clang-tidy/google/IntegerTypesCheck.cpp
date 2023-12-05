@@ -36,7 +36,9 @@ static Token getTokenAtLoc(SourceLocation Loc,
   return Tok;
 }
 
-namespace tidy::google::runtime {
+namespace tidy {
+namespace google {
+namespace runtime {
 
 IntegerTypesCheck::IntegerTypesCheck(StringRef Name, ClangTidyContext *Context)
     : ClangTidyCheck(Name, Context),
@@ -88,8 +90,8 @@ void IntegerTypesCheck::check(const MatchFinder::MatchResult &Result) {
                    tok::kw_signed))
     return;
 
-  bool IsSigned = false;
-  unsigned Width = 0;
+  bool IsSigned;
+  unsigned Width;
   const TargetInfo &TargetInfo = Result.Context->getTargetInfo();
 
   // Look for uses of short, long, long long and their unsigned versions.
@@ -127,7 +129,7 @@ void IntegerTypesCheck::check(const MatchFinder::MatchResult &Result) {
   const StringRef Port = "unsigned short port";
   const char *Data = Result.SourceManager->getCharacterData(Loc);
   if (!std::strncmp(Data, Port.data(), Port.size()) &&
-      !isAsciiIdentifierContinue(Data[Port.size()]))
+      !isIdentifierBody(Data[Port.size()]))
     return;
 
   std::string Replacement =
@@ -142,5 +144,7 @@ void IntegerTypesCheck::check(const MatchFinder::MatchResult &Result) {
                                                << Replacement;
 }
 
-} // namespace tidy::google::runtime
+} // namespace runtime
+} // namespace google
+} // namespace tidy
 } // namespace clang

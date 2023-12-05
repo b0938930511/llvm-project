@@ -20,7 +20,7 @@
 #include "test_iterators.h"
 #include "min_allocator.h"
 
-TEST_CONSTEXPR_CXX20 bool tests()
+int main(int, char**)
 {
     {
         std::vector<bool> v(100);
@@ -57,7 +57,7 @@ TEST_CONSTEXPR_CXX20 bool tests()
     {
         std::vector<bool> v(100);
         while(v.size() < v.capacity()) v.push_back(false);
-        std::size_t sz = v.size();
+        size_t sz = v.size();
         bool a[] = {1, 0, 0, 1, 1};
         const unsigned N = sizeof(a)/sizeof(a[0]);
         std::vector<bool>::iterator i = v.insert(v.cbegin() + 10, forward_iterator<const bool*>(a),
@@ -76,7 +76,7 @@ TEST_CONSTEXPR_CXX20 bool tests()
         std::vector<bool> v(100);
         while(v.size() < v.capacity()) v.push_back(false);
         v.pop_back(); v.pop_back(); v.pop_back();
-        std::size_t sz = v.size();
+        size_t sz = v.size();
         bool a[] = {1, 0, 0, 1, 1};
         const unsigned N = sizeof(a)/sizeof(a[0]);
         std::vector<bool>::iterator i = v.insert(v.cbegin() + 10, forward_iterator<const bool*>(a),
@@ -92,22 +92,6 @@ TEST_CONSTEXPR_CXX20 bool tests()
             assert(v[j] == 0);
     }
 #if TEST_STD_VER >= 11
-    {
-        std::vector<bool, explicit_allocator<bool>> v(100);
-        bool a[] = {1, 0, 0, 1, 1};
-        const unsigned N = sizeof(a)/sizeof(a[0]);
-        std::vector<bool, explicit_allocator<bool>>::iterator i = v.insert(v.cbegin() + 10, cpp17_input_iterator<const bool*>(a),
-                                        cpp17_input_iterator<const bool*>(a+N));
-        assert(v.size() == 100 + N);
-        assert(i == v.begin() + 10);
-        std::size_t j;
-        for (j = 0; j < 10; ++j)
-            assert(v[j] == 0);
-        for (std::size_t k = 0; k < N; ++j, ++k)
-            assert(v[j] == a[k]);
-        for (; j < v.size(); ++j)
-            assert(v[j] == 0);
-    }
     {
         std::vector<bool, min_allocator<bool>> v(100);
         bool a[] = {1, 0, 0, 1, 1};
@@ -142,14 +126,5 @@ TEST_CONSTEXPR_CXX20 bool tests()
     }
 #endif
 
-    return true;
-}
-
-int main(int, char**)
-{
-    tests();
-#if TEST_STD_VER > 17
-    static_assert(tests());
-#endif
-    return 0;
+  return 0;
 }

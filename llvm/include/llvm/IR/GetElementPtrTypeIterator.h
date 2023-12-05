@@ -32,6 +32,8 @@ class generic_gep_type_iterator {
 
   ItTy OpIt;
   PointerUnion<StructType *, Type *> CurTy;
+  enum : uint64_t { Unbounded = -1ull };
+  uint64_t NumElements = Unbounded;
 
   generic_gep_type_iterator() = default;
 
@@ -68,20 +70,25 @@ public:
   // temporarily not giving this iterator an operator*() to avoid a subtle
   // semantics break.
   Type *getIndexedType() const {
-    if (auto *T = dyn_cast_if_present<Type *>(CurTy))
+    if (auto *T = CurTy.dyn_cast<Type *>())
       return T;
-    return cast<StructType *>(CurTy)->getTypeAtIndex(getOperand());
+    return CurTy.get<StructType *>()->getTypeAtIndex(getOperand());
   }
 
   Value *getOperand() const { return const_cast<Value *>(&**OpIt); }
 
   generic_gep_type_iterator &operator++() { // Preincrement
     Type *Ty = getIndexedType();
-    if (auto *ATy = dyn_cast<ArrayType>(Ty))
+    if (auto *ATy = dyn_cast<ArrayType>(Ty)) {
       CurTy = ATy->getElementType();
-    else if (auto *VTy = dyn_cast<VectorType>(Ty))
+      NumElements = ATy->getNumElements();
+    } else if (auto *VTy = dyn_cast<VectorType>(Ty)) {
       CurTy = VTy->getElementType();
-    else
+      if (isa<ScalableVectorType>(VTy))
+        NumElements = Unbounded;
+      else
+        NumElements = cast<FixedVectorType>(VTy)->getNumElements();
+    } else
       CurTy = dyn_cast<StructType>(Ty);
     ++OpIt;
     return *this;
@@ -108,13 +115,22 @@ public:
   // we should provide a more minimal API here that exposes not much more than
   // that.
 
-  bool isStruct() const { return isa<StructType *>(CurTy); }
-  bool isSequential() const { return isa<Type *>(CurTy); }
+  bool isStruct() const { return CurTy.is<StructType *>(); }
+  bool isSequential() const { return CurTy.is<Type *>(); }
 
-  StructType *getStructType() const { return cast<StructType *>(CurTy); }
+  StructType *getStructType() const { return CurTy.get<StructType *>(); }
 
   StructType *getStructTypeOrNull() const {
-    return dyn_cast_if_present<StructType *>(CurTy);
+    return CurTy.dyn_cast<StructType *>();
+  }
+
+  bool isBoundedSequential() const {
+    return isSequential() && NumElements != Unbounded;
+  }
+
+  uint64_t getSequentialNumElements() const {
+    assert(isBoundedSequential());
+    return NumElements;
   }
 };
 

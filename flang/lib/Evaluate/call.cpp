@@ -10,7 +10,6 @@
 #include "flang/Common/Fortran.h"
 #include "flang/Common/idioms.h"
 #include "flang/Evaluate/characteristics.h"
-#include "flang/Evaluate/check-expression.h"
 #include "flang/Evaluate/expression.h"
 #include "flang/Evaluate/tools.h"
 #include "flang/Semantics/symbol.h"
@@ -57,7 +56,8 @@ int ActualArgument::Rank() const {
 }
 
 bool ActualArgument::operator==(const ActualArgument &that) const {
-  return keyword_ == that.keyword_ && attrs_ == that.attrs_ && u_ == that.u_;
+  return keyword_ == that.keyword_ && isPassedObject_ == that.isPassedObject_ &&
+      u_ == that.u_;
 }
 
 void ActualArgument::Parenthesize() {
@@ -119,12 +119,10 @@ const Symbol *ProcedureDesignator::GetInterfaceSymbol() const {
   if (const Symbol * symbol{GetSymbol()}) {
     const Symbol &ultimate{symbol->GetUltimate()};
     if (const auto *proc{ultimate.detailsIf<semantics::ProcEntityDetails>()}) {
-      return proc->procInterface();
+      return proc->interface().symbol();
     } else if (const auto *binding{
                    ultimate.detailsIf<semantics::ProcBindingDetails>()}) {
       return &binding->symbol();
-    } else if (ultimate.has<semantics::SubprogramDetails>()) {
-      return &ultimate;
     }
   }
   return nullptr;
@@ -132,28 +130,14 @@ const Symbol *ProcedureDesignator::GetInterfaceSymbol() const {
 
 bool ProcedureDesignator::IsElemental() const {
   if (const Symbol * interface{GetInterfaceSymbol()}) {
-    return IsElementalProcedure(*interface);
+    return interface->attrs().test(semantics::Attr::ELEMENTAL);
   } else if (const Symbol * symbol{GetSymbol()}) {
-    return IsElementalProcedure(*symbol);
+    return symbol->attrs().test(semantics::Attr::ELEMENTAL);
   } else if (const auto *intrinsic{std::get_if<SpecificIntrinsic>(&u)}) {
     return intrinsic->characteristics.value().attrs.test(
         characteristics::Procedure::Attr::Elemental);
   } else {
     DIE("ProcedureDesignator::IsElemental(): no case");
-  }
-  return false;
-}
-
-bool ProcedureDesignator::IsPure() const {
-  if (const Symbol * interface{GetInterfaceSymbol()}) {
-    return IsPureProcedure(*interface);
-  } else if (const Symbol * symbol{GetSymbol()}) {
-    return IsPureProcedure(*symbol);
-  } else if (const auto *intrinsic{std::get_if<SpecificIntrinsic>(&u)}) {
-    return intrinsic->characteristics.value().attrs.test(
-        characteristics::Procedure::Attr::Pure);
-  } else {
-    DIE("ProcedureDesignator::IsPure(): no case");
   }
   return false;
 }
@@ -171,23 +155,18 @@ const Component *ProcedureDesignator::GetComponent() const {
 }
 
 const Symbol *ProcedureDesignator::GetSymbol() const {
-  return common::visit(
-      common::visitors{
-          [](SymbolRef symbol) { return &*symbol; },
-          [](const common::CopyableIndirection<Component> &c) {
-            return &c.value().GetLastSymbol();
-          },
-          [](const auto &) -> const Symbol * { return nullptr; },
-      },
+  return std::visit(common::visitors{
+                        [](SymbolRef symbol) { return &*symbol; },
+                        [](const common::CopyableIndirection<Component> &c) {
+                          return &c.value().GetLastSymbol();
+                        },
+                        [](const auto &) -> const Symbol * { return nullptr; },
+                    },
       u);
 }
 
-const SymbolRef *ProcedureDesignator::UnwrapSymbolRef() const {
-  return std::get_if<SymbolRef>(&u);
-}
-
 std::string ProcedureDesignator::GetName() const {
-  return common::visit(
+  return std::visit(
       common::visitors{
           [](const SpecificIntrinsic &i) { return i.name; },
           [](const Symbol &symbol) { return symbol.name().ToString(); },
@@ -217,15 +196,7 @@ std::optional<Expr<SubscriptInteger>> ProcedureRef::LEN() const {
     // ProcedureDesignator::LEN() because they're independent of the
     // lengths of the actual arguments.
   }
-  if (auto len{proc_.LEN()}) {
-    if (IsActuallyConstant(*len)) {
-      return len;
-    }
-    // TODO: Handle cases where the length of a function result is a
-    // safe expression in terms of actual argument values, after substituting
-    // actual argument expressions for INTENT(IN)/VALUE dummy arguments.
-  }
-  return std::nullopt;
+  return proc_.LEN();
 }
 
 int ProcedureRef::Rank() const {
@@ -247,4 +218,5 @@ ProcedureRef::~ProcedureRef() {}
 
 void ProcedureRef::Deleter(ProcedureRef *p) { delete p; }
 
+FOR_EACH_SPECIFIC_TYPE(template class FunctionRef, )
 } // namespace Fortran::evaluate

@@ -10,7 +10,7 @@
 
 // expected-no-diagnostics
 
-void test(void) {
+void test() {
   (void)MyModuleVersion; // should be found by implicit import
 }
 

@@ -8,12 +8,15 @@
 
 #include "clang/AST/CommentBriefParser.h"
 #include "clang/AST/CommentCommandTraits.h"
-#include "clang/Basic/CharInfo.h"
 
 namespace clang {
 namespace comments {
 
 namespace {
+inline bool isWhitespace(char C) {
+  return C == ' ' || C == '\n' || C == '\r' ||
+         C == '\t' || C == '\f' || C == '\v';
+}
 
 /// Convert all whitespace into spaces, remove leading and trailing spaces,
 /// compress multiple spaces into one.
@@ -23,11 +26,12 @@ void cleanupBrief(std::string &S) {
   for (std::string::iterator I = S.begin(), E = S.end();
        I != E; ++I) {
     const char C = *I;
-    if (clang::isWhitespace(C)) {
+    if (isWhitespace(C)) {
       if (!PrevWasSpace) {
         *O++ = ' ';
         PrevWasSpace = true;
       }
+      continue;
     } else {
       *O++ = C;
       PrevWasSpace = false;
@@ -40,7 +44,12 @@ void cleanupBrief(std::string &S) {
 }
 
 bool isWhitespace(StringRef Text) {
-  return llvm::all_of(Text, clang::isWhitespace);
+  for (StringRef::const_iterator I = Text.begin(), E = Text.end();
+       I != E; ++I) {
+    if (!isWhitespace(*I))
+      return false;
+  }
+  return true;
 }
 } // unnamed namespace
 
@@ -114,7 +123,7 @@ std::string BriefParser::Parse() {
         // We found a paragraph end.  This ends the brief description if
         // \command or its equivalent was explicitly used.
         // Stop scanning text because an explicit \paragraph is the
-        // preferred one.
+        // preffered one.
         if (InBrief)
           break;
         // End first paragraph if we found some non-whitespace text.

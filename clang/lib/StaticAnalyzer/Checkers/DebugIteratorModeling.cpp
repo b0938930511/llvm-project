@@ -13,7 +13,6 @@
 #include "clang/StaticAnalyzer/Checkers/BuiltinCheckerRegistration.h"
 #include "clang/StaticAnalyzer/Core/BugReporter/BugType.h"
 #include "clang/StaticAnalyzer/Core/Checker.h"
-#include "clang/StaticAnalyzer/Core/PathSensitive/CallDescription.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CallEvent.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CheckerContext.h"
 
@@ -42,12 +41,12 @@ class DebugIteratorModeling
                                                  CheckerContext &) const;
 
   CallDescriptionMap<FnCheck> Callbacks = {
-      {{{"clang_analyzer_iterator_position"}, 1},
-       &DebugIteratorModeling::analyzerIteratorPosition},
-      {{{"clang_analyzer_iterator_container"}, 1},
-       &DebugIteratorModeling::analyzerIteratorContainer},
-      {{{"clang_analyzer_iterator_validity"}, 1},
-       &DebugIteratorModeling::analyzerIteratorValidity},
+    {{0, "clang_analyzer_iterator_position", 1},
+     &DebugIteratorModeling::analyzerIteratorPosition},
+    {{0, "clang_analyzer_iterator_container", 1},
+     &DebugIteratorModeling::analyzerIteratorContainer},
+    {{0, "clang_analyzer_iterator_validity", 1},
+     &DebugIteratorModeling::analyzerIteratorValidity},
   };
 
 public:

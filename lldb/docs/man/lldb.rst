@@ -111,7 +111,7 @@ COMMANDS
 
 .. option:: --source-quietly
 
- Tells the debugger not to echo commands while sourcing files or one-line commands provided on the command line.
+ Tells the debugger to execute this one-line lldb command before any file has been loaded.
 
 .. option:: --source <file>
 
@@ -233,10 +233,6 @@ SCRIPTING
 .. option:: -l <value>
 
  Alias for --script-language
-
-.. option:: --print-script-interpreter-info
-
-  Prints out a json dictionary with information about the scripting language interpreter.
 
 .. option:: --python-path
 

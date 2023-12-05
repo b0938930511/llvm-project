@@ -9,14 +9,21 @@ from lldbsuite.test.decorators import *
 from lldbsuite.test.lldbtest import *
 from lldbsuite.test import lldbutil
 
-
 class TestVectorOfEnums(TestBase):
-    @add_test_categories(["libc++"])
-    def test_vector_of_enums(self):
-        self.build()
 
-        lldbutil.run_to_source_breakpoint(
-            self, "// break here", lldb.SBFileSpec("main.cpp", False)
-        )
+  mydir = TestBase.compute_mydir(__file__)
 
-        self.expect("expr v", substrs=["size=3", "[0] = a", "[1] = b", "[2] = c", "}"])
+  @add_test_categories(["libc++"])
+  def test_vector_of_enums(self):
+    self.build()
+
+    lldbutil.run_to_source_breakpoint(self, '// break here',
+            lldb.SBFileSpec("main.cpp", False))
+
+    self.expect("expr v", substrs=[
+         'size=3',
+         '[0] = a',
+         '[1] = b',
+         '[2] = c',
+         '}'
+        ])

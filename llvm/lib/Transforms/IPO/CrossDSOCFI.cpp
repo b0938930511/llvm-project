@@ -14,15 +14,22 @@
 #include "llvm/Transforms/IPO/CrossDSOCFI.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/Triple.h"
+#include "llvm/IR/Constant.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalObject.h"
+#include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Module.h"
-#include "llvm/TargetParser/Triple.h"
+#include "llvm/IR/Operator.h"
+#include "llvm/InitializePasses.h"
+#include "llvm/Pass.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO.h"
 
 using namespace llvm;
@@ -33,15 +40,27 @@ STATISTIC(NumTypeIds, "Number of unique type identifiers");
 
 namespace {
 
-struct CrossDSOCFI {
+struct CrossDSOCFI : public ModulePass {
+  static char ID;
+  CrossDSOCFI() : ModulePass(ID) {
+    initializeCrossDSOCFIPass(*PassRegistry::getPassRegistry());
+  }
+
   MDNode *VeryLikelyWeights;
 
   ConstantInt *extractNumericTypeId(MDNode *MD);
   void buildCFICheck(Module &M);
-  bool runOnModule(Module &M);
+  bool runOnModule(Module &M) override;
 };
 
 } // anonymous namespace
+
+INITIALIZE_PASS_BEGIN(CrossDSOCFI, "cross-dso-cfi", "Cross-DSO CFI", false,
+                      false)
+INITIALIZE_PASS_END(CrossDSOCFI, "cross-dso-cfi", "Cross-DSO CFI", false, false)
+char CrossDSOCFI::ID = 0;
+
+ModulePass *llvm::createCrossDSOCFIPass() { return new CrossDSOCFI; }
 
 /// Extracts a numeric type identifier from an MDNode containing type metadata.
 ConstantInt *CrossDSOCFI::extractNumericTypeId(MDNode *MD) {
@@ -73,7 +92,7 @@ void CrossDSOCFI::buildCFICheck(Module &M) {
 
   NamedMDNode *CfiFunctionsMD = M.getNamedMetadata("cfi.functions");
   if (CfiFunctionsMD) {
-    for (auto *Func : CfiFunctionsMD->operands()) {
+    for (auto Func : CfiFunctionsMD->operands()) {
       assert(Func->getNumOperands() >= 2);
       for (unsigned I = 2; I < Func->getNumOperands(); ++I)
         if (ConstantInt *TypeId =
@@ -85,7 +104,7 @@ void CrossDSOCFI::buildCFICheck(Module &M) {
   LLVMContext &Ctx = M.getContext();
   FunctionCallee C = M.getOrInsertFunction(
       "__cfi_check", Type::getVoidTy(Ctx), Type::getInt64Ty(Ctx),
-      PointerType::getUnqual(Ctx), PointerType::getUnqual(Ctx));
+      Type::getInt8PtrTy(Ctx), Type::getInt8PtrTy(Ctx));
   Function *F = cast<Function>(C.getCallee());
   // Take over the existing function. The frontend emits a weak stub so that the
   // linker knows about the symbol; this pass replaces the function body.
@@ -110,9 +129,9 @@ void CrossDSOCFI::buildCFICheck(Module &M) {
 
   BasicBlock *TrapBB = BasicBlock::Create(Ctx, "fail", F);
   IRBuilder<> IRBFail(TrapBB);
-  FunctionCallee CFICheckFailFn = M.getOrInsertFunction(
-      "__cfi_check_fail", Type::getVoidTy(Ctx), PointerType::getUnqual(Ctx),
-      PointerType::getUnqual(Ctx));
+  FunctionCallee CFICheckFailFn =
+      M.getOrInsertFunction("__cfi_check_fail", Type::getVoidTy(Ctx),
+                            Type::getInt8PtrTy(Ctx), Type::getInt8PtrTy(Ctx));
   IRBFail.CreateCall(CFICheckFailFn, {&CFICheckFailData, &Addr});
   IRBFail.CreateBr(ExitBB);
 

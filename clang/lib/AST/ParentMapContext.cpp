@@ -99,7 +99,7 @@ class ParentMapContext::ParentMap {
       return llvm::ArrayRef<DynTypedNode>();
     }
     if (const auto *V = I->second.template dyn_cast<ParentVector *>()) {
-      return llvm::ArrayRef(*V);
+      return llvm::makeArrayRef(*V);
     }
     return getSingleDynTypedNodeFromParentMap(I->second);
   }
@@ -252,7 +252,7 @@ public:
       const auto *S = It->second.dyn_cast<const Stmt *>();
       if (!S) {
         if (auto *Vec = It->second.dyn_cast<ParentVector *>())
-          return llvm::ArrayRef(*Vec);
+          return llvm::makeArrayRef(*Vec);
         return getSingleDynTypedNodeFromParentMap(It->second);
       }
       const auto *P = dyn_cast<Expr>(S);
@@ -265,6 +265,16 @@ public:
   }
 };
 
+template <typename Tuple, std::size_t... Is>
+auto tuple_pop_front_impl(const Tuple &tuple, std::index_sequence<Is...>) {
+  return std::make_tuple(std::get<1 + Is>(tuple)...);
+}
+
+template <typename Tuple> auto tuple_pop_front(const Tuple &tuple) {
+  return tuple_pop_front_impl(
+      tuple, std::make_index_sequence<std::tuple_size<Tuple>::value - 1>());
+}
+
 template <typename T, typename... U> struct MatchParents {
   static std::tuple<bool, DynTypedNodeList, const T *, const U *...>
   match(const DynTypedNodeList &NodeList,
@@ -275,11 +285,10 @@ template <typename T, typename... U> struct MatchParents {
       if (NextParentList.size() == 1) {
         auto TailTuple = MatchParents<U...>::match(NextParentList, ParentMap);
         if (std::get<bool>(TailTuple)) {
-          return std::apply(
-              [TypedNode](bool, DynTypedNodeList NodeList, auto... TupleTail) {
-                return std::make_tuple(true, NodeList, TypedNode, TupleTail...);
-              },
-              TailTuple);
+          return std::tuple_cat(
+              std::make_tuple(true, std::get<DynTypedNodeList>(TailTuple),
+                              TypedNode),
+              tuple_pop_front(tuple_pop_front(TailTuple)));
         }
       }
     }
@@ -319,9 +328,6 @@ template <> DynTypedNode createDynTypedNode(const TypeLoc &Node) {
 }
 template <>
 DynTypedNode createDynTypedNode(const NestedNameSpecifierLoc &Node) {
-  return DynTypedNode::create(Node);
-}
-template <> DynTypedNode createDynTypedNode(const ObjCProtocolLoc &Node) {
   return DynTypedNode::create(Node);
 }
 /// @}
@@ -383,23 +389,21 @@ private:
       auto *Vector = NodeOrVector.template get<ParentVector *>();
       // Skip duplicates for types that have memoization data.
       // We must check that the type has memoization data before calling
-      // llvm::is_contained() because DynTypedNode::operator== can't compare all
+      // std::find() because DynTypedNode::operator== can't compare all
       // types.
       bool Found = ParentStack.back().getMemoizationData() &&
-                   llvm::is_contained(*Vector, ParentStack.back());
+                   std::find(Vector->begin(), Vector->end(),
+                             ParentStack.back()) != Vector->end();
       if (!Found)
         Vector->push_back(ParentStack.back());
     }
   }
 
-  template <typename T> static bool isNull(T Node) { return !Node; }
-  static bool isNull(ObjCProtocolLoc Node) { return false; }
-
   template <typename T, typename MapNodeTy, typename BaseTraverseFn,
             typename MapTy>
   bool TraverseNode(T Node, MapNodeTy MapNode, BaseTraverseFn BaseTraverse,
                     MapTy *Parents) {
-    if (isNull(Node))
+    if (!Node)
       return true;
     addParent(MapNode, Parents);
     ParentStack.push_back(createDynTypedNode(Node));
@@ -423,17 +427,6 @@ private:
     return TraverseNode(
         NNSLocNode, DynTypedNode::create(NNSLocNode),
         [&] { return VisitorBase::TraverseNestedNameSpecifierLoc(NNSLocNode); },
-        &Map.OtherParents);
-  }
-  bool TraverseAttr(Attr *AttrNode) {
-    return TraverseNode(
-        AttrNode, AttrNode, [&] { return VisitorBase::TraverseAttr(AttrNode); },
-        &Map.PointerParents);
-  }
-  bool TraverseObjCProtocolLoc(ObjCProtocolLoc ProtocolLocNode) {
-    return TraverseNode(
-        ProtocolLocNode, DynTypedNode::create(ProtocolLocNode),
-        [&] { return VisitorBase::TraverseObjCProtocolLoc(ProtocolLocNode); },
         &Map.OtherParents);
   }
 

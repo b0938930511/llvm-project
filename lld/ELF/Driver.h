@@ -9,14 +9,47 @@
 #ifndef LLD_ELF_DRIVER_H
 #define LLD_ELF_DRIVER_H
 
+#include "LTO.h"
+#include "SymbolTable.h"
 #include "lld/Common/LLVM.h"
+#include "lld/Common/Reproduce.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Option/ArgList.h"
-#include <optional>
+#include "llvm/Support/raw_ostream.h"
 
-namespace lld::elf {
+namespace lld {
+namespace elf {
+
+extern class LinkerDriver *driver;
+
+class LinkerDriver {
+public:
+  void linkerMain(ArrayRef<const char *> args);
+  void addFile(StringRef path, bool withLOption);
+  void addLibrary(StringRef name);
+
+private:
+  void createFiles(llvm::opt::InputArgList &args);
+  void inferMachineType();
+  template <class ELFT> void link(llvm::opt::InputArgList &args);
+  template <class ELFT> void compileBitcodeFiles();
+
+  // True if we are in --whole-archive and --no-whole-archive.
+  bool inWholeArchive = false;
+
+  // True if we are in --start-lib and --end-lib.
+  bool inLib = false;
+
+  // For LTO.
+  std::unique_ptr<BitcodeCompiler> lto;
+
+  std::vector<InputFile *> files;
+};
+
 // Parses command line options.
-class ELFOptTable : public llvm::opt::GenericOptTable {
+class ELFOptTable : public llvm::opt::OptTable {
 public:
   ELFOptTable();
   llvm::opt::InputArgList parse(ArrayRef<const char *> argv);
@@ -25,7 +58,7 @@ public:
 // Create enum with OPT_xxx values for each option in Options.td
 enum {
   OPT_INVALID = 0,
-#define OPTION(...) LLVM_MAKE_OPT_ID(__VA_ARGS__),
+#define OPTION(_1, _2, ID, _4, _5, _6, _7, _8, _9, _10, _11, _12) OPT_##ID,
 #include "Options.inc"
 #undef OPTION
 };
@@ -33,11 +66,12 @@ enum {
 void printHelp();
 std::string createResponseFile(const llvm::opt::InputArgList &args);
 
-std::optional<std::string> findFromSearchPaths(StringRef path);
-std::optional<std::string> searchScript(StringRef path);
-std::optional<std::string> searchLibraryBaseName(StringRef path);
-std::optional<std::string> searchLibrary(StringRef path);
+llvm::Optional<std::string> findFromSearchPaths(StringRef path);
+llvm::Optional<std::string> searchScript(StringRef path);
+llvm::Optional<std::string> searchLibraryBaseName(StringRef path);
+llvm::Optional<std::string> searchLibrary(StringRef path);
 
-} // namespace lld::elf
+} // namespace elf
+} // namespace lld
 
 #endif

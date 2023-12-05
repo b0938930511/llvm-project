@@ -41,7 +41,8 @@
 #include "NoAssemblerCheck.h"
 #include "SignedBitwiseCheck.h"
 
-namespace clang::tidy {
+namespace clang {
+namespace tidy {
 namespace hicpp {
 
 class HICPPModule : public ClangTidyModule {
@@ -119,4 +120,5 @@ static ClangTidyModuleRegistry::Add<HICPPModule>
 // and thus register the HICPPModule.
 volatile int HICPPModuleAnchorSource = 0;
 
-} // namespace clang::tidy
+} // namespace tidy
+} // namespace clang

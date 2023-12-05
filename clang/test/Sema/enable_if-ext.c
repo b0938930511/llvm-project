@@ -12,39 +12,39 @@ __attribute__ (( enable_if(1, "") ))
 #if defined(WARN_PEDANTIC)
 // expected-warning@-2 {{'enable_if' is a clang extension}}
 #endif
-void f(void) { }
+void f() { }
 
 __attribute__ (( __enable_if__(1, "") ))
 #if defined(WARN_PEDANTIC)
 // expected-warning@-2 {{'enable_if' is a clang extension}}
 #endif
-void g(void) { }
+void g() { }
 
 __attribute__ (( enable_if(0, "") ))
 #if defined(WARN_PEDANTIC)
 // expected-warning@-2 {{'enable_if' is a clang extension}}
 #endif
-void h(void) { }
+void h() { }
 
 __attribute__ (( __enable_if__(0, "") ))
 #if defined(WARN_PEDANTIC)
 // expected-warning@-2 {{'enable_if' is a clang extension}}
 #endif
-void i(void) { }
+void i() { }
 
 #pragma clang system_header
 
 __attribute__ (( enable_if(1, "") ))
-void j(void) { }
+void j() { }
 
 __attribute__ (( __enable_if__(1, "") ))
-void k(void) { }
+void k() { }
 
 __attribute__ (( enable_if(0, "") ))
-void l(void) { }
+void l() { }
 
 __attribute__ (( __enable_if__(0, "") ))
-void m(void) { }
+void m() { }
 
 #endif
 

@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TargetInfo/CSKYTargetInfo.h"
-#include "llvm/MC/TargetRegistry.h"
+#include "llvm/Support/TargetRegistry.h"
 using namespace llvm;
 
 Target &llvm::getTheCSKYTarget() {

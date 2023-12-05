@@ -6,14 +6,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+// XFAIL: libcpp-has-no-stdout
+
 // <iostream>
 
-// ostream cout;
+// istream cout;
 
+// XFAIL: LIBCXX-WINDOWS-FIXME
+
+// FILE_DEPENDENCIES: ../check-stdout.sh
 // RUN: %{build}
-// RUN: %{exec} %t.exe > %t.actual
-// RUN: echo -n 1234 > %t.expected
-// RUN: diff %t.expected %t.actual
+// RUN: %{exec} bash check-stdout.sh "%t.exe" "1234"
 
 #include <iostream>
 

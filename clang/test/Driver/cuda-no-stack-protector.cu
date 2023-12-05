@@ -1,16 +1,17 @@
 // Check that -stack-protector doesn't get passed down to device-side
 // compilation.
 //
+// REQUIRES: clang-driver
 //
-// RUN: not %clang -### --target=x86_64-linux-gnu -c --cuda-gpu-arch=sm_20 \
+// RUN: %clang -### -target x86_64-linux-gnu -c --cuda-gpu-arch=sm_20 \
 // RUN:   -fstack-protector-all %s 2>&1 | \
 // RUN: FileCheck %s
 //
-// RUN: not %clang -### --target=x86_64-linux-gnu -c --cuda-gpu-arch=sm_20 \
+// RUN: %clang -### -target x86_64-linux-gnu -c --cuda-gpu-arch=sm_20 \
 // RUN:   -fstack-protector-strong %s 2>&1 | \
 // RUN: FileCheck %s
 //
-// RUN: not %clang -### --target=x86_64-linux-gnu -c --cuda-gpu-arch=sm_20 \
+// RUN: %clang -### -target x86_64-linux-gnu -c --cuda-gpu-arch=sm_20 \
 // RUN:   -fstack-protector %s 2>&1 | \
 // RUN: FileCheck %s
 //

@@ -1,15 +1,11 @@
-// RUN: %clang_cc1 -fsyntax-only -triple x86_64-unknown-unknown %s -verify -Wvla
-
-int array[(long)(char *)0]; // expected-warning {{variable length array used}} \
-                            // expected-warning {{variable length array folded to constant array as an extension}} \
-                            // expected-note {{this conversion is not allowed in a constant expression}}
+// RUN: %clang_cc1 -fsyntax-only -triple x86_64-unknown-unknown %s -verify
 
 typedef struct { unsigned long bits[(((1) + (64) - 1) / (64))]; } cpumask_t;
 cpumask_t x;
-void foo(void) {
+void foo() {
   (void)x;
 }
-void bar(void) {
+void bar() {
   char* a;
   double b;
   b = (double)a; // expected-error {{pointer cannot be cast to type}}
@@ -187,7 +183,7 @@ void *intToPointerCast2(X x) {
   return (void*)x;
 }
 
-void *intToPointerCast3(void) {
+void *intToPointerCast3() {
   return (void*)(1 + 3);
 }
 

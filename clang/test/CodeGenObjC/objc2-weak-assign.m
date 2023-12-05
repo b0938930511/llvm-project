@@ -15,7 +15,7 @@ void foo (__weak id *param) {
  *param = 0;
 }
 
-int main(void)
+int main()
 {
 	*x = 0;
 	*y = 0;

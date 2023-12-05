@@ -1,49 +1,43 @@
+set(TARGETS_TO_APPEND "")
 
-set(LLVM_EXEGESIS_TARGETS)
 if (LLVM_TARGETS_TO_BUILD MATCHES "X86")
-  list(APPEND LLVM_EXEGESIS_TARGETS "X86")
+  add_subdirectory(X86)
+  set(TARGETS_TO_APPEND "${TARGETS_TO_APPEND} X86")
 endif()
 if (LLVM_TARGETS_TO_BUILD MATCHES "AArch64")
-  list(APPEND LLVM_EXEGESIS_TARGETS "AArch64")
+  add_subdirectory(AArch64)
+  set(TARGETS_TO_APPEND "${TARGETS_TO_APPEND} AArch64")
 endif()
 if (LLVM_TARGETS_TO_BUILD MATCHES "PowerPC")
-  list(APPEND LLVM_EXEGESIS_TARGETS "PowerPC")
+  add_subdirectory(PowerPC)
+  set(TARGETS_TO_APPEND "${TARGETS_TO_APPEND} PowerPC")
 endif()
 if (LLVM_TARGETS_TO_BUILD MATCHES "Mips")
-  list(APPEND LLVM_EXEGESIS_TARGETS "Mips")
+  add_subdirectory(Mips)
+  set(TARGETS_TO_APPEND "${TARGETS_TO_APPEND} Mips")
 endif()
 
-set(LLVM_EXEGESIS_TARGETS ${LLVM_EXEGESIS_TARGETS} PARENT_SCOPE)
-
-foreach(t ${LLVM_EXEGESIS_TARGETS})
-  add_subdirectory(${t})
-endforeach()
+set(LLVM_EXEGESIS_TARGETS "${LLVM_EXEGESIS_TARGETS} ${TARGETS_TO_APPEND}" PARENT_SCOPE)
 
 set(LLVM_LINK_COMPONENTS
   Analysis
   CodeGen
-  CodeGenTypes
   Core
   ExecutionEngine
   GlobalISel
   MC
-  MCA
   MCDisassembler
+  MCJIT
   MCParser
   Object
   ObjectYAML
-  OrcJIT
   RuntimeDyld
   Support
-  TargetParser
   )
 
 set(libs)
 if(LLVM_ENABLE_LIBPFM AND HAVE_LIBPFM)
   list(APPEND libs pfm)
-endif()
-if(HAVE_LIBRT)
-  list(APPEND libs rt)
 endif()
 
 add_llvm_library(LLVMExegesis
@@ -55,7 +49,6 @@ add_llvm_library(LLVMExegesis
   BenchmarkRunner.cpp
   Clustering.cpp
   CodeTemplate.cpp
-  DisassemblerHelper.cpp
   Error.cpp
   LatencyBenchmarkRunner.cpp
   LlvmState.cpp
@@ -69,7 +62,6 @@ add_llvm_library(LLVMExegesis
   SnippetFile.cpp
   SnippetGenerator.cpp
   SnippetRepetitor.cpp
-  SubprocessMemory.cpp
   Target.cpp
   UopsBenchmarkRunner.cpp
 

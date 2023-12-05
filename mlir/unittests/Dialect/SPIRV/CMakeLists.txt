@@ -5,7 +5,7 @@ add_mlir_unittest(MLIRSPIRVImportExportTests
 target_link_libraries(MLIRSPIRVImportExportTests
   PRIVATE
   MLIRIR
-  MLIRSPIRVDialect
+  MLIRSPIRV
   MLIRSPIRVDeserialization
   MLIRSPIRVSerialization
 )

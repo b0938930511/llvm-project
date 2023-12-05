@@ -14,8 +14,6 @@ using namespace mlir;
 namespace {
 struct SideEffectsPass
     : public PassWrapper<SideEffectsPass, OperationPass<ModuleOp>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(SideEffectsPass)
-
   StringRef getArgument() const final { return "test-side-effects"; }
   StringRef getDescription() const final {
     return "Test side effects interfaces";
@@ -71,7 +69,7 @@ struct SideEffectsPass
     });
   }
 };
-} // namespace
+} // end anonymous namespace
 
 namespace mlir {
 void registerSideEffectTestPasses() { PassRegistration<SideEffectsPass>(); }

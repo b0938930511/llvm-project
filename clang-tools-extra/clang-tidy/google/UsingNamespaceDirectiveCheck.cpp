@@ -13,7 +13,10 @@
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::google::build {
+namespace clang {
+namespace tidy {
+namespace google {
+namespace build {
 
 void UsingNamespaceDirectiveCheck::registerMatchers(
     ast_matchers::MatchFinder *Finder) {
@@ -53,4 +56,7 @@ bool UsingNamespaceDirectiveCheck::isStdLiteralsNamespace(
   return Parent->getName() == "literals" && Parent->getParent() &&
          Parent->getParent()->isStdNamespace();
 }
-} // namespace clang::tidy::google::build
+} // namespace build
+} // namespace google
+} // namespace tidy
+} // namespace clang

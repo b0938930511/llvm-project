@@ -1,7 +1,6 @@
 set(LLVM_LINK_COMPONENTS
   FrontendOpenMP
   Support
-  TargetParser
   )
 
 add_clang_library(clangStaticAnalyzerCheckers
@@ -10,7 +9,6 @@ add_clang_library(clangStaticAnalyzerCheckers
   ArrayBoundChecker.cpp
   ArrayBoundCheckerV2.cpp
   BasicObjCFoundationChecks.cpp
-  BitwiseShiftChecker.cpp
   BlockInCriticalSectionChecker.cpp
   BoolAssignmentChecker.cpp
   BuiltinFunctionChecker.cpp
@@ -30,21 +28,18 @@ add_clang_library(clangStaticAnalyzerCheckers
   CloneChecker.cpp
   ContainerModeling.cpp
   ConversionChecker.cpp
-  CXXDeleteChecker.cpp
   CXXSelfAssignmentChecker.cpp
   DeadStoresChecker.cpp
   DebugCheckers.cpp
   DebugContainerModeling.cpp
   DebugIteratorModeling.cpp
+  DeleteWithNonVirtualDtorChecker.cpp
   DereferenceChecker.cpp
   DirectIvarAssignment.cpp
   DivZeroChecker.cpp
   DynamicTypePropagation.cpp
   DynamicTypeChecker.cpp
   EnumCastOutOfRangeChecker.cpp
-  ErrnoChecker.cpp
-  ErrnoModeling.cpp
-  ErrnoTesterChecker.cpp
   ExprInspectionChecker.cpp
   FixedAddressChecker.cpp
   FuchsiaHandleChecker.cpp
@@ -54,7 +49,6 @@ add_clang_library(clangStaticAnalyzerCheckers
   IdenticalExprChecker.cpp
   InnerPointerChecker.cpp
   InvalidatedIteratorChecker.cpp
-  cert/InvalidPtrChecker.cpp
   Iterator.cpp
   IteratorModeling.cpp
   IteratorRangeChecker.cpp
@@ -108,22 +102,18 @@ add_clang_library(clangStaticAnalyzerCheckers
   SmartPtrModeling.cpp
   StackAddrEscapeChecker.cpp
   StdLibraryFunctionsChecker.cpp
-  StdVariantChecker.cpp
   STLAlgorithmModeling.cpp
   StreamChecker.cpp
-  StringChecker.cpp
   Taint.cpp
   TaintTesterChecker.cpp
   TestAfterDivZeroChecker.cpp
   TraversalChecker.cpp
   TrustNonnullChecker.cpp
-  TrustReturnsNonnullChecker.cpp
   UndefBranchChecker.cpp
   UndefCapturedBlockVarChecker.cpp
   UndefResultChecker.cpp
   UndefinedArraySubscriptChecker.cpp
   UndefinedAssignmentChecker.cpp
-  UndefinedNewArraySizeChecker.cpp
   UninitializedObject/UninitializedObjectChecker.cpp
   UninitializedObject/UninitializedPointee.cpp
   UnixAPIChecker.cpp
@@ -150,5 +140,4 @@ add_clang_library(clangStaticAnalyzerCheckers
 
   DEPENDS
   omp_gen
-  ClangDriverOptions
   )

@@ -5,7 +5,7 @@ typedef int Object;
 
 struct Object {int i1; } *P;
 
-void foo(void) {
+void foo() {
  struct Object { int i2; } *X;
   Object:
  {

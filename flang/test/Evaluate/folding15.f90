@@ -1,4 +1,5 @@
-! RUN: %python %S/test_folding.py %s %flang_fc1
+! RUN: %S/test_folding.sh %s %t %flang_fc1
+! REQUIRES: shell
 ! Test folding of array constructors with duplicate names for the implied
 ! DO variables
 module m1

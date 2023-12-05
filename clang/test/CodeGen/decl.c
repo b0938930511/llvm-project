@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -std=c89 -w -fmerge-all-constants -emit-llvm < %s | FileCheck %s
+// RUN: %clang_cc1 -w -fmerge-all-constants -emit-llvm < %s | FileCheck %s
 
 // CHECK: @test1.x = internal constant [12 x i32] [i32 1
 // CHECK: @__const.test2.x = private unnamed_addr constant [13 x i32] [i32 1,
@@ -9,7 +9,7 @@
 
 // CHECK: @test7 = {{(dso_local )?}}global [2 x %struct.test7s] [%struct.test7s { i32 1, i32 2 }, %struct.test7s { i32 4, i32 0 }]
 
-void test1(void) {
+void test1() {
   // This should codegen as a "@test1.x" global.
   const int x[] = { 1, 2, 3, 4, 6, 8, 9, 10, 123, 231, 123,23 };
   foo(x);
@@ -19,7 +19,8 @@ void test1(void) {
 }
 
 
-void test2(void) {
+// rdar://7346691
+void test2() {
   // This should codegen as a "@test2.x" global + memcpy.
   int x[] = { 1, 2, 3, 4, 6, 8, 9, 10, 123, 231, 123,23, 24 };
   foo(x);
@@ -27,11 +28,11 @@ void test2(void) {
   // CHECK: @test2()
   // CHECK: %x = alloca [13 x i32]
   // CHECK: call void @llvm.memcpy
-  // CHECK: call{{.*}}@foo{{.*}}ptr noundef %
+  // CHECK: call{{.*}}@foo{{.*}}i32* %
 }
 
 
-void test3(void) {
+void test3() {
   // This should codegen as a memset.
   int x[100] = { 0 };
   foo(x);
@@ -54,7 +55,7 @@ void test4(void) {
 
 union test5u { int i; double d; };
 
-void test5(void) {
+void test5() {
   union test5u ola = (union test5u) 351;
   union test5u olb = (union test5u) 1.0;
 }
@@ -72,16 +73,18 @@ struct SelectDest {
   int iMem;
 };
 
-void test6(void) {
+void test6() {
   struct SelectDest x = {1, 2, 3};
   test6f(&x);
 }
 
+// rdar://7657600
 struct test7s { int a; int b; } test7[] = {
   {1, 2},
   {4},
 };
 
+// rdar://7872531
 #pragma pack(push, 2)
 struct test8s { int f0; char f1; } test8g = {};
 
@@ -101,7 +104,7 @@ void init_error(void) {
 
 
 
-// ABI crash in recursive struct-through-function-pointer.
+// rdar://8147692 - ABI crash in recursive struct-through-function-pointer.
 typedef struct {
   int x5a;
 } x5;

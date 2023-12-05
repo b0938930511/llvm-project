@@ -8,12 +8,14 @@
 
 // <functional>
 
+// UNSUPPORTED: clang-4.0
 // UNSUPPORTED: c++03
 
 // ADDITIONAL_COMPILE_FLAGS: -D_LIBCPP_ENABLE_CXX17_REMOVED_BINDERS
 
 #include <functional>
 #include <cassert>
+#include "test_macros.h"
 
 int identity(int v) { return v; }
 int sum(int a, int b) { return a + b; }
@@ -25,7 +27,8 @@ struct Foo {
     int identity(int v) { return v; }
 };
 
-void f() {
+int main(int, char**)
+{
     typedef std::pointer_to_unary_function<int, int> PUF; // expected-warning {{'pointer_to_unary_function<int, int>' is deprecated}}
     typedef std::pointer_to_binary_function<int, int, int> PBF; // expected-warning {{'pointer_to_binary_function<int, int, int>' is deprecated}}
     std::ptr_fun<int, int>(identity); // expected-warning {{'ptr_fun<int, int>' is deprecated}}
@@ -48,4 +51,6 @@ void f() {
     std::mem_fun_ref<int, Foo, int>(&Foo::identity); // expected-warning {{'mem_fun_ref<int, Foo, int>' is deprecated}}
     std::mem_fun_ref<int, Foo>(&Foo::const_zero); // expected-warning {{'mem_fun_ref<int, Foo>' is deprecated}}
     std::mem_fun_ref<int, Foo, int>(&Foo::const_identity); // expected-warning {{'mem_fun_ref<int, Foo, int>' is deprecated}}
+
+  return 0;
 }

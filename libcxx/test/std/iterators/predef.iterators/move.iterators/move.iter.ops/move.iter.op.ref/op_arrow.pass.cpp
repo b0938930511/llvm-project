@@ -6,8 +6,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-// ADDITIONAL_COMPILE_FLAGS: -D_LIBCPP_DISABLE_DEPRECATION_WARNINGS
-
 // <iterator>
 
 // move_iterator
@@ -15,30 +13,35 @@
 // pointer operator->() const;
 //
 //  constexpr in C++17
-//  deprecated in C++20
 
 #include <iterator>
 #include <cassert>
 
 #include "test_macros.h"
 
-TEST_CONSTEXPR_CXX17 bool test()
+template <class It>
+void
+test(It i)
 {
-    char a[] = "123456789";
-    std::move_iterator<char *> it1 = std::make_move_iterator(a);
-    std::move_iterator<char *> it2 = std::make_move_iterator(a + 1);
-    assert(it1.operator->() == a);
-    assert(it2.operator->() == a + 1);
-
-    return true;
+    std::move_iterator<It> r(i);
+    assert(r.operator->() == i);
 }
 
 int main(int, char**)
 {
-    test();
+    char s[] = "123";
+    test(s);
+
 #if TEST_STD_VER > 14
-    static_assert(test());
+    {
+    constexpr const char *p = "123456789";
+    typedef std::move_iterator<const char *> MI;
+    constexpr MI it1 = std::make_move_iterator(p);
+    constexpr MI it2 = std::make_move_iterator(p+1);
+    static_assert(it1.operator->() == p, "");
+    static_assert(it2.operator->() == p + 1, "");
+    }
 #endif
 
-    return 0;
+  return 0;
 }

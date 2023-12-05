@@ -16,7 +16,6 @@
 
 #include <map>
 #include <cassert>
-#include <iterator>
 
 #include "test_macros.h"
 #include "MoveOnly.h"
@@ -166,7 +165,7 @@ int main(int, char**)
                 V(3, 2),
                 V(3, 3)
             };
-            const std::size_t num = sizeof(a1)/sizeof(a1[0]);
+            const size_t num = sizeof(a1)/sizeof(a1[0]);
             assert(Counter_base::gConstructed == num);
 
             M m1(I(a1), I(a1+num), C(), A());

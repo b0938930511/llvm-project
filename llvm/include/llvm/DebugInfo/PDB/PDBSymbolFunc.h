@@ -9,19 +9,16 @@
 #ifndef LLVM_DEBUGINFO_PDB_PDBSYMBOLFUNC_H
 #define LLVM_DEBUGINFO_PDB_PDBSYMBOLFUNC_H
 
-#include "llvm/DebugInfo/PDB/IPDBRawSymbol.h"
-
+#include "IPDBLineNumber.h"
 #include "PDBSymbol.h"
+#include "PDBSymbolTypeFunctionSig.h"
 #include "PDBTypes.h"
 
 namespace llvm {
 
-namespace pdb {
+class raw_ostream;
 
-class PDBSymDumper;
-class PDBSymbolData;
-class PDBSymbolTypeFunctionSig;
-template <typename ChildType> class IPDBEnumChildren;
+namespace pdb {
 
 class PDBSymbolFunc : public PDBSymbol {
   DECLARE_PDB_SYMBOL_CONCRETE_TYPE(PDB_SymType::Function)
@@ -82,7 +79,7 @@ public:
   uint32_t getCompilandId() const;
 };
 
-} // namespace pdb
 } // namespace llvm
+}
 
 #endif // LLVM_DEBUGINFO_PDB_PDBSYMBOLFUNC_H

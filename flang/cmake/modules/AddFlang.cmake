@@ -1,4 +1,3 @@
-include(GNUInstallDirs)
 include(LLVMDistributionSupport)
 
 macro(set_flang_windows_version_resource_properties name)
@@ -7,7 +6,7 @@ macro(set_flang_windows_version_resource_properties name)
       VERSION_MAJOR ${FLANG_VERSION_MAJOR}
       VERSION_MINOR ${FLANG_VERSION_MINOR}
       VERSION_PATCHLEVEL ${FLANG_VERSION_PATCHLEVEL}
-      VERSION_STRING "${FLANG_VERSION}"
+      VERSION_STRING "${FLANG_VERSION} (${BACKEND_PACKAGE_STRING})"
       PRODUCT_NAME "flang")
   endif()
 endmacro()
@@ -16,15 +15,12 @@ macro(add_flang_subdirectory name)
   add_llvm_subdirectory(FLANG TOOL ${name})
 endmacro()
 
-function(add_flang_library name)
-  set(options SHARED STATIC INSTALL_WITH_TOOLCHAIN)
-  set(multiValueArgs ADDITIONAL_HEADERS CLANG_LIBS)
+macro(add_flang_library name)
   cmake_parse_arguments(ARG
-    "${options}"
+    "SHARED"
     ""
-    "${multiValueArgs}"
+    "ADDITIONAL_HEADERS"
     ${ARGN})
-
   set(srcs)
   if (MSVC_IDE OR XCODE)
     # Add public headers
@@ -56,7 +52,7 @@ function(add_flang_library name)
   else()
     # llvm_add_library ignores BUILD_SHARED_LIBS if STATIC is explicitly set,
     # so we need to handle it here.
-    if (BUILD_SHARED_LIBS AND NOT ARG_STATIC)
+    if (BUILD_SHARED_LIBS)
       set(LIBTYPE SHARED OBJECT)
     else()
       set(LIBTYPE STATIC OBJECT)
@@ -66,19 +62,16 @@ function(add_flang_library name)
 
   llvm_add_library(${name} ${LIBTYPE} ${ARG_UNPARSED_ARGUMENTS} ${srcs})
 
-  clang_target_link_libraries(${name} PRIVATE ${ARG_CLANG_LIBS})
-
   if (TARGET ${name})
 
-    if (NOT LLVM_INSTALL_TOOLCHAIN_ONLY OR ${name} STREQUAL "libflang"
-        OR ARG_INSTALL_WITH_TOOLCHAIN)
+    if (NOT LLVM_INSTALL_TOOLCHAIN_ONLY OR ${name} STREQUAL "libflang")
       get_target_export_arg(${name} Flang export_to_flangtargets UMBRELLA flang-libraries)
       install(TARGETS ${name}
         COMPONENT ${name}
         ${export_to_flangtargets}
         LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}
         ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}
-        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+        RUNTIME DESTINATION bin)
 
       if (NOT LLVM_ENABLE_IDE)
         add_llvm_install_targets(install-${name}
@@ -96,7 +89,7 @@ function(add_flang_library name)
 
   set_target_properties(${name} PROPERTIES FOLDER "Flang libraries")
   set_flang_windows_version_resource_properties(${name})
-endfunction(add_flang_library)
+endmacro(add_flang_library)
 
 macro(add_flang_executable name)
   add_llvm_executable(${name} ${ARGN})
@@ -115,7 +108,7 @@ macro(add_flang_tool name)
     get_target_export_arg(${name} Flang export_to_flangtargets)
     install(TARGETS ${name}
       ${export_to_flangtargets}
-      RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+      RUNTIME DESTINATION bin
       COMPONENT ${name})
 
     if(NOT LLVM_ENABLE_IDE)
@@ -128,7 +121,8 @@ macro(add_flang_tool name)
 endmacro()
 
 macro(add_flang_symlink name dest)
-  llvm_add_tool_symlink(FLANG ${name} ${dest} ALWAYS_GENERATE)
+  add_llvm_tool_symlink(${name} ${dest} ALWAYS_GENERATE)
   # Always generate install targets
-  llvm_install_symlink(FLANG ${name} ${dest} ALWAYS_GENERATE)
+  llvm_install_symlink(${name} ${dest} ALWAYS_GENERATE)
 endmacro()
+

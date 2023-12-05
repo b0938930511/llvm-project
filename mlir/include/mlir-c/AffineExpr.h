@@ -39,8 +39,6 @@ DEFINE_C_API_STRUCT(MlirAffineExpr, const void);
 
 #undef DEFINE_C_API_STRUCT
 
-struct MlirAffineMap;
-
 /// Gets the context that owns the affine expression.
 MLIR_CAPI_EXPORTED MlirContext
 mlirAffineExprGetContext(MlirAffineExpr affineExpr);
@@ -87,10 +85,6 @@ MLIR_CAPI_EXPORTED bool mlirAffineExprIsMultipleOf(MlirAffineExpr affineExpr,
 /// 'position'.
 MLIR_CAPI_EXPORTED bool mlirAffineExprIsFunctionOfDim(MlirAffineExpr affineExpr,
                                                       intptr_t position);
-
-/// Composes the given map with the given expression.
-MLIR_CAPI_EXPORTED MlirAffineExpr mlirAffineExprCompose(
-    MlirAffineExpr affineExpr, struct MlirAffineMap affineMap);
 
 //===----------------------------------------------------------------------===//
 // Affine Dimension Expression.

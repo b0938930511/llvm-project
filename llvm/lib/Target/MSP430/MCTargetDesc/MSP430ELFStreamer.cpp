@@ -12,16 +12,13 @@
 
 #include "MSP430MCTargetDesc.h"
 #include "llvm/BinaryFormat/ELF.h"
-#include "llvm/MC/MCAssembler.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCELFStreamer.h"
 #include "llvm/MC/MCSectionELF.h"
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSubtargetInfo.h"
-#include "llvm/Support/MSP430Attributes.h"
 
 using namespace llvm;
-using namespace llvm::MSP430Attrs;
 
 namespace llvm {
 
@@ -43,7 +40,7 @@ MSP430TargetELFStreamer::MSP430TargetELFStreamer(MCStreamer &S,
   // MSP430 EABI (slaa534.pdf, part 13).
   MCSection *AttributeSection = getStreamer().getContext().getELFSection(
       ".MSP430.attributes", ELF::SHT_MSP430_ATTRIBUTES, 0);
-  Streamer.switchSection(AttributeSection);
+  Streamer.SwitchSection(AttributeSection);
 
   // Format version.
   Streamer.emitInt8(0x41);
@@ -57,14 +54,15 @@ MSP430TargetELFStreamer::MSP430TargetELFStreamer(MCStreamer &S,
   Streamer.emitInt8(1);
   // Attribute vector length.
   Streamer.emitInt32(11);
-
-  Streamer.emitInt8(TagISA);
-  Streamer.emitInt8(STI.hasFeature(MSP430::FeatureX) ? ISAMSP430X : ISAMSP430);
-  Streamer.emitInt8(TagCodeModel);
-  Streamer.emitInt8(CMSmall);
-  Streamer.emitInt8(TagDataModel);
-  Streamer.emitInt8(DMSmall);
-  // Don't emit TagEnumSize, for full GCC compatibility.
+  // OFBA_MSPABI_Tag_ISA(4) = 1, MSP430
+  Streamer.emitInt8(4);
+  Streamer.emitInt8(1);
+  // OFBA_MSPABI_Tag_Code_Model(6) = 1, Small
+  Streamer.emitInt8(6);
+  Streamer.emitInt8(1);
+  // OFBA_MSPABI_Tag_Data_Model(8) = 1, Small
+  Streamer.emitInt8(8);
+  Streamer.emitInt8(1);
 }
 
 MCELFStreamer &MSP430TargetELFStreamer::getStreamer() {

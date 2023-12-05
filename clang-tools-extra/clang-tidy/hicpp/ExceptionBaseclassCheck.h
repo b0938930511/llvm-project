@@ -11,12 +11,14 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::hicpp {
+namespace clang {
+namespace tidy {
+namespace hicpp {
 
 /// Check for thrown exceptions and enforce they are all derived from std::exception.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/hicpp/exception-baseclass.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/hicpp-exception-baseclass.html
 class ExceptionBaseclassCheck : public ClangTidyCheck {
 public:
   ExceptionBaseclassCheck(StringRef Name, ClangTidyContext *Context)
@@ -28,6 +30,8 @@ public:
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
 };
 
-} // namespace clang::tidy::hicpp
+} // namespace hicpp
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_HICPP_EXCEPTION_BASECLASS_H

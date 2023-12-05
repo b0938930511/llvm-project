@@ -31,6 +31,7 @@
 #ifndef LLVM_CLANG_TOOLS_EXTRA_CLANGD_INDEX_DEX_ITERATOR_H
 #define LLVM_CLANG_TOOLS_EXTRA_CLANGD_INDEX_DEX_ITERATOR_H
 
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <memory>
@@ -124,8 +125,8 @@ inline void populateChildren(std::vector<std::unique_ptr<Iterator>> &) {}
 template <typename... TailT>
 void populateChildren(std::vector<std::unique_ptr<Iterator>> &Children,
                       std::unique_ptr<Iterator> Head, TailT... Tail) {
-  Children.push_back(std::move(Head));
-  populateChildren(Children, std::move(Tail)...);
+  Children.push_back(move(Head));
+  populateChildren(Children, move(Tail)...);
 }
 } // namespace detail
 
@@ -178,7 +179,7 @@ public:
   std::unique_ptr<Iterator> intersect(Args... args) const {
     std::vector<std::unique_ptr<Iterator>> Children;
     detail::populateChildren(Children, std::forward<Args>(args)...);
-    return intersect(std::move(Children));
+    return intersect(move(Children));
   }
 
   /// This allows unionOf(create(...), create(...)) syntax.
@@ -186,7 +187,7 @@ public:
   std::unique_ptr<Iterator> unionOf(Args... args) const {
     std::vector<std::unique_ptr<Iterator>> Children;
     detail::populateChildren(Children, std::forward<Args>(args)...);
-    return unionOf(std::move(Children));
+    return unionOf(move(Children));
   }
 };
 

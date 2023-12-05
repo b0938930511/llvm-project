@@ -93,7 +93,9 @@ MCOperand LanaiMCInstLower::LowerSymbolOperand(const MachineOperand &MO,
 void LanaiMCInstLower::Lower(const MachineInstr *MI, MCInst &OutMI) const {
   OutMI.setOpcode(MI->getOpcode());
 
-  for (const MachineOperand &MO : MI->operands()) {
+  for (unsigned I = 0, E = MI->getNumOperands(); I != E; ++I) {
+    const MachineOperand &MO = MI->getOperand(I);
+
     MCOperand MCOp;
     switch (MO.getType()) {
     case MachineOperand::MO_Register:

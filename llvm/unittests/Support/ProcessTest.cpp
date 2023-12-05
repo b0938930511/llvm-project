@@ -6,12 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Support/Process.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/Support/Error.h"
-#include "llvm/TargetParser/Host.h"
-#include "llvm/TargetParser/Triple.h"
+#include "llvm/Support/Host.h"
+#include "llvm/Support/Process.h"
 #include "gtest/gtest.h"
-#include <optional>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -46,15 +45,15 @@ TEST(ProcessTest, GetRandomNumberTest) {
 #if HAVE_SETENV || _MSC_VER
 TEST(ProcessTest, Basic) {
   setenv("__LLVM_TEST_ENVIRON_VAR__", "abc", true);
-  std::optional<std::string> val(Process::GetEnv("__LLVM_TEST_ENVIRON_VAR__"));
-  EXPECT_TRUE(val.has_value());
+  Optional<std::string> val(Process::GetEnv("__LLVM_TEST_ENVIRON_VAR__"));
+  EXPECT_TRUE(val.hasValue());
   EXPECT_STREQ("abc", val->c_str());
 }
 
 TEST(ProcessTest, None) {
-  std::optional<std::string> val(
+  Optional<std::string> val(
       Process::GetEnv("__LLVM_TEST_ENVIRON_NO_SUCH_VAR__"));
-  EXPECT_FALSE(val.has_value());
+  EXPECT_FALSE(val.hasValue());
 }
 #endif
 
@@ -62,15 +61,15 @@ TEST(ProcessTest, None) {
 
 TEST(ProcessTest, EmptyVal) {
   SetEnvironmentVariableA("__LLVM_TEST_ENVIRON_VAR__", "");
-  std::optional<std::string> val(Process::GetEnv("__LLVM_TEST_ENVIRON_VAR__"));
-  EXPECT_TRUE(val.has_value());
+  Optional<std::string> val(Process::GetEnv("__LLVM_TEST_ENVIRON_VAR__"));
+  EXPECT_TRUE(val.hasValue());
   EXPECT_STREQ("", val->c_str());
 }
 
 TEST(ProcessTest, Wchar) {
   SetEnvironmentVariableW(L"__LLVM_TEST_ENVIRON_VAR__", L"abcdefghijklmnopqrs");
-  std::optional<std::string> val(Process::GetEnv("__LLVM_TEST_ENVIRON_VAR__"));
-  EXPECT_TRUE(val.has_value());
+  Optional<std::string> val(Process::GetEnv("__LLVM_TEST_ENVIRON_VAR__"));
+  EXPECT_TRUE(val.hasValue());
   EXPECT_STREQ("abcdefghijklmnopqrs", val->c_str());
 }
 #endif
@@ -103,7 +102,7 @@ protected:
 
 TEST_F(PageSizeTest, PageSize) {
   if (!isSupported())
-    GTEST_SKIP();
+    return;
 
   llvm::Expected<unsigned> Result = llvm::sys::Process::getPageSize();
   ASSERT_FALSE(!Result);

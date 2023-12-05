@@ -11,8 +11,6 @@
 #include "ARMBaseRegisterInfo.h"
 #include "ARMSubtarget.h"
 #include "llvm/Analysis/ValueTracking.h"
-#include "llvm/CodeGen/MachineFrameInfo.h"
-#include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/ScheduleDAG.h"
 #include "llvm/CodeGen/TargetRegisterInfo.h"
@@ -166,7 +164,7 @@ static bool getBaseOffset(const MachineInstr &MI, const MachineOperand *&BaseOp,
 
 ARMBankConflictHazardRecognizer::ARMBankConflictHazardRecognizer(
     const ScheduleDAG *DAG, int64_t CPUBankMask, bool CPUAssumeITCMConflict)
-    : MF(DAG->MF), DL(DAG->MF.getDataLayout()),
+    : ScheduleHazardRecognizer(), MF(DAG->MF), DL(DAG->MF.getDataLayout()),
       DataMask(DataBankMask.getNumOccurrences() ? int64_t(DataBankMask)
                                                 : CPUBankMask),
       AssumeITCMBankConflict(AssumeITCMConflict.getNumOccurrences()

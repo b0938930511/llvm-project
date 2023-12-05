@@ -61,7 +61,8 @@ static cl::opt<int> DbgNVJCount("nvj-count", cl::init(-1), cl::Hidden,
     "New Value Jump"));
 
 static cl::opt<bool> DisableNewValueJumps("disable-nvjump", cl::Hidden,
-                                          cl::desc("Disable New Value Jumps"));
+    cl::ZeroOrMore, cl::init(false),
+    cl::desc("Disable New Value Jumps"));
 
 namespace llvm {
 
@@ -534,9 +535,13 @@ bool HexagonNewValueJump::runOnMachineFunction(MachineFunction &MF) {
         // I am doing this only because LLVM does not provide LiveOut
         // at the BB level.
         bool predLive = false;
-        for (const MachineBasicBlock *SuccMBB : MBB->successors())
-          if (SuccMBB->isLiveIn(predReg))
+        for (MachineBasicBlock::const_succ_iterator SI = MBB->succ_begin(),
+                                                    SIE = MBB->succ_end();
+             SI != SIE; ++SI) {
+          MachineBasicBlock *succMBB = *SI;
+          if (succMBB->isLiveIn(predReg))
             predLive = true;
+        }
         if (predLive)
           break;
 

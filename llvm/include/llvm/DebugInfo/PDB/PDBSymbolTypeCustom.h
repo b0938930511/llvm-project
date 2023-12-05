@@ -14,6 +14,7 @@
 
 namespace llvm {
 
+class raw_ostream;
 namespace pdb {
 
 class PDBSymbolTypeCustom : public PDBSymbol {
@@ -25,7 +26,7 @@ public:
   FORWARD_SYMBOL_METHOD(getOemSymbolId)
 };
 
-} // namespace pdb
 } // namespace llvm
+}
 
 #endif // LLVM_DEBUGINFO_PDB_PDBSYMBOLTYPECUSTOM_H

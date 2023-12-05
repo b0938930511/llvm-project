@@ -22,6 +22,7 @@
 #ifndef LLVM_LIB_TRANSFORMS_OBJCARC_DEPENDENCYANALYSIS_H
 #define LLVM_LIB_TRANSFORMS_OBJCARC_DEPENDENCYANALYSIS_H
 
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Analysis/ObjCARCInstKind.h"
 
 namespace llvm {
@@ -45,7 +46,8 @@ enum DependenceKind {
   AutoreleasePoolBoundary,
   CanChangeRetainCount,
   RetainAutoreleaseDep,       ///< Blocks objc_retainAutorelease.
-  RetainAutoreleaseRVDep      ///< Blocks objc_retainAutoreleaseReturnValue.
+  RetainAutoreleaseRVDep,     ///< Blocks objc_retainAutoreleaseReturnValue.
+  RetainRVDep                 ///< Blocks objc_retainAutoreleasedReturnValue.
 };
 
 /// Find dependent instructions. If there is exactly one dependent instruction,

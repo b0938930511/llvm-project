@@ -38,7 +38,7 @@ void gorf (struct S* s) {
 }
 
 
-I *source(void);
+I *source();
 
 @interface I()
 {
@@ -46,7 +46,7 @@ I *source(void);
 }
 @end
 
-void use(void) {
+void use() {
     int _c = source()->c;
 }
 
@@ -56,4 +56,4 @@ void use(void) {
 }
 @end
 
-I *x(void);
+I *x();

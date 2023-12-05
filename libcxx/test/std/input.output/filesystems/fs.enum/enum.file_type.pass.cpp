@@ -6,18 +6,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-// UNSUPPORTED: c++03, c++11, c++14
+// UNSUPPORTED: c++03
 
 // <filesystem>
 
 // enum class file_type;
 
-#include <filesystem>
+#include "filesystem_include.h"
 #include <type_traits>
 #include <cassert>
 
 #include "test_macros.h"
-namespace fs = std::filesystem;
+
 
 constexpr fs::file_type ME(int val) { return static_cast<fs::file_type>(val); }
 

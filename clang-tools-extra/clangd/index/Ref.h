@@ -9,8 +9,10 @@
 #ifndef LLVM_CLANG_TOOLS_EXTRA_CLANGD_INDEX_REF_H
 #define LLVM_CLANG_TOOLS_EXTRA_CLANGD_INDEX_REF_H
 
-#include "index/SymbolID.h"
-#include "index/SymbolLocation.h"
+#include "SymbolID.h"
+#include "SymbolLocation.h"
+#include "clang/Index/IndexSymbol.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/StringSaver.h"

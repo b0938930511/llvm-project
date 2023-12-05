@@ -1,14 +1,14 @@
 // RUN: %clang_cc1 -triple i686-win32 -emit-llvm -fms-extensions < %s | FileCheck %s
 
-void bar(void) {
+void bar() {
 }
 
 // CHECK-NOT: foo
-__forceinline void foo(void) {
+__forceinline void foo() {
   bar();
 }
 
-void i_want_bar(void) {
+void i_want_bar() {
 // CHECK: call void @bar
   foo();
 }

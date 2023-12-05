@@ -8,7 +8,7 @@
 
 // UNSUPPORTED: no-exceptions
 
-// constexpr bool test(size_t pos) const;
+// test constexpr bool test(size_t pos) const;
 
 // Make sure we throw std::out_of_range when calling test() on an OOB index.
 

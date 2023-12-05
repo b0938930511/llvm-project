@@ -28,6 +28,7 @@
 #include "SyntheticSections.h"
 #include "lld/Common/Strings.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Parallel.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -74,7 +75,7 @@ static SymbolMapTy getSectionSyms(ArrayRef<Symbol *> syms) {
 static DenseMap<Symbol *, std::string>
 getSymbolStrings(ArrayRef<Symbol *> syms) {
   std::vector<std::string> str(syms.size());
-  parallelFor(0, syms.size(), [&](size_t i) {
+  parallelForEachN(0, syms.size(), [&](size_t i) {
     raw_string_ostream os(str[i]);
     auto *chunk = syms[i]->getChunk();
     if (chunk == nullptr)

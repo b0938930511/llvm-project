@@ -73,7 +73,3 @@ module XN {
 
 module XS {
 }
-
-module Textual {
-  textual header "textual.h"
-}

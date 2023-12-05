@@ -15,7 +15,9 @@
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::misc {
+namespace clang {
+namespace tidy {
+namespace misc {
 
 namespace {
 
@@ -58,7 +60,7 @@ public:
   size_type count(const T &V) const {
     if (isSmall()) {
       // Since the collection is small, just do a linear search.
-      return llvm::is_contained(Vector, V) ? 1 : 0;
+      return llvm::find(Vector, V) == Vector.end() ? 0 : 1;
     }
 
     return Set.count(V);
@@ -104,7 +106,7 @@ private:
   size_type count(const T &V) const {
     if (isSmall()) {
       // Since the collection is small, just do a linear search.
-      return llvm::is_contained(Vector, V) ? 1 : 0;
+      return llvm::find(Vector, V) == Vector.end() ? 0 : 1;
     }
     // Look-up in the Set.
     return Set.count(V);
@@ -169,7 +171,7 @@ CallStackTy pathfindSomeCycle(ArrayRef<CallGraphNode *> SCC) {
   SmartSmallSetVector<CallGraphNode::CallRecord, SmallCallStackSize>
       CallStackSet;
 
-  // Arbitrarily take the first element of SCC as entry point.
+  // Arbitrairly take the first element of SCC as entry point.
   CallGraphNode::CallRecord EntryNode(SCC.front(), /*CallExpr=*/nullptr);
   // Continue recursing into subsequent callees that are part of this SCC,
   // and are thus known to be part of the call graph loop, until loop forms.
@@ -268,4 +270,6 @@ void NoRecursionCheck::check(const MatchFinder::MatchResult &Result) {
   }
 }
 
-} // namespace clang::tidy::misc
+} // namespace misc
+} // namespace tidy
+} // namespace clang

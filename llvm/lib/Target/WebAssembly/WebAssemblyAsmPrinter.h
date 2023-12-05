@@ -66,11 +66,10 @@ public:
   void emitEndOfAsmFile(Module &M) override;
   void EmitProducerInfo(Module &M);
   void EmitTargetFeatures(Module &M);
-  void EmitFunctionAttributes(Module &M);
-  void emitSymbolType(const MCSymbolWasm *Sym);
   void emitGlobalVariable(const GlobalVariable *GV) override;
   void emitJumpTableInfo() override;
   void emitConstantPool() override;
+  void emitLinkage(const GlobalValue *, MCSymbol *) const override;
   void emitFunctionBodyStart() override;
   void emitInstruction(const MachineInstr *MI) override;
   bool PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
@@ -85,7 +84,7 @@ public:
                                        wasm::WasmSignature *Sig,
                                        bool &InvokeDetected);
   MCSymbol *getOrCreateWasmSymbol(StringRef Name);
-  void emitDecls(const Module &M);
+  void emitExternalDecls(const Module &M);
 };
 
 } // end namespace llvm

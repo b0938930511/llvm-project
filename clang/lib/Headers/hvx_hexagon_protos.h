@@ -9,6 +9,7 @@
 //===----------------------------------------------------------------------===//
 
 
+
 #ifndef _HVX_HEXAGON_PROTOS_H_
 #define _HVX_HEXAGON_PROTOS_H_ 1
 
@@ -27,7 +28,7 @@
    Execution Slots:       SLOT0
    ========================================================================== */
 
-#define Q6_R_vextract_VR(Vu,Rs) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_extractw)(Vu,Rs)
+#define Q6_R_vextract_VR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_extractw)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -38,7 +39,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_V_hi_W(Vss) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_hi)(Vss)
+#define Q6_V_hi_W __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_hi)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -49,7 +50,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_V_lo_W(Vss) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_lo)(Vss)
+#define Q6_V_lo_W __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_lo)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -60,7 +61,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_V_vsplat_R(Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_lvsplatw)(Rt)
+#define Q6_V_vsplat_R __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_lvsplatw)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -71,7 +72,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_and_QQ(Qs,Qt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_pred_and)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qs),-1),__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qt),-1))),-1)
+#define Q6_Q_and_QQ __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_pred_and)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -82,7 +83,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_and_QQn(Qs,Qt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_pred_and_n)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qs),-1),__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qt),-1))),-1)
+#define Q6_Q_and_QQn __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_pred_and_n)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -93,7 +94,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_not_Q(Qs) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_pred_not)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qs),-1))),-1)
+#define Q6_Q_not_Q __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_pred_not)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -104,7 +105,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_or_QQ(Qs,Qt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_pred_or)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qs),-1),__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qt),-1))),-1)
+#define Q6_Q_or_QQ __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_pred_or)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -115,7 +116,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_or_QQn(Qs,Qt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_pred_or_n)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qs),-1),__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qt),-1))),-1)
+#define Q6_Q_or_QQn __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_pred_or_n)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -126,7 +127,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vsetq_R(Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_pred_scalar2)(Rt)),-1)
+#define Q6_Q_vsetq_R __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_pred_scalar2)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -137,7 +138,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_xor_QQ(Qs,Qt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_pred_xor)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qs),-1),__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qt),-1))),-1)
+#define Q6_Q_xor_QQ __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_pred_xor)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -148,7 +149,7 @@
    Execution Slots:       SLOT0
    ========================================================================== */
 
-#define Q6_vmem_QnRIV(Qv,Rt,Vs) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vS32b_nqpred_ai)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qv),-1),Rt,Vs)
+#define Q6_vmem_QnRIV __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vS32b_nqpred_ai)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -159,7 +160,7 @@
    Execution Slots:       SLOT0
    ========================================================================== */
 
-#define Q6_vmem_QnRIV_nt(Qv,Rt,Vs) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vS32b_nt_nqpred_ai)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qv),-1),Rt,Vs)
+#define Q6_vmem_QnRIV_nt __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vS32b_nt_nqpred_ai)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -170,7 +171,7 @@
    Execution Slots:       SLOT0
    ========================================================================== */
 
-#define Q6_vmem_QRIV_nt(Qv,Rt,Vs) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vS32b_nt_qpred_ai)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qv),-1),Rt,Vs)
+#define Q6_vmem_QRIV_nt __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vS32b_nt_qpred_ai)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -181,7 +182,7 @@
    Execution Slots:       SLOT0
    ========================================================================== */
 
-#define Q6_vmem_QRIV(Qv,Rt,Vs) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vS32b_qpred_ai)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qv),-1),Rt,Vs)
+#define Q6_vmem_QRIV __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vS32b_qpred_ai)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -192,7 +193,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vuh_vabsdiff_VhVh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vabsdiffh)(Vu,Vv)
+#define Q6_Vuh_vabsdiff_VhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vabsdiffh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -203,7 +204,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vub_vabsdiff_VubVub(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vabsdiffub)(Vu,Vv)
+#define Q6_Vub_vabsdiff_VubVub __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vabsdiffub)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -214,7 +215,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vuh_vabsdiff_VuhVuh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vabsdiffuh)(Vu,Vv)
+#define Q6_Vuh_vabsdiff_VuhVuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vabsdiffuh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -225,7 +226,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vuw_vabsdiff_VwVw(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vabsdiffw)(Vu,Vv)
+#define Q6_Vuw_vabsdiff_VwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vabsdiffw)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -236,7 +237,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vabs_Vh(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vabsh)(Vu)
+#define Q6_Vh_vabs_Vh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vabsh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -247,7 +248,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vabs_Vh_sat(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vabsh_sat)(Vu)
+#define Q6_Vh_vabs_Vh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vabsh_sat)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -258,7 +259,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_vabs_Vw(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vabsw)(Vu)
+#define Q6_Vw_vabs_Vw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vabsw)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -269,7 +270,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_vabs_Vw_sat(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vabsw_sat)(Vu)
+#define Q6_Vw_vabs_Vw_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vabsw_sat)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -280,7 +281,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vadd_VbVb(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddb)(Vu,Vv)
+#define Q6_Vb_vadd_VbVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddb)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -291,7 +292,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wb_vadd_WbWb(Vuu,Vvv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddb_dv)(Vuu,Vvv)
+#define Q6_Wb_vadd_WbWb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddb_dv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -302,7 +303,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_condacc_QnVbVb(Qv,Vx,Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddbnq)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qv),-1),Vx,Vu)
+#define Q6_Vb_condacc_QnVbVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddbnq)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -313,7 +314,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_condacc_QVbVb(Qv,Vx,Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddbq)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qv),-1),Vx,Vu)
+#define Q6_Vb_condacc_QVbVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddbq)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -324,7 +325,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vadd_VhVh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddh)(Vu,Vv)
+#define Q6_Vh_vadd_VhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -335,7 +336,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wh_vadd_WhWh(Vuu,Vvv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddh_dv)(Vuu,Vvv)
+#define Q6_Wh_vadd_WhWh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddh_dv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -346,7 +347,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_condacc_QnVhVh(Qv,Vx,Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddhnq)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qv),-1),Vx,Vu)
+#define Q6_Vh_condacc_QnVhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddhnq)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -357,7 +358,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_condacc_QVhVh(Qv,Vx,Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddhq)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qv),-1),Vx,Vu)
+#define Q6_Vh_condacc_QVhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddhq)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -368,7 +369,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vadd_VhVh_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddhsat)(Vu,Vv)
+#define Q6_Vh_vadd_VhVh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddhsat)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -379,7 +380,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wh_vadd_WhWh_sat(Vuu,Vvv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddhsat_dv)(Vuu,Vvv)
+#define Q6_Wh_vadd_WhWh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddhsat_dv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -390,7 +391,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Ww_vadd_VhVh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddhw)(Vu,Vv)
+#define Q6_Ww_vadd_VhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddhw)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -401,7 +402,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wh_vadd_VubVub(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddubh)(Vu,Vv)
+#define Q6_Wh_vadd_VubVub __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddubh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -412,7 +413,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vub_vadd_VubVub_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddubsat)(Vu,Vv)
+#define Q6_Vub_vadd_VubVub_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddubsat)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -423,7 +424,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wub_vadd_WubWub_sat(Vuu,Vvv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddubsat_dv)(Vuu,Vvv)
+#define Q6_Wub_vadd_WubWub_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddubsat_dv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -434,7 +435,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vuh_vadd_VuhVuh_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vadduhsat)(Vu,Vv)
+#define Q6_Vuh_vadd_VuhVuh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vadduhsat)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -445,7 +446,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wuh_vadd_WuhWuh_sat(Vuu,Vvv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vadduhsat_dv)(Vuu,Vvv)
+#define Q6_Wuh_vadd_WuhWuh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vadduhsat_dv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -456,7 +457,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Ww_vadd_VuhVuh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vadduhw)(Vu,Vv)
+#define Q6_Ww_vadd_VuhVuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vadduhw)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -467,7 +468,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_vadd_VwVw(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddw)(Vu,Vv)
+#define Q6_Vw_vadd_VwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddw)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -478,7 +479,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Ww_vadd_WwWw(Vuu,Vvv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddw_dv)(Vuu,Vvv)
+#define Q6_Ww_vadd_WwWw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddw_dv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -489,7 +490,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_condacc_QnVwVw(Qv,Vx,Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddwnq)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qv),-1),Vx,Vu)
+#define Q6_Vw_condacc_QnVwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddwnq)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -500,7 +501,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_condacc_QVwVw(Qv,Vx,Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddwq)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qv),-1),Vx,Vu)
+#define Q6_Vw_condacc_QVwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddwq)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -511,7 +512,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_vadd_VwVw_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddwsat)(Vu,Vv)
+#define Q6_Vw_vadd_VwVw_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddwsat)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -522,7 +523,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Ww_vadd_WwWw_sat(Vuu,Vvv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddwsat_dv)(Vuu,Vvv)
+#define Q6_Ww_vadd_WwWw_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddwsat_dv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -533,7 +534,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_V_valign_VVR(Vu,Vv,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_valignb)(Vu,Vv,Rt)
+#define Q6_V_valign_VVR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_valignb)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -544,7 +545,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_V_valign_VVI(Vu,Vv,Iu3) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_valignbi)(Vu,Vv,Iu3)
+#define Q6_V_valign_VVI __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_valignbi)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -555,7 +556,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_V_vand_VV(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vand)(Vu,Vv)
+#define Q6_V_vand_VV __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vand)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -566,7 +567,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_V_vand_QR(Qu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qu),-1),Rt)
+#define Q6_V_vand_QR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -577,7 +578,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_V_vandor_VQR(Vx,Qu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt_acc)(Vx,__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qu),-1),Rt)
+#define Q6_V_vandor_VQR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -588,7 +589,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Q_vand_VR(Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)(Vu,Rt)),-1)
+#define Q6_Q_vand_VR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -599,7 +600,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Q_vandor_QVR(Qx,Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt_acc)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Rt)),-1)
+#define Q6_Q_vandor_QVR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -610,7 +611,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vasl_VhR(Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaslh)(Vu,Rt)
+#define Q6_Vh_vasl_VhR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaslh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -621,7 +622,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vasl_VhVh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaslhv)(Vu,Vv)
+#define Q6_Vh_vasl_VhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaslhv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -632,7 +633,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_vasl_VwR(Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaslw)(Vu,Rt)
+#define Q6_Vw_vasl_VwR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaslw)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -643,7 +644,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_vaslacc_VwVwR(Vx,Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaslw_acc)(Vx,Vu,Rt)
+#define Q6_Vw_vaslacc_VwVwR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaslw_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -654,7 +655,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_vasl_VwVw(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaslwv)(Vu,Vv)
+#define Q6_Vw_vasl_VwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaslwv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -665,7 +666,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vasr_VhR(Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrh)(Vu,Rt)
+#define Q6_Vh_vasr_VhR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -676,7 +677,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vasr_VhVhR_rnd_sat(Vu,Vv,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrhbrndsat)(Vu,Vv,Rt)
+#define Q6_Vb_vasr_VhVhR_rnd_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrhbrndsat)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -687,7 +688,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vub_vasr_VhVhR_rnd_sat(Vu,Vv,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrhubrndsat)(Vu,Vv,Rt)
+#define Q6_Vub_vasr_VhVhR_rnd_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrhubrndsat)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -698,7 +699,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vub_vasr_VhVhR_sat(Vu,Vv,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrhubsat)(Vu,Vv,Rt)
+#define Q6_Vub_vasr_VhVhR_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrhubsat)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -709,7 +710,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vasr_VhVh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrhv)(Vu,Vv)
+#define Q6_Vh_vasr_VhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrhv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -720,7 +721,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_vasr_VwR(Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrw)(Vu,Rt)
+#define Q6_Vw_vasr_VwR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrw)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -731,7 +732,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_vasracc_VwVwR(Vx,Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrw_acc)(Vx,Vu,Rt)
+#define Q6_Vw_vasracc_VwVwR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrw_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -742,7 +743,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vasr_VwVwR(Vu,Vv,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrwh)(Vu,Vv,Rt)
+#define Q6_Vh_vasr_VwVwR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrwh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -753,7 +754,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vasr_VwVwR_rnd_sat(Vu,Vv,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrwhrndsat)(Vu,Vv,Rt)
+#define Q6_Vh_vasr_VwVwR_rnd_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrwhrndsat)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -764,7 +765,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vasr_VwVwR_sat(Vu,Vv,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrwhsat)(Vu,Vv,Rt)
+#define Q6_Vh_vasr_VwVwR_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrwhsat)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -775,7 +776,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vuh_vasr_VwVwR_sat(Vu,Vv,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrwuhsat)(Vu,Vv,Rt)
+#define Q6_Vuh_vasr_VwVwR_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrwuhsat)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -786,7 +787,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_vasr_VwVw(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrwv)(Vu,Vv)
+#define Q6_Vw_vasr_VwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrwv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -797,7 +798,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_V_equals_V(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vassign)(Vu)
+#define Q6_V_equals_V __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vassign)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -808,7 +809,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_W_equals_W(Vuu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vassignp)(Vuu)
+#define Q6_W_equals_W __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vassignp)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -819,7 +820,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vavg_VhVh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vavgh)(Vu,Vv)
+#define Q6_Vh_vavg_VhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vavgh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -830,7 +831,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vavg_VhVh_rnd(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vavghrnd)(Vu,Vv)
+#define Q6_Vh_vavg_VhVh_rnd __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vavghrnd)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -841,7 +842,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vub_vavg_VubVub(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vavgub)(Vu,Vv)
+#define Q6_Vub_vavg_VubVub __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vavgub)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -852,7 +853,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vub_vavg_VubVub_rnd(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vavgubrnd)(Vu,Vv)
+#define Q6_Vub_vavg_VubVub_rnd __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vavgubrnd)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -863,7 +864,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vuh_vavg_VuhVuh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vavguh)(Vu,Vv)
+#define Q6_Vuh_vavg_VuhVuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vavguh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -874,7 +875,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vuh_vavg_VuhVuh_rnd(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vavguhrnd)(Vu,Vv)
+#define Q6_Vuh_vavg_VuhVuh_rnd __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vavguhrnd)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -885,7 +886,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_vavg_VwVw(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vavgw)(Vu,Vv)
+#define Q6_Vw_vavg_VwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vavgw)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -896,7 +897,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_vavg_VwVw_rnd(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vavgwrnd)(Vu,Vv)
+#define Q6_Vw_vavg_VwVw_rnd __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vavgwrnd)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -907,7 +908,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vuh_vcl0_Vuh(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vcl0h)(Vu)
+#define Q6_Vuh_vcl0_Vuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vcl0h)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -918,7 +919,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vuw_vcl0_Vuw(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vcl0w)(Vu)
+#define Q6_Vuw_vcl0_Vuw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vcl0w)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -929,7 +930,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_W_vcombine_VV(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vcombine)(Vu,Vv)
+#define Q6_W_vcombine_VV __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vcombine)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -940,7 +941,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_V_vzero() __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vd0)()
+#define Q6_V_vzero __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vd0)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -951,7 +952,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vdeal_Vb(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdealb)(Vu)
+#define Q6_Vb_vdeal_Vb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdealb)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -962,7 +963,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vdeale_VbVb(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdealb4w)(Vu,Vv)
+#define Q6_Vb_vdeale_VbVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdealb4w)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -973,7 +974,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vdeal_Vh(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdealh)(Vu)
+#define Q6_Vh_vdeal_Vh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdealh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -984,7 +985,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_W_vdeal_VVR(Vu,Vv,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdealvdd)(Vu,Vv,Rt)
+#define Q6_W_vdeal_VVR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdealvdd)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -995,7 +996,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_V_vdelta_VV(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdelta)(Vu,Vv)
+#define Q6_V_vdelta_VV __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdelta)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1006,7 +1007,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vh_vdmpy_VubRb(Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpybus)(Vu,Rt)
+#define Q6_Vh_vdmpy_VubRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpybus)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1017,7 +1018,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vh_vdmpyacc_VhVubRb(Vx,Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpybus_acc)(Vx,Vu,Rt)
+#define Q6_Vh_vdmpyacc_VhVubRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpybus_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1028,7 +1029,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wh_vdmpy_WubRb(Vuu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpybus_dv)(Vuu,Rt)
+#define Q6_Wh_vdmpy_WubRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpybus_dv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1039,7 +1040,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wh_vdmpyacc_WhWubRb(Vxx,Vuu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpybus_dv_acc)(Vxx,Vuu,Rt)
+#define Q6_Wh_vdmpyacc_WhWubRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpybus_dv_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1050,7 +1051,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vdmpy_VhRb(Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhb)(Vu,Rt)
+#define Q6_Vw_vdmpy_VhRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhb)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1061,7 +1062,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vdmpyacc_VwVhRb(Vx,Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhb_acc)(Vx,Vu,Rt)
+#define Q6_Vw_vdmpyacc_VwVhRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhb_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1072,7 +1073,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Ww_vdmpy_WhRb(Vuu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhb_dv)(Vuu,Rt)
+#define Q6_Ww_vdmpy_WhRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhb_dv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1083,7 +1084,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Ww_vdmpyacc_WwWhRb(Vxx,Vuu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhb_dv_acc)(Vxx,Vuu,Rt)
+#define Q6_Ww_vdmpyacc_WwWhRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhb_dv_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1094,7 +1095,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vdmpy_WhRh_sat(Vuu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhisat)(Vuu,Rt)
+#define Q6_Vw_vdmpy_WhRh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhisat)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1105,29 +1106,29 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vdmpyacc_VwWhRh_sat(Vx,Vuu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhisat_acc)(Vx,Vuu,Rt)
+#define Q6_Vw_vdmpyacc_VwWhRh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhisat_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
 /* ==========================================================================
    Assembly Syntax:       Vd32.w=vdmpy(Vu32.h,Rt32.h):sat
    C Intrinsic Prototype: HVX_Vector Q6_Vw_vdmpy_VhRh_sat(HVX_Vector Vu, Word32 Rt)
-   Instruction Type:      CVI_VX
+   Instruction Type:      CVI_VX_DV
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vdmpy_VhRh_sat(Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhsat)(Vu,Rt)
+#define Q6_Vw_vdmpy_VhRh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhsat)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
 /* ==========================================================================
    Assembly Syntax:       Vx32.w+=vdmpy(Vu32.h,Rt32.h):sat
    C Intrinsic Prototype: HVX_Vector Q6_Vw_vdmpyacc_VwVhRh_sat(HVX_Vector Vx, HVX_Vector Vu, Word32 Rt)
-   Instruction Type:      CVI_VX
+   Instruction Type:      CVI_VX_DV
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vdmpyacc_VwVhRh_sat(Vx,Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhsat_acc)(Vx,Vu,Rt)
+#define Q6_Vw_vdmpyacc_VwVhRh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhsat_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1138,7 +1139,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vdmpy_WhRuh_sat(Vuu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhsuisat)(Vuu,Rt)
+#define Q6_Vw_vdmpy_WhRuh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhsuisat)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1149,40 +1150,40 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vdmpyacc_VwWhRuh_sat(Vx,Vuu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhsuisat_acc)(Vx,Vuu,Rt)
+#define Q6_Vw_vdmpyacc_VwWhRuh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhsuisat_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
 /* ==========================================================================
    Assembly Syntax:       Vd32.w=vdmpy(Vu32.h,Rt32.uh):sat
    C Intrinsic Prototype: HVX_Vector Q6_Vw_vdmpy_VhRuh_sat(HVX_Vector Vu, Word32 Rt)
-   Instruction Type:      CVI_VX
+   Instruction Type:      CVI_VX_DV
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vdmpy_VhRuh_sat(Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhsusat)(Vu,Rt)
+#define Q6_Vw_vdmpy_VhRuh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhsusat)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
 /* ==========================================================================
    Assembly Syntax:       Vx32.w+=vdmpy(Vu32.h,Rt32.uh):sat
    C Intrinsic Prototype: HVX_Vector Q6_Vw_vdmpyacc_VwVhRuh_sat(HVX_Vector Vx, HVX_Vector Vu, Word32 Rt)
-   Instruction Type:      CVI_VX
+   Instruction Type:      CVI_VX_DV
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vdmpyacc_VwVhRuh_sat(Vx,Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhsusat_acc)(Vx,Vu,Rt)
+#define Q6_Vw_vdmpyacc_VwVhRuh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhsusat_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
 /* ==========================================================================
    Assembly Syntax:       Vd32.w=vdmpy(Vu32.h,Vv32.h):sat
    C Intrinsic Prototype: HVX_Vector Q6_Vw_vdmpy_VhVh_sat(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX
+   Instruction Type:      CVI_VX_DV
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vdmpy_VhVh_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhvsat)(Vu,Vv)
+#define Q6_Vw_vdmpy_VhVh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhvsat)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1193,7 +1194,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vdmpyacc_VwVhVh_sat(Vx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhvsat_acc)(Vx,Vu,Vv)
+#define Q6_Vw_vdmpyacc_VwVhVh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpyhvsat_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1204,7 +1205,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wuw_vdsad_WuhRuh(Vuu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdsaduh)(Vuu,Rt)
+#define Q6_Wuw_vdsad_WuhRuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdsaduh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1215,7 +1216,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wuw_vdsadacc_WuwWuhRuh(Vxx,Vuu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdsaduh_acc)(Vxx,Vuu,Rt)
+#define Q6_Wuw_vdsadacc_WuwWuhRuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdsaduh_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1226,7 +1227,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_eq_VbVb(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_veqb)(Vu,Vv)),-1)
+#define Q6_Q_vcmp_eq_VbVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_veqb)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1237,7 +1238,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_eqand_QVbVb(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_veqb_and)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
+#define Q6_Q_vcmp_eqand_QVbVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_veqb_and)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1248,7 +1249,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_eqor_QVbVb(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_veqb_or)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
+#define Q6_Q_vcmp_eqor_QVbVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_veqb_or)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1259,7 +1260,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_eqxacc_QVbVb(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_veqb_xor)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
+#define Q6_Q_vcmp_eqxacc_QVbVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_veqb_xor)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1270,7 +1271,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_eq_VhVh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_veqh)(Vu,Vv)),-1)
+#define Q6_Q_vcmp_eq_VhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_veqh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1281,7 +1282,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_eqand_QVhVh(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_veqh_and)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
+#define Q6_Q_vcmp_eqand_QVhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_veqh_and)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1292,7 +1293,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_eqor_QVhVh(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_veqh_or)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
+#define Q6_Q_vcmp_eqor_QVhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_veqh_or)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1303,7 +1304,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_eqxacc_QVhVh(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_veqh_xor)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
+#define Q6_Q_vcmp_eqxacc_QVhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_veqh_xor)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1314,7 +1315,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_eq_VwVw(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_veqw)(Vu,Vv)),-1)
+#define Q6_Q_vcmp_eq_VwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_veqw)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1325,7 +1326,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_eqand_QVwVw(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_veqw_and)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
+#define Q6_Q_vcmp_eqand_QVwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_veqw_and)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1336,7 +1337,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_eqor_QVwVw(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_veqw_or)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
+#define Q6_Q_vcmp_eqor_QVwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_veqw_or)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1347,7 +1348,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_eqxacc_QVwVw(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_veqw_xor)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
+#define Q6_Q_vcmp_eqxacc_QVwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_veqw_xor)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1358,7 +1359,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_gt_VbVb(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtb)(Vu,Vv)),-1)
+#define Q6_Q_vcmp_gt_VbVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtb)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1369,7 +1370,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_gtand_QVbVb(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtb_and)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
+#define Q6_Q_vcmp_gtand_QVbVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtb_and)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1380,7 +1381,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_gtor_QVbVb(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtb_or)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
+#define Q6_Q_vcmp_gtor_QVbVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtb_or)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1391,7 +1392,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_gtxacc_QVbVb(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtb_xor)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
+#define Q6_Q_vcmp_gtxacc_QVbVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtb_xor)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1402,7 +1403,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_gt_VhVh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgth)(Vu,Vv)),-1)
+#define Q6_Q_vcmp_gt_VhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgth)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1413,7 +1414,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_gtand_QVhVh(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgth_and)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
+#define Q6_Q_vcmp_gtand_QVhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgth_and)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1424,7 +1425,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_gtor_QVhVh(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgth_or)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
+#define Q6_Q_vcmp_gtor_QVhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgth_or)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1435,7 +1436,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_gtxacc_QVhVh(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgth_xor)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
+#define Q6_Q_vcmp_gtxacc_QVhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgth_xor)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1446,7 +1447,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_gt_VubVub(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtub)(Vu,Vv)),-1)
+#define Q6_Q_vcmp_gt_VubVub __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtub)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1457,7 +1458,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_gtand_QVubVub(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtub_and)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
+#define Q6_Q_vcmp_gtand_QVubVub __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtub_and)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1468,7 +1469,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_gtor_QVubVub(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtub_or)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
+#define Q6_Q_vcmp_gtor_QVubVub __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtub_or)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1479,7 +1480,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_gtxacc_QVubVub(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtub_xor)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
+#define Q6_Q_vcmp_gtxacc_QVubVub __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtub_xor)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1490,7 +1491,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_gt_VuhVuh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtuh)(Vu,Vv)),-1)
+#define Q6_Q_vcmp_gt_VuhVuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtuh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1501,7 +1502,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_gtand_QVuhVuh(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtuh_and)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
+#define Q6_Q_vcmp_gtand_QVuhVuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtuh_and)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1512,7 +1513,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_gtor_QVuhVuh(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtuh_or)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
+#define Q6_Q_vcmp_gtor_QVuhVuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtuh_or)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1523,7 +1524,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_gtxacc_QVuhVuh(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtuh_xor)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
+#define Q6_Q_vcmp_gtxacc_QVuhVuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtuh_xor)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1534,7 +1535,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_gt_VuwVuw(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtuw)(Vu,Vv)),-1)
+#define Q6_Q_vcmp_gt_VuwVuw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtuw)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1545,7 +1546,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_gtand_QVuwVuw(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtuw_and)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
+#define Q6_Q_vcmp_gtand_QVuwVuw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtuw_and)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1556,7 +1557,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_gtor_QVuwVuw(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtuw_or)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
+#define Q6_Q_vcmp_gtor_QVuwVuw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtuw_or)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1567,7 +1568,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_gtxacc_QVuwVuw(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtuw_xor)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
+#define Q6_Q_vcmp_gtxacc_QVuwVuw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtuw_xor)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1578,7 +1579,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_gt_VwVw(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtw)(Vu,Vv)),-1)
+#define Q6_Q_vcmp_gt_VwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtw)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1589,7 +1590,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_gtand_QVwVw(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtw_and)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
+#define Q6_Q_vcmp_gtand_QVwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtw_and)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1600,7 +1601,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_gtor_QVwVw(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtw_or)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
+#define Q6_Q_vcmp_gtor_QVwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtw_or)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1611,7 +1612,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vcmp_gtxacc_QVwVw(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtw_xor)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
+#define Q6_Q_vcmp_gtxacc_QVwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtw_xor)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1622,7 +1623,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vinsert_VwR(Vx,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vinsertwr)(Vx,Rt)
+#define Q6_Vw_vinsert_VwR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vinsertwr)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1633,7 +1634,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_V_vlalign_VVR(Vu,Vv,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlalignb)(Vu,Vv,Rt)
+#define Q6_V_vlalign_VVR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlalignb)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1644,7 +1645,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_V_vlalign_VVI(Vu,Vv,Iu3) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlalignbi)(Vu,Vv,Iu3)
+#define Q6_V_vlalign_VVI __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlalignbi)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1655,7 +1656,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vuh_vlsr_VuhR(Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlsrh)(Vu,Rt)
+#define Q6_Vuh_vlsr_VuhR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlsrh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1666,7 +1667,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vlsr_VhVh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlsrhv)(Vu,Vv)
+#define Q6_Vh_vlsr_VhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlsrhv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1677,7 +1678,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vuw_vlsr_VuwR(Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlsrw)(Vu,Rt)
+#define Q6_Vuw_vlsr_VuwR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlsrw)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1688,7 +1689,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_vlsr_VwVw(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlsrwv)(Vu,Vv)
+#define Q6_Vw_vlsr_VwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlsrwv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1699,7 +1700,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vlut32_VbVbR(Vu,Vv,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlutvvb)(Vu,Vv,Rt)
+#define Q6_Vb_vlut32_VbVbR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlutvvb)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1710,7 +1711,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vlut32or_VbVbVbR(Vx,Vu,Vv,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlutvvb_oracc)(Vx,Vu,Vv,Rt)
+#define Q6_Vb_vlut32or_VbVbVbR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlutvvb_oracc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1721,7 +1722,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wh_vlut16_VbVhR(Vu,Vv,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlutvwh)(Vu,Vv,Rt)
+#define Q6_Wh_vlut16_VbVhR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlutvwh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1732,7 +1733,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wh_vlut16or_WhVbVhR(Vxx,Vu,Vv,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlutvwh_oracc)(Vxx,Vu,Vv,Rt)
+#define Q6_Wh_vlut16or_WhVbVhR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlutvwh_oracc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1743,7 +1744,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vmax_VhVh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmaxh)(Vu,Vv)
+#define Q6_Vh_vmax_VhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmaxh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1754,7 +1755,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vub_vmax_VubVub(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmaxub)(Vu,Vv)
+#define Q6_Vub_vmax_VubVub __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmaxub)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1765,7 +1766,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vuh_vmax_VuhVuh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmaxuh)(Vu,Vv)
+#define Q6_Vuh_vmax_VuhVuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmaxuh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1776,7 +1777,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_vmax_VwVw(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmaxw)(Vu,Vv)
+#define Q6_Vw_vmax_VwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmaxw)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1787,7 +1788,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vmin_VhVh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vminh)(Vu,Vv)
+#define Q6_Vh_vmin_VhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vminh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1798,7 +1799,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vub_vmin_VubVub(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vminub)(Vu,Vv)
+#define Q6_Vub_vmin_VubVub __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vminub)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1809,7 +1810,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vuh_vmin_VuhVuh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vminuh)(Vu,Vv)
+#define Q6_Vuh_vmin_VuhVuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vminuh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1820,7 +1821,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_vmin_VwVw(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vminw)(Vu,Vv)
+#define Q6_Vw_vmin_VwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vminw)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1831,7 +1832,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wh_vmpa_WubRb(Vuu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpabus)(Vuu,Rt)
+#define Q6_Wh_vmpa_WubRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpabus)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1842,7 +1843,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wh_vmpaacc_WhWubRb(Vxx,Vuu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpabus_acc)(Vxx,Vuu,Rt)
+#define Q6_Wh_vmpaacc_WhWubRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpabus_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1853,7 +1854,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wh_vmpa_WubWb(Vuu,Vvv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpabusv)(Vuu,Vvv)
+#define Q6_Wh_vmpa_WubWb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpabusv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1864,7 +1865,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wh_vmpa_WubWub(Vuu,Vvv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpabuuv)(Vuu,Vvv)
+#define Q6_Wh_vmpa_WubWub __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpabuuv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1875,7 +1876,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Ww_vmpa_WhRb(Vuu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpahb)(Vuu,Rt)
+#define Q6_Ww_vmpa_WhRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpahb)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1886,7 +1887,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Ww_vmpaacc_WwWhRb(Vxx,Vuu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpahb_acc)(Vxx,Vuu,Rt)
+#define Q6_Ww_vmpaacc_WwWhRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpahb_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1897,7 +1898,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wh_vmpy_VubRb(Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpybus)(Vu,Rt)
+#define Q6_Wh_vmpy_VubRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpybus)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1908,7 +1909,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wh_vmpyacc_WhVubRb(Vxx,Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpybus_acc)(Vxx,Vu,Rt)
+#define Q6_Wh_vmpyacc_WhVubRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpybus_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1919,7 +1920,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wh_vmpy_VubVb(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpybusv)(Vu,Vv)
+#define Q6_Wh_vmpy_VubVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpybusv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1930,7 +1931,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wh_vmpyacc_WhVubVb(Vxx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpybusv_acc)(Vxx,Vu,Vv)
+#define Q6_Wh_vmpyacc_WhVubVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpybusv_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1941,7 +1942,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wh_vmpy_VbVb(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpybv)(Vu,Vv)
+#define Q6_Wh_vmpy_VbVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpybv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1952,7 +1953,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wh_vmpyacc_WhVbVb(Vxx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpybv_acc)(Vxx,Vu,Vv)
+#define Q6_Wh_vmpyacc_WhVbVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpybv_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1963,7 +1964,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vmpye_VwVuh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyewuh)(Vu,Vv)
+#define Q6_Vw_vmpye_VwVuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyewuh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1974,7 +1975,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Ww_vmpy_VhRh(Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyh)(Vu,Rt)
+#define Q6_Ww_vmpy_VhRh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -1985,29 +1986,29 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Ww_vmpyacc_WwVhRh_sat(Vxx,Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyhsat_acc)(Vxx,Vu,Rt)
+#define Q6_Ww_vmpyacc_WwVhRh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyhsat_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
 /* ==========================================================================
    Assembly Syntax:       Vd32.h=vmpy(Vu32.h,Rt32.h):<<1:rnd:sat
    C Intrinsic Prototype: HVX_Vector Q6_Vh_vmpy_VhRh_s1_rnd_sat(HVX_Vector Vu, Word32 Rt)
-   Instruction Type:      CVI_VX
+   Instruction Type:      CVI_VX_DV
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vh_vmpy_VhRh_s1_rnd_sat(Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyhsrs)(Vu,Rt)
+#define Q6_Vh_vmpy_VhRh_s1_rnd_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyhsrs)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
 /* ==========================================================================
    Assembly Syntax:       Vd32.h=vmpy(Vu32.h,Rt32.h):<<1:sat
    C Intrinsic Prototype: HVX_Vector Q6_Vh_vmpy_VhRh_s1_sat(HVX_Vector Vu, Word32 Rt)
-   Instruction Type:      CVI_VX
+   Instruction Type:      CVI_VX_DV
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vh_vmpy_VhRh_s1_sat(Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyhss)(Vu,Rt)
+#define Q6_Vh_vmpy_VhRh_s1_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyhss)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2018,7 +2019,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Ww_vmpy_VhVuh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyhus)(Vu,Vv)
+#define Q6_Ww_vmpy_VhVuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyhus)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2029,7 +2030,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Ww_vmpyacc_WwVhVuh(Vxx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyhus_acc)(Vxx,Vu,Vv)
+#define Q6_Ww_vmpyacc_WwVhVuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyhus_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2040,7 +2041,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Ww_vmpy_VhVh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyhv)(Vu,Vv)
+#define Q6_Ww_vmpy_VhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyhv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2051,18 +2052,18 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Ww_vmpyacc_WwVhVh(Vxx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyhv_acc)(Vxx,Vu,Vv)
+#define Q6_Ww_vmpyacc_WwVhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyhv_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
 /* ==========================================================================
    Assembly Syntax:       Vd32.h=vmpy(Vu32.h,Vv32.h):<<1:rnd:sat
    C Intrinsic Prototype: HVX_Vector Q6_Vh_vmpy_VhVh_s1_rnd_sat(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX
+   Instruction Type:      CVI_VX_DV
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vh_vmpy_VhVh_s1_rnd_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyhvsrs)(Vu,Vv)
+#define Q6_Vh_vmpy_VhVh_s1_rnd_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyhvsrs)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2073,7 +2074,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vmpyieo_VhVh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyieoh)(Vu,Vv)
+#define Q6_Vw_vmpyieo_VhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyieoh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2084,7 +2085,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vmpyieacc_VwVwVh(Vx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyiewh_acc)(Vx,Vu,Vv)
+#define Q6_Vw_vmpyieacc_VwVwVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyiewh_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2095,7 +2096,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vmpyie_VwVuh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyiewuh)(Vu,Vv)
+#define Q6_Vw_vmpyie_VwVuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyiewuh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2106,7 +2107,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vmpyieacc_VwVwVuh(Vx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyiewuh_acc)(Vx,Vu,Vv)
+#define Q6_Vw_vmpyieacc_VwVwVuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyiewuh_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2117,7 +2118,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vh_vmpyi_VhVh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyih)(Vu,Vv)
+#define Q6_Vh_vmpyi_VhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyih)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2128,7 +2129,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vh_vmpyiacc_VhVhVh(Vx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyih_acc)(Vx,Vu,Vv)
+#define Q6_Vh_vmpyiacc_VhVhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyih_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2139,7 +2140,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vh_vmpyi_VhRb(Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyihb)(Vu,Rt)
+#define Q6_Vh_vmpyi_VhRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyihb)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2150,7 +2151,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vh_vmpyiacc_VhVhRb(Vx,Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyihb_acc)(Vx,Vu,Rt)
+#define Q6_Vh_vmpyiacc_VhVhRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyihb_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2161,7 +2162,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vmpyio_VwVh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyiowh)(Vu,Vv)
+#define Q6_Vw_vmpyio_VwVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyiowh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2172,7 +2173,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vmpyi_VwRb(Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyiwb)(Vu,Rt)
+#define Q6_Vw_vmpyi_VwRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyiwb)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2183,7 +2184,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vmpyiacc_VwVwRb(Vx,Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyiwb_acc)(Vx,Vu,Rt)
+#define Q6_Vw_vmpyiacc_VwVwRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyiwb_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2194,7 +2195,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vmpyi_VwRh(Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyiwh)(Vu,Rt)
+#define Q6_Vw_vmpyi_VwRh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyiwh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2205,7 +2206,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vmpyiacc_VwVwRh(Vx,Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyiwh_acc)(Vx,Vu,Rt)
+#define Q6_Vw_vmpyiacc_VwVwRh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyiwh_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2216,7 +2217,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vmpyo_VwVh_s1_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyowh)(Vu,Vv)
+#define Q6_Vw_vmpyo_VwVh_s1_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyowh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2227,7 +2228,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vmpyo_VwVh_s1_rnd_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyowh_rnd)(Vu,Vv)
+#define Q6_Vw_vmpyo_VwVh_s1_rnd_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyowh_rnd)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2238,7 +2239,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vmpyoacc_VwVwVh_s1_rnd_sat_shift(Vx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyowh_rnd_sacc)(Vx,Vu,Vv)
+#define Q6_Vw_vmpyoacc_VwVwVh_s1_rnd_sat_shift __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyowh_rnd_sacc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2249,7 +2250,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vmpyoacc_VwVwVh_s1_sat_shift(Vx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyowh_sacc)(Vx,Vu,Vv)
+#define Q6_Vw_vmpyoacc_VwVwVh_s1_sat_shift __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyowh_sacc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2260,7 +2261,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wuh_vmpy_VubRub(Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyub)(Vu,Rt)
+#define Q6_Wuh_vmpy_VubRub __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyub)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2271,7 +2272,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wuh_vmpyacc_WuhVubRub(Vxx,Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyub_acc)(Vxx,Vu,Rt)
+#define Q6_Wuh_vmpyacc_WuhVubRub __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyub_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2282,7 +2283,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wuh_vmpy_VubVub(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyubv)(Vu,Vv)
+#define Q6_Wuh_vmpy_VubVub __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyubv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2293,7 +2294,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wuh_vmpyacc_WuhVubVub(Vxx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyubv_acc)(Vxx,Vu,Vv)
+#define Q6_Wuh_vmpyacc_WuhVubVub __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyubv_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2304,7 +2305,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wuw_vmpy_VuhRuh(Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyuh)(Vu,Rt)
+#define Q6_Wuw_vmpy_VuhRuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyuh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2315,7 +2316,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wuw_vmpyacc_WuwVuhRuh(Vxx,Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyuh_acc)(Vxx,Vu,Rt)
+#define Q6_Wuw_vmpyacc_WuwVuhRuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyuh_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2326,7 +2327,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wuw_vmpy_VuhVuh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyuhv)(Vu,Vv)
+#define Q6_Wuw_vmpy_VuhVuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyuhv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2337,7 +2338,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wuw_vmpyacc_WuwVuhVuh(Vxx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyuhv_acc)(Vxx,Vu,Vv)
+#define Q6_Wuw_vmpyacc_WuwVuhVuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyuhv_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2348,7 +2349,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_V_vmux_QVV(Qt,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmux)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qt),-1),Vu,Vv)
+#define Q6_V_vmux_QVV __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmux)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2359,7 +2360,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vnavg_VhVh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vnavgh)(Vu,Vv)
+#define Q6_Vh_vnavg_VhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vnavgh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2370,7 +2371,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vnavg_VubVub(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vnavgub)(Vu,Vv)
+#define Q6_Vb_vnavg_VubVub __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vnavgub)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2381,7 +2382,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_vnavg_VwVw(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vnavgw)(Vu,Vv)
+#define Q6_Vw_vnavg_VwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vnavgw)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2392,7 +2393,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vnormamt_Vh(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vnormamth)(Vu)
+#define Q6_Vh_vnormamt_Vh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vnormamth)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2403,7 +2404,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_vnormamt_Vw(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vnormamtw)(Vu)
+#define Q6_Vw_vnormamt_Vw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vnormamtw)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2414,7 +2415,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_V_vnot_V(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vnot)(Vu)
+#define Q6_V_vnot_V __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vnot)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2425,7 +2426,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_V_vor_VV(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vor)(Vu,Vv)
+#define Q6_V_vor_VV __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vor)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2436,7 +2437,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vpacke_VhVh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vpackeb)(Vu,Vv)
+#define Q6_Vb_vpacke_VhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vpackeb)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2447,7 +2448,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vpacke_VwVw(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vpackeh)(Vu,Vv)
+#define Q6_Vh_vpacke_VwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vpackeh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2458,7 +2459,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vpack_VhVh_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vpackhb_sat)(Vu,Vv)
+#define Q6_Vb_vpack_VhVh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vpackhb_sat)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2469,7 +2470,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vub_vpack_VhVh_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vpackhub_sat)(Vu,Vv)
+#define Q6_Vub_vpack_VhVh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vpackhub_sat)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2480,7 +2481,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vpacko_VhVh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vpackob)(Vu,Vv)
+#define Q6_Vb_vpacko_VhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vpackob)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2491,7 +2492,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vpacko_VwVw(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vpackoh)(Vu,Vv)
+#define Q6_Vh_vpacko_VwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vpackoh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2502,7 +2503,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vpack_VwVw_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vpackwh_sat)(Vu,Vv)
+#define Q6_Vh_vpack_VwVw_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vpackwh_sat)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2513,7 +2514,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vuh_vpack_VwVw_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vpackwuh_sat)(Vu,Vv)
+#define Q6_Vuh_vpack_VwVw_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vpackwuh_sat)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2524,7 +2525,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vpopcount_Vh(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vpopcounth)(Vu)
+#define Q6_Vh_vpopcount_Vh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vpopcounth)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2535,7 +2536,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_V_vrdelta_VV(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrdelta)(Vu,Vv)
+#define Q6_V_vrdelta_VV __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrdelta)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2546,7 +2547,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vrmpy_VubRb(Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpybus)(Vu,Rt)
+#define Q6_Vw_vrmpy_VubRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpybus)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2557,7 +2558,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vrmpyacc_VwVubRb(Vx,Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpybus_acc)(Vx,Vu,Rt)
+#define Q6_Vw_vrmpyacc_VwVubRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpybus_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2568,7 +2569,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Ww_vrmpy_WubRbI(Vuu,Rt,Iu1) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpybusi)(Vuu,Rt,Iu1)
+#define Q6_Ww_vrmpy_WubRbI __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpybusi)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2579,7 +2580,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Ww_vrmpyacc_WwWubRbI(Vxx,Vuu,Rt,Iu1) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpybusi_acc)(Vxx,Vuu,Rt,Iu1)
+#define Q6_Ww_vrmpyacc_WwWubRbI __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpybusi_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2590,18 +2591,18 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vrmpy_VubVb(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpybusv)(Vu,Vv)
+#define Q6_Vw_vrmpy_VubVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpybusv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
 /* ==========================================================================
    Assembly Syntax:       Vx32.w+=vrmpy(Vu32.ub,Vv32.b)
    C Intrinsic Prototype: HVX_Vector Q6_Vw_vrmpyacc_VwVubVb(HVX_Vector Vx, HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX
+   Instruction Type:      CVI_VX_DV
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vrmpyacc_VwVubVb(Vx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpybusv_acc)(Vx,Vu,Vv)
+#define Q6_Vw_vrmpyacc_VwVubVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpybusv_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2612,18 +2613,18 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vrmpy_VbVb(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpybv)(Vu,Vv)
+#define Q6_Vw_vrmpy_VbVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpybv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
 /* ==========================================================================
    Assembly Syntax:       Vx32.w+=vrmpy(Vu32.b,Vv32.b)
    C Intrinsic Prototype: HVX_Vector Q6_Vw_vrmpyacc_VwVbVb(HVX_Vector Vx, HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX
+   Instruction Type:      CVI_VX_DV
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vrmpyacc_VwVbVb(Vx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpybv_acc)(Vx,Vu,Vv)
+#define Q6_Vw_vrmpyacc_VwVbVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpybv_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2634,7 +2635,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vuw_vrmpy_VubRub(Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpyub)(Vu,Rt)
+#define Q6_Vuw_vrmpy_VubRub __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpyub)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2645,7 +2646,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vuw_vrmpyacc_VuwVubRub(Vx,Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpyub_acc)(Vx,Vu,Rt)
+#define Q6_Vuw_vrmpyacc_VuwVubRub __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpyub_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2656,7 +2657,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wuw_vrmpy_WubRubI(Vuu,Rt,Iu1) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpyubi)(Vuu,Rt,Iu1)
+#define Q6_Wuw_vrmpy_WubRubI __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpyubi)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2667,7 +2668,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wuw_vrmpyacc_WuwWubRubI(Vxx,Vuu,Rt,Iu1) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpyubi_acc)(Vxx,Vuu,Rt,Iu1)
+#define Q6_Wuw_vrmpyacc_WuwWubRubI __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpyubi_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2678,18 +2679,18 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vuw_vrmpy_VubVub(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpyubv)(Vu,Vv)
+#define Q6_Vuw_vrmpy_VubVub __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpyubv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
 /* ==========================================================================
    Assembly Syntax:       Vx32.uw+=vrmpy(Vu32.ub,Vv32.ub)
    C Intrinsic Prototype: HVX_Vector Q6_Vuw_vrmpyacc_VuwVubVub(HVX_Vector Vx, HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX
+   Instruction Type:      CVI_VX_DV
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vuw_vrmpyacc_VuwVubVub(Vx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpyubv_acc)(Vx,Vu,Vv)
+#define Q6_Vuw_vrmpyacc_VuwVubVub __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrmpyubv_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2700,7 +2701,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_V_vror_VR(Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vror)(Vu,Rt)
+#define Q6_V_vror_VR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vror)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2711,7 +2712,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vround_VhVh_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vroundhb)(Vu,Vv)
+#define Q6_Vb_vround_VhVh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vroundhb)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2722,7 +2723,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vub_vround_VhVh_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vroundhub)(Vu,Vv)
+#define Q6_Vub_vround_VhVh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vroundhub)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2733,7 +2734,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vround_VwVw_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vroundwh)(Vu,Vv)
+#define Q6_Vh_vround_VwVw_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vroundwh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2744,7 +2745,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vuh_vround_VwVw_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vroundwuh)(Vu,Vv)
+#define Q6_Vuh_vround_VwVw_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vroundwuh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2755,7 +2756,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wuw_vrsad_WubRubI(Vuu,Rt,Iu1) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrsadubi)(Vuu,Rt,Iu1)
+#define Q6_Wuw_vrsad_WubRubI __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrsadubi)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2766,7 +2767,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wuw_vrsadacc_WuwWubRubI(Vxx,Vuu,Rt,Iu1) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrsadubi_acc)(Vxx,Vuu,Rt,Iu1)
+#define Q6_Wuw_vrsadacc_WuwWubRubI __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrsadubi_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2777,7 +2778,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vub_vsat_VhVh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsathub)(Vu,Vv)
+#define Q6_Vub_vsat_VhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsathub)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2788,7 +2789,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vsat_VwVw(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsatwh)(Vu,Vv)
+#define Q6_Vh_vsat_VwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsatwh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2799,7 +2800,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wh_vsxt_Vb(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsb)(Vu)
+#define Q6_Wh_vsxt_Vb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsb)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2810,7 +2811,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Ww_vsxt_Vh(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsh)(Vu)
+#define Q6_Ww_vsxt_Vh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2821,7 +2822,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vshuffe_VhVh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vshufeh)(Vu,Vv)
+#define Q6_Vh_vshuffe_VhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vshufeh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2832,7 +2833,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vshuff_Vb(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vshuffb)(Vu)
+#define Q6_Vb_vshuff_Vb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vshuffb)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2843,7 +2844,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vshuffe_VbVb(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vshuffeb)(Vu,Vv)
+#define Q6_Vb_vshuffe_VbVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vshuffeb)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2854,7 +2855,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vshuff_Vh(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vshuffh)(Vu)
+#define Q6_Vh_vshuff_Vh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vshuffh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2865,7 +2866,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vshuffo_VbVb(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vshuffob)(Vu,Vv)
+#define Q6_Vb_vshuffo_VbVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vshuffob)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2876,7 +2877,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_W_vshuff_VVR(Vu,Vv,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vshuffvdd)(Vu,Vv,Rt)
+#define Q6_W_vshuff_VVR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vshuffvdd)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2887,7 +2888,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wb_vshuffoe_VbVb(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vshufoeb)(Vu,Vv)
+#define Q6_Wb_vshuffoe_VbVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vshufoeb)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2898,7 +2899,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wh_vshuffoe_VhVh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vshufoeh)(Vu,Vv)
+#define Q6_Wh_vshuffoe_VhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vshufoeh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2909,7 +2910,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vshuffo_VhVh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vshufoh)(Vu,Vv)
+#define Q6_Vh_vshuffo_VhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vshufoh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2920,7 +2921,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vsub_VbVb(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubb)(Vu,Vv)
+#define Q6_Vb_vsub_VbVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubb)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2931,7 +2932,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wb_vsub_WbWb(Vuu,Vvv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubb_dv)(Vuu,Vvv)
+#define Q6_Wb_vsub_WbWb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubb_dv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2942,7 +2943,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_condnac_QnVbVb(Qv,Vx,Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubbnq)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qv),-1),Vx,Vu)
+#define Q6_Vb_condnac_QnVbVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubbnq)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2953,7 +2954,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_condnac_QVbVb(Qv,Vx,Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubbq)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qv),-1),Vx,Vu)
+#define Q6_Vb_condnac_QVbVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubbq)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2964,7 +2965,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vsub_VhVh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubh)(Vu,Vv)
+#define Q6_Vh_vsub_VhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2975,7 +2976,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wh_vsub_WhWh(Vuu,Vvv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubh_dv)(Vuu,Vvv)
+#define Q6_Wh_vsub_WhWh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubh_dv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2986,7 +2987,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_condnac_QnVhVh(Qv,Vx,Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubhnq)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qv),-1),Vx,Vu)
+#define Q6_Vh_condnac_QnVhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubhnq)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -2997,7 +2998,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_condnac_QVhVh(Qv,Vx,Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubhq)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qv),-1),Vx,Vu)
+#define Q6_Vh_condnac_QVhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubhq)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3008,7 +3009,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vsub_VhVh_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubhsat)(Vu,Vv)
+#define Q6_Vh_vsub_VhVh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubhsat)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3019,7 +3020,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wh_vsub_WhWh_sat(Vuu,Vvv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubhsat_dv)(Vuu,Vvv)
+#define Q6_Wh_vsub_WhWh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubhsat_dv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3030,7 +3031,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Ww_vsub_VhVh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubhw)(Vu,Vv)
+#define Q6_Ww_vsub_VhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubhw)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3041,7 +3042,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wh_vsub_VubVub(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsububh)(Vu,Vv)
+#define Q6_Wh_vsub_VubVub __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsububh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3052,7 +3053,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vub_vsub_VubVub_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsububsat)(Vu,Vv)
+#define Q6_Vub_vsub_VubVub_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsububsat)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3063,7 +3064,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wub_vsub_WubWub_sat(Vuu,Vvv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsububsat_dv)(Vuu,Vvv)
+#define Q6_Wub_vsub_WubWub_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsububsat_dv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3074,7 +3075,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vuh_vsub_VuhVuh_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubuhsat)(Vu,Vv)
+#define Q6_Vuh_vsub_VuhVuh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubuhsat)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3085,7 +3086,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wuh_vsub_WuhWuh_sat(Vuu,Vvv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubuhsat_dv)(Vuu,Vvv)
+#define Q6_Wuh_vsub_WuhWuh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubuhsat_dv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3096,7 +3097,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Ww_vsub_VuhVuh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubuhw)(Vu,Vv)
+#define Q6_Ww_vsub_VuhVuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubuhw)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3107,7 +3108,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_vsub_VwVw(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubw)(Vu,Vv)
+#define Q6_Vw_vsub_VwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubw)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3118,7 +3119,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Ww_vsub_WwWw(Vuu,Vvv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubw_dv)(Vuu,Vvv)
+#define Q6_Ww_vsub_WwWw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubw_dv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3129,7 +3130,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_condnac_QnVwVw(Qv,Vx,Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubwnq)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qv),-1),Vx,Vu)
+#define Q6_Vw_condnac_QnVwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubwnq)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3140,7 +3141,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_condnac_QVwVw(Qv,Vx,Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubwq)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qv),-1),Vx,Vu)
+#define Q6_Vw_condnac_QVwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubwq)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3151,7 +3152,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_vsub_VwVw_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubwsat)(Vu,Vv)
+#define Q6_Vw_vsub_VwVw_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubwsat)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3162,7 +3163,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Ww_vsub_WwWw_sat(Vuu,Vvv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubwsat_dv)(Vuu,Vvv)
+#define Q6_Ww_vsub_WwWw_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubwsat_dv)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3173,7 +3174,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_W_vswap_QVV(Qt,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vswap)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qt),-1),Vu,Vv)
+#define Q6_W_vswap_QVV __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vswap)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3184,7 +3185,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wh_vtmpy_WbRb(Vuu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vtmpyb)(Vuu,Rt)
+#define Q6_Wh_vtmpy_WbRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vtmpyb)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3195,7 +3196,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wh_vtmpyacc_WhWbRb(Vxx,Vuu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vtmpyb_acc)(Vxx,Vuu,Rt)
+#define Q6_Wh_vtmpyacc_WhWbRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vtmpyb_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3206,7 +3207,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wh_vtmpy_WubRb(Vuu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vtmpybus)(Vuu,Rt)
+#define Q6_Wh_vtmpy_WubRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vtmpybus)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3217,7 +3218,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wh_vtmpyacc_WhWubRb(Vxx,Vuu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vtmpybus_acc)(Vxx,Vuu,Rt)
+#define Q6_Wh_vtmpyacc_WhWubRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vtmpybus_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3228,7 +3229,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Ww_vtmpy_WhRb(Vuu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vtmpyhb)(Vuu,Rt)
+#define Q6_Ww_vtmpy_WhRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vtmpyhb)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3239,7 +3240,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Ww_vtmpyacc_WwWhRb(Vxx,Vuu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vtmpyhb_acc)(Vxx,Vuu,Rt)
+#define Q6_Ww_vtmpyacc_WwWhRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vtmpyhb_acc)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3250,7 +3251,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wh_vunpack_Vb(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vunpackb)(Vu)
+#define Q6_Wh_vunpack_Vb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vunpackb)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3261,7 +3262,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Ww_vunpack_Vh(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vunpackh)(Vu)
+#define Q6_Ww_vunpack_Vh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vunpackh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3272,7 +3273,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wh_vunpackoor_WhVb(Vxx,Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vunpackob)(Vxx,Vu)
+#define Q6_Wh_vunpackoor_WhVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vunpackob)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3283,7 +3284,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Ww_vunpackoor_WwVh(Vxx,Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vunpackoh)(Vxx,Vu)
+#define Q6_Ww_vunpackoor_WwVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vunpackoh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3294,7 +3295,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wuh_vunpack_Vub(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vunpackub)(Vu)
+#define Q6_Wuh_vunpack_Vub __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vunpackub)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3305,7 +3306,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wuw_vunpack_Vuh(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vunpackuh)(Vu)
+#define Q6_Wuw_vunpack_Vuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vunpackuh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3316,7 +3317,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_V_vxor_VV(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vxor)(Vu,Vv)
+#define Q6_V_vxor_VV __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vxor)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3327,7 +3328,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wuh_vzxt_Vub(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vzb)(Vu)
+#define Q6_Wuh_vzxt_Vub __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vzb)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 60
@@ -3338,7 +3339,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wuw_vzxt_Vuh(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vzh)(Vu)
+#define Q6_Wuw_vzxt_Vuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vzh)
 #endif /* __HEXAGON_ARCH___ >= 60 */
 
 #if __HVX_ARCH__ >= 62
@@ -3349,7 +3350,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vb_vsplat_R(Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_lvsplatb)(Rt)
+#define Q6_Vb_vsplat_R __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_lvsplatb)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3360,7 +3361,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vh_vsplat_R(Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_lvsplath)(Rt)
+#define Q6_Vh_vsplat_R __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_lvsplath)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3371,7 +3372,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Q_vsetq2_R(Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_pred_scalar2v2)(Rt)),-1)
+#define Q6_Q_vsetq2_R __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_pred_scalar2v2)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3382,7 +3383,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Qb_vshuffe_QhQh(Qs,Qt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_shuffeqh)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qs),-1),__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qt),-1))),-1)
+#define Q6_Qb_vshuffe_QhQh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_shuffeqh)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3393,7 +3394,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Qh_vshuffe_QwQw(Qs,Qt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_shuffeqw)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qs),-1),__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qt),-1))),-1)
+#define Q6_Qh_vshuffe_QwQw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_shuffeqw)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3404,7 +3405,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vadd_VbVb_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddbsat)(Vu,Vv)
+#define Q6_Vb_vadd_VbVb_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddbsat)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3415,7 +3416,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wb_vadd_WbWb_sat(Vuu,Vvv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddbsat_dv)(Vuu,Vvv)
+#define Q6_Wb_vadd_WbWb_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddbsat_dv)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3426,7 +3427,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_vadd_VwVwQ_carry(Vu,Vv,Qx) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddcarry)(Vu,Vv,Qx)
+#define Q6_Vw_vadd_VwVwQ_carry __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddcarry)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3437,7 +3438,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vadd_vclb_VhVh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddclbh)(Vu,Vv)
+#define Q6_Vh_vadd_vclb_VhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddclbh)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3448,7 +3449,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_vadd_vclb_VwVw(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddclbw)(Vu,Vv)
+#define Q6_Vw_vadd_vclb_VwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddclbw)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3459,7 +3460,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Ww_vaddacc_WwVhVh(Vxx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddhw_acc)(Vxx,Vu,Vv)
+#define Q6_Ww_vaddacc_WwVhVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddhw_acc)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3470,7 +3471,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wh_vaddacc_WhVubVub(Vxx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddubh_acc)(Vxx,Vu,Vv)
+#define Q6_Wh_vaddacc_WhVubVub __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddubh_acc)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3481,7 +3482,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vub_vadd_VubVb_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddububb_sat)(Vu,Vv)
+#define Q6_Vub_vadd_VubVb_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddububb_sat)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3492,7 +3493,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Ww_vaddacc_WwVuhVuh(Vxx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vadduhw_acc)(Vxx,Vu,Vv)
+#define Q6_Ww_vaddacc_WwVuhVuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vadduhw_acc)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3503,7 +3504,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vuw_vadd_VuwVuw_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vadduwsat)(Vu,Vv)
+#define Q6_Vuw_vadd_VuwVuw_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vadduwsat)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3514,7 +3515,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wuw_vadd_WuwWuw_sat(Vuu,Vvv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vadduwsat_dv)(Vuu,Vvv)
+#define Q6_Wuw_vadd_WuwWuw_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vadduwsat_dv)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3525,7 +3526,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_V_vand_QnR(Qu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandnqrt)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qu),-1),Rt)
+#define Q6_V_vand_QnR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandnqrt)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3536,7 +3537,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_V_vandor_VQnR(Vx,Qu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandnqrt_acc)(Vx,__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qu),-1),Rt)
+#define Q6_V_vandor_VQnR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandnqrt_acc)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3547,7 +3548,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_V_vand_QnV(Qv,Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvnqv)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qv),-1),Vu)
+#define Q6_V_vand_QnV __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvnqv)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3558,7 +3559,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_V_vand_QV(Qv,Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvqv)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qv),-1),Vu)
+#define Q6_V_vand_QV __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvqv)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3569,7 +3570,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vasr_VhVhR_sat(Vu,Vv,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrhbsat)(Vu,Vv,Rt)
+#define Q6_Vb_vasr_VhVhR_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrhbsat)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3580,7 +3581,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vuh_vasr_VuwVuwR_rnd_sat(Vu,Vv,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasruwuhrndsat)(Vu,Vv,Rt)
+#define Q6_Vuh_vasr_VuwVuwR_rnd_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasruwuhrndsat)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3591,7 +3592,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vuh_vasr_VwVwR_rnd_sat(Vu,Vv,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrwuhrndsat)(Vu,Vv,Rt)
+#define Q6_Vuh_vasr_VwVwR_rnd_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrwuhrndsat)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3602,7 +3603,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vub_vlsr_VubR(Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlsrb)(Vu,Rt)
+#define Q6_Vub_vlsr_VubR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlsrb)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3613,7 +3614,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vlut32_VbVbR_nomatch(Vu,Vv,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlutvvb_nm)(Vu,Vv,Rt)
+#define Q6_Vb_vlut32_VbVbR_nomatch __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlutvvb_nm)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3624,7 +3625,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vlut32or_VbVbVbI(Vx,Vu,Vv,Iu3) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlutvvb_oracci)(Vx,Vu,Vv,Iu3)
+#define Q6_Vb_vlut32or_VbVbVbI __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlutvvb_oracci)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3635,7 +3636,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vlut32_VbVbI(Vu,Vv,Iu3) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlutvvbi)(Vu,Vv,Iu3)
+#define Q6_Vb_vlut32_VbVbI __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlutvvbi)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3646,7 +3647,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wh_vlut16_VbVhR_nomatch(Vu,Vv,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlutvwh_nm)(Vu,Vv,Rt)
+#define Q6_Wh_vlut16_VbVhR_nomatch __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlutvwh_nm)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3657,7 +3658,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wh_vlut16or_WhVbVhI(Vxx,Vu,Vv,Iu3) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlutvwh_oracci)(Vxx,Vu,Vv,Iu3)
+#define Q6_Wh_vlut16or_WhVbVhI __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlutvwh_oracci)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3668,7 +3669,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wh_vlut16_VbVhI(Vu,Vv,Iu3) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlutvwhi)(Vu,Vv,Iu3)
+#define Q6_Wh_vlut16_VbVhI __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlutvwhi)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3679,7 +3680,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vmax_VbVb(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmaxb)(Vu,Vv)
+#define Q6_Vb_vmax_VbVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmaxb)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3690,7 +3691,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vmin_VbVb(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vminb)(Vu,Vv)
+#define Q6_Vb_vmin_VbVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vminb)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3701,7 +3702,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Ww_vmpa_WuhRb(Vuu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpauhb)(Vuu,Rt)
+#define Q6_Ww_vmpa_WuhRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpauhb)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3712,7 +3713,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Ww_vmpaacc_WwWuhRb(Vxx,Vuu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpauhb_acc)(Vxx,Vuu,Rt)
+#define Q6_Ww_vmpaacc_WwWuhRb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpauhb_acc)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3723,7 +3724,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_W_vmpye_VwVuh(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyewuh_64)(Vu,Vv)
+#define Q6_W_vmpye_VwVuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyewuh_64)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3734,7 +3735,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vmpyi_VwRub(Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyiwub)(Vu,Rt)
+#define Q6_Vw_vmpyi_VwRub __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyiwub)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3745,7 +3746,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vw_vmpyiacc_VwVwRub(Vx,Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyiwub_acc)(Vx,Vu,Rt)
+#define Q6_Vw_vmpyiacc_VwVwRub __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyiwub_acc)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3756,7 +3757,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_W_vmpyoacc_WVwVh(Vxx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyowh_64_acc)(Vxx,Vu,Vv)
+#define Q6_W_vmpyoacc_WVwVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyowh_64_acc)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3767,7 +3768,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vub_vround_VuhVuh_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrounduhub)(Vu,Vv)
+#define Q6_Vub_vround_VuhVuh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrounduhub)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3778,7 +3779,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vuh_vround_VuwVuw_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrounduwuh)(Vu,Vv)
+#define Q6_Vuh_vround_VuwVuw_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrounduwuh)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3789,7 +3790,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vuh_vsat_VuwVuw(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsatuwuh)(Vu,Vv)
+#define Q6_Vuh_vsat_VuwVuw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsatuwuh)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3800,7 +3801,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vsub_VbVb_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubbsat)(Vu,Vv)
+#define Q6_Vb_vsub_VbVb_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubbsat)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3811,7 +3812,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wb_vsub_WbWb_sat(Vuu,Vvv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubbsat_dv)(Vuu,Vvv)
+#define Q6_Wb_vsub_WbWb_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubbsat_dv)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3822,7 +3823,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_vsub_VwVwQ_carry(Vu,Vv,Qx) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubcarry)(Vu,Vv,Qx)
+#define Q6_Vw_vsub_VwVwQ_carry __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubcarry)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3833,7 +3834,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vub_vsub_VubVb_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubububb_sat)(Vu,Vv)
+#define Q6_Vub_vsub_VubVb_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubububb_sat)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3844,7 +3845,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vuw_vsub_VuwVuw_sat(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubuwsat)(Vu,Vv)
+#define Q6_Vuw_vsub_VuwVuw_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubuwsat)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 62
@@ -3855,7 +3856,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Wuw_vsub_WuwWuw_sat(Vuu,Vvv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubuwsat_dv)(Vuu,Vvv)
+#define Q6_Wuw_vsub_WuwWuw_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsubuwsat_dv)
 #endif /* __HEXAGON_ARCH___ >= 62 */
 
 #if __HVX_ARCH__ >= 65
@@ -3866,7 +3867,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vabs_Vb(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vabsb)(Vu)
+#define Q6_Vb_vabs_Vb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vabsb)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -3877,7 +3878,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vabs_Vb_sat(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vabsb_sat)(Vu)
+#define Q6_Vb_vabs_Vb_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vabsb_sat)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -3888,7 +3889,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vaslacc_VhVhR(Vx,Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaslh_acc)(Vx,Vu,Rt)
+#define Q6_Vh_vaslacc_VhVhR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaslh_acc)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -3899,7 +3900,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_vasracc_VhVhR(Vx,Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrh_acc)(Vx,Vu,Rt)
+#define Q6_Vh_vasracc_VhVhR __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrh_acc)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -3910,7 +3911,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vub_vasr_VuhVuhR_rnd_sat(Vu,Vv,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasruhubrndsat)(Vu,Vv,Rt)
+#define Q6_Vub_vasr_VuhVuhR_rnd_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasruhubrndsat)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -3921,7 +3922,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vub_vasr_VuhVuhR_sat(Vu,Vv,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasruhubsat)(Vu,Vv,Rt)
+#define Q6_Vub_vasr_VuhVuhR_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasruhubsat)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -3932,7 +3933,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vuh_vasr_VuwVuwR_sat(Vu,Vv,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasruwuhsat)(Vu,Vv,Rt)
+#define Q6_Vuh_vasr_VuwVuwR_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasruwuhsat)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -3943,7 +3944,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vavg_VbVb(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vavgb)(Vu,Vv)
+#define Q6_Vb_vavg_VbVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vavgb)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -3954,7 +3955,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vavg_VbVb_rnd(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vavgbrnd)(Vu,Vv)
+#define Q6_Vb_vavg_VbVb_rnd __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vavgbrnd)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -3965,7 +3966,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vuw_vavg_VuwVuw(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vavguw)(Vu,Vv)
+#define Q6_Vuw_vavg_VuwVuw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vavguw)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -3976,7 +3977,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vuw_vavg_VuwVuw_rnd(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vavguwrnd)(Vu,Vv)
+#define Q6_Vuw_vavg_VuwVuw_rnd __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vavguwrnd)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -3987,7 +3988,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_W_vzero() __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdd0)()
+#define Q6_W_vzero __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdd0)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -3998,7 +3999,7 @@
    Execution Slots:       SLOT01
    ========================================================================== */
 
-#define Q6_vgather_ARMVh(Rs,Rt,Mu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgathermh)(Rs,Rt,Mu,Vv)
+#define Q6_vgather_ARMVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgathermh)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -4009,7 +4010,7 @@
    Execution Slots:       SLOT01
    ========================================================================== */
 
-#define Q6_vgather_AQRMVh(Rs,Qs,Rt,Mu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgathermhq)(Rs,__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qs),-1),Rt,Mu,Vv)
+#define Q6_vgather_AQRMVh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgathermhq)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -4020,7 +4021,7 @@
    Execution Slots:       SLOT01
    ========================================================================== */
 
-#define Q6_vgather_ARMWw(Rs,Rt,Mu,Vvv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgathermhw)(Rs,Rt,Mu,Vvv)
+#define Q6_vgather_ARMWw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgathermhw)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -4031,7 +4032,7 @@
    Execution Slots:       SLOT01
    ========================================================================== */
 
-#define Q6_vgather_AQRMWw(Rs,Qs,Rt,Mu,Vvv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgathermhwq)(Rs,__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qs),-1),Rt,Mu,Vvv)
+#define Q6_vgather_AQRMWw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgathermhwq)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -4042,7 +4043,7 @@
    Execution Slots:       SLOT01
    ========================================================================== */
 
-#define Q6_vgather_ARMVw(Rs,Rt,Mu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgathermw)(Rs,Rt,Mu,Vv)
+#define Q6_vgather_ARMVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgathermw)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -4053,7 +4054,7 @@
    Execution Slots:       SLOT01
    ========================================================================== */
 
-#define Q6_vgather_AQRMVw(Rs,Qs,Rt,Mu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgathermwq)(Rs,__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qs),-1),Rt,Mu,Vv)
+#define Q6_vgather_AQRMVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgathermwq)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -4064,7 +4065,7 @@
    Execution Slots:       SLOT2
    ========================================================================== */
 
-#define Q6_Vh_vlut4_VuhPh(Vu,Rtt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlut4)(Vu,Rtt)
+#define Q6_Vh_vlut4_VuhPh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vlut4)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -4075,7 +4076,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wh_vmpa_WubRub(Vuu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpabuu)(Vuu,Rt)
+#define Q6_Wh_vmpa_WubRub __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpabuu)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -4086,7 +4087,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Wh_vmpaacc_WhWubRub(Vxx,Vuu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpabuu_acc)(Vxx,Vuu,Rt)
+#define Q6_Wh_vmpaacc_WhWubRub __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpabuu_acc)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -4097,7 +4098,7 @@
    Execution Slots:       SLOT2
    ========================================================================== */
 
-#define Q6_Vh_vmpa_VhVhVhPh_sat(Vx,Vu,Rtt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpahhsat)(Vx,Vu,Rtt)
+#define Q6_Vh_vmpa_VhVhVhPh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpahhsat)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -4108,7 +4109,7 @@
    Execution Slots:       SLOT2
    ========================================================================== */
 
-#define Q6_Vh_vmpa_VhVhVuhPuh_sat(Vx,Vu,Rtt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpauhuhsat)(Vx,Vu,Rtt)
+#define Q6_Vh_vmpa_VhVhVuhPuh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpauhuhsat)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -4119,7 +4120,7 @@
    Execution Slots:       SLOT2
    ========================================================================== */
 
-#define Q6_Vh_vmps_VhVhVuhPuh_sat(Vx,Vu,Rtt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpsuhuhsat)(Vx,Vu,Rtt)
+#define Q6_Vh_vmps_VhVhVuhPuh_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpsuhuhsat)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -4130,7 +4131,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Ww_vmpyacc_WwVhRh(Vxx,Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyh_acc)(Vxx,Vu,Rt)
+#define Q6_Ww_vmpyacc_WwVhRh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyh_acc)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -4141,7 +4142,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vuw_vmpye_VuhRuh(Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyuhe)(Vu,Rt)
+#define Q6_Vuw_vmpye_VuhRuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyuhe)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -4152,7 +4153,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Vuw_vmpyeacc_VuwVuhRuh(Vx,Vu,Rt) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyuhe_acc)(Vx,Vu,Rt)
+#define Q6_Vuw_vmpyeacc_VuwVuhRuh __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyuhe_acc)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -4163,7 +4164,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_vnavg_VbVb(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vnavgb)(Vu,Vv)
+#define Q6_Vb_vnavg_VbVb __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vnavgb)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -4174,7 +4175,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vb_prefixsum_Q(Qv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vprefixqb)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qv),-1))
+#define Q6_Vb_prefixsum_Q __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vprefixqb)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -4185,7 +4186,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vh_prefixsum_Q(Qv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vprefixqh)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qv),-1))
+#define Q6_Vh_prefixsum_Q __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vprefixqh)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -4196,7 +4197,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_prefixsum_Q(Qv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vprefixqw)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qv),-1))
+#define Q6_Vw_prefixsum_Q __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vprefixqw)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -4207,7 +4208,7 @@
    Execution Slots:       SLOT0
    ========================================================================== */
 
-#define Q6_vscatter_RMVhV(Rt,Mu,Vv,Vw) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vscattermh)(Rt,Mu,Vv,Vw)
+#define Q6_vscatter_RMVhV __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vscattermh)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -4218,7 +4219,7 @@
    Execution Slots:       SLOT0
    ========================================================================== */
 
-#define Q6_vscatteracc_RMVhV(Rt,Mu,Vv,Vw) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vscattermh_add)(Rt,Mu,Vv,Vw)
+#define Q6_vscatteracc_RMVhV __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vscattermh_add)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -4229,7 +4230,7 @@
    Execution Slots:       SLOT0
    ========================================================================== */
 
-#define Q6_vscatter_QRMVhV(Qs,Rt,Mu,Vv,Vw) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vscattermhq)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qs),-1),Rt,Mu,Vv,Vw)
+#define Q6_vscatter_QRMVhV __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vscattermhq)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -4240,7 +4241,7 @@
    Execution Slots:       SLOT0
    ========================================================================== */
 
-#define Q6_vscatter_RMWwV(Rt,Mu,Vvv,Vw) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vscattermhw)(Rt,Mu,Vvv,Vw)
+#define Q6_vscatter_RMWwV __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vscattermhw)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -4251,7 +4252,7 @@
    Execution Slots:       SLOT0
    ========================================================================== */
 
-#define Q6_vscatteracc_RMWwV(Rt,Mu,Vvv,Vw) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vscattermhw_add)(Rt,Mu,Vvv,Vw)
+#define Q6_vscatteracc_RMWwV __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vscattermhw_add)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -4262,7 +4263,7 @@
    Execution Slots:       SLOT0
    ========================================================================== */
 
-#define Q6_vscatter_QRMWwV(Qs,Rt,Mu,Vvv,Vw) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vscattermhwq)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qs),-1),Rt,Mu,Vvv,Vw)
+#define Q6_vscatter_QRMWwV __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vscattermhwq)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -4273,7 +4274,7 @@
    Execution Slots:       SLOT0
    ========================================================================== */
 
-#define Q6_vscatter_RMVwV(Rt,Mu,Vv,Vw) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vscattermw)(Rt,Mu,Vv,Vw)
+#define Q6_vscatter_RMVwV __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vscattermw)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -4284,7 +4285,7 @@
    Execution Slots:       SLOT0
    ========================================================================== */
 
-#define Q6_vscatteracc_RMVwV(Rt,Mu,Vv,Vw) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vscattermw_add)(Rt,Mu,Vv,Vw)
+#define Q6_vscatteracc_RMVwV __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vscattermw_add)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 65
@@ -4295,7 +4296,7 @@
    Execution Slots:       SLOT0
    ========================================================================== */
 
-#define Q6_vscatter_QRMVwV(Qs,Rt,Mu,Vv,Vw) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vscattermwq)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qs),-1),Rt,Mu,Vv,Vw)
+#define Q6_vscatter_QRMVwV __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vscattermwq)
 #endif /* __HEXAGON_ARCH___ >= 65 */
 
 #if __HVX_ARCH__ >= 66
@@ -4306,7 +4307,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_vadd_VwVwQ_carry_sat(Vu,Vv,Qs) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddcarrysat)(Vu,Vv,__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qs),-1))
+#define Q6_Vw_vadd_VwVwQ_carry_sat __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vaddcarrysat)
 #endif /* __HEXAGON_ARCH___ >= 66 */
 
 #if __HVX_ARCH__ >= 66
@@ -4317,7 +4318,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Ww_vasrinto_WwVwVw(Vxx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasr_into)(Vxx,Vu,Vv)
+#define Q6_Ww_vasrinto_WwVwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasr_into)
 #endif /* __HEXAGON_ARCH___ >= 66 */
 
 #if __HVX_ARCH__ >= 66
@@ -4328,7 +4329,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vuw_vrotr_VuwVuw(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrotr)(Vu,Vv)
+#define Q6_Vuw_vrotr_VuwVuw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vrotr)
 #endif /* __HEXAGON_ARCH___ >= 66 */
 
 #if __HVX_ARCH__ >= 66
@@ -4339,7 +4340,7 @@
    Execution Slots:       SLOT0123
    ========================================================================== */
 
-#define Q6_Vw_vsatdw_VwVw(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsatdw)(Vu,Vv)
+#define Q6_Vw_vsatdw_VwVw __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsatdw)
 #endif /* __HEXAGON_ARCH___ >= 66 */
 
 #if __HVX_ARCH__ >= 68
@@ -4350,7 +4351,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Ww_v6mpy_WubWbI_h(Vuu,Vvv,Iu2) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_v6mpyhubs10)(Vuu,Vvv,Iu2)
+#define Q6_Ww_v6mpy_WubWbI_h __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_v6mpyhubs10)
 #endif /* __HEXAGON_ARCH___ >= 68 */
 
 #if __HVX_ARCH__ >= 68
@@ -4361,7 +4362,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Ww_v6mpyacc_WwWubWbI_h(Vxx,Vuu,Vvv,Iu2) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_v6mpyhubs10_vxx)(Vxx,Vuu,Vvv,Iu2)
+#define Q6_Ww_v6mpyacc_WwWubWbI_h __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_v6mpyhubs10_vxx)
 #endif /* __HEXAGON_ARCH___ >= 68 */
 
 #if __HVX_ARCH__ >= 68
@@ -4372,7 +4373,7 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Ww_v6mpy_WubWbI_v(Vuu,Vvv,Iu2) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_v6mpyvubs10)(Vuu,Vvv,Iu2)
+#define Q6_Ww_v6mpy_WubWbI_v __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_v6mpyvubs10)
 #endif /* __HEXAGON_ARCH___ >= 68 */
 
 #if __HVX_ARCH__ >= 68
@@ -4383,800 +4384,8 @@
    Execution Slots:       SLOT23
    ========================================================================== */
 
-#define Q6_Ww_v6mpyacc_WwWubWbI_v(Vxx,Vuu,Vvv,Iu2) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_v6mpyvubs10_vxx)(Vxx,Vuu,Vvv,Iu2)
+#define Q6_Ww_v6mpyacc_WwWubWbI_v __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_v6mpyvubs10_vxx)
 #endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.hf=vabs(Vu32.hf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vhf_vabs_Vhf(HVX_Vector Vu)
-   Instruction Type:      CVI_VX_LATE
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vhf_vabs_Vhf(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vabs_hf)(Vu)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.sf=vabs(Vu32.sf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vsf_vabs_Vsf(HVX_Vector Vu)
-   Instruction Type:      CVI_VX_LATE
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vsf_vabs_Vsf(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vabs_sf)(Vu)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.qf16=vadd(Vu32.hf,Vv32.hf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vqf16_vadd_VhfVhf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VS
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Vqf16_vadd_VhfVhf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vadd_hf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.hf=vadd(Vu32.hf,Vv32.hf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vhf_vadd_VhfVhf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vhf_vadd_VhfVhf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vadd_hf_hf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.qf16=vadd(Vu32.qf16,Vv32.qf16)
-   C Intrinsic Prototype: HVX_Vector Q6_Vqf16_vadd_Vqf16Vqf16(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VS
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Vqf16_vadd_Vqf16Vqf16(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vadd_qf16)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.qf16=vadd(Vu32.qf16,Vv32.hf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vqf16_vadd_Vqf16Vhf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VS
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Vqf16_vadd_Vqf16Vhf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vadd_qf16_mix)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.qf32=vadd(Vu32.qf32,Vv32.qf32)
-   C Intrinsic Prototype: HVX_Vector Q6_Vqf32_vadd_Vqf32Vqf32(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VS
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Vqf32_vadd_Vqf32Vqf32(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vadd_qf32)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.qf32=vadd(Vu32.qf32,Vv32.sf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vqf32_vadd_Vqf32Vsf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VS
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Vqf32_vadd_Vqf32Vsf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vadd_qf32_mix)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.qf32=vadd(Vu32.sf,Vv32.sf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vqf32_vadd_VsfVsf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VS
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Vqf32_vadd_VsfVsf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vadd_sf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vdd32.sf=vadd(Vu32.hf,Vv32.hf)
-   C Intrinsic Prototype: HVX_VectorPair Q6_Wsf_vadd_VhfVhf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX_DV
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Wsf_vadd_VhfVhf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vadd_sf_hf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.sf=vadd(Vu32.sf,Vv32.sf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vsf_vadd_VsfVsf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vsf_vadd_VsfVsf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vadd_sf_sf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.w=vfmv(Vu32.w)
-   C Intrinsic Prototype: HVX_Vector Q6_Vw_vfmv_Vw(HVX_Vector Vu)
-   Instruction Type:      CVI_VX_LATE
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vw_vfmv_Vw(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vassign_fp)(Vu)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.hf=Vu32.qf16
-   C Intrinsic Prototype: HVX_Vector Q6_Vhf_equals_Vqf16(HVX_Vector Vu)
-   Instruction Type:      CVI_VS
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Vhf_equals_Vqf16(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vconv_hf_qf16)(Vu)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.hf=Vuu32.qf32
-   C Intrinsic Prototype: HVX_Vector Q6_Vhf_equals_Wqf32(HVX_VectorPair Vuu)
-   Instruction Type:      CVI_VS
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Vhf_equals_Wqf32(Vuu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vconv_hf_qf32)(Vuu)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.sf=Vu32.qf32
-   C Intrinsic Prototype: HVX_Vector Q6_Vsf_equals_Vqf32(HVX_Vector Vu)
-   Instruction Type:      CVI_VS
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Vsf_equals_Vqf32(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vconv_sf_qf32)(Vu)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.b=vcvt(Vu32.hf,Vv32.hf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vb_vcvt_VhfVhf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vb_vcvt_VhfVhf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vcvt_b_hf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.h=vcvt(Vu32.hf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vh_vcvt_Vhf(HVX_Vector Vu)
-   Instruction Type:      CVI_VX
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vh_vcvt_Vhf(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vcvt_h_hf)(Vu)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vdd32.hf=vcvt(Vu32.b)
-   C Intrinsic Prototype: HVX_VectorPair Q6_Whf_vcvt_Vb(HVX_Vector Vu)
-   Instruction Type:      CVI_VX_DV
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Whf_vcvt_Vb(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vcvt_hf_b)(Vu)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.hf=vcvt(Vu32.h)
-   C Intrinsic Prototype: HVX_Vector Q6_Vhf_vcvt_Vh(HVX_Vector Vu)
-   Instruction Type:      CVI_VX
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vhf_vcvt_Vh(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vcvt_hf_h)(Vu)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.hf=vcvt(Vu32.sf,Vv32.sf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vhf_vcvt_VsfVsf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vhf_vcvt_VsfVsf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vcvt_hf_sf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vdd32.hf=vcvt(Vu32.ub)
-   C Intrinsic Prototype: HVX_VectorPair Q6_Whf_vcvt_Vub(HVX_Vector Vu)
-   Instruction Type:      CVI_VX_DV
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Whf_vcvt_Vub(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vcvt_hf_ub)(Vu)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.hf=vcvt(Vu32.uh)
-   C Intrinsic Prototype: HVX_Vector Q6_Vhf_vcvt_Vuh(HVX_Vector Vu)
-   Instruction Type:      CVI_VX
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vhf_vcvt_Vuh(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vcvt_hf_uh)(Vu)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vdd32.sf=vcvt(Vu32.hf)
-   C Intrinsic Prototype: HVX_VectorPair Q6_Wsf_vcvt_Vhf(HVX_Vector Vu)
-   Instruction Type:      CVI_VX_DV
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Wsf_vcvt_Vhf(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vcvt_sf_hf)(Vu)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.ub=vcvt(Vu32.hf,Vv32.hf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vub_vcvt_VhfVhf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vub_vcvt_VhfVhf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vcvt_ub_hf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.uh=vcvt(Vu32.hf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vuh_vcvt_Vhf(HVX_Vector Vu)
-   Instruction Type:      CVI_VX
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vuh_vcvt_Vhf(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vcvt_uh_hf)(Vu)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.sf=vdmpy(Vu32.hf,Vv32.hf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vsf_vdmpy_VhfVhf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vsf_vdmpy_VhfVhf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpy_sf_hf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vx32.sf+=vdmpy(Vu32.hf,Vv32.hf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vsf_vdmpyacc_VsfVhfVhf(HVX_Vector Vx, HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vsf_vdmpyacc_VsfVhfVhf(Vx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vdmpy_sf_hf_acc)(Vx,Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.hf=vfmax(Vu32.hf,Vv32.hf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vhf_vfmax_VhfVhf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX_LATE
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vhf_vfmax_VhfVhf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vfmax_hf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.sf=vfmax(Vu32.sf,Vv32.sf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vsf_vfmax_VsfVsf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX_LATE
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vsf_vfmax_VsfVsf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vfmax_sf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.hf=vfmin(Vu32.hf,Vv32.hf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vhf_vfmin_VhfVhf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX_LATE
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vhf_vfmin_VhfVhf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vfmin_hf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.sf=vfmin(Vu32.sf,Vv32.sf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vsf_vfmin_VsfVsf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX_LATE
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vsf_vfmin_VsfVsf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vfmin_sf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.hf=vfneg(Vu32.hf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vhf_vfneg_Vhf(HVX_Vector Vu)
-   Instruction Type:      CVI_VX_LATE
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vhf_vfneg_Vhf(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vfneg_hf)(Vu)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.sf=vfneg(Vu32.sf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vsf_vfneg_Vsf(HVX_Vector Vu)
-   Instruction Type:      CVI_VX_LATE
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vsf_vfneg_Vsf(Vu) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vfneg_sf)(Vu)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Qd4=vcmp.gt(Vu32.hf,Vv32.hf)
-   C Intrinsic Prototype: HVX_VectorPred Q6_Q_vcmp_gt_VhfVhf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VA
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Q_vcmp_gt_VhfVhf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgthf)(Vu,Vv)),-1)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Qx4&=vcmp.gt(Vu32.hf,Vv32.hf)
-   C Intrinsic Prototype: HVX_VectorPred Q6_Q_vcmp_gtand_QVhfVhf(HVX_VectorPred Qx, HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VA
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Q_vcmp_gtand_QVhfVhf(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgthf_and)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Qx4|=vcmp.gt(Vu32.hf,Vv32.hf)
-   C Intrinsic Prototype: HVX_VectorPred Q6_Q_vcmp_gtor_QVhfVhf(HVX_VectorPred Qx, HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VA
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Q_vcmp_gtor_QVhfVhf(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgthf_or)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Qx4^=vcmp.gt(Vu32.hf,Vv32.hf)
-   C Intrinsic Prototype: HVX_VectorPred Q6_Q_vcmp_gtxacc_QVhfVhf(HVX_VectorPred Qx, HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VA
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Q_vcmp_gtxacc_QVhfVhf(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgthf_xor)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Qd4=vcmp.gt(Vu32.sf,Vv32.sf)
-   C Intrinsic Prototype: HVX_VectorPred Q6_Q_vcmp_gt_VsfVsf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VA
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Q_vcmp_gt_VsfVsf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtsf)(Vu,Vv)),-1)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Qx4&=vcmp.gt(Vu32.sf,Vv32.sf)
-   C Intrinsic Prototype: HVX_VectorPred Q6_Q_vcmp_gtand_QVsfVsf(HVX_VectorPred Qx, HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VA
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Q_vcmp_gtand_QVsfVsf(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtsf_and)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Qx4|=vcmp.gt(Vu32.sf,Vv32.sf)
-   C Intrinsic Prototype: HVX_VectorPred Q6_Q_vcmp_gtor_QVsfVsf(HVX_VectorPred Qx, HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VA
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Q_vcmp_gtor_QVsfVsf(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtsf_or)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Qx4^=vcmp.gt(Vu32.sf,Vv32.sf)
-   C Intrinsic Prototype: HVX_VectorPred Q6_Q_vcmp_gtxacc_QVsfVsf(HVX_VectorPred Qx, HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VA
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Q_vcmp_gtxacc_QVsfVsf(Qx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandqrt)((__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vgtsf_xor)(__BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vandvrt)((Qx),-1),Vu,Vv)),-1)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.hf=vmax(Vu32.hf,Vv32.hf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vhf_vmax_VhfVhf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VA
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Vhf_vmax_VhfVhf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmax_hf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.sf=vmax(Vu32.sf,Vv32.sf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vsf_vmax_VsfVsf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VA
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Vsf_vmax_VsfVsf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmax_sf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.hf=vmin(Vu32.hf,Vv32.hf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vhf_vmin_VhfVhf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VA
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Vhf_vmin_VhfVhf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmin_hf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.sf=vmin(Vu32.sf,Vv32.sf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vsf_vmin_VsfVsf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VA
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Vsf_vmin_VsfVsf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmin_sf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.hf=vmpy(Vu32.hf,Vv32.hf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vhf_vmpy_VhfVhf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vhf_vmpy_VhfVhf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpy_hf_hf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vx32.hf+=vmpy(Vu32.hf,Vv32.hf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vhf_vmpyacc_VhfVhfVhf(HVX_Vector Vx, HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vhf_vmpyacc_VhfVhfVhf(Vx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpy_hf_hf_acc)(Vx,Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.qf16=vmpy(Vu32.qf16,Vv32.qf16)
-   C Intrinsic Prototype: HVX_Vector Q6_Vqf16_vmpy_Vqf16Vqf16(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX_DV
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vqf16_vmpy_Vqf16Vqf16(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpy_qf16)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.qf16=vmpy(Vu32.hf,Vv32.hf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vqf16_vmpy_VhfVhf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX_DV
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vqf16_vmpy_VhfVhf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpy_qf16_hf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.qf16=vmpy(Vu32.qf16,Vv32.hf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vqf16_vmpy_Vqf16Vhf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX_DV
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vqf16_vmpy_Vqf16Vhf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpy_qf16_mix_hf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.qf32=vmpy(Vu32.qf32,Vv32.qf32)
-   C Intrinsic Prototype: HVX_Vector Q6_Vqf32_vmpy_Vqf32Vqf32(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX_DV
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vqf32_vmpy_Vqf32Vqf32(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpy_qf32)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vdd32.qf32=vmpy(Vu32.hf,Vv32.hf)
-   C Intrinsic Prototype: HVX_VectorPair Q6_Wqf32_vmpy_VhfVhf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX_DV
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Wqf32_vmpy_VhfVhf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpy_qf32_hf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vdd32.qf32=vmpy(Vu32.qf16,Vv32.hf)
-   C Intrinsic Prototype: HVX_VectorPair Q6_Wqf32_vmpy_Vqf16Vhf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX_DV
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Wqf32_vmpy_Vqf16Vhf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpy_qf32_mix_hf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vdd32.qf32=vmpy(Vu32.qf16,Vv32.qf16)
-   C Intrinsic Prototype: HVX_VectorPair Q6_Wqf32_vmpy_Vqf16Vqf16(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX_DV
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Wqf32_vmpy_Vqf16Vqf16(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpy_qf32_qf16)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.qf32=vmpy(Vu32.sf,Vv32.sf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vqf32_vmpy_VsfVsf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX_DV
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vqf32_vmpy_VsfVsf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpy_qf32_sf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vdd32.sf=vmpy(Vu32.hf,Vv32.hf)
-   C Intrinsic Prototype: HVX_VectorPair Q6_Wsf_vmpy_VhfVhf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX_DV
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Wsf_vmpy_VhfVhf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpy_sf_hf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vxx32.sf+=vmpy(Vu32.hf,Vv32.hf)
-   C Intrinsic Prototype: HVX_VectorPair Q6_Wsf_vmpyacc_WsfVhfVhf(HVX_VectorPair Vxx, HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX_DV
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Wsf_vmpyacc_WsfVhfVhf(Vxx,Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpy_sf_hf_acc)(Vxx,Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.sf=vmpy(Vu32.sf,Vv32.sf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vsf_vmpy_VsfVsf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX_DV
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vsf_vmpy_VsfVsf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpy_sf_sf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.qf16=vsub(Vu32.hf,Vv32.hf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vqf16_vsub_VhfVhf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VS
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Vqf16_vsub_VhfVhf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsub_hf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.hf=vsub(Vu32.hf,Vv32.hf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vhf_vsub_VhfVhf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vhf_vsub_VhfVhf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsub_hf_hf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.qf16=vsub(Vu32.qf16,Vv32.qf16)
-   C Intrinsic Prototype: HVX_Vector Q6_Vqf16_vsub_Vqf16Vqf16(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VS
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Vqf16_vsub_Vqf16Vqf16(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsub_qf16)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.qf16=vsub(Vu32.qf16,Vv32.hf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vqf16_vsub_Vqf16Vhf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VS
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Vqf16_vsub_Vqf16Vhf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsub_qf16_mix)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.qf32=vsub(Vu32.qf32,Vv32.qf32)
-   C Intrinsic Prototype: HVX_Vector Q6_Vqf32_vsub_Vqf32Vqf32(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VS
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Vqf32_vsub_Vqf32Vqf32(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsub_qf32)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.qf32=vsub(Vu32.qf32,Vv32.sf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vqf32_vsub_Vqf32Vsf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VS
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Vqf32_vsub_Vqf32Vsf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsub_qf32_mix)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.qf32=vsub(Vu32.sf,Vv32.sf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vqf32_vsub_VsfVsf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VS
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Vqf32_vsub_VsfVsf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsub_sf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vdd32.sf=vsub(Vu32.hf,Vv32.hf)
-   C Intrinsic Prototype: HVX_VectorPair Q6_Wsf_vsub_VhfVhf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX_DV
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Wsf_vsub_VhfVhf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsub_sf_hf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 68
-/* ==========================================================================
-   Assembly Syntax:       Vd32.sf=vsub(Vu32.sf,Vv32.sf)
-   C Intrinsic Prototype: HVX_Vector Q6_Vsf_vsub_VsfVsf(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vsf_vsub_VsfVsf(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vsub_sf_sf)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 68 */
-
-#if __HVX_ARCH__ >= 69
-/* ==========================================================================
-   Assembly Syntax:       Vd32.ub=vasr(Vuu32.uh,Vv32.ub):rnd:sat
-   C Intrinsic Prototype: HVX_Vector Q6_Vub_vasr_WuhVub_rnd_sat(HVX_VectorPair Vuu, HVX_Vector Vv)
-   Instruction Type:      CVI_VS
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Vub_vasr_WuhVub_rnd_sat(Vuu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrvuhubrndsat)(Vuu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 69 */
-
-#if __HVX_ARCH__ >= 69
-/* ==========================================================================
-   Assembly Syntax:       Vd32.ub=vasr(Vuu32.uh,Vv32.ub):sat
-   C Intrinsic Prototype: HVX_Vector Q6_Vub_vasr_WuhVub_sat(HVX_VectorPair Vuu, HVX_Vector Vv)
-   Instruction Type:      CVI_VS
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Vub_vasr_WuhVub_sat(Vuu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrvuhubsat)(Vuu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 69 */
-
-#if __HVX_ARCH__ >= 69
-/* ==========================================================================
-   Assembly Syntax:       Vd32.uh=vasr(Vuu32.w,Vv32.uh):rnd:sat
-   C Intrinsic Prototype: HVX_Vector Q6_Vuh_vasr_WwVuh_rnd_sat(HVX_VectorPair Vuu, HVX_Vector Vv)
-   Instruction Type:      CVI_VS
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Vuh_vasr_WwVuh_rnd_sat(Vuu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrvwuhrndsat)(Vuu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 69 */
-
-#if __HVX_ARCH__ >= 69
-/* ==========================================================================
-   Assembly Syntax:       Vd32.uh=vasr(Vuu32.w,Vv32.uh):sat
-   C Intrinsic Prototype: HVX_Vector Q6_Vuh_vasr_WwVuh_sat(HVX_VectorPair Vuu, HVX_Vector Vv)
-   Instruction Type:      CVI_VS
-   Execution Slots:       SLOT0123
-   ========================================================================== */
-
-#define Q6_Vuh_vasr_WwVuh_sat(Vuu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vasrvwuhsat)(Vuu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 69 */
-
-#if __HVX_ARCH__ >= 69
-/* ==========================================================================
-   Assembly Syntax:       Vd32.uh=vmpy(Vu32.uh,Vv32.uh):>>16
-   C Intrinsic Prototype: HVX_Vector Q6_Vuh_vmpy_VuhVuh_rs16(HVX_Vector Vu, HVX_Vector Vv)
-   Instruction Type:      CVI_VX
-   Execution Slots:       SLOT23
-   ========================================================================== */
-
-#define Q6_Vuh_vmpy_VuhVuh_rs16(Vu,Vv) __BUILTIN_VECTOR_WRAP(__builtin_HEXAGON_V6_vmpyuhvs)(Vu,Vv)
-#endif /* __HEXAGON_ARCH___ >= 69 */
 
 #endif /* __HVX__ */
 

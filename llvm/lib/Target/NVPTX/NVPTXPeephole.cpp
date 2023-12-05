@@ -21,19 +21,17 @@
 // This peephole pass optimizes these cases, for example
 //
 // It will transform the following pattern
-//    %0 = LEA_ADDRi64 %VRFrame64, 4
+//    %0 = LEA_ADDRi64 %VRFrame, 4
 //    %1 = cvta_to_local_yes_64 %0
 //
 // into
-//    %1 = LEA_ADDRi64 %VRFrameLocal64, 4
+//    %1 = LEA_ADDRi64 %VRFrameLocal, 4
 //
-// %VRFrameLocal64 is the virtual register name of %SPL
+// %VRFrameLocal is the virtual register name of %SPL
 //
 //===----------------------------------------------------------------------===//
 
 #include "NVPTX.h"
-#include "NVPTXRegisterInfo.h"
-#include "NVPTXSubtarget.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
@@ -83,7 +81,7 @@ static bool isCVTAToLocalCombinationCandidate(MachineInstr &Root) {
   auto &Op = Root.getOperand(1);
   const auto &MRI = MF.getRegInfo();
   MachineInstr *GenericAddrDef = nullptr;
-  if (Op.isReg() && Op.getReg().isVirtual()) {
+  if (Op.isReg() && Register::isVirtualRegister(Op.getReg())) {
     GenericAddrDef = MRI.getUniqueVRegDef(Op.getReg());
   }
 
@@ -94,12 +92,9 @@ static bool isCVTAToLocalCombinationCandidate(MachineInstr &Root) {
     return false;
   }
 
-  const NVPTXRegisterInfo *NRI =
-      MF.getSubtarget<NVPTXSubtarget>().getRegisterInfo();
-
   // Check the LEA_ADDRi operand is Frame index
   auto &BaseAddrOp = GenericAddrDef->getOperand(1);
-  if (BaseAddrOp.isReg() && BaseAddrOp.getReg() == NRI->getFrameRegister(MF)) {
+  if (BaseAddrOp.isReg() && BaseAddrOp.getReg() == NVPTX::VRFrame) {
     return true;
   }
 
@@ -113,22 +108,19 @@ static void CombineCVTAToLocal(MachineInstr &Root) {
   const TargetInstrInfo *TII = MF.getSubtarget().getInstrInfo();
   auto &Prev = *MRI.getUniqueVRegDef(Root.getOperand(1).getReg());
 
-  const NVPTXRegisterInfo *NRI =
-      MF.getSubtarget<NVPTXSubtarget>().getRegisterInfo();
-
   MachineInstrBuilder MIB =
       BuildMI(MF, Root.getDebugLoc(), TII->get(Prev.getOpcode()),
               Root.getOperand(0).getReg())
-          .addReg(NRI->getFrameLocalRegister(MF))
+          .addReg(NVPTX::VRFrameLocal)
           .add(Prev.getOperand(2));
 
   MBB.insert((MachineBasicBlock::iterator)&Root, MIB);
 
   // Check if MRI has only one non dbg use, which is Root
   if (MRI.hasOneNonDBGUse(Prev.getOperand(0).getReg())) {
-    Prev.eraseFromParent();
+    Prev.eraseFromParentAndMarkDBGValuesForRemoval();
   }
-  Root.eraseFromParent();
+  Root.eraseFromParentAndMarkDBGValuesForRemoval();
 }
 
 bool NVPTXPeephole::runOnMachineFunction(MachineFunction &MF) {
@@ -150,14 +142,11 @@ bool NVPTXPeephole::runOnMachineFunction(MachineFunction &MF) {
     }  // Instruction
   }    // Basic Block
 
-  const NVPTXRegisterInfo *NRI =
-      MF.getSubtarget<NVPTXSubtarget>().getRegisterInfo();
-
   // Remove unnecessary %VRFrame = cvta.local %VRFrameLocal
   const auto &MRI = MF.getRegInfo();
-  if (MRI.use_empty(NRI->getFrameRegister(MF))) {
-    if (auto MI = MRI.getUniqueVRegDef(NRI->getFrameRegister(MF))) {
-      MI->eraseFromParent();
+  if (MRI.use_empty(NVPTX::VRFrame)) {
+    if (auto MI = MRI.getUniqueVRegDef(NVPTX::VRFrame)) {
+      MI->eraseFromParentAndMarkDBGValuesForRemoval();
     }
   }
 

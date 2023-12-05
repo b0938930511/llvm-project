@@ -42,7 +42,7 @@ SingleInsnBetween:
 	blr
 	.long	0
 	.quad	0
-# CHECK-LABEL:   SingleInsnBetween
+# CHECK_LABEL:   SingleInsnBetween
 # CHECK:         pld 3, 0(0), 1
 # CHECK-NEXT:    R_PPC64_GOT_PCREL34	vec
 # CHECK-NEXT:    R_PPC64_PCREL_OPT	*ABS*+0xc
@@ -68,7 +68,7 @@ MultiInsnBetween:
 	blr
 	.long	0
 	.quad	0
-# CHECK-LABEL:   MultiInsnBetween
+# CHECK_LABEL:   MultiInsnBetween
 # CHECK:         pld 3, 0(0), 1
 # CHECK-NEXT:    R_PPC64_GOT_PCREL34	vec
 # CHECK-NEXT:    R_PPC64_PCREL_OPT	*ABS*+0x1c
@@ -98,7 +98,7 @@ PrefixInsnBetween:
 	blr
 	.long	0
 	.quad	0
-# CHECK-LABEL:   PrefixInsnBetween
+# CHECK_LABEL:   PrefixInsnBetween
 # CHECK:         pld 3, 0(0), 1
 # CHECK-NEXT:    R_PPC64_GOT_PCREL34	vec
 # CHECK-NEXT:    R_PPC64_PCREL_OPT	*ABS*+0x28
@@ -130,7 +130,7 @@ SpaceBetween:
 	blr
 	.long	0
 	.quad	0
-# CHECK-LABEL:   SpaceBetween
+# CHECK_LABEL:   SpaceBetween
 # CHECK:         pld 3, 0(0), 1
 # CHECK-NEXT:    R_PPC64_GOT_PCREL34	vec
 # CHECK-NEXT:    R_PPC64_PCREL_OPT	*ABS*+0x50
@@ -202,7 +202,7 @@ VarLabelSingleInsnBetween:
 	blr
 	.long	0
 	.quad	0
-# CHECK-LABEL:   VarLabelSingleInsnBetween
+# CHECK_LABEL:   VarLabelSingleInsnBetween
 # CHECK:         pld 3, 0(0), 1
 # CHECK-NEXT:    R_PPC64_GOT_PCREL34	vec
 # CHECK-NEXT:    R_PPC64_PCREL_OPT	*ABS*+0xc
@@ -227,7 +227,7 @@ VarLabelMultiInsnBetween:
 	blr
 	.long	0
 	.quad	0
-# CHECK-LABEL:   VarLabelMultiInsnBetween
+# CHECK_LABEL:   VarLabelMultiInsnBetween
 # CHECK:         pld 3, 0(0), 1
 # CHECK-NEXT:    R_PPC64_GOT_PCREL34	vec
 # CHECK-NEXT:    R_PPC64_PCREL_OPT	*ABS*+0x1c
@@ -257,7 +257,7 @@ VarLabelPrefixInsnBetween:
 	blr
 	.long	0
 	.quad	0
-# CHECK-LABEL:   VarLabelPrefixInsnBetween
+# CHECK_LABEL:   VarLabelPrefixInsnBetween
 # CHECK:         pld 3, 0(0), 1
 # CHECK-NEXT:    R_PPC64_GOT_PCREL34	vec
 # CHECK-NEXT:    R_PPC64_PCREL_OPT	*ABS*+0x24
@@ -288,7 +288,7 @@ VarLabelSpaceBetween:
 	blr
 	.long	0
 	.quad	0
-# CHECK-LABEL:   VarLabelSpaceBetween
+# CHECK_LABEL:   VarLabelSpaceBetween
 # CHECK:         pld 3, 0(0), 1
 # CHECK-NEXT:    R_PPC64_GOT_PCREL34	vec
 # CHECK-NEXT:    R_PPC64_PCREL_OPT	*ABS*+0x4c

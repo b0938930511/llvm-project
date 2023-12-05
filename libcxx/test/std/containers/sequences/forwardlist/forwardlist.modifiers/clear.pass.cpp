@@ -12,7 +12,6 @@
 
 #include <forward_list>
 #include <cassert>
-#include <iterator>
 
 #include "test_macros.h"
 #include "../../../NotConstructible.h"
@@ -26,7 +25,7 @@ int main(int, char**)
         C c;
         ASSERT_NOEXCEPT(c.clear());
         c.clear();
-        assert(std::distance(c.begin(), c.end()) == 0);
+        assert(distance(c.begin(), c.end()) == 0);
     }
     {
         typedef int T;
@@ -36,10 +35,10 @@ int main(int, char**)
 
         ASSERT_NOEXCEPT(c.clear());
         c.clear();
-        assert(std::distance(c.begin(), c.end()) == 0);
+        assert(distance(c.begin(), c.end()) == 0);
 
         c.clear();
-        assert(std::distance(c.begin(), c.end()) == 0);
+        assert(distance(c.begin(), c.end()) == 0);
     }
 #if TEST_STD_VER >= 11
     {
@@ -48,7 +47,7 @@ int main(int, char**)
         C c;
         ASSERT_NOEXCEPT(c.clear());
         c.clear();
-        assert(std::distance(c.begin(), c.end()) == 0);
+        assert(distance(c.begin(), c.end()) == 0);
     }
     {
         typedef int T;
@@ -58,10 +57,10 @@ int main(int, char**)
 
         ASSERT_NOEXCEPT(c.clear());
         c.clear();
-        assert(std::distance(c.begin(), c.end()) == 0);
+        assert(distance(c.begin(), c.end()) == 0);
 
         c.clear();
-        assert(std::distance(c.begin(), c.end()) == 0);
+        assert(distance(c.begin(), c.end()) == 0);
     }
 #endif
 

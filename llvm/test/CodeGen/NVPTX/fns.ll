@@ -1,5 +1,4 @@
 ; RUN: llc < %s -march=nvptx64 -mcpu=sm_30 -mattr=+ptx60 | FileCheck %s
-; RUN: %if ptxas %{ llc < %s -march=nvptx64 -mcpu=sm_30 -mattr=+ptx60 | %ptxas-verify %}
 
 declare i32 @llvm.nvvm.fns(i32, i32, i32)
 

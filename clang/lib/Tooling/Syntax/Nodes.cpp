@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "clang/Tooling/Syntax/Nodes.h"
-#include "llvm/Support/raw_ostream.h"
+#include "clang/Basic/TokenKinds.h"
 
 using namespace clang;
 

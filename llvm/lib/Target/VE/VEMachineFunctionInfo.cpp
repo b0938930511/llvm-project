@@ -11,10 +11,3 @@
 using namespace llvm;
 
 void VEMachineFunctionInfo::anchor() {}
-
-MachineFunctionInfo *VEMachineFunctionInfo::clone(
-    BumpPtrAllocator &Allocator, MachineFunction &DestMF,
-    const DenseMap<MachineBasicBlock *, MachineBasicBlock *> &Src2DstMBB)
-    const {
-  return DestMF.cloneInfo<VEMachineFunctionInfo>(*this);
-}

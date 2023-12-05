@@ -20,7 +20,6 @@
 #include "Plugins/Process/Utility/RegisterContextFreeBSD_mips64.h"
 
 #include <array>
-#include <optional>
 
 namespace lldb_private {
 namespace process_freebsd {
@@ -45,7 +44,7 @@ public:
   Status WriteRegister(const RegisterInfo *reg_info,
                        const RegisterValue &reg_value) override;
 
-  Status ReadAllRegisterValues(lldb::WritableDataBufferSP &data_sp) override;
+  Status ReadAllRegisterValues(lldb::DataBufferSP &data_sp) override;
 
   Status WriteAllRegisterValues(const lldb::DataBufferSP &data_sp) override;
 
@@ -55,11 +54,8 @@ public:
 private:
   enum RegSetKind {
     GPRegSet,
-    FPRegSet,
   };
-  std::array<uint8_t, sizeof(reg) + sizeof(fpreg)> m_reg_data;
-
-  std::optional<RegSetKind> GetSetForNativeRegNum(uint32_t reg_num) const;
+  std::array<uint8_t, sizeof(reg)> m_reg_data;
 
   Status ReadRegisterSet(RegSetKind set);
   Status WriteRegisterSet(RegSetKind set);

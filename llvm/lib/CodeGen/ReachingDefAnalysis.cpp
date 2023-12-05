@@ -34,7 +34,12 @@ static bool isValidRegUseOf(const MachineOperand &MO, MCRegister PhysReg,
                             const TargetRegisterInfo *TRI) {
   if (!isValidRegUse(MO))
     return false;
-  return TRI->regsOverlap(MO.getReg(), PhysReg);
+  if (MO.getReg() == PhysReg)
+    return true;
+  for (MCRegAliasIterator R(PhysReg, TRI, false); R.isValid(); ++R)
+    if (MO.getReg() == *R)
+      return true;
+  return false;
 }
 
 static bool isValidRegDef(const MachineOperand &MO) {
@@ -45,7 +50,12 @@ static bool isValidRegDefOf(const MachineOperand &MO, MCRegister PhysReg,
                             const TargetRegisterInfo *TRI) {
   if (!isValidRegDef(MO))
     return false;
-  return TRI->regsOverlap(MO.getReg(), PhysReg);
+  if (MO.getReg() == PhysReg)
+    return true;
+  for (MCRegAliasIterator R(PhysReg, TRI, false); R.isValid(); ++R)
+    if (MO.getReg() == *R)
+      return true;
+  return false;
 }
 
 void ReachingDefAnalysis::enterBasicBlock(MachineBasicBlock *MBB) {
@@ -65,13 +75,13 @@ void ReachingDefAnalysis::enterBasicBlock(MachineBasicBlock *MBB) {
   // This is the entry block.
   if (MBB->pred_empty()) {
     for (const auto &LI : MBB->liveins()) {
-      for (MCRegUnit Unit : TRI->regunits(LI.PhysReg)) {
+      for (MCRegUnitIterator Unit(LI.PhysReg, TRI); Unit.isValid(); ++Unit) {
         // Treat function live-ins as if they were defined just before the first
         // instruction.  Usually, function arguments are set up immediately
         // before the call.
-        if (LiveRegs[Unit] != -1) {
-          LiveRegs[Unit] = -1;
-          MBBReachingDefs[MBBNumber][Unit].push_back(-1);
+        if (LiveRegs[*Unit] != -1) {
+          LiveRegs[*Unit] = -1;
+          MBBReachingDefs[MBBNumber][*Unit].push_back(-1);
         }
       }
     }
@@ -128,15 +138,16 @@ void ReachingDefAnalysis::processDefs(MachineInstr *MI) {
   for (auto &MO : MI->operands()) {
     if (!isValidRegDef(MO))
       continue;
-    for (MCRegUnit Unit : TRI->regunits(MO.getReg().asMCReg())) {
+    for (MCRegUnitIterator Unit(MO.getReg().asMCReg(), TRI); Unit.isValid();
+         ++Unit) {
       // This instruction explicitly defines the current reg unit.
-      LLVM_DEBUG(dbgs() << printRegUnit(Unit, TRI) << ":\t" << CurInstr << '\t'
-                        << *MI);
+      LLVM_DEBUG(dbgs() << printRegUnit(*Unit, TRI) << ":\t" << CurInstr
+                        << '\t' << *MI);
 
       // How many instructions since this reg unit was last written?
-      if (LiveRegs[Unit] != CurInstr) {
-        LiveRegs[Unit] = CurInstr;
-        MBBReachingDefs[MBBNumber][Unit].push_back(CurInstr);
+      if (LiveRegs[*Unit] != CurInstr) {
+        LiveRegs[*Unit] = CurInstr;
+        MBBReachingDefs[MBBNumber][*Unit].push_back(CurInstr);
       }
     }
   }
@@ -181,7 +192,7 @@ void ReachingDefAnalysis::reprocessBasicBlock(MachineBasicBlock *MBB) {
         MBBReachingDefs[MBBNumber][Unit].insert(Start, Def);
       }
 
-      // Update reaching def at end of BB. Keep in mind that these are
+      // Update reaching def at end of of BB. Keep in mind that these are
       // adjusted relative to the end of the basic block.
       if (MBBOutRegsInfos[MBBNumber][Unit] < Def - NumInsts)
         MBBOutRegsInfos[MBBNumber][Unit] = Def - NumInsts;
@@ -268,8 +279,8 @@ int ReachingDefAnalysis::getReachingDef(MachineInstr *MI,
   assert(MBBNumber < MBBReachingDefs.size() &&
          "Unexpected basic block number.");
   int LatestDef = ReachingDefDefaultVal;
-  for (MCRegUnit Unit : TRI->regunits(PhysReg)) {
-    for (int Def : MBBReachingDefs[MBBNumber][Unit]) {
+  for (MCRegUnitIterator Unit(PhysReg, TRI); Unit.isValid(); ++Unit) {
+    for (int Def : MBBReachingDefs[MBBNumber][*Unit]) {
       if (Def >= InstId)
         break;
       DefRes = Def;
@@ -386,7 +397,8 @@ void ReachingDefAnalysis::getGlobalUses(MachineInstr *MI, MCRegister PhysReg,
     SmallVector<MachineBasicBlock *, 4> ToVisit(MBB->successors());
     SmallPtrSet<MachineBasicBlock*, 4>Visited;
     while (!ToVisit.empty()) {
-      MachineBasicBlock *MBB = ToVisit.pop_back_val();
+      MachineBasicBlock *MBB = ToVisit.back();
+      ToVisit.pop_back();
       if (Visited.count(MBB) || !MBB->isLiveIn(PhysReg))
         continue;
       if (getLiveInUses(MBB, PhysReg, Uses))
@@ -634,7 +646,7 @@ ReachingDefAnalysis::isSafeToRemove(MachineInstr *MI, InstSet &Visited,
     SmallPtrSet<MachineInstr*, 4> Uses;
     getGlobalUses(MI, MO.getReg(), Uses);
 
-    for (auto *I : Uses) {
+    for (auto I : Uses) {
       if (Ignore.count(I) || ToRemove.count(I))
         continue;
       if (!isSafeToRemove(I, Visited, ToRemove, Ignore))

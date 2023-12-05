@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// UNSUPPORTED: c++03 && !stdlib=libc++
+// UNSUPPORTED: c++03
 
 // <vector>
 
@@ -20,7 +20,7 @@
 #include "min_allocator.h"
 #include "asan_testing.h"
 
-TEST_CONSTEXPR_CXX20 bool tests()
+int main(int, char**)
 {
     {
         std::vector<MoveOnly, test_allocator<MoveOnly> > l(test_allocator<MoveOnly>(5));
@@ -77,8 +77,8 @@ TEST_CONSTEXPR_CXX20 bool tests()
         assert(is_contiguous_container_asan_correct(l2));
     }
     {
-        std::vector<MoveOnly, min_allocator<MoveOnly> > l((min_allocator<MoveOnly>()));
-        std::vector<MoveOnly, min_allocator<MoveOnly> > lo((min_allocator<MoveOnly>()));
+        std::vector<MoveOnly, min_allocator<MoveOnly> > l(min_allocator<MoveOnly>{});
+        std::vector<MoveOnly, min_allocator<MoveOnly> > lo(min_allocator<MoveOnly>{});
         assert(is_contiguous_container_asan_correct(l));
         assert(is_contiguous_container_asan_correct(lo));
         for (int i = 1; i <= 3; ++i)
@@ -94,32 +94,6 @@ TEST_CONSTEXPR_CXX20 bool tests()
         assert(l2.get_allocator() == min_allocator<MoveOnly>());
         assert(is_contiguous_container_asan_correct(l2));
     }
-    {
-      std::vector<MoveOnly, safe_allocator<MoveOnly> > l((safe_allocator<MoveOnly>()));
-      std::vector<MoveOnly, safe_allocator<MoveOnly> > lo((safe_allocator<MoveOnly>()));
-      assert(is_contiguous_container_asan_correct(l));
-      assert(is_contiguous_container_asan_correct(lo));
-      for (int i = 1; i <= 3; ++i) {
-        l.push_back(i);
-        lo.push_back(i);
-      }
-      assert(is_contiguous_container_asan_correct(l));
-      assert(is_contiguous_container_asan_correct(lo));
-      std::vector<MoveOnly, safe_allocator<MoveOnly> > l2(std::move(l), safe_allocator<MoveOnly>());
-      assert(l2 == lo);
-      assert(l.empty());
-      assert(l2.get_allocator() == safe_allocator<MoveOnly>());
-      assert(is_contiguous_container_asan_correct(l2));
-    }
 
-    return true;
-}
-
-int main(int, char**)
-{
-    tests();
-#if TEST_STD_VER > 17
-    static_assert(tests());
-#endif
-    return 0;
+  return 0;
 }

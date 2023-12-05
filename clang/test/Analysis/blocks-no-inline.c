@@ -3,7 +3,7 @@
 
 void clang_analyzer_eval(int);
 
-void testInvalidation(void) {
+void testInvalidation() {
   __block int i = 0;
   ^{
     ++i;
@@ -15,7 +15,7 @@ void testInvalidation(void) {
 
 
 const int globalConstant = 1;
-void testCapturedConstants(void) {
+void testCapturedConstants() {
   const int localConstant = 2;
   static const int staticConstant = 3;
 
@@ -28,7 +28,7 @@ void testCapturedConstants(void) {
 
 typedef const int constInt;
 constInt anotherGlobalConstant = 1;
-void testCapturedConstantsTypedef(void) {
+void testCapturedConstantsTypedef() {
   constInt localConstant = 2;
   static constInt staticConstant = 3;
 

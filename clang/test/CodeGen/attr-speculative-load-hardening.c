@@ -3,7 +3,7 @@
 //
 // Check that we set the attribute on each function.
 
-int test1(void) {
+int test1() {
   return 42;
 }
 // SLH: @{{.*}}test1{{.*}}[[SLH:#[0-9]+]]

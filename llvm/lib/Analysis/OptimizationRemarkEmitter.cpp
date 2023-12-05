@@ -20,7 +20,6 @@
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/InitializePasses.h"
-#include <optional>
 
 using namespace llvm;
 
@@ -48,7 +47,7 @@ OptimizationRemarkEmitter::OptimizationRemarkEmitter(const Function *F)
 bool OptimizationRemarkEmitter::invalidate(
     Function &F, const PreservedAnalyses &PA,
     FunctionAnalysisManager::Invalidator &Inv) {
-  if (OwnedBFI) {
+  if (OwnedBFI.get()) {
     OwnedBFI.reset();
     BFI = nullptr;
   }
@@ -61,10 +60,9 @@ bool OptimizationRemarkEmitter::invalidate(
   return false;
 }
 
-std::optional<uint64_t>
-OptimizationRemarkEmitter::computeHotness(const Value *V) {
+Optional<uint64_t> OptimizationRemarkEmitter::computeHotness(const Value *V) {
   if (!BFI)
-    return std::nullopt;
+    return None;
 
   return BFI->getBlockProfileCount(cast<BasicBlock>(V));
 }
@@ -82,7 +80,7 @@ void OptimizationRemarkEmitter::emit(
   computeHotness(OptDiag);
 
   // Only emit it if its hotness meets the threshold.
-  if (OptDiag.getHotness().value_or(0) <
+  if (OptDiag.getHotness().getValueOr(0) <
       F->getContext().getDiagnosticsHotnessThreshold()) {
     return;
   }

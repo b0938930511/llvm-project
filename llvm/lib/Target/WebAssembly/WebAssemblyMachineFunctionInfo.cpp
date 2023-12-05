@@ -24,33 +24,10 @@ using namespace llvm;
 
 WebAssemblyFunctionInfo::~WebAssemblyFunctionInfo() = default; // anchor.
 
-MachineFunctionInfo *WebAssemblyFunctionInfo::clone(
-    BumpPtrAllocator &Allocator, MachineFunction &DestMF,
-    const DenseMap<MachineBasicBlock *, MachineBasicBlock *> &Src2DstMBB)
-    const {
-  // TODO: Implement cloning for WasmEHFuncInfo. This will have invalid block
-  // references.
-  return DestMF.cloneInfo<WebAssemblyFunctionInfo>(*this);
-}
-
 void WebAssemblyFunctionInfo::initWARegs(MachineRegisterInfo &MRI) {
   assert(WARegs.empty());
-  unsigned Reg = WebAssembly::UnusedReg;
+  unsigned Reg = UnusedReg;
   WARegs.resize(MRI.getNumVirtRegs(), Reg);
-}
-
-void llvm::computeLegalValueVTs(const WebAssemblyTargetLowering &TLI,
-                                LLVMContext &Ctx, const DataLayout &DL,
-                                Type *Ty, SmallVectorImpl<MVT> &ValueVTs) {
-  SmallVector<EVT, 4> VTs;
-  ComputeValueVTs(TLI, DL, Ty, VTs);
-
-  for (EVT VT : VTs) {
-    unsigned NumRegs = TLI.getNumRegisters(Ctx, VT);
-    MVT RegisterVT = TLI.getRegisterType(Ctx, VT);
-    for (unsigned I = 0; I != NumRegs; ++I)
-      ValueVTs.push_back(RegisterVT);
-  }
 }
 
 void llvm::computeLegalValueVTs(const Function &F, const TargetMachine &TM,
@@ -58,7 +35,15 @@ void llvm::computeLegalValueVTs(const Function &F, const TargetMachine &TM,
   const DataLayout &DL(F.getParent()->getDataLayout());
   const WebAssemblyTargetLowering &TLI =
       *TM.getSubtarget<WebAssemblySubtarget>(F).getTargetLowering();
-  computeLegalValueVTs(TLI, F.getContext(), DL, Ty, ValueVTs);
+  SmallVector<EVT, 4> VTs;
+  ComputeValueVTs(TLI, DL, Ty, VTs);
+
+  for (EVT VT : VTs) {
+    unsigned NumRegs = TLI.getNumRegisters(F.getContext(), VT);
+    MVT RegisterVT = TLI.getRegisterType(F.getContext(), VT);
+    for (unsigned I = 0; I != NumRegs; ++I)
+      ValueVTs.push_back(RegisterVT);
+  }
 }
 
 void llvm::computeSignatureVTs(const FunctionType *Ty,
@@ -121,8 +106,11 @@ llvm::signatureFromMVTs(const SmallVectorImpl<MVT> &Results,
 }
 
 yaml::WebAssemblyFunctionInfo::WebAssemblyFunctionInfo(
-    const llvm::MachineFunction &MF, const llvm::WebAssemblyFunctionInfo &MFI)
+    const llvm::WebAssemblyFunctionInfo &MFI)
     : CFGStackified(MFI.isCFGStackified()) {
+  auto *EHInfo = MFI.getWasmEHFuncInfo();
+  const llvm::MachineFunction &MF = MFI.getMachineFunction();
+
   for (auto VT : MFI.getParams())
     Params.push_back(EVT(VT).getEVTString());
   for (auto VT : MFI.getResults())
@@ -130,8 +118,7 @@ yaml::WebAssemblyFunctionInfo::WebAssemblyFunctionInfo(
 
   //  MFI.getWasmEHFuncInfo() is non-null only for functions with the
   //  personality function.
-
-  if (auto *EHInfo = MF.getWasmEHFuncInfo()) {
+  if (EHInfo) {
     // SrcToUnwindDest can contain stale mappings in case BBs are removed in
     // optimizations, in case, for example, they are unreachable. We should not
     // include their info.
@@ -152,17 +139,13 @@ void yaml::WebAssemblyFunctionInfo::mappingImpl(yaml::IO &YamlIO) {
 }
 
 void WebAssemblyFunctionInfo::initializeBaseYamlFields(
-    MachineFunction &MF, const yaml::WebAssemblyFunctionInfo &YamlMFI) {
+    const yaml::WebAssemblyFunctionInfo &YamlMFI) {
   CFGStackified = YamlMFI.CFGStackified;
   for (auto VT : YamlMFI.Params)
     addParam(WebAssembly::parseMVT(VT.Value));
   for (auto VT : YamlMFI.Results)
     addResult(WebAssembly::parseMVT(VT.Value));
-
-  // FIXME: WasmEHInfo is defined in the MachineFunction, but serialized
-  // here. Either WasmEHInfo should be moved out of MachineFunction, or the
-  // serialization handling should be moved to MachineFunction.
-  if (WasmEHFuncInfo *WasmEHInfo = MF.getWasmEHFuncInfo()) {
+  if (WasmEHInfo) {
     for (auto KV : YamlMFI.SrcToUnwindDest)
       WasmEHInfo->setUnwindDest(MF.getBlockNumbered(KV.first),
                                 MF.getBlockNumbered(KV.second));

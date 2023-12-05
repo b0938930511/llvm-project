@@ -6,8 +6,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-// XFAIL: no-wide-characters
-
 // REQUIRES: locale.en_US.UTF-8
 // REQUIRES: locale.fr_FR.UTF-8
 // REQUIRES: locale.ru_RU.UTF-8
@@ -52,7 +50,7 @@ int main(int, char**)
         err = std::ios_base::goodbit;
         t = std::tm();
         I i = f.get_time(I(in), I(in+sizeof(in)/sizeof(in[0])-1), ios, err, &t);
-        assert(base(i) == in+sizeof(in)/sizeof(in[0])-1);
+        assert(i.base() == in+sizeof(in)/sizeof(in[0])-1);
         assert(t.tm_hour == 13);
         assert(t.tm_min == 14);
         assert(t.tm_sec == 15);
@@ -64,7 +62,7 @@ int main(int, char**)
         err = std::ios_base::goodbit;
         t = std::tm();
         I i = f.get_time(I(in), I(in+sizeof(in)/sizeof(in[0])-1), ios, err, &t);
-        assert(base(i) == in+sizeof(in)/sizeof(in[0])-1);
+        assert(i.base() == in+sizeof(in)/sizeof(in[0])-1);
         assert(t.tm_hour == 13);
         assert(t.tm_min == 14);
         assert(t.tm_sec == 15);
@@ -76,7 +74,7 @@ int main(int, char**)
         err = std::ios_base::goodbit;
         t = std::tm();
         I i = f.get_time(I(in), I(in+sizeof(in)/sizeof(in[0])-1), ios, err, &t);
-        assert(base(i) == in+sizeof(in)/sizeof(in[0])-1);
+        assert(i.base() == in+sizeof(in)/sizeof(in[0])-1);
         assert(t.tm_hour == 13);
         assert(t.tm_min == 14);
         assert(t.tm_sec == 15);
@@ -88,7 +86,7 @@ int main(int, char**)
         err = std::ios_base::goodbit;
         t = std::tm();
         I i = f.get_time(I(in), I(in+sizeof(in)/sizeof(in[0])-1), ios, err, &t);
-        assert(base(i) == in+sizeof(in)/sizeof(in[0])-1);
+        assert(i.base() == in+sizeof(in)/sizeof(in[0])-1);
         assert(t.tm_hour == 13);
         assert(t.tm_min == 14);
         assert(t.tm_sec == 15);

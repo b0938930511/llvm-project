@@ -10,15 +10,19 @@ extern "C" {
 
 #include "InstrProfiling.h"
 
-static int RegisterRuntime() {
-  __llvm_profile_initialize();
-#ifdef _AIX
-  extern COMPILER_RT_VISIBILITY void *__llvm_profile_keep[];
-  (void)*(void *volatile *)__llvm_profile_keep;
-#endif
-  return 0;
+/* int __llvm_profile_runtime  */
+COMPILER_RT_VISIBILITY int INSTR_PROF_PROFILE_RUNTIME_VAR;
 }
 
-/* int __llvm_profile_runtime  */
-COMPILER_RT_VISIBILITY int INSTR_PROF_PROFILE_RUNTIME_VAR = RegisterRuntime();
+namespace {
+
+class RegisterRuntime {
+public:
+  RegisterRuntime() {
+    __llvm_profile_initialize();
+  }
+};
+
+RegisterRuntime Registration;
+
 }

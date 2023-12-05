@@ -1,3 +1,4 @@
+// -*- C++ -*-
 //===----------------------------------------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -16,7 +17,12 @@
 
 #include <queue>
 
-void f() {
+#include "test_macros.h"
+
+int main(int, char**)
+{
     std::queue<int> c;
     c.empty(); // expected-warning {{ignoring return value of function declared with 'nodiscard' attribute}}
+
+    return 0;
 }

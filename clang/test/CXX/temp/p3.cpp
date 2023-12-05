@@ -10,7 +10,7 @@ template<typename T> struct A { static A a; } A<T>::a; // expected-error {{expec
                                                           expected-error {{use of undeclared identifier 'T'}}
 
 template<typename T> struct B { } f(); // expected-error {{expected ';' after struct}} \
-                                          expected-error {{a type specifier is required}}
+                                          expected-error {{requires a type specifier}}
 
 template<typename T> struct C { } // expected-error {{expected ';' after struct}}
 

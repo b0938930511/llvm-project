@@ -195,8 +195,20 @@ private:
             Expect e = std::__invoke(M, std::forward<T>(obj));
             assert(&e == expect);
         }
+#if TEST_STD_VER >= 11
+        {
+            static_assert((std::is_same<
+                decltype(std::__invoke_constexpr(M, std::forward<T>(obj))), Expect
+              >::value), "");
+            Expect e = std::__invoke_constexpr(M, std::forward<T>(obj));
+            assert(&e == expect);
+        }
+#endif
     }
 };
+
+
+
 
 int main(int, char**) {
     TestCase<ArgType>::run();

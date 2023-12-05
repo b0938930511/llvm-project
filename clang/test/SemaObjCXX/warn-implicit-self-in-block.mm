@@ -1,4 +1,5 @@
 // RUN: %clang_cc1 -x objective-c++ -std=c++11 -fobjc-arc -fblocks -Wimplicit-retain-self -verify %s
+// rdar://11194874
 
 typedef void (^BlockTy)();
 
@@ -37,9 +38,5 @@ void escapeFunc(BlockTy);
   - (void)testLambdaInBlock{
     noescapeFunc(^{ [&](){ (void)_bar; }(); });
     escapeFunc(^{ [&](){ (void)_bar; }(); }); // expected-warning {{block implicitly retains 'self'; explicitly mention 'self' to indicate this is intended behavior}}
-  }
-
-  - (BlockTy)testDeclType{
-    return ^{ decltype(_bar) i = 12; (void)i; };
   }
 @end

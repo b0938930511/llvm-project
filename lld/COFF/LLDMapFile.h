@@ -9,9 +9,13 @@
 #ifndef LLD_COFF_LLDMAPFILE_H
 #define LLD_COFF_LLDMAPFILE_H
 
-namespace lld::coff {
-class COFFLinkerContext;
-void writeLLDMapFile(const COFFLinkerContext &ctx);
+#include "llvm/ADT/ArrayRef.h"
+
+namespace lld {
+namespace coff {
+class OutputSection;
+void writeLLDMapFile(llvm::ArrayRef<OutputSection *> outputSections);
+}
 }
 
 #endif

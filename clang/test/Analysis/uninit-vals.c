@@ -12,13 +12,13 @@ int f1_a(struct FPRec* foo) {
   return bar(x)+1; // no-warning
 }
 
-int f1_b(void) {
+int f1_b() {
   int x; // expected-note{{'x' declared without an initial value}}
   return bar(x)+1;  // expected-warning{{1st function call argument is an uninitialized value}}
                     // expected-note@-1{{1st function call argument is an uninitialized value}}
 }
 
-int f2(void) {
+int f2() {
   
   int x; // expected-note{{'x' declared without an initial value}}
   
@@ -29,7 +29,7 @@ int f2(void) {
   return 2;  
 }
 
-int f2_b(void) {
+int f2_b() {
   int x; // expected-note{{'x' declared without an initial value}}
   
   return ((1+x)+2+((x))) + 1 ? 1 : 2; // expected-warning{{The right operand of '+' is a garbage value}}
@@ -69,13 +69,14 @@ void f6(int x) {
                       // expected-note@-1{{The left operand of '==' is a garbage value due to array index out of bounds}}
 }
 
-int ret_uninit(void) {
+int ret_uninit() {
   int i; // expected-note{{'i' declared without an initial value}}
   int *p = &i;
   return *p;  // expected-warning{{Undefined or garbage value returned to caller}}
               // expected-note@-1{{Undefined or garbage value returned to caller}}
 }
 
+// <rdar://problem/6451816>
 typedef unsigned char Boolean;
 typedef const struct __CFNumber * CFNumberRef;
 typedef signed long CFIndex;
@@ -134,29 +135,30 @@ int pr4631_f1_b(void)
   return x;  // no-warning
 }
 
-// FP when returning a void-valued expression from a void function...or block.
-void foo_radar12278788(void) { return; }
-void test_radar12278788(void) {
+// <rdar://problem/12278788> - FP when returning a void-valued expression from
+// a void function...or block.
+void foo_radar12278788() { return; }
+void test_radar12278788() {
   return foo_radar12278788(); // no-warning
 }
 
-void foo_radar12278788_fp(void) { return; }
-typedef int (*RetIntFuncType)(void);
-typedef void (*RetVoidFuncType)(void);
-int test_radar12278788_FP(void) {
+void foo_radar12278788_fp() { return; }
+typedef int (*RetIntFuncType)();
+typedef void (*RetVoidFuncType)();
+int test_radar12278788_FP() {
   RetVoidFuncType f = foo_radar12278788_fp;
   return ((RetIntFuncType)f)(); //expected-warning {{Undefined or garbage value returned to caller}}
                                 //expected-note@-1 {{Undefined or garbage value returned to caller}}
 }
 
-void rdar13665798(void) {
-  ^(void) {
+void rdar13665798() {
+  ^() {
     return foo_radar12278788(); // no-warning
   }();
-  ^void(void) {
+  ^void() {
     return foo_radar12278788(); // no-warning
   }();
-  ^int(void) { // expected-note{{Calling anonymous block}}
+  ^int() { // expected-note{{Calling anonymous block}}
     RetVoidFuncType f = foo_radar12278788_fp;
     return ((RetIntFuncType)f)(); //expected-warning {{Undefined or garbage value returned to caller}}
                                   //expected-note@-1 {{Undefined or garbage value returned to caller}}
@@ -167,7 +169,7 @@ struct Point {
   int x, y;
 };
 
-struct Point getHalfPoint(void) {
+struct Point getHalfPoint() {
   struct Point p;
   p.x = 0;
   return p;
@@ -175,13 +177,13 @@ struct Point getHalfPoint(void) {
 
 void use(struct Point p); 
 
-void testUseHalfPoint(void) {
+void testUseHalfPoint() {
   struct Point p = getHalfPoint(); // expected-note{{'p' initialized here}}
   use(p); // expected-warning{{uninitialized}}
           // expected-note@-1{{uninitialized}}
 }
 
-void testUseHalfPoint2(void) {
+void testUseHalfPoint2() {
   struct Point p;
   p = getHalfPoint(); // expected-note{{Value assigned to 'p'}}
   use(p); // expected-warning{{uninitialized}}

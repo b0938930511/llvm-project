@@ -11,7 +11,6 @@
 
 #include "ClangTidyDiagnosticConsumer.h"
 #include "ClangTidyOptions.h"
-#include "llvm/ADT/StringSet.h"
 #include <memory>
 #include <vector>
 
@@ -39,7 +38,7 @@ public:
 
   /// Returns an ASTConsumer that runs the specified clang-tidy checks.
   std::unique_ptr<clang::ASTConsumer>
-  createASTConsumer(clang::CompilerInstance &Compiler, StringRef File);
+  CreateASTConsumer(clang::CompilerInstance &Compiler, StringRef File);
 
   /// Get the list of enabled checks.
   std::vector<std::string> getCheckNames();
@@ -57,14 +56,6 @@ private:
 /// filters are applied.
 std::vector<std::string> getCheckNames(const ClangTidyOptions &Options,
                                        bool AllowEnablingAnalyzerAlphaCheckers);
-
-struct NamesAndOptions {
-  llvm::StringSet<> Names;
-  llvm::StringSet<> Options;
-};
-
-NamesAndOptions
-getAllChecksAndOptions(bool AllowEnablingAnalyzerAlphaCheckers = true);
 
 /// Returns the effective check-specific options.
 ///

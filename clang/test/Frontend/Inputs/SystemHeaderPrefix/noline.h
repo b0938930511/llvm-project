@@ -1,1 +1,1 @@
-foo(void);
+foo();

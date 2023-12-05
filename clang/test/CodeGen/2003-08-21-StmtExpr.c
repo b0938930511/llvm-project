@@ -6,7 +6,7 @@ typedef struct {
 } structty;
 
 void bar(structty new_mask);
-static void foo(void) {
+static void foo() {
   bar(({ structty mask; mask; }));
 }
 

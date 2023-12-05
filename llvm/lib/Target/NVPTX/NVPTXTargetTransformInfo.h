@@ -21,7 +21,6 @@
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/CodeGen/BasicTTIImpl.h"
 #include "llvm/CodeGen/TargetLowering.h"
-#include <optional>
 
 namespace llvm {
 
@@ -41,7 +40,7 @@ public:
       : BaseT(TM, F.getParent()->getDataLayout()), ST(TM->getSubtargetImpl()),
         TLI(ST->getTargetLowering()) {}
 
-  bool hasBranchDivergence(const Function *F = nullptr) { return true; }
+  bool hasBranchDivergence() { return true; }
 
   bool isSourceOfDivergence(const Value *V);
 
@@ -49,13 +48,8 @@ public:
     return AddressSpace::ADDRESS_SPACE_GENERIC;
   }
 
-  bool canHaveNonUndefGlobalInitializerInAddressSpace(unsigned AS) const {
-    return AS != AddressSpace::ADDRESS_SPACE_SHARED &&
-           AS != AddressSpace::ADDRESS_SPACE_LOCAL && AS != ADDRESS_SPACE_PARAM;
-  }
-
-  std::optional<Instruction *> instCombineIntrinsic(InstCombiner &IC,
-                                                    IntrinsicInst &II) const;
+  Optional<Instruction *> instCombineIntrinsic(InstCombiner &IC,
+                                               IntrinsicInst &II) const;
 
   // Loads and stores can be vectorized if the alignment is at least as big as
   // the load/store we want to vectorize.
@@ -90,14 +84,17 @@ public:
     return true;
   }
 
-  // Increase the inlining cost threshold by a factor of 11, reflecting that
+  // Increase the inlining cost threshold by a factor of 5, reflecting that
   // calls are particularly expensive in NVPTX.
-  unsigned getInliningThresholdMultiplier() const { return 11; }
+  unsigned getInliningThresholdMultiplier() { return 5; }
 
   InstructionCost getArithmeticInstrCost(
-      unsigned Opcode, Type *Ty, TTI::TargetCostKind CostKind,
-      TTI::OperandValueInfo Op1Info = {TTI::OK_AnyValue, TTI::OP_None},
-      TTI::OperandValueInfo Op2Info = {TTI::OK_AnyValue, TTI::OP_None},
+      unsigned Opcode, Type *Ty,
+      TTI::TargetCostKind CostKind = TTI::TCK_RecipThroughput,
+      TTI::OperandValueKind Opd1Info = TTI::OK_AnyValue,
+      TTI::OperandValueKind Opd2Info = TTI::OK_AnyValue,
+      TTI::OperandValueProperties Opd1PropInfo = TTI::OP_None,
+      TTI::OperandValueProperties Opd2PropInfo = TTI::OP_None,
       ArrayRef<const Value *> Args = ArrayRef<const Value *>(),
       const Instruction *CxtI = nullptr);
 

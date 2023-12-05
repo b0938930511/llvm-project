@@ -47,11 +47,9 @@ namespace llvm {
 
 static unsigned RDFCount = 0;
 
-static cl::opt<unsigned>
-    RDFLimit("hexagon-rdf-limit",
-             cl::init(std::numeric_limits<unsigned>::max()));
-static cl::opt<bool> RDFDump("hexagon-rdf-dump", cl::Hidden);
-static cl::opt<bool> RDFTrackReserved("hexagon-rdf-track-reserved", cl::Hidden);
+static cl::opt<unsigned> RDFLimit("rdf-limit",
+    cl::init(std::numeric_limits<unsigned>::max()));
+static cl::opt<bool> RDFDump("rdf-dump", cl::init(false));
 
 namespace {
 
@@ -134,7 +132,7 @@ bool HexagonCP::interpretAsCopy(const MachineInstr *MI, EqualityMap &EM) {
       const MachineOperand &A = MI->getOperand(2);
       if (!A.isImm() || A.getImm() != 0)
         return false;
-      [[fallthrough]];
+      LLVM_FALLTHROUGH;
     }
     case Hexagon::A2_tfr: {
       const MachineOperand &DstOp = MI->getOperand(0);
@@ -203,7 +201,7 @@ void HexagonDCE::removeOperand(NodeAddr<InstrNode*> IA, unsigned OpNum) {
   for (NodeAddr<RefNode*> RA : Refs)
     OpMap.insert(std::make_pair(RA.Id, getOpNum(RA.Addr->getOp())));
 
-  MI->removeOperand(OpNum);
+  MI->RemoveOperand(OpNum);
 
   for (NodeAddr<RefNode*> RA : Refs) {
     unsigned N = OpMap[RA.Id];
@@ -301,15 +299,12 @@ bool HexagonRDFOpt::runOnMachineFunction(MachineFunction &MF) {
   if (RDFDump)
     MF.print(dbgs() << "Before " << getPassName() << "\n", nullptr);
 
-  DataFlowGraph G(MF, HII, HRI, *MDT, MDF);
+  TargetOperandInfo TOI(HII);
+  DataFlowGraph G(MF, HII, HRI, *MDT, MDF, TOI);
   // Dead phi nodes are necessary for copy propagation: we can add a use
   // of a register in a block where it would need a phi node, but which
   // was dead (and removed) during the graph build time.
-  DataFlowGraph::Config Cfg;
-  Cfg.Options = RDFTrackReserved
-                    ? BuildOptions::KeepDeadPhis
-                    : BuildOptions::KeepDeadPhis | BuildOptions::OmitReserved;
-  G.build(Cfg);
+  G.build(BuildOptions::KeepDeadPhis);
 
   if (RDFDump)
     dbgs() << "Starting copy propagation on: " << MF.getName() << '\n'
@@ -326,10 +321,8 @@ bool HexagonRDFOpt::runOnMachineFunction(MachineFunction &MF) {
   Changed |= DCE.run();
 
   if (Changed) {
-    if (RDFDump) {
-      dbgs() << "Starting liveness recomputation on: " << MF.getName() << '\n'
-             << PrintNode<FuncNode*>(G.getFunc(), G) << '\n';
-    }
+    if (RDFDump)
+      dbgs() << "Starting liveness recomputation on: " << MF.getName() << '\n';
     Liveness LV(*MRI, G);
     LV.trace(RDFDump);
     LV.computeLiveIns();

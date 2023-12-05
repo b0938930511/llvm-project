@@ -14,7 +14,6 @@
 #include "MapFile.h"
 #include "OutputSection.h"
 #include "OutputSegment.h"
-#include "SectionPriorities.h"
 #include "SymbolTable.h"
 #include "Symbols.h"
 #include "SyntheticSections.h"
@@ -22,13 +21,14 @@
 #include "UnwindInfoSection.h"
 
 #include "lld/Common/Arrays.h"
-#include "lld/Common/CommonLinkerContext.h"
+#include "lld/Common/ErrorHandler.h"
+#include "lld/Common/Memory.h"
 #include "llvm/BinaryFormat/MachO.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/Support/LEB128.h"
+#include "llvm/Support/MathExtras.h"
 #include "llvm/Support/Parallel.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/ThreadPool.h"
 #include "llvm/Support/TimeProfiler.h"
 #include "llvm/Support/xxhash.h"
 
@@ -58,15 +58,12 @@ public:
 
   void openFile();
   void writeSections();
-  void applyOptimizationHints();
-  void buildFixupChains();
   void writeUuid();
   void writeCodeSignature();
   void writeOutputFile();
 
   template <class LP> void run();
 
-  ThreadPool threadPool;
   std::unique_ptr<FileOutputBuffer> &buffer;
   uint64_t addr = 0;
   uint64_t fileOff = 0;
@@ -133,8 +130,8 @@ public:
   LCSubFramework(StringRef umbrella) : umbrella(umbrella) {}
 
   uint32_t getSize() const override {
-    return alignToPowerOf2(sizeof(sub_framework_command) + umbrella.size() + 1,
-                           target->wordSize);
+    return alignTo(sizeof(sub_framework_command) + umbrella.size() + 1,
+                   target->wordSize);
   }
 
   void writeTo(uint8_t *buf) const override {
@@ -230,7 +227,7 @@ public:
 
   void writeTo(uint8_t *buf) const override {
     using SegmentCommand = typename LP::segment_command;
-    using SectionHeader = typename LP::section;
+    using Section = typename LP::section;
 
     auto *c = reinterpret_cast<SegmentCommand *>(buf);
     buf += sizeof(SegmentCommand);
@@ -246,14 +243,13 @@ public:
     c->vmsize = seg->vmSize;
     c->filesize = seg->fileSize;
     c->nsects = seg->numNonHiddenSections();
-    c->flags = seg->flags;
 
     for (const OutputSection *osec : seg->getSections()) {
       if (osec->isHidden())
         continue;
 
-      auto *sectHdr = reinterpret_cast<SectionHeader *>(buf);
-      buf += sizeof(SectionHeader);
+      auto *sectHdr = reinterpret_cast<Section *>(buf);
+      buf += sizeof(Section);
 
       memcpy(sectHdr->sectname, osec->name.data(), osec->name.size());
       memcpy(sectHdr->segname, name.data(), name.size());
@@ -328,8 +324,7 @@ public:
   }
 
   uint32_t getSize() const override {
-    return alignToPowerOf2(sizeof(dylib_command) + path.size() + 1,
-                           target->wordSize);
+    return alignTo(sizeof(dylib_command) + path.size() + 1, 8);
   }
 
   void writeTo(uint8_t *buf) const override {
@@ -348,7 +343,6 @@ public:
   }
 
   static uint32_t getInstanceCount() { return instanceCount; }
-  static void resetInstanceCount() { instanceCount = 0; }
 
 private:
   LoadCommandType type;
@@ -363,8 +357,7 @@ uint32_t LCDylib::instanceCount = 0;
 class LCLoadDylinker final : public LoadCommand {
 public:
   uint32_t getSize() const override {
-    return alignToPowerOf2(sizeof(dylinker_command) + path.size() + 1,
-                           target->wordSize);
+    return alignTo(sizeof(dylinker_command) + path.size() + 1, 8);
   }
 
   void writeTo(uint8_t *buf) const override {
@@ -390,8 +383,7 @@ public:
   explicit LCRPath(StringRef path) : path(path) {}
 
   uint32_t getSize() const override {
-    return alignToPowerOf2(sizeof(rpath_command) + path.size() + 1,
-                           target->wordSize);
+    return alignTo(sizeof(rpath_command) + path.size() + 1, target->wordSize);
   }
 
   void writeTo(uint8_t *buf) const override {
@@ -410,31 +402,6 @@ private:
   StringRef path;
 };
 
-class LCDyldEnv final : public LoadCommand {
-public:
-  explicit LCDyldEnv(StringRef name) : name(name) {}
-
-  uint32_t getSize() const override {
-    return alignToPowerOf2(sizeof(dyld_env_command) + name.size() + 1,
-                           target->wordSize);
-  }
-
-  void writeTo(uint8_t *buf) const override {
-    auto *c = reinterpret_cast<dyld_env_command *>(buf);
-    buf += sizeof(dyld_env_command);
-
-    c->cmd = LC_DYLD_ENVIRONMENT;
-    c->cmdsize = getSize();
-    c->name = sizeof(dyld_env_command);
-
-    memcpy(buf, name.data(), name.size());
-    buf[name.size()] = '\0';
-  }
-
-private:
-  StringRef name;
-};
-
 class LCMinVersion final : public LoadCommand {
 public:
   explicit LCMinVersion(const PlatformInfo &platformInfo)
@@ -445,19 +412,19 @@ public:
   void writeTo(uint8_t *buf) const override {
     auto *c = reinterpret_cast<version_min_command *>(buf);
     switch (platformInfo.target.Platform) {
-    case PLATFORM_MACOS:
+    case PlatformKind::macOS:
       c->cmd = LC_VERSION_MIN_MACOSX;
       break;
-    case PLATFORM_IOS:
-    case PLATFORM_IOSSIMULATOR:
+    case PlatformKind::iOS:
+    case PlatformKind::iOSSimulator:
       c->cmd = LC_VERSION_MIN_IPHONEOS;
       break;
-    case PLATFORM_TVOS:
-    case PLATFORM_TVOSSIMULATOR:
+    case PlatformKind::tvOS:
+    case PlatformKind::tvOSSimulator:
       c->cmd = LC_VERSION_MIN_TVOS;
       break;
-    case PLATFORM_WATCHOS:
-    case PLATFORM_WATCHOSSIMULATOR:
+    case PlatformKind::watchOS:
+    case PlatformKind::watchOSSimulator:
       c->cmd = LC_VERSION_MIN_WATCHOS;
       break;
     default:
@@ -465,7 +432,7 @@ public:
       break;
     }
     c->cmdsize = getSize();
-    c->version = encodeVersion(platformInfo.target.MinDeployment);
+    c->version = encodeVersion(platformInfo.minimum);
     c->sdk = encodeVersion(platformInfo.sdk);
   }
 
@@ -488,14 +455,12 @@ public:
     auto *c = reinterpret_cast<build_version_command *>(buf);
     c->cmd = LC_BUILD_VERSION;
     c->cmdsize = getSize();
-
     c->platform = static_cast<uint32_t>(platformInfo.target.Platform);
-    c->minos = encodeVersion(platformInfo.target.MinDeployment);
+    c->minos = encodeVersion(platformInfo.minimum);
     c->sdk = encodeVersion(platformInfo.sdk);
-
     c->ntools = ntools;
     auto *t = reinterpret_cast<build_tool_version *>(&c[1]);
-    t->tool = TOOL_LLD;
+    t->tool = TOOL_LD;
     t->version = encodeVersion(VersionTuple(
         LLVM_VERSION_MAJOR, LLVM_VERSION_MINOR, LLVM_VERSION_PATCH));
   }
@@ -581,40 +546,6 @@ public:
   CodeSignatureSection *section;
 };
 
-class LCExportsTrie final : public LoadCommand {
-public:
-  LCExportsTrie(ExportSection *section) : section(section) {}
-
-  uint32_t getSize() const override { return sizeof(linkedit_data_command); }
-
-  void writeTo(uint8_t *buf) const override {
-    auto *c = reinterpret_cast<linkedit_data_command *>(buf);
-    c->cmd = LC_DYLD_EXPORTS_TRIE;
-    c->cmdsize = getSize();
-    c->dataoff = section->fileOff;
-    c->datasize = section->getSize();
-  }
-
-  ExportSection *section;
-};
-
-class LCChainedFixups final : public LoadCommand {
-public:
-  LCChainedFixups(ChainedFixupsSection *section) : section(section) {}
-
-  uint32_t getSize() const override { return sizeof(linkedit_data_command); }
-
-  void writeTo(uint8_t *buf) const override {
-    auto *c = reinterpret_cast<linkedit_data_command *>(buf);
-    c->cmd = LC_DYLD_CHAINED_FIXUPS;
-    c->cmdsize = getSize();
-    c->dataoff = section->fileOff;
-    c->datasize = section->getSize();
-  }
-
-  ChainedFixupsSection *section;
-};
-
 } // namespace
 
 void Writer::treatSpecialUndefineds() {
@@ -638,14 +569,50 @@ void Writer::treatSpecialUndefineds() {
   }
 }
 
+// Add stubs and bindings where necessary (e.g. if the symbol is a
+// DylibSymbol.)
+static void prepareBranchTarget(Symbol *sym) {
+  if (auto *dysym = dyn_cast<DylibSymbol>(sym)) {
+    if (in.stubs->addEntry(dysym)) {
+      if (sym->isWeakDef()) {
+        in.binding->addEntry(dysym, in.lazyPointers->isec,
+                             sym->stubsIndex * target->wordSize);
+        in.weakBinding->addEntry(sym, in.lazyPointers->isec,
+                                 sym->stubsIndex * target->wordSize);
+      } else {
+        in.lazyBinding->addEntry(dysym);
+      }
+    }
+  } else if (auto *defined = dyn_cast<Defined>(sym)) {
+    if (defined->isExternalWeakDef()) {
+      if (in.stubs->addEntry(sym)) {
+        in.rebase->addEntry(in.lazyPointers->isec,
+                            sym->stubsIndex * target->wordSize);
+        in.weakBinding->addEntry(sym, in.lazyPointers->isec,
+                                 sym->stubsIndex * target->wordSize);
+      }
+    }
+  } else {
+    llvm_unreachable("invalid branch target symbol type");
+  }
+}
+
+// Can a symbol's address can only be resolved at runtime?
+static bool needsBinding(const Symbol *sym) {
+  if (isa<DylibSymbol>(sym))
+    return true;
+  if (const auto *defined = dyn_cast<Defined>(sym))
+    return defined->isExternalWeakDef();
+  return false;
+}
+
 static void prepareSymbolRelocation(Symbol *sym, const InputSection *isec,
-                                    const lld::macho::Reloc &r) {
+                                    const Reloc &r) {
   assert(sym->isLive());
   const RelocAttrs &relocAttrs = target->getRelocAttrs(r.type);
 
   if (relocAttrs.hasAttr(RelocAttrBits::BRANCH)) {
-    if (needsBinding(sym))
-      in.stubs->addEntry(sym);
+    prepareBranchTarget(sym);
   } else if (relocAttrs.hasAttr(RelocAttrBits::GOT)) {
     if (relocAttrs.hasAttr(RelocAttrBits::POINTER) || needsBinding(sym))
       in.got->addEntry(sym);
@@ -673,105 +640,65 @@ void Writer::scanRelocations() {
       continue;
 
     for (auto it = isec->relocs.begin(); it != isec->relocs.end(); ++it) {
-      lld::macho::Reloc &r = *it;
-
-      // Canonicalize the referent so that later accesses in Writer won't
-      // have to worry about it.
-      if (auto *referentIsec = r.referent.dyn_cast<InputSection *>())
-        r.referent = referentIsec->canonical();
-
+      Reloc &r = *it;
       if (target->hasAttr(r.type, RelocAttrBits::SUBTRAHEND)) {
         // Skip over the following UNSIGNED relocation -- it's just there as the
         // minuend, and doesn't have the usual UNSIGNED semantics. We don't want
         // to emit rebase opcodes for it.
-        ++it;
-        // Canonicalize the referent so that later accesses in Writer won't
-        // have to worry about it.
-        if (auto *referentIsec = it->referent.dyn_cast<InputSection *>())
-          it->referent = referentIsec->canonical();
+        it++;
         continue;
       }
       if (auto *sym = r.referent.dyn_cast<Symbol *>()) {
         if (auto *undefined = dyn_cast<Undefined>(sym))
-          treatUndefinedSymbol(*undefined, isec, r.offset);
+          treatUndefinedSymbol(*undefined);
         // treatUndefinedSymbol() can replace sym with a DylibSymbol; re-check.
         if (!isa<Undefined>(sym) && validateSymbolRelocation(sym, isec, r))
           prepareSymbolRelocation(sym, isec, r);
       } else {
-        if (!r.pcrel) {
-          if (config->emitChainedFixups)
-            in.chainedFixups->addRebase(isec, r.offset);
-          else
-            in.rebase->addEntry(isec, r.offset);
-        }
+        // Canonicalize the referent so that later accesses in Writer won't
+        // have to worry about it. Perhaps we should do this for Defined::isec
+        // too...
+        auto *referentIsec = r.referent.get<InputSection *>();
+        r.referent = referentIsec->canonical();
+        if (!r.pcrel)
+          in.rebase->addEntry(isec, r.offset);
       }
     }
   }
 
-  in.unwindInfo->prepare();
-}
-
-static void addNonWeakDefinition(const Defined *defined) {
-  if (config->emitChainedFixups)
-    in.chainedFixups->setHasNonWeakDefinition();
-  else
-    in.weakBinding->addNonWeakDefinition(defined);
+  in.unwindInfo->prepareRelocations();
 }
 
 void Writer::scanSymbols() {
   TimeTraceScope timeScope("Scan symbols");
-  for (Symbol *sym : symtab->getSymbols()) {
-    if (auto *defined = dyn_cast<Defined>(sym)) {
-      if (!defined->isLive())
-        continue;
-      defined->canonicalize();
-      if (defined->overridesWeakDef)
-        addNonWeakDefinition(defined);
-      if (!defined->isAbsolute() && isCodeSection(defined->isec))
-        in.unwindInfo->addSymbol(defined);
+  for (const Symbol *sym : symtab->getSymbols()) {
+    if (const auto *defined = dyn_cast<Defined>(sym)) {
+      if (defined->overridesWeakDef && defined->isLive())
+        in.weakBinding->addNonWeakDefinition(defined);
     } else if (const auto *dysym = dyn_cast<DylibSymbol>(sym)) {
       // This branch intentionally doesn't check isLive().
       if (dysym->isDynamicLookup())
         continue;
       dysym->getFile()->refState =
           std::max(dysym->getFile()->refState, dysym->getRefState());
-    } else if (isa<Undefined>(sym)) {
-      if (sym->getName().starts_with(ObjCStubsSection::symbolPrefix))
-        in.objcStubs->addEntry(sym);
     }
-  }
-
-  for (const InputFile *file : inputFiles) {
-    if (auto *objFile = dyn_cast<ObjFile>(file))
-      for (Symbol *sym : objFile->symbols) {
-        if (auto *defined = dyn_cast_or_null<Defined>(sym)) {
-          if (!defined->isLive())
-            continue;
-          defined->canonicalize();
-          if (!defined->isExternal() && !defined->isAbsolute() &&
-              isCodeSection(defined->isec))
-            in.unwindInfo->addSymbol(defined);
-        }
-      }
   }
 }
 
 // TODO: ld64 enforces the old load commands in a few other cases.
 static bool useLCBuildVersion(const PlatformInfo &platformInfo) {
-  static const std::array<std::pair<PlatformType, VersionTuple>, 7> minVersion =
-      {{{PLATFORM_MACOS, VersionTuple(10, 14)},
-        {PLATFORM_IOS, VersionTuple(12, 0)},
-        {PLATFORM_IOSSIMULATOR, VersionTuple(13, 0)},
-        {PLATFORM_TVOS, VersionTuple(12, 0)},
-        {PLATFORM_TVOSSIMULATOR, VersionTuple(13, 0)},
-        {PLATFORM_WATCHOS, VersionTuple(5, 0)},
-        {PLATFORM_WATCHOSSIMULATOR, VersionTuple(6, 0)}}};
+  static const std::vector<std::pair<PlatformKind, VersionTuple>> minVersion = {
+      {PlatformKind::macOS, VersionTuple(10, 14)},
+      {PlatformKind::iOS, VersionTuple(12, 0)},
+      {PlatformKind::iOSSimulator, VersionTuple(13, 0)},
+      {PlatformKind::tvOS, VersionTuple(12, 0)},
+      {PlatformKind::tvOSSimulator, VersionTuple(13, 0)},
+      {PlatformKind::watchOS, VersionTuple(5, 0)},
+      {PlatformKind::watchOSSimulator, VersionTuple(6, 0)}};
   auto it = llvm::find_if(minVersion, [&](const auto &p) {
     return p.first == platformInfo.target.Platform;
   });
-  return it == minVersion.end()
-             ? true
-             : platformInfo.target.MinDeployment >= it->second;
+  return it == minVersion.end() ? true : platformInfo.minimum >= it->second;
 }
 
 template <class LP> void Writer::createLoadCommands() {
@@ -781,13 +708,8 @@ template <class LP> void Writer::createLoadCommands() {
     seg->index = segIndex++;
   }
 
-  if (config->emitChainedFixups) {
-    in.header->addLoadCommand(make<LCChainedFixups>(in.chainedFixups));
-    in.header->addLoadCommand(make<LCExportsTrie>(in.exports));
-  } else {
-    in.header->addLoadCommand(make<LCDyldInfo>(
-        in.rebase, in.binding, in.weakBinding, in.lazyBinding, in.exports));
-  }
+  in.header->addLoadCommand(make<LCDyldInfo>(
+      in.rebase, in.binding, in.weakBinding, in.lazyBinding, in.exports));
   in.header->addLoadCommand(make<LCSymtab>(symtabSection, stringTableSection));
   in.header->addLoadCommand(
       make<LCDysymtab>(symtabSection, indirectSymtabSection));
@@ -813,103 +735,83 @@ template <class LP> void Writer::createLoadCommands() {
     llvm_unreachable("unhandled output file type");
   }
 
-  if (config->generateUuid) {
-    uuidCommand = make<LCUuid>();
-    in.header->addLoadCommand(uuidCommand);
-  }
+  uuidCommand = make<LCUuid>();
+  in.header->addLoadCommand(uuidCommand);
 
   if (useLCBuildVersion(config->platformInfo))
     in.header->addLoadCommand(make<LCBuildVersion>(config->platformInfo));
   else
     in.header->addLoadCommand(make<LCMinVersion>(config->platformInfo));
 
-  if (config->secondaryPlatformInfo) {
-    in.header->addLoadCommand(
-        make<LCBuildVersion>(*config->secondaryPlatformInfo));
-  }
-
   // This is down here to match ld64's load command order.
   if (config->outputType == MH_EXECUTE)
     in.header->addLoadCommand(make<LCMain>());
 
-  // See ld64's OutputFile::buildDylibOrdinalMapping for the corresponding
-  // library ordinal computation code in ld64.
   int64_t dylibOrdinal = 1;
   DenseMap<StringRef, int64_t> ordinalForInstallName;
-
-  std::vector<DylibFile *> dylibFiles;
   for (InputFile *file : inputFiles) {
-    if (auto *dylibFile = dyn_cast<DylibFile>(file))
-      dylibFiles.push_back(dylibFile);
-  }
-  for (size_t i = 0; i < dylibFiles.size(); ++i)
-    dylibFiles.insert(dylibFiles.end(), dylibFiles[i]->extraDylibs.begin(),
-                      dylibFiles[i]->extraDylibs.end());
+    if (auto *dylibFile = dyn_cast<DylibFile>(file)) {
+      if (dylibFile->isBundleLoader) {
+        dylibFile->ordinal = BIND_SPECIAL_DYLIB_MAIN_EXECUTABLE;
+        // Shortcut since bundle-loader does not re-export the symbols.
 
-  for (DylibFile *dylibFile : dylibFiles) {
-    if (dylibFile->isBundleLoader) {
-      dylibFile->ordinal = BIND_SPECIAL_DYLIB_MAIN_EXECUTABLE;
-      // Shortcut since bundle-loader does not re-export the symbols.
+        dylibFile->reexport = false;
+        continue;
+      }
 
-      dylibFile->reexport = false;
-      continue;
+      // Don't emit load commands for a dylib that is not referenced if:
+      // - it was added implicitly (via a reexport, an LC_LOAD_DYLINKER --
+      //   if it's on the linker command line, it's explicit)
+      // - or it's marked MH_DEAD_STRIPPABLE_DYLIB
+      // - or the flag -dead_strip_dylibs is used
+      // FIXME: `isReferenced()` is currently computed before dead code
+      // stripping, so references from dead code keep a dylib alive. This
+      // matches ld64, but it's something we should do better.
+      if (!dylibFile->isReferenced() && !dylibFile->forceNeeded &&
+          (!dylibFile->explicitlyLinked || dylibFile->deadStrippable ||
+           config->deadStripDylibs))
+        continue;
+
+      // Several DylibFiles can have the same installName. Only emit a single
+      // load command for that installName and give all these DylibFiles the
+      // same ordinal.
+      // This can happen in several cases:
+      // - a new framework could change its installName to an older
+      //   framework name via an $ld$ symbol depending on platform_version
+      // - symlinks (for example, libpthread.tbd is a symlink to libSystem.tbd;
+      //   Foo.framework/Foo.tbd is usually a symlink to
+      //   Foo.framework/Versions/Current/Foo.tbd, where
+      //   Foo.framework/Versions/Current is usually a symlink to
+      //   Foo.framework/Versions/A)
+      // - a framework can be linked both explicitly on the linker
+      //   command line and implicitly as a reexport from a different
+      //   framework. The re-export will usually point to the tbd file
+      //   in Foo.framework/Versions/A/Foo.tbd, while the explicit link will
+      //   usually find Foo.framework/Foo.tbd. These are usually symlinks,
+      //   but in a --reproduce archive they will be identical but distinct
+      //   files.
+      // In the first case, *semantically distinct* DylibFiles will have the
+      // same installName.
+      int64_t &ordinal = ordinalForInstallName[dylibFile->installName];
+      if (ordinal) {
+        dylibFile->ordinal = ordinal;
+        continue;
+      }
+
+      ordinal = dylibFile->ordinal = dylibOrdinal++;
+      LoadCommandType lcType =
+          dylibFile->forceWeakImport || dylibFile->refState == RefState::Weak
+              ? LC_LOAD_WEAK_DYLIB
+              : LC_LOAD_DYLIB;
+      in.header->addLoadCommand(make<LCDylib>(lcType, dylibFile->installName,
+                                              dylibFile->compatibilityVersion,
+                                              dylibFile->currentVersion));
+
+      if (dylibFile->reexport)
+        in.header->addLoadCommand(
+            make<LCDylib>(LC_REEXPORT_DYLIB, dylibFile->installName));
     }
-
-    // Don't emit load commands for a dylib that is not referenced if:
-    // - it was added implicitly (via a reexport, an LC_LOAD_DYLINKER --
-    //   if it's on the linker command line, it's explicit)
-    // - or it's marked MH_DEAD_STRIPPABLE_DYLIB
-    // - or the flag -dead_strip_dylibs is used
-    // FIXME: `isReferenced()` is currently computed before dead code
-    // stripping, so references from dead code keep a dylib alive. This
-    // matches ld64, but it's something we should do better.
-    if (!dylibFile->isReferenced() && !dylibFile->forceNeeded &&
-        (!dylibFile->isExplicitlyLinked() || dylibFile->deadStrippable ||
-         config->deadStripDylibs))
-      continue;
-
-    // Several DylibFiles can have the same installName. Only emit a single
-    // load command for that installName and give all these DylibFiles the
-    // same ordinal.
-    // This can happen in several cases:
-    // - a new framework could change its installName to an older
-    //   framework name via an $ld$ symbol depending on platform_version
-    // - symlinks (for example, libpthread.tbd is a symlink to libSystem.tbd;
-    //   Foo.framework/Foo.tbd is usually a symlink to
-    //   Foo.framework/Versions/Current/Foo.tbd, where
-    //   Foo.framework/Versions/Current is usually a symlink to
-    //   Foo.framework/Versions/A)
-    // - a framework can be linked both explicitly on the linker
-    //   command line and implicitly as a reexport from a different
-    //   framework. The re-export will usually point to the tbd file
-    //   in Foo.framework/Versions/A/Foo.tbd, while the explicit link will
-    //   usually find Foo.framework/Foo.tbd. These are usually symlinks,
-    //   but in a --reproduce archive they will be identical but distinct
-    //   files.
-    // In the first case, *semantically distinct* DylibFiles will have the
-    // same installName.
-    int64_t &ordinal = ordinalForInstallName[dylibFile->installName];
-    if (ordinal) {
-      dylibFile->ordinal = ordinal;
-      continue;
-    }
-
-    ordinal = dylibFile->ordinal = dylibOrdinal++;
-    LoadCommandType lcType =
-        dylibFile->forceWeakImport || dylibFile->refState == RefState::Weak
-            ? LC_LOAD_WEAK_DYLIB
-            : LC_LOAD_DYLIB;
-    in.header->addLoadCommand(make<LCDylib>(lcType, dylibFile->installName,
-                                            dylibFile->compatibilityVersion,
-                                            dylibFile->currentVersion));
-
-    if (dylibFile->reexport)
-      in.header->addLoadCommand(
-          make<LCDylib>(LC_REEXPORT_DYLIB, dylibFile->installName));
   }
-
-  for (const auto &dyldEnv : config->dyldEnvs)
-    in.header->addLoadCommand(make<LCDyldEnv>(dyldEnv));
 
   if (functionStartsSection)
     in.header->addLoadCommand(make<LCFunctionStarts>(functionStartsSection));
@@ -925,6 +827,52 @@ template <class LP> void Writer::createLoadCommands() {
                               : 0));
 }
 
+static size_t getSymbolPriority(const SymbolPriorityEntry &entry,
+                                const InputFile *f) {
+  // We don't use toString(InputFile *) here because it returns the full path
+  // for object files, and we only want the basename.
+  StringRef filename;
+  if (f->archiveName.empty())
+    filename = path::filename(f->getName());
+  else
+    filename = saver.save(path::filename(f->archiveName) + "(" +
+                          path::filename(f->getName()) + ")");
+  return std::max(entry.objectFiles.lookup(filename), entry.anyObjectFile);
+}
+
+// Each section gets assigned the priority of the highest-priority symbol it
+// contains.
+static DenseMap<const InputSection *, size_t> buildInputSectionPriorities() {
+  DenseMap<const InputSection *, size_t> sectionPriorities;
+
+  if (config->priorities.empty())
+    return sectionPriorities;
+
+  auto addSym = [&](Defined &sym) {
+    if (sym.isAbsolute())
+      return;
+
+    auto it = config->priorities.find(sym.getName());
+    if (it == config->priorities.end())
+      return;
+
+    SymbolPriorityEntry &entry = it->second;
+    size_t &priority = sectionPriorities[sym.isec];
+    priority =
+        std::max(priority, getSymbolPriority(entry, sym.isec->getFile()));
+  };
+
+  // TODO: Make sure this handles weak symbols correctly.
+  for (const InputFile *file : inputFiles) {
+    if (isa<ObjFile>(file))
+      for (Symbol *sym : file->symbols)
+        if (auto *d = dyn_cast_or_null<Defined>(sym))
+          addSym(*d);
+  }
+
+  return sectionPriorities;
+}
+
 // Sorting only can happen once all outputs have been collected. Here we sort
 // segments, output sections within each segment, and input sections within each
 // output segment.
@@ -933,40 +881,25 @@ static void sortSegmentsAndSections() {
   sortOutputSegments();
 
   DenseMap<const InputSection *, size_t> isecPriorities =
-      priorityBuilder.buildInputSectionPriorities();
+      buildInputSectionPriorities();
 
   uint32_t sectionIndex = 0;
   for (OutputSegment *seg : outputSegments) {
     seg->sortOutputSections();
-    // References from thread-local variable sections are treated as offsets
-    // relative to the start of the thread-local data memory area, which
-    // is initialized via copying all the TLV data sections (which are all
-    // contiguous). If later data sections require a greater alignment than
-    // earlier ones, the offsets of data within those sections won't be
-    // guaranteed to aligned unless we normalize alignments. We therefore use
-    // the largest alignment for all TLV data sections.
-    uint32_t tlvAlign = 0;
-    for (const OutputSection *osec : seg->getSections())
-      if (isThreadLocalData(osec->flags) && osec->align > tlvAlign)
-        tlvAlign = osec->align;
-
     for (OutputSection *osec : seg->getSections()) {
       // Now that the output sections are sorted, assign the final
       // output section indices.
       if (!osec->isHidden())
         osec->index = ++sectionIndex;
-      if (isThreadLocalData(osec->flags)) {
-        if (!firstTLVDataSection)
-          firstTLVDataSection = osec;
-        osec->align = tlvAlign;
-      }
+      if (!firstTLVDataSection && isThreadLocalData(osec->flags))
+        firstTLVDataSection = osec;
 
       if (!isecPriorities.empty()) {
         if (auto *merged = dyn_cast<ConcatOutputSection>(osec)) {
-          llvm::stable_sort(
-              merged->inputs, [&](InputSection *a, InputSection *b) {
-                return isecPriorities.lookup(a) > isecPriorities.lookup(b);
-              });
+          llvm::stable_sort(merged->inputs,
+                            [&](InputSection *a, InputSection *b) {
+                              return isecPriorities[a] > isecPriorities[b];
+                            });
         }
       }
     }
@@ -985,6 +918,8 @@ template <class LP> void Writer::createOutputSections() {
     dataInCodeSection = make<DataInCodeSection>();
   if (config->emitFunctionStarts)
     functionStartsSection = make<FunctionStartsSection>();
+  if (config->emitBitcodeBundle)
+    make<BitcodeBundleSection>();
 
   switch (config->outputType) {
   case MH_EXECUTE:
@@ -1013,30 +948,13 @@ template <class LP> void Writer::createOutputSections() {
     StringRef segname = it.first.first;
     ConcatOutputSection *osec = it.second;
     assert(segname != segment_names::ld);
-    if (osec->isNeeded()) {
-      // See comment in ObjFile::splitEhFrames()
-      if (osec->name == section_names::ehFrame &&
-          segname == segment_names::text)
-        osec->align = target->wordSize;
-
-      // MC keeps the default 1-byte alignment for __thread_vars, even though it
-      // contains pointers that are fixed up by dyld, which requires proper
-      // alignment.
-      if (isThreadLocalVariables(osec->flags))
-        osec->align = std::max<uint32_t>(osec->align, target->wordSize);
-
+    if (osec->isNeeded())
       getOrCreateOutputSegment(segname)->addOutputSection(osec);
-    }
   }
 
   for (SyntheticSection *ssec : syntheticSections) {
     auto it = concatOutputSections.find({ssec->segname, ssec->name});
-    // We add all LinkEdit sections here because we don't know if they are
-    // needed until their finalizeContents() methods get called later. While
-    // this means that we add some redundant sections to __LINKEDIT, there is
-    // is no redundancy in the output, as we do not emit section headers for
-    // any LinkEdit sections.
-    if (ssec->isNeeded() || ssec->segname == segment_names::linkEdit) {
+    if (ssec->isNeeded()) {
       if (it == concatOutputSections.end()) {
         getOrCreateOutputSegment(ssec->segname)->addOutputSection(ssec);
       } else {
@@ -1055,21 +973,6 @@ template <class LP> void Writer::createOutputSections() {
 void Writer::finalizeAddresses() {
   TimeTraceScope timeScope("Finalize addresses");
   uint64_t pageSize = target->getPageSize();
-
-  // We could parallelize this loop, but local benchmarking indicates it is
-  // faster to do it all in the main thread.
-  for (OutputSegment *seg : outputSegments) {
-    if (seg == linkEditSegment)
-      continue;
-    for (OutputSection *osec : seg->getSections()) {
-      if (!osec->isNeeded())
-        continue;
-      // Other kinds of OutputSections have already been finalized.
-      if (auto *concatOsec = dyn_cast<ConcatOutputSection>(osec))
-        concatOsec->finalizeContents();
-    }
-  }
-
   // Ensure that segments (and the sections they contain) are allocated
   // addresses in ascending order, which dyld requires.
   //
@@ -1082,12 +985,11 @@ void Writer::finalizeAddresses() {
     seg->addr = addr;
     assignAddresses(seg);
     // codesign / libstuff checks for segment ordering by verifying that
-    // `fileOff + fileSize == next segment fileOff`. So we call
-    // alignToPowerOf2() before (instead of after) computing fileSize to ensure
-    // that the segments are contiguous. We handle addr / vmSize similarly for
-    // the same reason.
-    fileOff = alignToPowerOf2(fileOff, pageSize);
-    addr = alignToPowerOf2(addr, pageSize);
+    // `fileOff + fileSize == next segment fileOff`. So we call alignTo() before
+    // (instead of after) computing fileSize to ensure that the segments are
+    // contiguous. We handle addr / vmSize similarly for the same reason.
+    fileOff = alignTo(fileOff, pageSize);
+    addr = alignTo(addr, pageSize);
     seg->vmSize = addr - seg->addr;
     seg->fileSize = fileOff - seg->fileOff;
     seg->assignAddressesToStartEndSymbols();
@@ -1097,21 +999,21 @@ void Writer::finalizeAddresses() {
 void Writer::finalizeLinkEditSegment() {
   TimeTraceScope timeScope("Finalize __LINKEDIT segment");
   // Fill __LINKEDIT contents.
-  std::array<LinkEditSection *, 10> linkEditSections{
-      in.rebase,         in.binding,
-      in.weakBinding,    in.lazyBinding,
-      in.exports,        in.chainedFixups,
-      symtabSection,     indirectSymtabSection,
-      dataInCodeSection, functionStartsSection,
+  std::vector<LinkEditSection *> linkEditSections{
+      in.rebase,
+      in.binding,
+      in.weakBinding,
+      in.lazyBinding,
+      in.exports,
+      symtabSection,
+      indirectSymtabSection,
+      dataInCodeSection,
+      functionStartsSection,
   };
-  SmallVector<std::shared_future<void>> threadFutures;
-  threadFutures.reserve(linkEditSections.size());
-  for (LinkEditSection *osec : linkEditSections)
+  parallelForEach(linkEditSections, [](LinkEditSection *osec) {
     if (osec)
-      threadFutures.emplace_back(threadPool.async(
-          [](LinkEditSection *osec) { osec->finalizeContents(); }, osec));
-  for (std::shared_future<void> &future : threadFutures)
-    future.wait();
+      osec->finalizeContents();
+  });
 
   // Now that __LINKEDIT is filled out, do a proper calculation of its
   // addresses and offsets.
@@ -1128,8 +1030,8 @@ void Writer::assignAddresses(OutputSegment *seg) {
   for (OutputSection *osec : seg->getSections()) {
     if (!osec->isNeeded())
       continue;
-    addr = alignToPowerOf2(addr, osec->align);
-    fileOff = alignToPowerOf2(fileOff, osec->align);
+    addr = alignTo(addr, osec->align);
+    fileOff = alignTo(fileOff, osec->align);
     osec->addr = addr;
     osec->fileOff = isZeroFill(osec->flags) ? 0 : fileOff;
     osec->finalize();
@@ -1146,33 +1048,17 @@ void Writer::openFile() {
                                FileOutputBuffer::F_executable);
 
   if (!bufferOrErr)
-    fatal("failed to open " + config->outputFile + ": " +
+    error("failed to open " + config->outputFile + ": " +
           llvm::toString(bufferOrErr.takeError()));
-  buffer = std::move(*bufferOrErr);
-  in.bufferStart = buffer->getBufferStart();
+  else
+    buffer = std::move(*bufferOrErr);
 }
 
 void Writer::writeSections() {
   uint8_t *buf = buffer->getBufferStart();
-  std::vector<const OutputSection *> osecs;
   for (const OutputSegment *seg : outputSegments)
-    append_range(osecs, seg->getSections());
-
-  parallelForEach(osecs.begin(), osecs.end(), [&](const OutputSection *osec) {
-    osec->writeTo(buf + osec->fileOff);
-  });
-}
-
-void Writer::applyOptimizationHints() {
-  if (config->arch() != AK_arm64 || config->ignoreOptimizationHints)
-    return;
-
-  uint8_t *buf = buffer->getBufferStart();
-  TimeTraceScope timeScope("Apply linker optimization hints");
-  parallelForEach(inputFiles, [buf](const InputFile *file) {
-    if (const auto *objFile = dyn_cast<ObjFile>(file))
-      target->applyOptimizationHints(buf, *objFile);
-  });
+    for (const OutputSection *osec : seg->getSections())
+      osec->writeTo(buf + osec->fileOff);
 }
 
 // In order to utilize multiple cores, we first split the buffer into chunks,
@@ -1180,129 +1066,46 @@ void Writer::applyOptimizationHints() {
 // values.
 void Writer::writeUuid() {
   TimeTraceScope timeScope("Computing UUID");
-
   ArrayRef<uint8_t> data{buffer->getBufferStart(), buffer->getBufferEnd()};
-  std::vector<ArrayRef<uint8_t>> chunks = split(data, 1024 * 1024);
-  // Leave one slot for filename
-  std::vector<uint64_t> hashes(chunks.size() + 1);
-  SmallVector<std::shared_future<void>> threadFutures;
-  threadFutures.reserve(chunks.size());
-  for (size_t i = 0; i < chunks.size(); ++i)
-    threadFutures.emplace_back(threadPool.async(
-        [&](size_t j) { hashes[j] = xxh3_64bits(chunks[j]); }, i));
-  for (std::shared_future<void> &future : threadFutures)
-    future.wait();
-  // Append the output filename so that identical binaries with different names
-  // don't get the same UUID.
-  hashes[chunks.size()] = xxh3_64bits(sys::path::filename(config->finalOutput));
-  uint64_t digest = xxh3_64bits({reinterpret_cast<uint8_t *>(hashes.data()),
-                                 hashes.size() * sizeof(uint64_t)});
+  unsigned chunkCount = parallel::strategy.compute_thread_count() * 10;
+  // Round-up integer division
+  size_t chunkSize = (data.size() + chunkCount - 1) / chunkCount;
+  std::vector<ArrayRef<uint8_t>> chunks = split(data, chunkSize);
+  std::vector<uint64_t> hashes(chunks.size());
+  parallelForEachN(0, chunks.size(),
+                   [&](size_t i) { hashes[i] = xxHash64(chunks[i]); });
+  uint64_t digest = xxHash64({reinterpret_cast<uint8_t *>(hashes.data()),
+                              hashes.size() * sizeof(uint64_t)});
   uuidCommand->writeUuid(digest);
 }
 
-// This is step 5 of the algorithm described in the class comment of
-// ChainedFixupsSection.
-void Writer::buildFixupChains() {
-  if (!config->emitChainedFixups)
-    return;
-
-  const std::vector<Location> &loc = in.chainedFixups->getLocations();
-  if (loc.empty())
-    return;
-
-  TimeTraceScope timeScope("Build fixup chains");
-
-  const uint64_t pageSize = target->getPageSize();
-  constexpr uint32_t stride = 4; // for DYLD_CHAINED_PTR_64
-
-  for (size_t i = 0, count = loc.size(); i < count;) {
-    const OutputSegment *oseg = loc[i].isec->parent->parent;
-    uint8_t *buf = buffer->getBufferStart() + oseg->fileOff;
-    uint64_t pageIdx = loc[i].offset / pageSize;
-    ++i;
-
-    while (i < count && loc[i].isec->parent->parent == oseg &&
-           (loc[i].offset / pageSize) == pageIdx) {
-      uint64_t offset = loc[i].offset - loc[i - 1].offset;
-
-      auto fail = [&](Twine message) {
-        error(loc[i].isec->getSegName() + "," + loc[i].isec->getName() +
-              ", offset " +
-              Twine(loc[i].offset - loc[i].isec->parent->getSegmentOffset()) +
-              ": " + message);
-      };
-
-      if (offset < target->wordSize)
-        return fail("fixups overlap");
-      if (offset % stride != 0)
-        return fail(
-            "fixups are unaligned (offset " + Twine(offset) +
-            " is not a multiple of the stride). Re-link with -no_fixup_chains");
-
-      // The "next" field is in the same location for bind and rebase entries.
-      reinterpret_cast<dyld_chained_ptr_64_bind *>(buf + loc[i - 1].offset)
-          ->next = offset / stride;
-      ++i;
-    }
-  }
-}
-
 void Writer::writeCodeSignature() {
-  if (codeSignatureSection) {
-    TimeTraceScope timeScope("Write code signature");
+  if (codeSignatureSection)
     codeSignatureSection->writeHashes(buffer->getBufferStart());
-  }
 }
 
 void Writer::writeOutputFile() {
   TimeTraceScope timeScope("Write output file");
   openFile();
-  reportPendingUndefinedSymbols();
   if (errorCount())
     return;
   writeSections();
-  applyOptimizationHints();
-  buildFixupChains();
-  if (config->generateUuid)
-    writeUuid();
+  writeUuid();
   writeCodeSignature();
 
   if (auto e = buffer->commit())
-    fatal("failed to write output '" + buffer->getPath() +
-          "': " + toString(std::move(e)));
+    error("failed to write to the output file: " + toString(std::move(e)));
 }
 
 template <class LP> void Writer::run() {
   treatSpecialUndefineds();
-  if (config->entry && needsBinding(config->entry))
-    in.stubs->addEntry(config->entry);
-
-  // Canonicalization of all pointers to InputSections should be handled by
-  // these two scan* methods. I.e. from this point onward, for all live
-  // InputSections, we should have `isec->canonical() == isec`.
-  scanSymbols();
-  if (in.objcStubs->isNeeded())
-    in.objcStubs->setUp();
+  if (config->entry && !isa<Undefined>(config->entry))
+    prepareBranchTarget(config->entry);
   scanRelocations();
-  if (in.initOffsets->isNeeded())
-    in.initOffsets->setUp();
-
-  // Do not proceed if there were undefined or duplicate symbols.
-  reportPendingUndefinedSymbols();
-  reportPendingDuplicateSymbols();
-  if (errorCount())
-    return;
-
-  if (in.stubHelper && in.stubHelper->isNeeded())
-    in.stubHelper->setUp();
-
-  if (in.objCImageInfo->isNeeded())
-    in.objCImageInfo->finalizeContents();
-
-  // At this point, we should know exactly which output sections are needed,
-  // courtesy of scanSymbols() and scanRelocations().
+  if (in.stubHelper->isNeeded())
+    in.stubHelper->setup();
+  scanSymbols();
   createOutputSections<LP>();
-
   // After this point, we create no new segments; HOWEVER, we might
   // yet create branch-range extension thunks for architectures whose
   // hardware call instructions have limited range, e.g., ARM(64).
@@ -1311,58 +1114,42 @@ template <class LP> void Writer::run() {
   sortSegmentsAndSections();
   createLoadCommands<LP>();
   finalizeAddresses();
-  threadPool.async([&] {
-    if (LLVM_ENABLE_THREADS && config->timeTraceEnabled)
-      timeTraceProfilerInitialize(config->timeTraceGranularity, "writeMapFile");
-    writeMapFile();
-    if (LLVM_ENABLE_THREADS && config->timeTraceEnabled)
-      timeTraceProfilerFinishThread();
-  });
   finalizeLinkEditSegment();
+  writeMapFile();
   writeOutputFile();
 }
 
 template <class LP> void macho::writeResult() { Writer().run<LP>(); }
 
-void macho::resetWriter() { LCDylib::resetInstanceCount(); }
-
 void macho::createSyntheticSections() {
   in.header = make<MachHeaderSection>();
-  if (config->dedupStrings)
-    in.cStringSection =
-        make<DeduplicatedCStringSection>(section_names::cString);
-  else
-    in.cStringSection = make<CStringSection>(section_names::cString);
-  in.objcMethnameSection =
-      make<DeduplicatedCStringSection>(section_names::objcMethname);
-  in.wordLiteralSection = make<WordLiteralSection>();
-  if (config->emitChainedFixups) {
-    in.chainedFixups = make<ChainedFixupsSection>();
+  if (config->dedupLiterals) {
+    in.cStringSection = make<DeduplicatedCStringSection>();
   } else {
-    in.rebase = make<RebaseSection>();
-    in.binding = make<BindingSection>();
-    in.weakBinding = make<WeakBindingSection>();
-    in.lazyBinding = make<LazyBindingSection>();
-    in.lazyPointers = make<LazyPointerSection>();
-    in.stubHelper = make<StubHelperSection>();
+    in.cStringSection = make<CStringSection>();
   }
+  in.wordLiteralSection =
+      config->dedupLiterals ? make<WordLiteralSection>() : nullptr;
+  in.rebase = make<RebaseSection>();
+  in.binding = make<BindingSection>();
+  in.weakBinding = make<WeakBindingSection>();
+  in.lazyBinding = make<LazyBindingSection>();
   in.exports = make<ExportSection>();
   in.got = make<GotSection>();
   in.tlvPointers = make<TlvPointerSection>();
+  in.lazyPointers = make<LazyPointerSection>();
   in.stubs = make<StubsSection>();
-  in.objcStubs = make<ObjCStubsSection>();
+  in.stubHelper = make<StubHelperSection>();
   in.unwindInfo = makeUnwindInfoSection();
-  in.objCImageInfo = make<ObjCImageInfoSection>();
-  in.initOffsets = make<InitOffsetsSection>();
 
   // This section contains space for just a single word, and will be used by
   // dyld to cache an address to the image loader it uses.
-  uint8_t *arr = bAlloc().Allocate<uint8_t>(target->wordSize);
+  uint8_t *arr = bAlloc.Allocate<uint8_t>(target->wordSize);
   memset(arr, 0, target->wordSize);
-  in.imageLoaderCache = makeSyntheticInputSection(
-      segment_names::data, section_names::data, S_REGULAR,
+  in.imageLoaderCache = make<ConcatInputSection>(
+      segment_names::data, section_names::data, /*file=*/nullptr,
       ArrayRef<uint8_t>{arr, target->wordSize},
-      /*align=*/target->wordSize);
+      /*align=*/target->wordSize, /*flags=*/S_REGULAR);
   // References from dyld are not visible to us, so ensure this section is
   // always treated as live.
   in.imageLoaderCache->live = true;

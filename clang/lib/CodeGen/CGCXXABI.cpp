@@ -45,9 +45,13 @@ CGCallee CGCXXABI::EmitLoadOfMemberFunctionPointer(
   ErrorUnsupportedABI(CGF, "calls through member pointers");
 
   ThisPtrForCall = This.getPointer();
-  const auto *FPT = MPT->getPointeeType()->castAs<FunctionProtoType>();
-  llvm::Constant *FnPtr = llvm::Constant::getNullValue(
-      llvm::PointerType::getUnqual(CGM.getLLVMContext()));
+  const FunctionProtoType *FPT =
+    MPT->getPointeeType()->getAs<FunctionProtoType>();
+  const auto *RD =
+      cast<CXXRecordDecl>(MPT->getClass()->castAs<RecordType>()->getDecl());
+  llvm::FunctionType *FTy = CGM.getTypes().GetFunctionType(
+      CGM.getTypes().arrangeCXXMethodType(RD, FPT, /*FD=*/nullptr));
+  llvm::Constant *FnPtr = llvm::Constant::getNullValue(FTy->getPointerTo());
   return CGCallee::forDirect(FnPtr, FPT);
 }
 
@@ -56,8 +60,8 @@ CGCXXABI::EmitMemberDataPointerAddress(CodeGenFunction &CGF, const Expr *E,
                                        Address Base, llvm::Value *MemPtr,
                                        const MemberPointerType *MPT) {
   ErrorUnsupportedABI(CGF, "loads of member pointers");
-  llvm::Type *Ty =
-      llvm::PointerType::get(CGF.getLLVMContext(), Base.getAddressSpace());
+  llvm::Type *Ty = CGF.ConvertType(MPT->getPointeeType())
+                         ->getPointerTo(Base.getAddressSpace());
   return llvm::Constant::getNullValue(Ty);
 }
 
@@ -120,10 +124,10 @@ void CGCXXABI::buildThisParam(CodeGenFunction &CGF, FunctionArgList &params) {
 
   // FIXME: I'm not entirely sure I like using a fake decl just for code
   // generation. Maybe we can come up with a better way?
-  auto *ThisDecl =
-      ImplicitParamDecl::Create(CGM.getContext(), nullptr, MD->getLocation(),
-                                &CGM.getContext().Idents.get("this"),
-                                MD->getThisType(), ImplicitParamKind::CXXThis);
+  auto *ThisDecl = ImplicitParamDecl::Create(
+      CGM.getContext(), nullptr, MD->getLocation(),
+      &CGM.getContext().Idents.get("this"), MD->getThisType(),
+      ImplicitParamDecl::CXXThis);
   params.push_back(ThisDecl);
   CGF.CXXABIThisDecl = ThisDecl;
 
@@ -148,51 +152,6 @@ void CGCXXABI::setCXXABIThisValue(CodeGenFunction &CGF, llvm::Value *ThisPtr) {
   /// Initialize the 'this' slot.
   assert(getThisDecl(CGF) && "no 'this' variable for function");
   CGF.CXXABIThisValue = ThisPtr;
-}
-
-bool CGCXXABI::mayNeedDestruction(const VarDecl *VD) const {
-  if (VD->needsDestruction(getContext()))
-    return true;
-
-  // If the variable has an incomplete class type (or array thereof), it
-  // might need destruction.
-  const Type *T = VD->getType()->getBaseElementTypeUnsafe();
-  if (T->getAs<RecordType>() && T->isIncompleteType())
-    return true;
-
-  return false;
-}
-
-bool CGCXXABI::isEmittedWithConstantInitializer(
-    const VarDecl *VD, bool InspectInitForWeakDef) const {
-  VD = VD->getMostRecentDecl();
-  if (VD->hasAttr<ConstInitAttr>())
-    return true;
-
-  // All later checks examine the initializer specified on the variable. If
-  // the variable is weak, such examination would not be correct.
-  if (!InspectInitForWeakDef && (VD->isWeak() || VD->hasAttr<SelectAnyAttr>()))
-    return false;
-
-  const VarDecl *InitDecl = VD->getInitializingDeclaration();
-  if (!InitDecl)
-    return false;
-
-  // If there's no initializer to run, this is constant initialization.
-  if (!InitDecl->hasInit())
-    return true;
-
-  // If we have the only definition, we don't need a thread wrapper if we
-  // will emit the value as a constant.
-  if (isUniqueGVALinkage(getContext().GetGVALinkageForVariable(VD)))
-    return !mayNeedDestruction(VD) && InitDecl->evaluateValue();
-
-  // Otherwise, we need a thread wrapper unless we know that every
-  // translation unit will emit the value as a constant. We rely on the
-  // variable being constant-initialized in every translation unit if it's
-  // constant-initialized in any translation unit, which isn't actually
-  // guaranteed by the standard but is necessary for sanity.
-  return InitDecl->hasConstantInitialization();
 }
 
 void CGCXXABI::EmitReturnFromThunk(CodeGenFunction &CGF,
@@ -247,7 +206,7 @@ void CGCXXABI::ReadArrayCookie(CodeGenFunction &CGF, Address ptr,
                                llvm::Value *&numElements,
                                llvm::Value *&allocPtr, CharUnits &cookieSize) {
   // Derive a char* in the same address space as the pointer.
-  ptr = ptr.withElementType(CGF.Int8Ty);
+  ptr = CGF.Builder.CreateElementBitCast(ptr, CGF.Int8Ty);
 
   // If we don't need an array cookie, bail out early.
   if (!requiresArrayCookie(expr, eltTy)) {
@@ -312,7 +271,8 @@ void CGCXXABI::setCXXDestructorDLLStorage(llvm::GlobalValue *GV,
 llvm::GlobalValue::LinkageTypes CGCXXABI::getCXXDestructorLinkage(
     GVALinkage Linkage, const CXXDestructorDecl *Dtor, CXXDtorType DT) const {
   // Delegate back to CGM by default.
-  return CGM.getLLVMLinkageForDeclarator(Dtor, Linkage);
+  return CGM.getLLVMLinkageForDeclarator(Dtor, Linkage,
+                                         /*IsConstantVariable=*/false);
 }
 
 bool CGCXXABI::NeedsVTTParameter(GlobalDecl GD) {

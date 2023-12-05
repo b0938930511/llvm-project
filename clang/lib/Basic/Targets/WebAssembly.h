@@ -15,42 +15,18 @@
 
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Basic/TargetOptions.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/Support/Compiler.h"
-#include "llvm/TargetParser/Triple.h"
 
 namespace clang {
 namespace targets {
 
-static const unsigned WebAssemblyAddrSpaceMap[] = {
-    0, // Default
-    0, // opencl_global
-    0, // opencl_local
-    0, // opencl_constant
-    0, // opencl_private
-    0, // opencl_generic
-    0, // opencl_global_device
-    0, // opencl_global_host
-    0, // cuda_device
-    0, // cuda_constant
-    0, // cuda_shared
-    0, // sycl_global
-    0, // sycl_global_device
-    0, // sycl_global_host
-    0, // sycl_local
-    0, // sycl_private
-    0, // ptr32_sptr
-    0, // ptr32_uptr
-    0, // ptr64
-    0, // hlsl_groupshared
-    20, // wasm_funcref
-};
-
 class LLVM_LIBRARY_VISIBILITY WebAssemblyTargetInfo : public TargetInfo {
+  static const Builtin::Info BuiltinInfo[];
 
   enum SIMDEnum {
     NoSIMD,
     SIMD128,
-    RelaxedSIMD,
   } SIMDLevel = NoSIMD;
 
   bool HasNontrappingFPToInt = false;
@@ -62,19 +38,17 @@ class LLVM_LIBRARY_VISIBILITY WebAssemblyTargetInfo : public TargetInfo {
   bool HasMultivalue = false;
   bool HasTailCall = false;
   bool HasReferenceTypes = false;
-  bool HasExtendedConst = false;
-  bool HasMultiMemory = false;
 
   std::string ABI;
 
 public:
   explicit WebAssemblyTargetInfo(const llvm::Triple &T, const TargetOptions &)
       : TargetInfo(T) {
-    AddrSpaceMap = &WebAssemblyAddrSpaceMap;
     NoAsmVariants = true;
     SuitableAlign = 128;
     LargeArrayMinWidth = 128;
     LargeArrayAlign = 128;
+    SimdDefaultAlign = 128;
     SigAtomicType = SignedLong;
     LongDoubleWidth = LongDoubleAlign = 128;
     LongDoubleFormat = &llvm::APFloat::IEEEquad();
@@ -120,10 +94,10 @@ private:
     return VoidPtrBuiltinVaList;
   }
 
-  ArrayRef<const char *> getGCCRegNames() const final { return std::nullopt; }
+  ArrayRef<const char *> getGCCRegNames() const final { return None; }
 
   ArrayRef<TargetInfo::GCCRegAlias> getGCCRegAliases() const final {
-    return std::nullopt;
+    return None;
   }
 
   bool validateAsmConstraint(const char *&Name,
@@ -131,7 +105,7 @@ private:
     return false;
   }
 
-  std::string_view getClobbers() const final { return ""; }
+  const char *getClobbers() const final { return ""; }
 
   bool isCLZForZeroUndef() const final { return false; }
 
@@ -162,7 +136,7 @@ private:
     }
   }
 
-  bool hasBitIntType() const override { return true; }
+  bool hasExtIntType() const override { return true; }
 
   bool hasProtectedVisibility() const override { return false; }
 
@@ -176,11 +150,9 @@ public:
                                    const TargetOptions &Opts)
       : WebAssemblyTargetInfo(T, Opts) {
     if (T.isOSEmscripten())
-      resetDataLayout("e-m:e-p:32:32-p10:8:8-p20:8:8-i64:64-f128:64-n32:64-"
-                      "S128-ni:1:10:20");
+      resetDataLayout("e-m:e-p:32:32-i64:64-f128:64-n32:64-S128-ni:1:10:20");
     else
-      resetDataLayout(
-          "e-m:e-p:32:32-p10:8:8-p20:8:8-i64:64-n32:64-S128-ni:1:10:20");
+      resetDataLayout("e-m:e-p:32:32-i64:64-n32:64-S128-ni:1:10:20");
   }
 
 protected:
@@ -200,11 +172,9 @@ public:
     PtrDiffType = SignedLong;
     IntPtrType = SignedLong;
     if (T.isOSEmscripten())
-      resetDataLayout("e-m:e-p:64:64-p10:8:8-p20:8:8-i64:64-f128:64-n32:64-"
-                      "S128-ni:1:10:20");
+      resetDataLayout("e-m:e-p:64:64-i64:64-f128:64-n32:64-S128-ni:1:10:20");
     else
-      resetDataLayout(
-          "e-m:e-p:64:64-p10:8:8-p20:8:8-i64:64-n32:64-S128-ni:1:10:20");
+      resetDataLayout("e-m:e-p:64:64-i64:64-n32:64-S128-ni:1:10:20");
   }
 
 protected:

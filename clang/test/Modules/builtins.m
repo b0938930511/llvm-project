@@ -1,4 +1,3 @@
-// UNSUPPORTED: target={{.*}}-zos{{.*}}, target={{.*}}-aix{{.*}}
 // RUN: rm -rf %t
 // RUN: %clang_cc1 -fmodules-cache-path=%t -fmodules -fimplicit-module-maps -I %S/Inputs %s -verify
 // RUN: %clang_cc1 -fmodules-cache-path=%t -fmodules -fimplicit-module-maps -I %S/Inputs -x c %s -verify
@@ -17,17 +16,17 @@ void use_constant_string_builtins1(void) {
 
 #include "builtin.h"
 
-int foo(void) {
+int foo() {
   return __builtin_object_size(p, 0);
 }
 
 #include "builtin_sub.h"
 
-int bar(void) {
+int bar() {
   return __builtin_object_size(p, 0);
 }
 
-int baz(void) {
+int baz() {
   return IS_CONST(0);
 }
 

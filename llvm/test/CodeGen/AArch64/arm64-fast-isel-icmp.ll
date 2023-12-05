@@ -44,22 +44,22 @@ entry:
   ret i32 %conv
 }
 
-define i32 @icmp_eq_ptr(ptr %a) {
+define i32 @icmp_eq_ptr(i8* %a) {
 entry:
 ; CHECK-LABEL: icmp_eq_ptr
 ; CHECK:       cmp x0, #0
 ; CHECK-NEXT:  cset {{.+}}, eq
-  %cmp = icmp eq ptr %a, null
+  %cmp = icmp eq i8* %a, null
   %conv = zext i1 %cmp to i32
   ret i32 %conv
 }
 
-define i32 @icmp_ne_ptr(ptr %a) {
+define i32 @icmp_ne_ptr(i8* %a) {
 entry:
 ; CHECK-LABEL: icmp_ne_ptr
 ; CHECK:       cmp x0, #0
 ; CHECK-NEXT:  cset {{.+}}, ne
-  %cmp = icmp ne ptr %a, null
+  %cmp = icmp ne i8* %a, null
   %conv = zext i1 %cmp to i32
   ret i32 %conv
 }

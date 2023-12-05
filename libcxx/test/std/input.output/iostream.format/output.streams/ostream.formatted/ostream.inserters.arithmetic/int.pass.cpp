@@ -76,7 +76,7 @@ int main(int, char**)
     {
         testbuf<char> sb;
         std::ostream os(&sb);
-        std::hex(os);
+        hex(os);
         int n = -10;
         os << n;
         assert(sb.str() == "fffffff6");

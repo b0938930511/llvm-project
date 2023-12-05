@@ -13,12 +13,14 @@
 #include "lld/Common/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 
-namespace lld::coff {
+namespace lld {
+namespace coff {
 
-class COFFLinkerContext;
+class Chunk;
 
-void doICF(COFFLinkerContext &ctx);
+void doICF(ArrayRef<Chunk *> chunks, ICFLevel);
 
-} // namespace lld::coff
+} // namespace coff
+} // namespace lld
 
 #endif

@@ -12,23 +12,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "mlir/Dialect/GPU/IR/GPUDialect.h"
-#include "mlir/Dialect/GPU/Transforms/Passes.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/ExecutionEngine/OptUtils.h"
+#include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Target/LLVMIR/Dialect/GPU/GPUToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
 #include "llvm/IR/LegacyPassManager.h"
-#include "llvm/MC/TargetRegistry.h"
+#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
-
-#include <optional>
-#include <string>
-
-#define DEBUG_TYPE "serialize-to-blob"
 
 using namespace mlir;
 
@@ -40,28 +31,18 @@ gpu::SerializeToBlobPass::SerializeToBlobPass(TypeID passID)
 gpu::SerializeToBlobPass::SerializeToBlobPass(const SerializeToBlobPass &other)
     : OperationPass<gpu::GPUModuleOp>(other) {}
 
-std::optional<std::string>
-gpu::SerializeToBlobPass::translateToISA(llvm::Module &llvmModule,
-                                         llvm::TargetMachine &targetMachine) {
+static std::string translateToISA(llvm::Module &llvmModule,
+                                  llvm::TargetMachine &targetMachine) {
   llvmModule.setDataLayout(targetMachine.createDataLayout());
-
-  if (failed(optimizeLlvm(llvmModule, targetMachine)))
-    return std::nullopt;
 
   std::string targetISA;
   llvm::raw_string_ostream stream(targetISA);
-
-  { // Drop pstream after this to prevent the ISA from being stuck buffering
-    llvm::buffer_ostream pstream(stream);
-    llvm::legacy::PassManager codegenPasses;
-
-    if (targetMachine.addPassesToEmitFile(codegenPasses, pstream, nullptr,
-                                          llvm::CodeGenFileType::AssemblyFile))
-      return std::nullopt;
-
-    codegenPasses.run(llvmModule);
-  }
-  return stream.str();
+  llvm::buffer_ostream pstream(stream);
+  llvm::legacy::PassManager codegenPasses;
+  targetMachine.addPassesToEmitFile(codegenPasses, pstream, nullptr,
+                                    llvm::CGFT_AssemblyFile);
+  codegenPasses.run(llvmModule);
+  return targetISA;
 }
 
 void gpu::SerializeToBlobPass::runOnOperation() {
@@ -77,19 +58,7 @@ void gpu::SerializeToBlobPass::runOnOperation() {
   if (!targetMachine)
     return signalPassFailure();
 
-  std::optional<std::string> maybeTargetISA =
-      translateToISA(*llvmModule, *targetMachine);
-
-  if (!maybeTargetISA.has_value())
-    return signalPassFailure();
-
-  std::string targetISA = std::move(*maybeTargetISA);
-
-  LLVM_DEBUG({
-    llvm::dbgs() << "ISA for module: " << getOperation().getNameAttr() << "\n";
-    llvm::dbgs() << targetISA << "\n";
-    llvm::dbgs().flush();
-  });
+  std::string targetISA = translateToISA(*llvmModule, *targetMachine);
 
   // Serialize the target ISA.
   std::unique_ptr<std::vector<char>> blob = serializeISA(targetISA);
@@ -102,28 +71,10 @@ void gpu::SerializeToBlobPass::runOnOperation() {
   getOperation()->setAttr(gpuBinaryAnnotation, attr);
 }
 
-LogicalResult
-gpu::SerializeToBlobPass::optimizeLlvm(llvm::Module &llvmModule,
-                                       llvm::TargetMachine &targetMachine) {
-  int optLevel = this->optLevel.getValue();
-  if (optLevel < 0 || optLevel > 3)
-    return getOperation().emitError()
-           << "invalid optimization level " << optLevel;
-
-  targetMachine.setOptLevel(static_cast<llvm::CodeGenOptLevel>(optLevel));
-
-  auto transformer =
-      makeOptimizingTransformer(optLevel, /*sizeLevel=*/0, &targetMachine);
-  auto error = transformer(&llvmModule);
-  if (error) {
-    InFlightDiagnostic mlirError = getOperation()->emitError();
-    llvm::handleAllErrors(
-        std::move(error), [&mlirError](const llvm::ErrorInfoBase &ei) {
-          mlirError << "could not optimize LLVM IR: " << ei.message();
-        });
-    return mlirError;
-  }
-  return success();
+void gpu::SerializeToBlobPass::getDependentDialects(
+    DialectRegistry &registry) const {
+  registerLLVMDialectTranslation(registry);
+  OperationPass<gpu::GPUModuleOp>::getDependentDialects(registry);
 }
 
 std::unique_ptr<llvm::TargetMachine>

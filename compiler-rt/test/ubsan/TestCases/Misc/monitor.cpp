@@ -1,30 +1,28 @@
-// RUN: %clangxx -w -fsanitize=bool -fno-sanitize-memory-param-retval %s -o %t
+// RUN: %clangxx -w -fsanitize=bool %s -o %t
 // RUN: %run %t 2>&1 | FileCheck %s
 
 // __ubsan_on_report is not defined as weak. Redefining it here isn't supported
 // on Windows.
 //
-// UNSUPPORTED: target={{.*windows.*}}
+// UNSUPPORTED: windows-msvc
 // Linkage issue
-// XFAIL: target={{.*openbsd.*}}
+// XFAIL: openbsd
 
 #include <cstdio>
 
-// Override __ubsan_on_report() from the runtime, just for testing purposes.
-// Required for dyld macOS 12.0+
-#if (__APPLE__)
-__attribute__((weak))
-#endif
-extern "C" void
-__ubsan_on_report(void) {
-  void __ubsan_get_current_report_data(
-      const char **OutIssueKind, const char **OutMessage,
-      const char **OutFilename, unsigned *OutLine, unsigned *OutCol,
-      char **OutMemoryAddr);
+extern "C" {
+void __ubsan_get_current_report_data(const char **OutIssueKind,
+                                     const char **OutMessage,
+                                     const char **OutFilename,
+                                     unsigned *OutLine, unsigned *OutCol,
+                                     char **OutMemoryAddr);
+
+// Override the definition of __ubsan_on_report from the runtime, just for
+// testing purposes.
+void __ubsan_on_report(void) {
   const char *IssueKind, *Message, *Filename;
   unsigned Line, Col;
   char *Addr;
-
   __ubsan_get_current_report_data(&IssueKind, &Message, &Filename, &Line, &Col,
                                   &Addr);
 
@@ -34,6 +32,7 @@ __ubsan_on_report(void) {
   fflush(stdout);
 
   (void)Addr;
+}
 }
 
 int main() {

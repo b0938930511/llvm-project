@@ -12,7 +12,7 @@ source code and comments.
 
 The tool is in a very early development stage, so you might encounter bugs and
 crashes. Submitting reports with information about how to reproduce the issue
-to `the LLVM bug tracker <https://github.com/llvm/llvm-project/issues/>`_ will definitely help the
+to `the LLVM bugtracker <https://bugs.llvm.org/>`_ will definitely help the
 project. If you have any ideas or suggestions, please to put a feature request
 there.
 
@@ -25,23 +25,19 @@ compile command database for your project (for an example of how to do this
 see `How To Setup Tooling For LLVM
 <https://clang.llvm.org/docs/HowToSetupToolingForLLVM.html>`_).
 
-The tool will process a list of files by default:
+By default, the tool will run on all files listed in the given compile commands
+database:
 
 .. code-block:: console
 
-  $ clang-doc File1.cpp File2.cpp ... FileN.cpp
+  $ clang-doc /path/to/compile_commands.json
 
-The tool can be also used with a compile commands database:
-
-.. code-block:: console
-
-  $ clang-doc --executor=all-TUs compile_commands.json
-
-To select only a subset of files from the database, use the ``--filter`` flag:
+The tool can also be used on a single file or multiple files if a build path is
+passed with the ``-p`` flag.
 
 .. code-block:: console
 
-  $ clang-doc --executor=all-TUs --filter=File[0-9]+.cpp compile_commands.json
+  $ clang-doc /path/to/file.cpp -p /path/to/build
 
 Output
 ======
@@ -54,7 +50,7 @@ The top-level directory is configurable through the ``output`` flag:
 
 .. code-block:: console
 
-  $ clang-doc --output=output/directory/ compile_commands.json
+  $ clang-doc -output=output/directory/ compile_commands.json
 
 Configuration
 =============
@@ -71,16 +67,6 @@ Options
 .. code-block:: console
 
   $ clang-doc --help
-  OVERVIEW: Generates documentation from source code and comments.
-
-  Example usage for files without flags (default):
-
-    $ clang-doc File1.cpp File2.cpp ... FileN.cpp
-
-  Example usage for a project using a compile commands database:
-
-    $ clang-doc --executor=all-TUs compile_commands.json
-
   USAGE: clang-doc [options] <source0> [... <sourceN>]
 
   OPTIONS:
@@ -104,7 +90,7 @@ Options
       =html                     -   Documentation in HTML format.
     --ignore-map-errors         - Continue if files are not mapped correctly.
     --output=<string>           - Directory for outputting generated files.
-    -p <string>                 - Build path
+    -p=<string>                 - Build path
     --project-name=<string>     - Name of project.
     --public                    - Document only public declarations.
     --repository=<string>       -

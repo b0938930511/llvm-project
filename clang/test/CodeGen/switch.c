@@ -66,7 +66,7 @@ static int foo4(int i) {
 // CHECK-LABEL: define{{.*}} i32 @foo4t()
 // CHECK: ret i32 376
 // CHECK: }
-int foo4t(void) {
+int foo4t() {
   // 111 + 1 + 222 + 42 = 376
   return foo4(111) + foo4(99) + foo4(222) + foo4(601);
 }
@@ -74,7 +74,7 @@ int foo4t(void) {
 // CHECK-LABEL: define{{.*}} void @foo5()
 // CHECK-NOT: switch
 // CHECK: }
-void foo5(void){
+void foo5(){
     switch(0){
     default:
         if (0) {
@@ -86,7 +86,7 @@ void foo5(void){
 // CHECK-LABEL: define{{.*}} void @foo6()
 // CHECK-NOT: switch
 // CHECK: }
-void foo6(void){
+void foo6(){
     switch(0){
     }
 }
@@ -94,7 +94,7 @@ void foo6(void){
 // CHECK-LABEL: define{{.*}} void @foo7()
 // CHECK-NOT: switch
 // CHECK: }
-void foo7(void){
+void foo7(){
     switch(0){
       foo7();
     }
@@ -126,7 +126,7 @@ static int f9_0(unsigned x) {
     return 10;
   }
 }
-int f9(void) {
+int f9() {
   return f9_0(2);
 }
 
@@ -146,7 +146,7 @@ static int f10_0(unsigned x) {
   }
 }
 
-int f10(void) {
+int f10() {
   f10_0(1);
   return 10;
 }
@@ -197,6 +197,7 @@ int f13(unsigned x) {
 
 // Don't delete a basic block that we want to introduce later references to.
 // This isn't really specific to switches, but it's easy to show with them.
+// rdar://problem/8837067
 int f14(int x) {
   switch (x) {
 

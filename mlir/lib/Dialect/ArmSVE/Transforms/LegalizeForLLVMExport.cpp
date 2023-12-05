@@ -8,38 +8,82 @@
 
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
-#include "mlir/Dialect/ArmSVE/IR/ArmSVEDialect.h"
-#include "mlir/Dialect/ArmSVE/Transforms/Transforms.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/ArmSVE/ArmSVEDialect.h"
+#include "mlir/Dialect/ArmSVE/Transforms.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/Utils/IndexingUtils.h"
-#include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
 
 using namespace mlir;
 using namespace mlir::arm_sve;
 
+// Extract an LLVM IR type from the LLVM IR dialect type.
+static Type unwrap(Type type) {
+  if (!type)
+    return nullptr;
+  auto *mlirContext = type.getContext();
+  if (!LLVM::isCompatibleType(type))
+    emitError(UnknownLoc::get(mlirContext),
+              "conversion resulted in a non-LLVM type");
+  return type;
+}
+
+static Optional<Type>
+convertScalableVectorTypeToLLVM(ScalableVectorType svType,
+                                LLVMTypeConverter &converter) {
+  auto elementType = unwrap(converter.convertType(svType.getElementType()));
+  if (!elementType)
+    return {};
+
+  auto sVectorType =
+      LLVM::LLVMScalableVectorType::get(elementType, svType.getShape().back());
+  return sVectorType;
+}
+
 template <typename OpTy>
 class ForwardOperands : public OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
+  matchAndRewrite(OpTy op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    if (adaptor.getOperands().getTypes() == op->getOperands().getTypes())
+    if (ValueRange(operands).getTypes() == op->getOperands().getTypes())
       return rewriter.notifyMatchFailure(op, "operand types already match");
 
-    rewriter.updateRootInPlace(
-        op, [&]() { op->setOperands(adaptor.getOperands()); });
+    rewriter.updateRootInPlace(op, [&]() { op->setOperands(operands); });
     return success();
   }
 };
+
+class ReturnOpTypeConversion : public OpConversionPattern<ReturnOp> {
+public:
+  using OpConversionPattern<ReturnOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(ReturnOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    rewriter.updateRootInPlace(op, [&]() { op->setOperands(operands); });
+    return success();
+  }
+};
+
+static Optional<Value> addUnrealizedCast(OpBuilder &builder,
+                                         ScalableVectorType svType,
+                                         ValueRange inputs, Location loc) {
+  if (inputs.size() != 1 ||
+      !inputs[0].getType().isa<LLVM::LLVMScalableVectorType>())
+    return Value();
+  return builder.create<UnrealizedConversionCastOp>(loc, svType, inputs)
+      .getResult(0);
+}
 
 using SdotOpLowering = OneToOneConvertToLLVMPattern<SdotOp, SdotIntrOp>;
 using SmmlaOpLowering = OneToOneConvertToLLVMPattern<SmmlaOp, SmmlaIntrOp>;
 using UdotOpLowering = OneToOneConvertToLLVMPattern<UdotOp, UdotIntrOp>;
 using UmmlaOpLowering = OneToOneConvertToLLVMPattern<UmmlaOp, UmmlaIntrOp>;
+using VectorScaleOpLowering =
+    OneToOneConvertToLLVMPattern<VectorScaleOp, VectorScaleIntrOp>;
 using ScalableMaskedAddIOpLowering =
     OneToOneConvertToLLVMPattern<ScalableMaskedAddIOp,
                                  ScalableMaskedAddIIntrOp>;
@@ -68,91 +112,151 @@ using ScalableMaskedDivFOpLowering =
     OneToOneConvertToLLVMPattern<ScalableMaskedDivFOp,
                                  ScalableMaskedDivFIntrOp>;
 
-namespace {
-
-/// Unrolls a conversion to/from equivalent vector types, to allow using a
-/// conversion intrinsic that only supports 1-D vector types.
-///
-/// Example:
-/// ```
-/// %result = arm_sve.convert_to_svbool %source : vector<2x[4]xi1>
-/// ```
-/// is rewritten into:
-/// ```
-/// %cst = arith.constant dense<false> : vector<2x[16]xi1>
-/// %1 = vector.extract %source[0] : vector<[4]xi1> from vector<2x[4]xi1>
-/// %2 = "arm_sve.intr.convert.to.svbool"(%1)
-///                : (vector<[4]xi1>) -> vector<[16]xi1>
-/// %3 = vector.insert %2, %cst[0] : vector<[16]xi1> into vector<2x[16]xi1>
-/// %4 = vector.extract %source[1] : vector<[4]xi1> from vector<2x[4]xi1>
-/// %5 = "arm_sve.intr.convert.to.svbool"(%4)
-///                : (vector<[4]xi1>) -> vector<[16]xi1>
-/// %result = vector.insert %5, %3[1] : vector<[16]xi1> into vector<2x[16]xi1>
-/// ```
-template <typename Op, typename IntrOp>
-struct SvboolConversionOpLowering : public ConvertOpToLLVMPattern<Op> {
-  using ConvertOpToLLVMPattern<Op>::ConvertOpToLLVMPattern;
+// Load operation is lowered to code that obtains a pointer to the indexed
+// element and loads from it.
+struct ScalableLoadOpLowering : public ConvertOpToLLVMPattern<ScalableLoadOp> {
+  using ConvertOpToLLVMPattern<ScalableLoadOp>::ConvertOpToLLVMPattern;
 
   LogicalResult
-  matchAndRewrite(Op convertOp, typename Op::Adaptor,
+  matchAndRewrite(ScalableLoadOp loadOp, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    auto loc = convertOp.getLoc();
+    auto type = loadOp.getMemRefType();
+    if (!isConvertibleAndHasIdentityMaps(type))
+      return failure();
 
-    auto source = convertOp.getSource();
-    VectorType sourceType = source.getType();
-    VectorType resultType = convertOp.getResult().getType();
+    ScalableLoadOp::Adaptor transformed(operands);
+    LLVMTypeConverter converter(loadOp.getContext());
 
-    Value result = rewriter.create<arith::ConstantOp>(
-        loc, resultType, rewriter.getZeroAttr(resultType));
-
-    // We want to iterate over the input vector in steps of the trailing
-    // dimension. So this creates tile shape where all leading dimensions are 1,
-    // and the trailing dimension step is the size of the dimension.
-    SmallVector<int64_t> tileShape(sourceType.getRank(), 1);
-    tileShape.back() = sourceType.getShape().back();
-
-    // Iterate over all scalable mask/predicate slices of the source vector.
-    for (SmallVector<int64_t> index :
-         StaticTileOffsetRange(sourceType.getShape(), tileShape)) {
-      auto extractOrInsertPosition = ArrayRef(index).drop_back();
-      auto sourceVector = rewriter.create<vector::ExtractOp>(
-          loc, source, extractOrInsertPosition);
-      VectorType convertedType =
-          VectorType::Builder(llvm::cast<VectorType>(sourceVector.getType()))
-              .setDim(0, resultType.getShape().back());
-      auto convertedVector =
-          rewriter.create<IntrOp>(loc, TypeRange{convertedType}, sourceVector);
-      result = rewriter.create<vector::InsertOp>(loc, convertedVector, result,
-                                                 extractOrInsertPosition);
+    auto resultType = loadOp.result().getType();
+    LLVM::LLVMPointerType llvmDataTypePtr;
+    if (resultType.isa<VectorType>()) {
+      llvmDataTypePtr =
+          LLVM::LLVMPointerType::get(resultType.cast<VectorType>());
+    } else if (resultType.isa<ScalableVectorType>()) {
+      llvmDataTypePtr = LLVM::LLVMPointerType::get(
+          convertScalableVectorTypeToLLVM(resultType.cast<ScalableVectorType>(),
+                                          converter)
+              .getValue());
     }
-
-    rewriter.replaceOp(convertOp, result);
+    Value dataPtr =
+        getStridedElementPtr(loadOp.getLoc(), type, transformed.base(),
+                             transformed.index(), rewriter);
+    Value bitCastedPtr = rewriter.create<LLVM::BitcastOp>(
+        loadOp.getLoc(), llvmDataTypePtr, dataPtr);
+    rewriter.replaceOpWithNewOp<LLVM::LoadOp>(loadOp, bitCastedPtr);
     return success();
   }
 };
 
-using ConvertToSvboolOpLowering =
-    SvboolConversionOpLowering<ConvertToSvboolOp, ConvertToSvboolIntrOp>;
+// Store operation is lowered to code that obtains a pointer to the indexed
+// element, and stores the given value to it.
+struct ScalableStoreOpLowering
+    : public ConvertOpToLLVMPattern<ScalableStoreOp> {
+  using ConvertOpToLLVMPattern<ScalableStoreOp>::ConvertOpToLLVMPattern;
 
-using ConvertFromSvboolOpLowering =
-    SvboolConversionOpLowering<ConvertFromSvboolOp, ConvertFromSvboolIntrOp>;
+  LogicalResult
+  matchAndRewrite(ScalableStoreOp storeOp, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto type = storeOp.getMemRefType();
+    if (!isConvertibleAndHasIdentityMaps(type))
+      return failure();
 
-} // namespace
+    ScalableStoreOp::Adaptor transformed(operands);
+    LLVMTypeConverter converter(storeOp.getContext());
+
+    auto resultType = storeOp.value().getType();
+    LLVM::LLVMPointerType llvmDataTypePtr;
+    if (resultType.isa<VectorType>()) {
+      llvmDataTypePtr =
+          LLVM::LLVMPointerType::get(resultType.cast<VectorType>());
+    } else if (resultType.isa<ScalableVectorType>()) {
+      llvmDataTypePtr = LLVM::LLVMPointerType::get(
+          convertScalableVectorTypeToLLVM(resultType.cast<ScalableVectorType>(),
+                                          converter)
+              .getValue());
+    }
+    Value dataPtr =
+        getStridedElementPtr(storeOp.getLoc(), type, transformed.base(),
+                             transformed.index(), rewriter);
+    Value bitCastedPtr = rewriter.create<LLVM::BitcastOp>(
+        storeOp.getLoc(), llvmDataTypePtr, dataPtr);
+    rewriter.replaceOpWithNewOp<LLVM::StoreOp>(storeOp, transformed.value(),
+                                               bitCastedPtr);
+    return success();
+  }
+};
+
+static void
+populateBasicSVEArithmeticExportPatterns(LLVMTypeConverter &converter,
+                                         OwningRewritePatternList &patterns) {
+  // clang-format off
+  patterns.add<OneToOneConvertToLLVMPattern<ScalableAddIOp, LLVM::AddOp>,
+               OneToOneConvertToLLVMPattern<ScalableAddFOp, LLVM::FAddOp>,
+               OneToOneConvertToLLVMPattern<ScalableSubIOp, LLVM::SubOp>,
+               OneToOneConvertToLLVMPattern<ScalableSubFOp, LLVM::FSubOp>,
+               OneToOneConvertToLLVMPattern<ScalableMulIOp, LLVM::MulOp>,
+               OneToOneConvertToLLVMPattern<ScalableMulFOp, LLVM::FMulOp>,
+               OneToOneConvertToLLVMPattern<ScalableSDivIOp, LLVM::SDivOp>,
+               OneToOneConvertToLLVMPattern<ScalableUDivIOp, LLVM::UDivOp>,
+               OneToOneConvertToLLVMPattern<ScalableDivFOp, LLVM::FDivOp>
+              >(converter);
+  // clang-format on
+}
+
+static void
+configureBasicSVEArithmeticLegalizations(LLVMConversionTarget &target) {
+  // clang-format off
+  target.addIllegalOp<ScalableAddIOp,
+                      ScalableAddFOp,
+                      ScalableSubIOp,
+                      ScalableSubFOp,
+                      ScalableMulIOp,
+                      ScalableMulFOp,
+                      ScalableSDivIOp,
+                      ScalableUDivIOp,
+                      ScalableDivFOp>();
+  // clang-format on
+}
+
+static void
+populateSVEMaskGenerationExportPatterns(LLVMTypeConverter &converter,
+                                        OwningRewritePatternList &patterns) {
+  // clang-format off
+  patterns.add<OneToOneConvertToLLVMPattern<ScalableCmpFOp, LLVM::FCmpOp>,
+               OneToOneConvertToLLVMPattern<ScalableCmpIOp, LLVM::ICmpOp>
+              >(converter);
+  // clang-format on
+}
+
+static void
+configureSVEMaskGenerationLegalizations(LLVMConversionTarget &target) {
+  // clang-format off
+  target.addIllegalOp<ScalableCmpFOp,
+                      ScalableCmpIOp>();
+  // clang-format on
+}
 
 /// Populate the given list with patterns that convert from ArmSVE to LLVM.
 void mlir::populateArmSVELegalizeForLLVMExportPatterns(
-    LLVMTypeConverter &converter, RewritePatternSet &patterns) {
+    LLVMTypeConverter &converter, OwningRewritePatternList &patterns) {
   // Populate conversion patterns
+  // Remove any ArmSVE-specific types from function signatures and results.
+  populateFuncOpTypeConversionPattern(patterns, converter);
+  converter.addConversion([&converter](ScalableVectorType svType) {
+    return convertScalableVectorTypeToLLVM(svType, converter);
+  });
+  converter.addSourceMaterialization(addUnrealizedCast);
 
   // clang-format off
-  patterns.add<ForwardOperands<func::CallOp>,
-               ForwardOperands<func::CallIndirectOp>,
-               ForwardOperands<func::ReturnOp>>(converter,
+  patterns.add<ForwardOperands<CallOp>,
+               ForwardOperands<CallIndirectOp>,
+               ForwardOperands<ReturnOp>>(converter,
                                           &converter.getContext());
   patterns.add<SdotOpLowering,
                SmmlaOpLowering,
                UdotOpLowering,
                UmmlaOpLowering,
+               VectorScaleOpLowering,
                ScalableMaskedAddIOpLowering,
                ScalableMaskedAddFOpLowering,
                ScalableMaskedSubIOpLowering,
@@ -161,10 +265,12 @@ void mlir::populateArmSVELegalizeForLLVMExportPatterns(
                ScalableMaskedMulFOpLowering,
                ScalableMaskedSDivIOpLowering,
                ScalableMaskedUDivIOpLowering,
-               ScalableMaskedDivFOpLowering,
-               ConvertToSvboolOpLowering,
-               ConvertFromSvboolOpLowering>(converter);
+               ScalableMaskedDivFOpLowering>(converter);
+  patterns.add<ScalableLoadOpLowering,
+               ScalableStoreOpLowering>(converter);
   // clang-format on
+  populateBasicSVEArithmeticExportPatterns(converter, patterns);
+  populateSVEMaskGenerationExportPatterns(converter, patterns);
 }
 
 void mlir::configureArmSVELegalizeForExportTarget(
@@ -174,6 +280,7 @@ void mlir::configureArmSVELegalizeForExportTarget(
                     SmmlaIntrOp,
                     UdotIntrOp,
                     UmmlaIntrOp,
+                    VectorScaleIntrOp,
                     ScalableMaskedAddIIntrOp,
                     ScalableMaskedAddFIntrOp,
                     ScalableMaskedSubIIntrOp,
@@ -182,13 +289,12 @@ void mlir::configureArmSVELegalizeForExportTarget(
                     ScalableMaskedMulFIntrOp,
                     ScalableMaskedSDivIIntrOp,
                     ScalableMaskedUDivIIntrOp,
-                    ScalableMaskedDivFIntrOp,
-                    ConvertToSvboolIntrOp,
-                    ConvertFromSvboolIntrOp>();
+                    ScalableMaskedDivFIntrOp>();
   target.addIllegalOp<SdotOp,
                       SmmlaOp,
                       UdotOp,
                       UmmlaOp,
+                      VectorScaleOp,
                       ScalableMaskedAddIOp,
                       ScalableMaskedAddFOp,
                       ScalableMaskedSubIOp,
@@ -198,7 +304,24 @@ void mlir::configureArmSVELegalizeForExportTarget(
                       ScalableMaskedSDivIOp,
                       ScalableMaskedUDivIOp,
                       ScalableMaskedDivFOp,
-                      ConvertToSvboolOp,
-                      ConvertFromSvboolOp>();
+                      ScalableLoadOp,
+                      ScalableStoreOp>();
   // clang-format on
+  auto hasScalableVectorType = [](TypeRange types) {
+    for (Type type : types)
+      if (type.isa<arm_sve::ScalableVectorType>())
+        return true;
+    return false;
+  };
+  target.addDynamicallyLegalOp<FuncOp>([hasScalableVectorType](FuncOp op) {
+    return !hasScalableVectorType(op.getType().getInputs()) &&
+           !hasScalableVectorType(op.getType().getResults());
+  });
+  target.addDynamicallyLegalOp<CallOp, CallIndirectOp, ReturnOp>(
+      [hasScalableVectorType](Operation *op) {
+        return !hasScalableVectorType(op->getOperandTypes()) &&
+               !hasScalableVectorType(op->getResultTypes());
+      });
+  configureBasicSVEArithmeticLegalizations(target);
+  configureSVEMaskGenerationLegalizations(target);
 }

@@ -80,7 +80,7 @@ public:
   ArrayRef<T> copyArray(ArrayRef<T> Source) {
     if (!Source.empty())
       return Source.copy(Allocator);
-    return std::nullopt;
+    return None;
   }
 
   ParagraphComment *actOnParagraphComment(
@@ -130,8 +130,14 @@ public:
 
   InlineCommandComment *actOnInlineCommand(SourceLocation CommandLocBegin,
                                            SourceLocation CommandLocEnd,
+                                           unsigned CommandID);
+
+  InlineCommandComment *actOnInlineCommand(SourceLocation CommandLocBegin,
+                                           SourceLocation CommandLocEnd,
                                            unsigned CommandID,
-                                           ArrayRef<Comment::Argument> Args);
+                                           SourceLocation ArgLocBegin,
+                                           SourceLocation ArgLocEnd,
+                                           StringRef Arg);
 
   InlineContentComment *actOnUnknownCommand(SourceLocation LocBegin,
                                             SourceLocation LocEnd,
@@ -175,7 +181,6 @@ public:
 
   FullComment *actOnFullComment(ArrayRef<BlockContentComment *> Blocks);
 
-private:
   void checkBlockCommandEmptyParagraph(BlockCommandComment *Command);
 
   void checkReturnsCommand(const BlockCommandComment *Command);
@@ -193,12 +198,8 @@ private:
   void checkContainerDecl(const BlockCommandComment *Comment);
 
   /// Resolve parameter names to parameter indexes in function declaration.
-  /// Emit diagnostics about unknown parameters.
+  /// Emit diagnostics about unknown parametrs.
   void resolveParamCommandIndexes(const FullComment *FC);
-
-  /// \returns \c true if the declaration that this comment is attached to
-  /// is a pointer to function/method/block type or has such a type.
-  bool involvesFunctionType();
 
   bool isFunctionDecl();
   bool isAnyFunctionDecl();
@@ -206,6 +207,10 @@ private:
   /// \returns \c true if declaration that this comment is attached to declares
   /// a function pointer.
   bool isFunctionPointerVarDecl();
+  /// \returns \c true if the declaration that this comment is attached to
+  /// declares a variable or a field whose type is a function or a block
+  /// pointer.
+  bool isFunctionOrBlockPointerVarLikeDecl();
   bool isFunctionOrMethodVariadic();
   bool isObjCMethodDecl();
   bool isObjCPropertyDecl();
@@ -244,7 +249,8 @@ private:
                               StringRef Typo,
                               const TemplateParameterList *TemplateParameters);
 
-  InlineCommandRenderKind getInlineCommandRenderKind(StringRef Name) const;
+  InlineCommandComment::RenderKind
+  getInlineCommandRenderKind(StringRef Name) const;
 };
 
 } // end namespace comments

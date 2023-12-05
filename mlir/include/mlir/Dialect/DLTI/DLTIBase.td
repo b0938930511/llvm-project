@@ -23,11 +23,9 @@ def DLTI_Dialect : Dialect {
   }];
 
   let extraClassDeclaration = [{
-    // Top level attribute name.
     constexpr const static ::llvm::StringLiteral
     kDataLayoutAttrName = "dlti.dl_spec";
 
-    // Constants used in entries.
     constexpr const static ::llvm::StringLiteral
     kDataLayoutEndiannessKey = "dlti.endianness";
 
@@ -36,20 +34,12 @@ def DLTI_Dialect : Dialect {
 
     constexpr const static ::llvm::StringLiteral
     kDataLayoutEndiannessLittle = "little";
-
-    constexpr const static ::llvm::StringLiteral
-    kDataLayoutAllocaMemorySpaceKey = "dlti.alloca_memory_space";
-
-    constexpr const static ::llvm::StringLiteral
-    kDataLayoutStackAlignmentKey = "dlti.stack_alignment";
   }];
-
-  let useDefaultAttributePrinterParser = 1;
 }
 
 def DLTI_DataLayoutEntryAttr : DialectAttr<
     DLTI_Dialect,
-    CPred<"::llvm::isa<::mlir::DataLayoutEntryAttr>($_self)">,
+    CPred<"$_self.isa<::mlir::DataLayoutEntryAttr>()">,
     "Target data layout entry"> {
   let storageType = "::mlir::DataLayoutEntryAttr";
   let returnType = "::mlir::DataLayoutEntryAttr";
@@ -58,7 +48,7 @@ def DLTI_DataLayoutEntryAttr : DialectAttr<
 
 def DLTI_DataLayoutSpecAttr : DialectAttr<
     DLTI_Dialect,
-    CPred<"::llvm::isa<::mlir::DataLayoutSpecAttr>($_self)">,
+    CPred<"$_self.isa<::mlir::DataLayoutSpecAttr>()">,
     "Target data layout specification"> {
   let storageType = "::mlir::DataLayoutSpecAttr";
   let returnType = "::mlir::DataLayoutSpecAttr";

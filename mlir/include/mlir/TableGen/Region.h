@@ -36,7 +36,7 @@ struct NamedRegion {
   Region constraint;
 };
 
-} // namespace tblgen
-} // namespace mlir
+} // end namespace tblgen
+} // end namespace mlir
 
 #endif // MLIR_TABLEGEN_REGION_H_

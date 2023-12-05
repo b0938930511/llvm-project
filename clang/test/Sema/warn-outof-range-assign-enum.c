@@ -1,4 +1,5 @@
 // RUN: %clang_cc1 -fsyntax-only -verify -Wassign-enum %s
+// rdar://11824807
 
 typedef enum CCTestEnum
 {
@@ -16,7 +17,7 @@ static const CCTestEnum SilenceWithCast2 = (CCTestEnum) 51; // no-warning
 static const CCTestEnum SilenceWithCast3 = (const CCTestEnum) 51; // no-warning
 static const CCTestEnum SilenceWithCast4 = (const volatile CCTestEnum) 51; // no-warning
 
-void SilenceWithCastLocalVar(void) {
+void SilenceWithCastLocalVar() {
   CCTestEnum SilenceWithCast1 = 51; // expected-warning {{integer constant not in range of enumerated type 'CCTestEnum'}}
   CCTestEnum SilenceWithCast2 = (CCTestEnum) 51; // no-warning
   CCTestEnum SilenceWithCast3 = (const CCTestEnum) 51; // no-warning
@@ -44,13 +45,13 @@ typedef enum
   a = 0
 } T;
 
-void f(void)
+void f()
 {
   T x = a;
   x += 1; // expected-warning {{integer constant not in range of enumerated type}}
 }
 
-int main(void) {
+int main() {
   CCTestEnum test = 1; // expected-warning {{integer constant not in range of enumerated type 'CCTestEnum'}}
   test = 600; // expected-warning {{integer constant not in range of enumerated type 'CCTestEnum'}}
   foo(2); // expected-warning {{integer constant not in range of enumerated type 'CCTestEnum'}}

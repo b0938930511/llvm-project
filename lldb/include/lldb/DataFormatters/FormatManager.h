@@ -57,7 +57,7 @@ public:
 
   void EnableCategory(ConstString category_name,
                       TypeCategoryMap::Position pos, lldb::LanguageType lang) {
-    lldb::TypeCategoryImplSP category_sp;
+    TypeCategoryMap::ValueSP category_sp;
     if (m_categories_map.Get(category_name, category_sp) && category_sp) {
       m_categories_map.Enable(category_sp, pos);
       category_sp->AddLanguage(lang);
@@ -128,12 +128,12 @@ public:
   GetSyntheticChildren(ValueObject &valobj, lldb::DynamicValueType use_dynamic);
 
   bool
-  AnyMatches(const FormattersMatchCandidate &candidate_type,
+  AnyMatches(ConstString type_name,
              TypeCategoryImpl::FormatCategoryItems items =
                  TypeCategoryImpl::ALL_ITEM_TYPES,
              bool only_enabled = true, const char **matching_category = nullptr,
              TypeCategoryImpl::FormatCategoryItems *matching_type = nullptr) {
-    return m_categories_map.AnyMatches(candidate_type, items, only_enabled,
+    return m_categories_map.AnyMatches(type_name, items, only_enabled,
                                        matching_category, matching_type);
   }
 
@@ -162,8 +162,8 @@ public:
   static FormattersMatchVector
   GetPossibleMatches(ValueObject &valobj, lldb::DynamicValueType use_dynamic) {
     FormattersMatchVector matches;
-    GetPossibleMatches(valobj, valobj.GetCompilerType(), use_dynamic, matches,
-                       FormattersMatchCandidate::Flags(), true);
+    GetPossibleMatches(valobj, valobj.GetCompilerType(),
+                       use_dynamic, matches, false, false, false, true);
     return matches;
   }
 
@@ -179,7 +179,8 @@ private:
                                  CompilerType compiler_type,
                                  lldb::DynamicValueType use_dynamic,
                                  FormattersMatchVector &entries,
-                                 FormattersMatchCandidate::Flags current_flags,
+                                 bool did_strip_ptr, bool did_strip_ref,
+                                 bool did_strip_typedef,
                                  bool root_level = false);
 
   std::atomic<uint32_t> m_last_revision;

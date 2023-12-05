@@ -6,16 +6,16 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// UNSUPPORTED: no-threads
+// UNSUPPORTED: libcpp-has-no-threads
 // UNSUPPORTED: c++03, c++11, c++14
 
 // <mutex>
 
-// template <class... MutexTypes>
+// template <class Mutex...>
 // class scoped_lock
 // {
 // public:
-//     typedef Mutex mutex_type;  // Only if sizeof...(MutexTypes) == 1
+//     typedef Mutex mutex_type;  // only if sizeof...(Mutex) == 1
 //     ...
 // };
 

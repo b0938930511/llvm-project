@@ -10,9 +10,9 @@
 #include "MipsInstrInfo.h"
 #include "TestBase.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
@@ -20,7 +20,11 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::testing::AllOf;
+using ::testing::Eq;
+using ::testing::get;
 using ::testing::Pointwise;
+using ::testing::Property;
 
 using llvm::unittest::TempDir;
 
@@ -51,7 +55,7 @@ class MipsBenchmarkResultTest : public MipsTestBase {};
 TEST_F(MipsBenchmarkResultTest, WriteToAndReadFromDisk) {
   ExitOnError ExitOnErr;
 
-  Benchmark ToDisk;
+  InstructionBenchmark ToDisk;
 
   ToDisk.Key.Instructions.push_back(MCInstBuilder(Mips::XOR)
                                         .addReg(Mips::T0)
@@ -61,7 +65,7 @@ TEST_F(MipsBenchmarkResultTest, WriteToAndReadFromDisk) {
   ToDisk.Key.RegisterInitialValues = {
       RegisterValue{Mips::T1, APInt(8, "123", 10)},
       RegisterValue{Mips::T2, APInt(8, "456", 10)}};
-  ToDisk.Mode = Benchmark::Latency;
+  ToDisk.Mode = InstructionBenchmark::Latency;
   ToDisk.CpuName = "cpu_name";
   ToDisk.LLVMTriple = "llvm_triple";
   ToDisk.NumRepetitions = 1;
@@ -74,23 +78,12 @@ TEST_F(MipsBenchmarkResultTest, WriteToAndReadFromDisk) {
   SmallString<64> Filename(TestDirectory.path());
   sys::path::append(Filename, "data.yaml");
   errs() << Filename << "-------\n";
-  {
-    int ResultFD = 0;
-    // Create output file or open existing file and truncate it, once.
-    ExitOnErr(errorCodeToError(openFileForWrite(Filename, ResultFD,
-                                                sys::fs::CD_CreateAlways,
-                                                sys::fs::OF_TextWithCRLF)));
-    raw_fd_ostream FileOstr(ResultFD, true /*shouldClose*/);
-
-    ExitOnErr(ToDisk.writeYamlTo(State, FileOstr));
-  }
-  const std::unique_ptr<MemoryBuffer> Buffer =
-      std::move(*MemoryBuffer::getFile(Filename));
+  ExitOnErr(ToDisk.writeYaml(State, Filename));
 
   {
     // One-element version.
     const auto FromDisk =
-        ExitOnErr(Benchmark::readYaml(State, *Buffer));
+        ExitOnErr(InstructionBenchmark::readYaml(State, Filename));
 
     EXPECT_THAT(FromDisk.Key.Instructions,
                 Pointwise(EqMCInst(), ToDisk.Key.Instructions));
@@ -106,9 +99,9 @@ TEST_F(MipsBenchmarkResultTest, WriteToAndReadFromDisk) {
   {
     // Vector version.
     const auto FromDiskVector =
-        ExitOnErr(Benchmark::readYamls(State, *Buffer));
+        ExitOnErr(InstructionBenchmark::readYamls(State, Filename));
     ASSERT_EQ(FromDiskVector.size(), size_t{1});
-    const auto &FromDisk = FromDiskVector[0];
+    const auto FromDisk = FromDiskVector[0];
     EXPECT_THAT(FromDisk.Key.Instructions,
                 Pointwise(EqMCInst(), ToDisk.Key.Instructions));
     EXPECT_EQ(FromDisk.Key.Config, ToDisk.Key.Config);

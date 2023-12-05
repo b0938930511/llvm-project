@@ -1,8 +1,9 @@
 //===----------------------------------------------------------------------===//
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//                     The LLVM Compiler Infrastructure
+//
+// This file is dual licensed under the MIT and the University of Illinois Open
+// Source Licenses. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
 
@@ -10,12 +11,12 @@
 
 // template <class T1, class T2> struct pair
 
-// template <class T1, class T2, class U1, class U2> bool operator==(const pair<T1,T2>&, const pair<U1,U2>&);
-// template <class T1, class T2, class U1, class U2> bool operator!=(const pair<T1,T2>&, const pair<U1,U2>&);
-// template <class T1, class T2, class U1, class U2> bool operator< (const pair<T1,T2>&, const pair<U1,U2>&);
-// template <class T1, class T2, class U1, class U2> bool operator> (const pair<T1,T2>&, const pair<U1,U2>&);
-// template <class T1, class T2, class U1, class U2> bool operator>=(const pair<T1,T2>&, const pair<U1,U2>&);
-// template <class T1, class T2, class U1, class U2> bool operator<=(const pair<T1,T2>&, const pair<U1,U2>&);
+// template <class T1, class T2> bool operator==(const pair<T1,T2>&, const pair<T1,T2>&);
+// template <class T1, class T2> bool operator!=(const pair<T1,T2>&, const pair<T1,T2>&);
+// template <class T1, class T2> bool operator< (const pair<T1,T2>&, const pair<T1,T2>&);
+// template <class T1, class T2> bool operator> (const pair<T1,T2>&, const pair<T1,T2>&);
+// template <class T1, class T2> bool operator>=(const pair<T1,T2>&, const pair<T1,T2>&);
+// template <class T1, class T2> bool operator<=(const pair<T1,T2>&, const pair<T1,T2>&);
 
 #include <utility>
 #include <cassert>
@@ -24,18 +25,6 @@
 
 int main(int, char**)
 {
-    {
-        typedef std::pair<int, short> P1;
-        typedef std::pair<long, long> P2;
-        P1 p1(3, static_cast<short>(4));
-        P2 p2(3, 4);
-        assert( (p1 == p2));
-        assert(!(p1 != p2));
-        assert(!(p1 <  p2));
-        assert( (p1 <= p2));
-        assert(!(p1 >  p2));
-        assert( (p1 >= p2));
-    }
     {
         typedef std::pair<int, short> P;
         P p1(3, static_cast<short>(4));

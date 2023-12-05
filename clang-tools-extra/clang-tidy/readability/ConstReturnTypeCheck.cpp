@@ -12,21 +12,23 @@
 #include "clang/ASTMatchers/ASTMatchFinder.h"
 #include "clang/Basic/SourceLocation.h"
 #include "clang/Lex/Lexer.h"
-#include <optional>
+#include "llvm/ADT/Optional.h"
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::readability {
+namespace clang {
+namespace tidy {
+namespace readability {
 
 // Finds the location of the qualifying `const` token in the `FunctionDecl`'s
-// return type. Returns `std::nullopt` when the return type is not
-// `const`-qualified or `const` does not appear in `Def`'s source, like when the
-// type is an alias or a macro.
-static std::optional<Token>
+// return type. Returns `None` when the return type is not `const`-qualified or
+// `const` does not appear in `Def`'s source, like when the type is an alias or
+// a macro.
+static llvm::Optional<Token>
 findConstToRemove(const FunctionDecl *Def,
                   const MatchFinder::MatchResult &Result) {
   if (!Def->getReturnType().isLocalConstQualified())
-    return std::nullopt;
+    return None;
 
   // Get the begin location for the function name, including any qualifiers
   // written in the source (for out-of-line declarations). A FunctionDecl's
@@ -43,25 +45,13 @@ findConstToRemove(const FunctionDecl *Def,
       *Result.SourceManager, Result.Context->getLangOpts());
 
   if (FileRange.isInvalid())
-    return std::nullopt;
+    return None;
 
   return utils::lexer::getQualifyingToken(
       tok::kw_const, FileRange, *Result.Context, *Result.SourceManager);
 }
 
 namespace {
-
-AST_MATCHER(QualType, isLocalConstQualified) {
-  return Node.isLocalConstQualified();
-}
-
-AST_MATCHER(QualType, isTypeOfType) {
-  return isa<TypeOfType>(Node.getTypePtr());
-}
-
-AST_MATCHER(QualType, isTypeOfExprType) {
-  return isa<TypeOfExprType>(Node.getTypePtr());
-}
 
 struct CheckResult {
   // Source range of the relevant `const` token in the definition being checked.
@@ -80,7 +70,7 @@ struct CheckResult {
 static CheckResult checkDef(const clang::FunctionDecl *Def,
                             const MatchFinder::MatchResult &MatchResult) {
   CheckResult Result;
-  std::optional<Token> Tok = findConstToRemove(Def, MatchResult);
+  llvm::Optional<Token> Tok = findConstToRemove(Def, MatchResult);
   if (!Tok)
     return Result;
 
@@ -93,7 +83,7 @@ static CheckResult checkDef(const clang::FunctionDecl *Def,
   // single warning at the definition.
   for (const FunctionDecl *Decl = Def->getPreviousDecl(); Decl != nullptr;
        Decl = Decl->getPreviousDecl()) {
-    if (std::optional<Token> T = findConstToRemove(Decl, MatchResult))
+    if (llvm::Optional<Token> T = findConstToRemove(Decl, MatchResult))
       Result.Hints.push_back(FixItHint::CreateRemoval(
           CharSourceRange::getCharRange(T->getLocation(), T->getEndLoc())));
     else
@@ -103,34 +93,16 @@ static CheckResult checkDef(const clang::FunctionDecl *Def,
   return Result;
 }
 
-void ConstReturnTypeCheck::storeOptions(ClangTidyOptions::OptionMap &Opts) {
-  Options.store(Opts, "IgnoreMacros", IgnoreMacros);
-}
-
 void ConstReturnTypeCheck::registerMatchers(MatchFinder *Finder) {
   // Find all function definitions for which the return types are `const`
-  // qualified, ignoring decltype types.
-  auto NonLocalConstType =
-      qualType(unless(isLocalConstQualified()),
-               anyOf(decltypeType(), autoType(), isTypeOfType(),
-                     isTypeOfExprType(), substTemplateTypeParmType()));
+  // qualified.
   Finder->addMatcher(
-      functionDecl(
-          returns(allOf(isConstQualified(), unless(NonLocalConstType))),
-          anyOf(isDefinition(), cxxMethodDecl(isPure())),
-          // Overridden functions are not actionable.
-          unless(cxxMethodDecl(isOverride())))
-          .bind("func"),
+      functionDecl(returns(isConstQualified()), isDefinition()).bind("func"),
       this);
 }
 
 void ConstReturnTypeCheck::check(const MatchFinder::MatchResult &Result) {
   const auto *Def = Result.Nodes.getNodeAs<FunctionDecl>("func");
-  // Suppress the check if macros are involved.
-  if (IgnoreMacros &&
-      (Def->getBeginLoc().isMacroID() || Def->getEndLoc().isMacroID()))
-    return;
-
   CheckResult CR = checkDef(Def, Result);
   {
     // Clang only supports one in-flight diagnostic at a time. So, delimit the
@@ -143,12 +115,6 @@ void ConstReturnTypeCheck::check(const MatchFinder::MatchResult &Result) {
         << Def->getReturnType();
     if (CR.ConstRange.isValid())
       Diagnostic << CR.ConstRange;
-
-    // Do not propose fixes for virtual function.
-    const auto *Method = dyn_cast<CXXMethodDecl>(Def);
-    if (Method && Method->isVirtual())
-      return;
-
     for (auto &Hint : CR.Hints)
       Diagnostic << Hint;
   }
@@ -156,4 +122,6 @@ void ConstReturnTypeCheck::check(const MatchFinder::MatchResult &Result) {
     diag(Loc, "could not transform this declaration", DiagnosticIDs::Note);
 }
 
-} // namespace clang::tidy::readability
+} // namespace readability
+} // namespace tidy
+} // namespace clang

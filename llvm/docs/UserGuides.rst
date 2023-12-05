@@ -12,7 +12,6 @@ intermediate LLVM representation.
 .. toctree::
    :hidden:
 
-   AArch64SME
    AddingConstrainedIntrinsics
    AdvancedBuilds
    AliasAnalysis
@@ -28,29 +27,22 @@ intermediate LLVM representation.
    CommandLine
    CompileCudaWithLLVM
    CoverageMappingFormat
-   CycleTerminology
    DebuggingJITedCode
-   DirectXUsage
    Docker
-   FatLTO
    ExtendingLLVM
-   GitHub
    GoldPlugin
-   GlobalISel/MIRPatterns
    HowToBuildOnARM
    HowToBuildWithPGO
    HowToBuildWindowsItaniumPrograms
    HowToCrossCompileBuiltinsOnArm
    HowToCrossCompileLLVM
    HowToUpdateDebugInfo
-   InstrRefDebugInfo
    LinkTimeOptimization
    LoopTerminology
    MarkdownQuickstartTemplate
    MemorySSA
    MergeFunctions
    MCJITDesignAndImplementation
-   MisExpect
    ORCv2
    OpaquePointers
    JITLink
@@ -59,11 +51,8 @@ intermediate LLVM representation.
    Phabricator
    Passes
    ReportingGuide
-   ResponseGuide
    Remarks
-   RISCVUsage
    SourceLevelDebugging
-   SPIRVUsage
    StackSafetyAnalysis
    SupportLibrary
    TableGen/index
@@ -148,9 +137,6 @@ Optimizations
 :doc:`LoopTerminology`
   A document describing Loops and associated terms as used in LLVM.
 
-:doc:`CycleTerminology`
-  A document describing cycles as a generalization of loops.
-
 :doc:`Vectorizers`
    This document describes the current status of vectorization in LLVM.
 
@@ -168,15 +154,6 @@ Optimizations
    This document describes the design and philosophy behind the LLVM
    source-level debugger.
 
-:doc:`How to Update Debug Info <HowToUpdateDebugInfo>`
-   This document specifies how to correctly update debug info in various kinds
-   of code transformations.
-
-:doc:`InstrRefDebugInfo`
-   This document explains how LLVM uses value tracking, or instruction
-   referencing, to determine variable locations for debug info in the final
-   stages of compilation.
-
 Code Generation
 ---------------
 
@@ -191,13 +168,6 @@ Code Generation
 :doc:`TableGen <TableGen/index>`
    Describes the TableGen tool, which is used heavily by the LLVM code
    generator.
-
-==========
-GlobalISel
-==========
-
-:doc:`MIRPatterns <GlobalISel/MIRPatterns>`
-   Describes the design of MIR Patterns and how to use them.
 
 ===
 JIT
@@ -231,7 +201,7 @@ Additional Topics
    to LLVM.
 
 :doc:`HowToBuildWindowsItaniumPrograms`
-   Notes on assembling a Windows Itanium environment.
+   Notes on assembling a Windows Itanium enviroment.
 
 :doc:`HowToCrossCompileBuiltinsOnArm`
    Notes on cross-building and testing the compiler-rt builtins for Arm.
@@ -239,9 +209,6 @@ Additional Topics
 :doc:`BigEndianNEON`
   LLVM's support for generating NEON instructions on big endian ARM targets is
   somewhat nonintuitive. This document explains the implementation and rationale.
-
-:doc:`AArch64SME`
-  LLVM's support for AArch64 SME ACLE and ABI.
 
 :doc:`CompileCudaWithLLVM`
   LLVM support for CUDA.
@@ -255,18 +222,3 @@ Additional Topics
 :doc:`AMDGPUDwarfExtensionsForHeterogeneousDebugging`
    This document describes DWARF extensions to support heterogeneous debugging
    for targets such as the AMDGPU backend.
-
-:doc:`AMDGPUDwarfExtensionAllowLocationDescriptionOnTheDwarfExpressionStack/AMDGPUDwarfExtensionAllowLocationDescriptionOnTheDwarfExpressionStack`
-   This document describes a DWARF extension to allow location descriptions on
-   the DWARF expression stack. It is part of
-   :doc:`AMDGPUDwarfExtensionsForHeterogeneousDebugging`.
-
-:doc:`SPIRVUsage`
-   This document describes using the SPIR-V target to compile GPU kernels.
-
-:doc:`DirectXUsage`
-   This document describes using the DirectX target to compile GPU code for the
-   DirectX runtime.
-
-:doc:`RISCVUsage`
-   This document describes using the RISCV-V target.

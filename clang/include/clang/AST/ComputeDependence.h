@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_CLANG_AST_COMPUTEDEPENDENCE_H
-#define LLVM_CLANG_AST_COMPUTEDEPENDENCE_H
+#ifndef LLVM_CLANG_AST_COMPUTE_DEPENDENCE_H
+#define LLVM_CLANG_AST_COMPUTE_DEPENDENCE_H
 
 #include "clang/AST/DependenceFlags.h"
 #include "clang/Basic/ExceptionSpecificationType.h"
@@ -30,8 +30,7 @@ class UnaryExprOrTypeTraitExpr;
 class ArraySubscriptExpr;
 class MatrixSubscriptExpr;
 class CompoundLiteralExpr;
-class ImplicitCastExpr;
-class ExplicitCastExpr;
+class CastExpr;
 class BinaryOperator;
 class ConditionalOperator;
 class BinaryConditionalOperator;
@@ -71,7 +70,6 @@ class CXXPseudoDestructorExpr;
 class OverloadExpr;
 class DependentScopeDeclRefExpr;
 class CXXConstructExpr;
-class CXXTemporaryObjectExpr;
 class CXXDefaultInitExpr;
 class CXXDefaultArgExpr;
 class LambdaExpr;
@@ -79,7 +77,6 @@ class CXXUnresolvedConstructExpr;
 class CXXDependentScopeMemberExpr;
 class MaterializeTemporaryExpr;
 class CXXFoldExpr;
-class CXXParenListInitExpr;
 class TypeTraitExpr;
 class ConceptSpecializationExpr;
 class SYCLUniqueStableNameExpr;
@@ -117,8 +114,7 @@ ExprDependence computeDependence(UnaryExprOrTypeTraitExpr *E);
 ExprDependence computeDependence(ArraySubscriptExpr *E);
 ExprDependence computeDependence(MatrixSubscriptExpr *E);
 ExprDependence computeDependence(CompoundLiteralExpr *E);
-ExprDependence computeDependence(ImplicitCastExpr *E);
-ExprDependence computeDependence(ExplicitCastExpr *E);
+ExprDependence computeDependence(CastExpr *E);
 ExprDependence computeDependence(BinaryOperator *E);
 ExprDependence computeDependence(ConditionalOperator *E);
 ExprDependence computeDependence(BinaryConditionalOperator *E);
@@ -160,7 +156,6 @@ ExprDependence computeDependence(OverloadExpr *E, bool KnownDependent,
                                  bool KnownContainsUnexpandedParameterPack);
 ExprDependence computeDependence(DependentScopeDeclRefExpr *E);
 ExprDependence computeDependence(CXXConstructExpr *E);
-ExprDependence computeDependence(CXXTemporaryObjectExpr *E);
 ExprDependence computeDependence(CXXDefaultInitExpr *E);
 ExprDependence computeDependence(CXXDefaultArgExpr *E);
 ExprDependence computeDependence(LambdaExpr *E,
@@ -169,7 +164,6 @@ ExprDependence computeDependence(CXXUnresolvedConstructExpr *E);
 ExprDependence computeDependence(CXXDependentScopeMemberExpr *E);
 ExprDependence computeDependence(MaterializeTemporaryExpr *E);
 ExprDependence computeDependence(CXXFoldExpr *E);
-ExprDependence computeDependence(CXXParenListInitExpr *E);
 ExprDependence computeDependence(TypeTraitExpr *E);
 ExprDependence computeDependence(ConceptSpecializationExpr *E,
                                  bool ValueDependent);

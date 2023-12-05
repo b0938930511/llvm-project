@@ -3,6 +3,6 @@
 // RUN: %clang_cc1 -femit-all-decls -emit-llvm -o %t %s
 // RUN: grep "@foo" %t
 
-static void foo(void) {
+static void foo() {
   
 }

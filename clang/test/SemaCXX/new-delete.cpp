@@ -1,10 +1,7 @@
+// RUN: %clang_cc1 -fsyntax-only -verify %s -triple=i686-pc-linux-gnu -Wno-new-returns-null
 // RUN: %clang_cc1 -fsyntax-only -verify %s -triple=i686-pc-linux-gnu -Wno-new-returns-null -std=c++98
 // RUN: %clang_cc1 -fsyntax-only -verify %s -triple=i686-pc-linux-gnu -Wno-new-returns-null -std=c++11
 // RUN: %clang_cc1 -fsyntax-only -verify %s -triple=i686-pc-linux-gnu -Wno-new-returns-null -std=c++14
-// RUN: %clang_cc1 -fsyntax-only -verify=expected,cxx17 %s -triple=i686-pc-linux-gnu -Wno-new-returns-null %std_cxx17-
-
-// FIXME Location is (frontend)
-// cxx17-note@*:* {{candidate function not viable: requires 2 arguments, but 3 were provided}}
 
 #include <stddef.h>
 
@@ -356,7 +353,7 @@ void h(unsigned i) {
   (void)new T(i); // expected-error {{array 'new' cannot have initialization arguments}}
 }
 template void h<unsigned>(unsigned);
-template void h<unsigned[10]>(unsigned); // expected-note {{in instantiation of function template specialization 'Test1::h<unsigned int[10]>' requested here}}
+template void h<unsigned[10]>(unsigned); // expected-note {{in instantiation of function template specialization 'Test1::h<unsigned int [10]>' requested here}}
 
 }
 
@@ -407,6 +404,7 @@ namespace rdar8018245 {
 
 }
 
+// <rdar://problem/8248780>
 namespace Instantiate {
   template<typename T> struct X {
     operator T*();
@@ -424,11 +422,7 @@ namespace PR7810 {
   };
   struct Y {
     // cv is ignored in arguments
-#if __cplusplus < 202002L
     static void operator delete(void *volatile);
-#else
-    static void operator delete(void *);
-#endif
   };
 }
 
@@ -454,6 +448,7 @@ namespace DeleteParam {
   };
 }
 
+// <rdar://problem/8427878>
 // Test that the correct 'operator delete' is selected to pair with
 // the unexpected placement 'operator new'.
 namespace PairedDelete {
@@ -484,7 +479,7 @@ namespace ArrayNewNeedsDtor {
 #endif
   struct B { B(); A a; };
 #if __cplusplus <= 199711L
-  // expected-error@-2 {{field of type 'A' has private destructor}}
+  // expected-error@-2 {{field of type 'ArrayNewNeedsDtor::A' has private destructor}}
 #else
   // expected-note@-4 {{destructor of 'B' is implicitly deleted because field 'a' has an inaccessible destructor}}
 #endif
@@ -644,5 +639,4 @@ int (*const_fold)[12] = new int[3][&const_fold + 12 - &const_fold];
 // expected-note@-3 {{cannot refer to element 12 of non-array}}
 #elif __cplusplus < 201103L
 // expected-error@-5 {{cannot allocate object of variably modified type}}
-// expected-warning@-6 {{variable length arrays in C++ are a Clang extension}}
 #endif

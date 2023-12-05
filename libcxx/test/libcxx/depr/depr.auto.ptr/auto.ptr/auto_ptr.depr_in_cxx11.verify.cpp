@@ -18,6 +18,7 @@
 //
 // Deprecated in C++11
 
+// UNSUPPORTED: clang-4.0
 // UNSUPPORTED: c++03
 
 // ADDITIONAL_COMPILE_FLAGS: -D_LIBCPP_ENABLE_CXX17_REMOVED_AUTO_PTR
@@ -25,6 +26,11 @@
 #include <memory>
 #include "test_macros.h"
 
-typedef std::auto_ptr<int> AP; // expected-warning {{'auto_ptr<int>' is deprecated}}
-typedef std::auto_ptr<void> APV; // expected-warning {{'auto_ptr<void>' is deprecated}}
-typedef std::auto_ptr_ref<int> APR; // expected-warning {{'auto_ptr_ref<int>' is deprecated}}
+int main(int, char**)
+{
+    typedef std::auto_ptr<int> AP; // expected-warning {{'auto_ptr<int>' is deprecated}}
+    typedef std::auto_ptr<void> APV; // expected-warning {{'auto_ptr<void>' is deprecated}}
+    typedef std::auto_ptr_ref<int> APR; // expected-warning {{'auto_ptr_ref<int>' is deprecated}}
+
+  return 0;
+}

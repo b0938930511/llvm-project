@@ -15,7 +15,9 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Analysis/ScalarEvolution.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <cassert>
 #include <cstdint>
 
@@ -124,10 +126,6 @@ void SCEVDivision::visitConstant(const SCEVConstant *Numerator) {
     Remainder = SE.getConstant(RemainderVal);
     return;
   }
-}
-
-void SCEVDivision::visitVScale(const SCEVVScale *Numerator) {
-  return cannotDivide(Numerator);
 }
 
 void SCEVDivision::visitAddRecExpr(const SCEVAddRecExpr *Numerator) {

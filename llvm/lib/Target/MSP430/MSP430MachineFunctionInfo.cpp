@@ -11,10 +11,3 @@
 using namespace llvm;
 
 void MSP430MachineFunctionInfo::anchor() { }
-
-MachineFunctionInfo *MSP430MachineFunctionInfo::clone(
-    BumpPtrAllocator &Allocator, MachineFunction &DestMF,
-    const DenseMap<MachineBasicBlock *, MachineBasicBlock *> &Src2DstMBB)
-    const {
-  return DestMF.cloneInfo<MSP430MachineFunctionInfo>(*this);
-}

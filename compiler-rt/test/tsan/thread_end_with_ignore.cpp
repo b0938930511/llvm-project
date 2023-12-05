@@ -1,7 +1,4 @@
 // RUN: %clangxx_tsan -O1 %s -o %t && %deflake %run %t | FileCheck %s
-
-// ReportIgnoresEnabled is disabled on Darwin, see comment in tsan_rtl_thread.cpp.
-// UNSUPPORTED: darwin
 #include "test.h"
 
 void *Thread(void *x) {

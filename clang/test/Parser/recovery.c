@@ -19,6 +19,7 @@ static void f (char * (*g) (char **, int), char **p, ...) {
 } // expected-error {{extraneous closing brace ('}')}}
 
 
+// rdar://6094870
 void test(int a) {
   struct { int i; } x;
   
@@ -60,7 +61,8 @@ struct S A = {
 &BADIDENT, 0     /* expected-error {{use of undeclared identifier}} */
 };
 
-void test6248081(void) { 
+// rdar://6248081
+void test6248081() { 
   [10]  // expected-error {{expected expression}}
 }
 
@@ -68,16 +70,18 @@ struct forward; // expected-note{{forward declaration of 'struct forward'}}
 void x(struct forward* x) {switch(x->a) {}} // expected-error {{incomplete definition of type}}
 
 // PR3410
-void foo(void) {
+void foo() {
   int X;
   X = 4 // expected-error{{expected ';' after expression}}
 }
 
+// rdar://9045701
 void test9045701(int x) {
 #define VALUE 0
   x = VALUE // expected-error{{expected ';' after expression}}
 }
 
+// rdar://7980651
 typedef int intptr_t;  // expected-note {{'intptr_t' declared here}}
 void bar(intptr y);     // expected-error {{unknown type name 'intptr'; did you mean 'intptr_t'?}}
 

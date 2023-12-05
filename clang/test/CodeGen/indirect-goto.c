@@ -26,6 +26,6 @@ L1: res *= 2;
   return res;
 }
 
-int main(void) {
+int main() {
   return foo(3)+foo2(4);
 }

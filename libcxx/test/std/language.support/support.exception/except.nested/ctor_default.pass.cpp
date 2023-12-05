@@ -45,7 +45,7 @@ int main(int, char**)
             assert(e.nested_ptr() != nullptr);
             try
             {
-                std::rethrow_exception(e.nested_ptr());
+                rethrow_exception(e.nested_ptr());
                 assert(false);
             }
             catch (const A& a)

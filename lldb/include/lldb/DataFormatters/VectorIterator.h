@@ -15,14 +15,13 @@
 #include "lldb/DataFormatters/TypeSynthetic.h"
 #include "lldb/Target/ExecutionContext.h"
 #include "lldb/Utility/ConstString.h"
-#include "llvm/ADT/SmallVector.h"
 
 namespace lldb_private {
 namespace formatters {
 class VectorIteratorSyntheticFrontEnd : public SyntheticChildrenFrontEnd {
 public:
   VectorIteratorSyntheticFrontEnd(lldb::ValueObjectSP valobj_sp,
-                                  llvm::ArrayRef<ConstString> item_names);
+                                  ConstString item_name);
 
   size_t CalculateNumChildren() override;
 
@@ -36,7 +35,7 @@ public:
 
 private:
   ExecutionContextRef m_exe_ctx_ref;
-  llvm::SmallVector<ConstString, 2> m_item_names;
+  ConstString m_item_name;
   lldb::ValueObjectSP m_item_sp;
 };
 

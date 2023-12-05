@@ -18,7 +18,7 @@ namespace lldb_private {
 
 class CommandOptionsProcessLaunch : public lldb_private::OptionGroup {
 public:
-  CommandOptionsProcessLaunch() {
+  CommandOptionsProcessLaunch() : lldb_private::OptionGroup() {
     // Keep default values of all options in one place: OptionParsingStarting
     // ()
     OptionParsingStarting(nullptr);

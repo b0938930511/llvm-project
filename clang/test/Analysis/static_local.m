@@ -2,7 +2,7 @@
 // expected-no-diagnostics
 
 // Test reasoning about static locals in ObjCMethods. 
-int *getValidPtr(void);
+int *getValidPtr();
 @interface Radar11275803
 - (int) useStaticInMethod;
 @end

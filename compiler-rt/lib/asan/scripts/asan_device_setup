@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 #===- lib/asan/scripts/asan_device_setup -----------------------------------===#
 #
 # Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.

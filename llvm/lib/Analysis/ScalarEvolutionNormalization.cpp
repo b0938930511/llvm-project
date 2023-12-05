@@ -13,7 +13,6 @@
 
 #include "llvm/Analysis/ScalarEvolutionNormalization.h"
 #include "llvm/Analysis/LoopInfo.h"
-#include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
 using namespace llvm;
 
@@ -96,20 +95,11 @@ NormalizeDenormalizeRewriter::visitAddRecExpr(const SCEVAddRecExpr *AR) {
 
 const SCEV *llvm::normalizeForPostIncUse(const SCEV *S,
                                          const PostIncLoopSet &Loops,
-                                         ScalarEvolution &SE,
-                                         bool CheckInvertible) {
-  if (Loops.empty())
-    return S;
+                                         ScalarEvolution &SE) {
   auto Pred = [&](const SCEVAddRecExpr *AR) {
     return Loops.count(AR->getLoop());
   };
-  const SCEV *Normalized =
-      NormalizeDenormalizeRewriter(Normalize, Pred, SE).visit(S);
-  const SCEV *Denormalized = denormalizeForPostIncUse(Normalized, Loops, SE);
-  // If the normalized expression isn't invertible.
-  if (CheckInvertible && Denormalized != S)
-    return nullptr;
-  return Normalized;
+  return NormalizeDenormalizeRewriter(Normalize, Pred, SE).visit(S);
 }
 
 const SCEV *llvm::normalizeForPostIncUseIf(const SCEV *S, NormalizePredTy Pred,
@@ -120,8 +110,6 @@ const SCEV *llvm::normalizeForPostIncUseIf(const SCEV *S, NormalizePredTy Pred,
 const SCEV *llvm::denormalizeForPostIncUse(const SCEV *S,
                                            const PostIncLoopSet &Loops,
                                            ScalarEvolution &SE) {
-  if (Loops.empty())
-    return S;
   auto Pred = [&](const SCEVAddRecExpr *AR) {
     return Loops.count(AR->getLoop());
   };

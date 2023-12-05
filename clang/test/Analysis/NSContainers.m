@@ -1,7 +1,4 @@
-// RUN: %clang_analyze_cc1 -Wno-objc-literal-conversion -Wno-objc-root-class -fobjc-arc \
-// RUN:   -analyzer-checker=core,osx.cocoa,nullability \
-// RUN:   -analyzer-config eagerly-assume=false \
-// RUN:   -analyzer-checker=debug.ExprInspection -verify %s
+// RUN: %clang_analyze_cc1  -Wno-objc-literal-conversion -analyzer-checker=core,osx.cocoa.NonNilReturnValue,osx.cocoa.NilArg,osx.cocoa.Loops,debug.ExprInspection -verify -Wno-objc-root-class %s
 
 void clang_analyzer_eval(int);
 
@@ -34,13 +31,13 @@ typedef struct _NSZone NSZone;
 @end
 
 typedef struct {
-    unsigned long state;
-    id __unsafe_unretained _Nullable * _Nullable itemsPtr;
-    unsigned long * _Nullable mutationsPtr;
-    unsigned long extra[5];
+  unsigned long state;
+  id *itemsPtr;
+  unsigned long *mutationsPtr;
+  unsigned long extra[5];
 } NSFastEnumerationState;
 @protocol NSFastEnumeration
-- (NSUInteger)countByEnumeratingWithState:(NSFastEnumerationState *)state objects:(id __unsafe_unretained _Nullable [_Nonnull])buffer count:(NSUInteger)len;
+- (NSUInteger)countByEnumeratingWithState:(NSFastEnumerationState *)state objects:(id [])buffer count:(NSUInteger)len;
 @end
 
 @interface NSArray : NSObject <NSCopying, NSMutableCopying, NSSecureCoding, NSFastEnumeration>
@@ -115,33 +112,33 @@ typedef struct {
 @end
 
 // NSMutableArray API
-void testNilArgNSMutableArray1(void) {
+void testNilArgNSMutableArray1() {
   NSMutableArray *marray = [[NSMutableArray alloc] init];
   [marray addObject:0]; // expected-warning {{Argument to 'NSMutableArray' method 'addObject:' cannot be nil}}
 }
 
-void testNilArgNSMutableArray2(void) {
+void testNilArgNSMutableArray2() {
   NSMutableArray *marray = [[NSMutableArray alloc] init];
   [marray insertObject:0 atIndex:1]; // expected-warning {{Argument to 'NSMutableArray' method 'insertObject:atIndex:' cannot be nil}}
 }
 
-void testNilArgNSMutableArray3(void) {
+void testNilArgNSMutableArray3() {
   NSMutableArray *marray = [[NSMutableArray alloc] init];
   [marray replaceObjectAtIndex:1 withObject:0]; // expected-warning {{Argument to 'NSMutableArray' method 'replaceObjectAtIndex:withObject:' cannot be nil}}
 }
 
-void testNilArgNSMutableArray4(void) {
+void testNilArgNSMutableArray4() {
   NSMutableArray *marray = [[NSMutableArray alloc] init];
   [marray setObject:0 atIndexedSubscript:1]; // expected-warning {{Argument to 'NSMutableArray' method 'setObject:atIndexedSubscript:' cannot be nil}}
 }
 
-void testNilArgNSMutableArray5(void) {
+void testNilArgNSMutableArray5() {
   NSMutableArray *marray = [[NSMutableArray alloc] init];
   marray[1] = 0; // expected-warning {{Array element cannot be nil}}
 }
 
 // NSArray API
-void testNilArgNSArray1(void) {
+void testNilArgNSArray1() {
   NSArray *array = [[NSArray alloc] init];
   NSArray *copyArray = [array arrayByAddingObject:0]; // expected-warning {{Argument to 'NSArray' method 'arrayByAddingObject:' cannot be nil}}
 }
@@ -227,7 +224,7 @@ void idc2(id x) {
 	if (!x)
 		return;
 }
-Foo *retNil(void) {
+Foo *retNil() {
   return 0;
 }
 
@@ -285,7 +282,7 @@ void testCountAwareNSOrderedSet(NSOrderedSet *containers, int *validptr) {
 	}
 }
 
-void testLiteralsNonNil(void) {
+void testLiteralsNonNil() {
   clang_analyzer_eval(!!@[]); // expected-warning{{TRUE}}
   clang_analyzer_eval(!!@{}); // expected-warning{{TRUE}}
 }
@@ -325,44 +322,4 @@ void testInlinedDefensiveCheck(NSMutableDictionary *dict, id obj) {
   // The check in getStringFromString() is not a good indication
   // that 'obj' can be nil in this context.
   dict[obj] = getStringFromString(obj); // no-warning
-}
-
-Foo * getMightBeNullFoo();
-Foo * _Nonnull getNonnullFoo();
-Foo * _Nullable getNullableFoo();
-
-void testCreateDictionaryLiteralWithNullableArg() {
-  Foo *p1 = getMightBeNullFoo();
-  Foo *p2 = getNonnullFoo();
-  Foo *p3 = getNullableFoo();
-
-  clang_analyzer_eval(p1 == nil); // expected-warning {{UNKNOWN}}
-  clang_analyzer_eval(p2 == nil); // expected-warning {{UNKNOWN}}
-  clang_analyzer_eval(p3 == nil); // expected-warning {{UNKNOWN}}
-
-  (void)@{@"abc" : p1}; // no-warning
-  (void)@{@"abc" : p2}; // no-warning
-  (void)@{@"abc" : p3}; // expected-warning {{Nullable pointer is passed to a callee that requires a non-null}}
-
-  clang_analyzer_eval(p1 == nil); // expected-warning {{FALSE}}
-  clang_analyzer_eval(p2 == nil); // expected-warning {{FALSE}}
-  clang_analyzer_eval(p3 == nil); // expected-warning {{FALSE}}
-}
-
-void testCreateArrayLiteralWithNullableArg() {
-  Foo *p1 = getMightBeNullFoo();
-  Foo *p2 = getNonnullFoo();
-  Foo *p3 = getNullableFoo();
-
-  clang_analyzer_eval(p1 == nil); // expected-warning {{UNKNOWN}}
-  clang_analyzer_eval(p2 == nil); // expected-warning {{UNKNOWN}}
-  clang_analyzer_eval(p3 == nil); // expected-warning {{UNKNOWN}}
-
-  (void)@[p1]; // no-warning
-  (void)@[p2]; // no-warning
-  (void)@[p3]; // expected-warning {{Nullable pointer is passed to a callee that requires a non-null}}
-
-  clang_analyzer_eval(p1 == nil); // expected-warning {{FALSE}}
-  clang_analyzer_eval(p2 == nil); // expected-warning {{FALSE}}
-  clang_analyzer_eval(p3 == nil); // expected-warning {{FALSE}}
 }

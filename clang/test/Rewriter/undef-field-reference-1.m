@@ -8,7 +8,7 @@
 @end
 
 MyDerived *pd;
-int main(void) {
+int main() {
 	return pd->IVAR;
 }
 

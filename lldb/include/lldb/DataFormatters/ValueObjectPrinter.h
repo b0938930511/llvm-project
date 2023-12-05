@@ -91,13 +91,14 @@ protected:
   bool PrintObjectDescriptionIfNeeded(bool value_printed, bool summary_printed);
 
   bool
-  ShouldPrintChildren(DumpValueObjectOptions::PointerDepth &curr_ptr_depth);
+  ShouldPrintChildren(bool is_failed_description,
+                      DumpValueObjectOptions::PointerDepth &curr_ptr_depth);
 
   bool ShouldExpandEmptyAggregates();
 
   ValueObject *GetValueObjectForChildrenGeneration();
 
-  void PrintChildrenPreamble(bool value_printed, bool summary_printed);
+  void PrintChildrenPreamble();
 
   void PrintChildrenPostamble(bool print_dotdotdot);
 
@@ -116,11 +117,7 @@ protected:
 
   bool PrintChildrenOneLiner(bool hide_names);
 
-  bool HasReachedMaximumDepth();
-
 private:
-  bool ShouldShowName() const;
-
   ValueObject *m_orig_valobj;
   ValueObject *m_valobj;
   Stream *m_stream;

@@ -1,11 +1,11 @@
 add_entrypoint_object(
-  abort
+  _Exit
   SRCS
-    abort.cpp
+    _Exit.cpp
   HDRS
-    ../abort.h
+    ../_Exit.h
   DEPENDS
+    libc.include.sys_syscall
+    libc.config.linux.linux_syscall_h
     libc.include.stdlib
-    libc.src.signal.raise
-    libc.src.stdlib._Exit
 )

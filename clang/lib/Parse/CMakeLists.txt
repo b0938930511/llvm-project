@@ -3,7 +3,6 @@ set(LLVM_LINK_COMPONENTS
   MC
   MCParser
   Support
-  TargetParser
   )
 
 add_clang_library(clangParse
@@ -13,7 +12,6 @@ add_clang_library(clangParse
   ParseDeclCXX.cpp
   ParseExpr.cpp
   ParseExprCXX.cpp
-  ParseHLSL.cpp
   ParseInit.cpp
   ParseObjc.cpp
   ParseOpenMP.cpp
@@ -23,7 +21,6 @@ add_clang_library(clangParse
   ParseTemplate.cpp
   ParseTentative.cpp
   Parser.cpp
-  ParseOpenACC.cpp
 
   LINK_LIBS
   clangAST
@@ -33,5 +30,4 @@ add_clang_library(clangParse
 
   DEPENDS
   omp_gen
-  ClangDriverOptions
   )

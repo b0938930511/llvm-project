@@ -23,6 +23,10 @@ add_lldb_tool(lldb
     Support
   )
 
+if ( CMAKE_SYSTEM_NAME MATCHES "Windows" )
+  add_definitions( -DIMPORT_LIBLLDB )
+endif()
+
 add_dependencies(lldb
   LLDBOptionsTableGen
   ${tablegen_deps}

@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// The --gdb-index option instructs the linker to emit a .gdb_index section.
+// The -gdb-index option instructs the linker to emit a .gdb_index section.
 // The section contains information to make gdb startup faster.
 // The format of the section is described at
 // https://sourceware.org/gdb/onlinedocs/gdb/Index-Section-Format.html.
@@ -14,8 +14,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "DWARF.h"
-#include "InputSection.h"
 #include "Symbols.h"
+#include "Target.h"
 #include "lld/Common/Memory.h"
 #include "llvm/DebugInfo/DWARF/DWARFDebugPubTable.h"
 #include "llvm/Object/ELFObjectFile.h"
@@ -27,9 +27,11 @@ using namespace lld::elf;
 
 template <class ELFT> LLDDwarfObj<ELFT>::LLDDwarfObj(ObjFile<ELFT> *obj) {
   // Get the ELF sections to retrieve sh_flags. See the SHF_GROUP comment below.
-  ArrayRef<typename ELFT::Shdr> objSections = obj->template getELFShdrs<ELFT>();
+  ArrayRef<typename ELFT::Shdr> objSections =
+      CHECK(obj->getObj().sections(), obj);
   assert(objSections.size() == obj->getSections().size());
-  for (auto [i, sec] : llvm::enumerate(obj->getSections())) {
+  for (auto it : llvm::enumerate(obj->getSections())) {
+    InputSectionBase *sec = it.value();
     if (!sec)
       continue;
 
@@ -44,19 +46,19 @@ template <class ELFT> LLDDwarfObj<ELFT>::LLDDwarfObj(ObjFile<ELFT> *obj) {
                 .Case(".debug_str_offsets", &strOffsetsSection)
                 .Case(".debug_line", &lineSection)
                 .Default(nullptr)) {
-      m->Data = toStringRef(sec->contentMaybeDecompress());
+      m->Data = toStringRef(sec->data());
       m->sec = sec;
       continue;
     }
 
     if (sec->name == ".debug_abbrev")
-      abbrevSection = toStringRef(sec->contentMaybeDecompress());
+      abbrevSection = toStringRef(sec->data());
     else if (sec->name == ".debug_str")
-      strSection = toStringRef(sec->contentMaybeDecompress());
+      strSection = toStringRef(sec->data());
     else if (sec->name == ".debug_line_str")
-      lineStrSection = toStringRef(sec->contentMaybeDecompress());
+      lineStrSection = toStringRef(sec->data());
     else if (sec->name == ".debug_info" &&
-             !(objSections[i].sh_flags & ELF::SHF_GROUP)) {
+             !(objSections[it.index()].sh_flags & ELF::SHF_GROUP)) {
       // In DWARF v5, -fdebug-types-section places type units in .debug_info
       // sections in COMDAT groups. They are not compile units and thus should
       // be ignored for .gdb_index/diagnostics purposes.
@@ -66,7 +68,7 @@ template <class ELFT> LLDDwarfObj<ELFT>::LLDDwarfObj(ObjFile<ELFT> *obj) {
       // need to perform a lightweight parsing. We drop the SHF_GROUP flag when
       // the InputSection was created, so we need to retrieve sh_flags from the
       // associated ELF section header.
-      infoSection.Data = toStringRef(sec->contentMaybeDecompress());
+      infoSection.Data = toStringRef(sec->data());
       infoSection.sec = sec;
     }
   }
@@ -101,13 +103,13 @@ template <class ELFT> struct LLDRelocationResolver<Elf_Rel_Impl<ELFT, false>> {
 // to llvm since it has no idea about InputSection.
 template <class ELFT>
 template <class RelTy>
-std::optional<RelocAddrEntry>
+Optional<RelocAddrEntry>
 LLDDwarfObj<ELFT>::findAux(const InputSectionBase &sec, uint64_t pos,
                            ArrayRef<RelTy> rels) const {
   auto it =
       partition_point(rels, [=](const RelTy &a) { return a.r_offset < pos; });
   if (it == rels.end() || it->r_offset != pos)
-    return std::nullopt;
+    return None;
   const RelTy &rel = *it;
 
   const ObjFile<ELFT> *file = sec.getFile<ELFT>();
@@ -127,18 +129,17 @@ LLDDwarfObj<ELFT>::findAux(const InputSectionBase &sec, uint64_t pos,
   DataRefImpl d;
   d.p = getAddend<ELFT>(rel);
   return RelocAddrEntry{secIndex, RelocationRef(d, nullptr),
-                        val,      std::optional<object::RelocationRef>(),
+                        val,      Optional<object::RelocationRef>(),
                         0,        LLDRelocationResolver<RelTy>::resolve};
 }
 
 template <class ELFT>
-std::optional<RelocAddrEntry>
-LLDDwarfObj<ELFT>::find(const llvm::DWARFSection &s, uint64_t pos) const {
+Optional<RelocAddrEntry> LLDDwarfObj<ELFT>::find(const llvm::DWARFSection &s,
+                                                 uint64_t pos) const {
   auto &sec = static_cast<const LLDDWARFSection &>(s);
-  const RelsOrRelas<ELFT> rels = sec.sec->template relsOrRelas<ELFT>();
-  if (rels.areRelocsRel())
-    return findAux(*sec.sec, pos, rels.rels);
-  return findAux(*sec.sec, pos, rels.relas);
+  if (sec.sec->areRelocsRela)
+    return findAux(*sec.sec, pos, sec.sec->template relas<ELFT>());
+  return findAux(*sec.sec, pos, sec.sec->template rels<ELFT>());
 }
 
 template class elf::LLDDwarfObj<ELF32LE>;

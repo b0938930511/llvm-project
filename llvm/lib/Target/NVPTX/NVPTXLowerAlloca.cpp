@@ -78,12 +78,15 @@ bool NVPTXLowerAlloca::runOnFunction(Function &F) {
             new AddrSpaceCastInst(NewASCToLocal, GenericAddrTy, "");
         NewASCToLocal->insertAfter(allocaInst);
         NewASCToGeneric->insertAfter(NewASCToLocal);
-        for (Use &AllocaUse : llvm::make_early_inc_range(allocaInst->uses())) {
+        for (Value::use_iterator UI = allocaInst->use_begin(),
+                                 UE = allocaInst->use_end();
+             UI != UE;) {
           // Check Load, Store, GEP, and BitCast Uses on alloca and make them
           // use the converted generic address, in order to expose non-generic
           // addrspacecast to NVPTXInferAddressSpaces. For other types
           // of instructions this is unnecessary and may introduce redundant
           // address cast.
+          const auto &AllocaUse = *UI++;
           auto LI = dyn_cast<LoadInst>(AllocaUse.getUser());
           if (LI && LI->getPointerOperand() == allocaInst &&
               !LI->isVolatile()) {

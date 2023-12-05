@@ -11,22 +11,19 @@
 
 #include "internal_defs.h"
 
-#if SCUDO_CAN_USE_MTE
+#if SCUDO_LINUX
 #include <sys/auxv.h>
 #include <sys/prctl.h>
 #endif
 
 namespace scudo {
 
-#if (__clang_major__ >= 12 && defined(__aarch64__) && !defined(__ILP32__)) ||  \
-    defined(SCUDO_FUZZ)
+#if (__clang_major__ >= 12 && defined(__aarch64__)) || defined(SCUDO_FUZZ)
 
 // We assume that Top-Byte Ignore is enabled if the architecture supports memory
 // tagging. Not all operating systems enable TBI, so we only claim architectural
 // support for memory tagging if the operating system enables TBI.
-// HWASan uses the top byte for its own purpose and Scudo should not touch it.
-#if SCUDO_CAN_USE_MTE && !defined(SCUDO_DISABLE_TBI) &&                        \
-    !__has_feature(hwaddress_sanitizer)
+#if SCUDO_LINUX && !defined(SCUDO_DISABLE_TBI)
 inline constexpr bool archSupportsMemoryTagging() { return true; }
 #else
 inline constexpr bool archSupportsMemoryTagging() { return false; }
@@ -42,25 +39,25 @@ inline uint8_t extractTag(uptr Ptr) { return (Ptr >> 56) & 0xf; }
 
 inline constexpr bool archSupportsMemoryTagging() { return false; }
 
-inline NORETURN uptr archMemoryTagGranuleSize() {
+inline uptr archMemoryTagGranuleSize() {
   UNREACHABLE("memory tagging not supported");
 }
 
-inline NORETURN uptr untagPointer(uptr Ptr) {
+inline uptr untagPointer(uptr Ptr) {
   (void)Ptr;
   UNREACHABLE("memory tagging not supported");
 }
 
-inline NORETURN uint8_t extractTag(uptr Ptr) {
+inline uint8_t extractTag(uptr Ptr) {
   (void)Ptr;
   UNREACHABLE("memory tagging not supported");
 }
 
 #endif
 
-#if __clang_major__ >= 12 && defined(__aarch64__) && !defined(__ILP32__)
+#if __clang_major__ >= 12 && defined(__aarch64__)
 
-#if SCUDO_CAN_USE_MTE
+#if SCUDO_LINUX
 
 inline bool systemSupportsMemoryTagging() {
 #ifndef HWCAP2_MTE
@@ -94,10 +91,9 @@ inline bool systemDetectsMemoryTagFaultsTestOnly() {
 #ifndef PR_MTE_TCF_MASK
 #define PR_MTE_TCF_MASK (3UL << PR_MTE_TCF_SHIFT)
 #endif
-  int res = prctl(PR_GET_TAGGED_ADDR_CTRL, 0, 0, 0, 0);
-  if (res == -1)
-    return false;
-  return (static_cast<unsigned long>(res) & PR_MTE_TCF_MASK) != PR_MTE_TCF_NONE;
+  return (static_cast<unsigned long>(
+              prctl(PR_GET_TAGGED_ADDR_CTRL, 0, 0, 0, 0)) &
+          PR_MTE_TCF_MASK) != PR_MTE_TCF_NONE;
 }
 
 inline void enableSystemMemoryTaggingTestOnly() {
@@ -106,19 +102,19 @@ inline void enableSystemMemoryTaggingTestOnly() {
         0, 0, 0);
 }
 
-#else // !SCUDO_CAN_USE_MTE
+#else // !SCUDO_LINUX
 
 inline bool systemSupportsMemoryTagging() { return false; }
 
-inline NORETURN bool systemDetectsMemoryTagFaultsTestOnly() {
+inline bool systemDetectsMemoryTagFaultsTestOnly() {
   UNREACHABLE("memory tagging not supported");
 }
 
-inline NORETURN void enableSystemMemoryTaggingTestOnly() {
+inline void enableSystemMemoryTaggingTestOnly() {
   UNREACHABLE("memory tagging not supported");
 }
 
-#endif // SCUDO_CAN_USE_MTE
+#endif // SCUDO_LINUX
 
 class ScopedDisableMemoryTagChecks {
   uptr PrevTCO;
@@ -256,15 +252,15 @@ inline uptr loadTag(uptr Ptr) {
 
 #else
 
-inline NORETURN bool systemSupportsMemoryTagging() {
+inline bool systemSupportsMemoryTagging() {
   UNREACHABLE("memory tagging not supported");
 }
 
-inline NORETURN bool systemDetectsMemoryTagFaultsTestOnly() {
+inline bool systemDetectsMemoryTagFaultsTestOnly() {
   UNREACHABLE("memory tagging not supported");
 }
 
-inline NORETURN void enableSystemMemoryTaggingTestOnly() {
+inline void enableSystemMemoryTaggingTestOnly() {
   UNREACHABLE("memory tagging not supported");
 }
 
@@ -272,44 +268,41 @@ struct ScopedDisableMemoryTagChecks {
   ScopedDisableMemoryTagChecks() {}
 };
 
-inline NORETURN uptr selectRandomTag(uptr Ptr, uptr ExcludeMask) {
+inline uptr selectRandomTag(uptr Ptr, uptr ExcludeMask) {
   (void)Ptr;
   (void)ExcludeMask;
   UNREACHABLE("memory tagging not supported");
 }
 
-inline NORETURN uptr addFixedTag(uptr Ptr, uptr Tag) {
+inline uptr addFixedTag(uptr Ptr, uptr Tag) {
   (void)Ptr;
   (void)Tag;
   UNREACHABLE("memory tagging not supported");
 }
 
-inline NORETURN uptr storeTags(uptr Begin, uptr End) {
+inline uptr storeTags(uptr Begin, uptr End) {
   (void)Begin;
   (void)End;
   UNREACHABLE("memory tagging not supported");
 }
 
-inline NORETURN void storeTag(uptr Ptr) {
+inline void storeTag(uptr Ptr) {
   (void)Ptr;
   UNREACHABLE("memory tagging not supported");
 }
 
-inline NORETURN uptr loadTag(uptr Ptr) {
+inline uptr loadTag(uptr Ptr) {
   (void)Ptr;
   UNREACHABLE("memory tagging not supported");
 }
 
 #endif
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmissing-noreturn"
 inline void setRandomTag(void *Ptr, uptr Size, uptr ExcludeMask,
                          uptr *TaggedBegin, uptr *TaggedEnd) {
   *TaggedBegin = selectRandomTag(reinterpret_cast<uptr>(Ptr), ExcludeMask);
   *TaggedEnd = storeTags(*TaggedBegin, *TaggedBegin + Size);
 }
-#pragma GCC diagnostic pop
 
 inline void *untagPointer(void *Ptr) {
   return reinterpret_cast<void *>(untagPointer(reinterpret_cast<uptr>(Ptr)));

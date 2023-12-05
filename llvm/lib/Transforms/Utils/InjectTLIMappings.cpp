@@ -19,6 +19,8 @@
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/VectorUtils.h"
 #include "llvm/IR/InstIterator.h"
+#include "llvm/IR/IntrinsicInst.h"
+#include "llvm/Transforms/Utils.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 
 using namespace llvm;
@@ -39,18 +41,16 @@ STATISTIC(NumCompUsedAdded,
 /// CI (other than void) need to be widened to a VectorType of VF
 /// lanes.
 static void addVariantDeclaration(CallInst &CI, const ElementCount &VF,
-                                  bool Predicate, const StringRef VFName) {
+                                  const StringRef VFName) {
   Module *M = CI.getModule();
 
   // Add function declaration.
   Type *RetTy = ToVectorTy(CI.getType(), VF);
   SmallVector<Type *, 4> Tys;
-  for (Value *ArgOperand : CI.args())
+  for (Value *ArgOperand : CI.arg_operands())
     Tys.push_back(ToVectorTy(ArgOperand->getType(), VF));
   assert(!CI.getFunctionType()->isVarArg() &&
          "VarArg functions are not supported.");
-  if (Predicate)
-    Tys.push_back(ToVectorTy(Type::getInt1Ty(RetTy->getContext()), VF));
   FunctionType *FTy = FunctionType::get(RetTy, Tys, /*isVarArg=*/false);
   Function *VectorF =
       Function::Create(FTy, Function::ExternalLinkage, VFName, M);
@@ -90,17 +90,19 @@ static void addMappingsFromTLI(const TargetLibraryInfo &TLI, CallInst &CI) {
   const SetVector<StringRef> OriginalSetOfMappings(Mappings.begin(),
                                                    Mappings.end());
 
-  auto AddVariantDecl = [&](const ElementCount &VF, bool Predicate) {
-    const VecDesc *VD = TLI.getVectorMappingInfo(ScalarName, VF, Predicate);
-    if (VD && !VD->getVectorFnName().empty()) {
-      std::string MangledName = VD->getVectorFunctionABIVariantString();
+  auto AddVariantDecl = [&](const ElementCount &VF) {
+    const std::string TLIName =
+        std::string(TLI.getVectorizedFunction(ScalarName, VF));
+    if (!TLIName.empty()) {
+      std::string MangledName = VFABI::mangleTLIVectorName(
+          TLIName, ScalarName, CI.getNumArgOperands(), VF);
       if (!OriginalSetOfMappings.count(MangledName)) {
         Mappings.push_back(MangledName);
         ++NumCallInjected;
       }
-      Function *VariantF = M->getFunction(VD->getVectorFnName());
+      Function *VariantF = M->getFunction(TLIName);
       if (!VariantF)
-        addVariantDeclaration(CI, VF, Predicate, VD->getVectorFnName());
+        addVariantDeclaration(CI, VF, TLIName);
     }
   };
 
@@ -108,15 +110,13 @@ static void addMappingsFromTLI(const TargetLibraryInfo &TLI, CallInst &CI) {
   ElementCount WidestFixedVF, WidestScalableVF;
   TLI.getWidestVF(ScalarName, WidestFixedVF, WidestScalableVF);
 
-  for (bool Predicated : {false, true}) {
-    for (ElementCount VF = ElementCount::getFixed(2);
-         ElementCount::isKnownLE(VF, WidestFixedVF); VF *= 2)
-      AddVariantDecl(VF, Predicated);
+  for (ElementCount VF = ElementCount::getFixed(2);
+       ElementCount::isKnownLE(VF, WidestFixedVF); VF *= 2)
+    AddVariantDecl(VF);
 
-    for (ElementCount VF = ElementCount::getScalable(2);
-         ElementCount::isKnownLE(VF, WidestScalableVF); VF *= 2)
-      AddVariantDecl(VF, Predicated);
-  }
+  // TODO: Add scalable variants once we're able to test them.
+  assert(WidestScalableVF.isZero() &&
+         "Scalable vector mappings not yet supported");
 
   VFABI::setVectorVariantNames(&CI, Mappings);
 }
@@ -138,4 +138,40 @@ PreservedAnalyses InjectTLIMappings::run(Function &F,
   runImpl(TLI, F);
   // Even if the pass adds IR attributes, the analyses are preserved.
   return PreservedAnalyses::all();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Legacy PM Implementation.
+////////////////////////////////////////////////////////////////////////////////
+bool InjectTLIMappingsLegacy::runOnFunction(Function &F) {
+  const TargetLibraryInfo &TLI =
+      getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(F);
+  return runImpl(TLI, F);
+}
+
+void InjectTLIMappingsLegacy::getAnalysisUsage(AnalysisUsage &AU) const {
+  AU.setPreservesCFG();
+  AU.addRequired<TargetLibraryInfoWrapperPass>();
+  AU.addPreserved<TargetLibraryInfoWrapperPass>();
+  AU.addPreserved<ScalarEvolutionWrapperPass>();
+  AU.addPreserved<AAResultsWrapperPass>();
+  AU.addPreserved<LoopAccessLegacyAnalysis>();
+  AU.addPreserved<DemandedBitsWrapperPass>();
+  AU.addPreserved<OptimizationRemarkEmitterWrapperPass>();
+  AU.addPreserved<GlobalsAAWrapperPass>();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Legacy Pass manager initialization
+////////////////////////////////////////////////////////////////////////////////
+char InjectTLIMappingsLegacy::ID = 0;
+
+INITIALIZE_PASS_BEGIN(InjectTLIMappingsLegacy, DEBUG_TYPE,
+                      "Inject TLI Mappings", false, false)
+INITIALIZE_PASS_DEPENDENCY(TargetLibraryInfoWrapperPass)
+INITIALIZE_PASS_END(InjectTLIMappingsLegacy, DEBUG_TYPE, "Inject TLI Mappings",
+                    false, false)
+
+FunctionPass *llvm::createInjectTLIMappingsLegacyPass() {
+  return new InjectTLIMappingsLegacy();
 }

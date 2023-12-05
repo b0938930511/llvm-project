@@ -34,8 +34,7 @@ enum ReportType {
   ReportTypeMutexBadReadUnlock,
   ReportTypeSignalUnsafe,
   ReportTypeErrnoInSignal,
-  ReportTypeDeadlock,
-  ReportTypeMutexHeldWrongContext
+  ReportTypeDeadlock
 };
 
 struct ReportStack {
@@ -44,7 +43,7 @@ struct ReportStack {
 };
 
 struct ReportMopMutex {
-  int id;
+  u64 id;
   bool write;
 };
 
@@ -77,7 +76,6 @@ struct ReportLocation {
   uptr external_tag = 0;
   Tid tid = kInvalidTid;
   int fd = 0;
-  bool fd_closed = false;
   bool suppressable = false;
   ReportStack *stack = nullptr;
 };
@@ -93,8 +91,9 @@ struct ReportThread {
 };
 
 struct ReportMutex {
-  int id;
+  u64 id;
   uptr addr;
+  bool destroyed;
   ReportStack *stack;
 };
 
@@ -110,7 +109,6 @@ class ReportDesc {
   Vector<Tid> unique_tids;
   ReportStack *sleep;
   int count;
-  int signum = 0;
 
   ReportDesc();
   ~ReportDesc();

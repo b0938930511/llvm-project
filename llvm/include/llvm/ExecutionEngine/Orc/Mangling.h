@@ -55,6 +55,11 @@ public:
                   SymbolNameToDefinitionMap *SymbolToDefinition = nullptr);
 };
 
+/// Returns a SymbolFlagsMap for the object file represented by the given
+/// buffer, or an error if the buffer does not contain a valid object file.
+Expected<std::pair<SymbolFlagsMap, SymbolStringPtr>>
+getObjectSymbolInfo(ExecutionSession &ES, MemoryBufferRef ObjBuffer);
+
 } // End namespace orc
 } // End namespace llvm
 

@@ -18,7 +18,7 @@ namespace driver {
 namespace tools {
 namespace wasm {
 
-class LLVM_LIBRARY_VISIBILITY Linker final : public Tool {
+class LLVM_LIBRARY_VISIBILITY Linker : public Tool {
 public:
   explicit Linker(const ToolChain &TC) : Tool("wasm::Linker", "linker", TC) {}
   bool isLinkJob() const override { return true; }
@@ -45,12 +45,12 @@ private:
   bool IsObjCNonFragileABIDefault() const override;
   bool UseObjCMixedDispatch() const override;
   bool isPICDefault() const override;
-  bool isPIEDefault(const llvm::opt::ArgList &Args) const override;
+  bool isPIEDefault() const override;
   bool isPICDefaultForced() const override;
+  bool IsIntegratedAssemblerDefault() const override;
   bool hasBlocksRuntime() const override;
   bool SupportsProfiling() const override;
   bool HasNativeLLVMSupport() const override;
-  unsigned GetDefaultDwarfVersion() const override { return 4; }
   void
   addClangTargetOptions(const llvm::opt::ArgList &DriverArgs,
                         llvm::opt::ArgStringList &CC1Args,
@@ -69,20 +69,11 @@ private:
 
   const char *getDefaultLinker() const override { return "wasm-ld"; }
 
-  CXXStdlibType GetDefaultCXXStdlibType() const override {
-    return ToolChain::CST_Libcxx;
-  }
-
   Tool *buildLinker() const override;
 
   std::string getMultiarchTriple(const Driver &D,
                                  const llvm::Triple &TargetTriple,
                                  StringRef SysRoot) const override;
-
-  void addLibCxxIncludePaths(const llvm::opt::ArgList &DriverArgs,
-                             llvm::opt::ArgStringList &CC1Args) const;
-  void addLibStdCXXIncludePaths(const llvm::opt::ArgList &DriverArgs,
-                                llvm::opt::ArgStringList &CC1Args) const;
 };
 
 } // end namespace toolchains

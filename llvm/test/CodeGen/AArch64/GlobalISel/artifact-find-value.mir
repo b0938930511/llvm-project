@@ -20,6 +20,7 @@ body:             |
     ; CHECK: [[COPY8:%[0-9]+]]:_(s64) = COPY $d5
     ; CHECK: %v2s64_val:_(<2 x s64>) = G_BUILD_VECTOR [[COPY5]](s64), [[COPY6]](s64)
     ; CHECK: %v2s64_val2:_(<2 x s64>) = G_BUILD_VECTOR [[COPY6]](s64), [[COPY8]](s64)
+    ; CHECK: [[DEF:%[0-9]+]]:_(<2 x s64>) = G_IMPLICIT_DEF
     ; CHECK: G_STORE %v2s64_val(<2 x s64>), [[COPY2]](p0) :: (store (<2 x s64>))
     ; CHECK: G_STORE %v2s64_val2(<2 x s64>), [[COPY2]](p0) :: (store (<2 x s64>))
     ; CHECK: G_STORE %v2s64_val2(<2 x s64>), [[COPY2]](p0) :: (store (<2 x s64>))
@@ -71,6 +72,7 @@ body:             |
     ; CHECK: [[COPY8:%[0-9]+]]:_(s64) = COPY $d5
     ; CHECK: %v2s64_val:_(<2 x s64>) = G_BUILD_VECTOR [[COPY5]](s64), [[COPY6]](s64)
     ; CHECK: %v2s64_val2:_(<2 x s64>) = G_BUILD_VECTOR [[COPY6]](s64), [[COPY8]](s64)
+    ; CHECK: [[DEF:%[0-9]+]]:_(<2 x s64>) = G_IMPLICIT_DEF
     ; CHECK: G_STORE %v2s64_val2(<2 x s64>), [[COPY2]](p0) :: (store (<2 x s64>))
     ; CHECK: G_STORE %v2s64_val2(<2 x s64>), [[COPY2]](p0) :: (store (<2 x s64>))
     ; CHECK: G_STORE %v2s64_val(<2 x s64>), [[COPY2]](p0) :: (store (<2 x s64>))
@@ -121,6 +123,7 @@ body:             |
     ; CHECK: [[COPY8:%[0-9]+]]:_(s64) = COPY $d5
     ; CHECK: %v2s64_val:_(<2 x s64>) = G_BUILD_VECTOR [[COPY5]](s64), [[COPY6]](s64)
     ; CHECK: %v2s64_val2:_(<2 x s64>) = G_BUILD_VECTOR [[COPY6]](s64), [[COPY8]](s64)
+    ; CHECK: [[DEF:%[0-9]+]]:_(<2 x s64>) = G_IMPLICIT_DEF
     ; CHECK: G_STORE %v2s64_val(<2 x s64>), [[COPY2]](p0) :: (store (<2 x s64>))
     ; CHECK: G_STORE %v2s64_val2(<2 x s64>), [[COPY2]](p0) :: (store (<2 x s64>))
     ; CHECK: RET_ReallyLR
@@ -167,6 +170,7 @@ body:             |
     ; CHECK: [[COPY8:%[0-9]+]]:_(s64) = COPY $d5
     ; CHECK: %v2s64_val:_(<2 x s64>) = G_BUILD_VECTOR [[COPY5]](s64), [[COPY6]](s64)
     ; CHECK: %v2s64_val2:_(<2 x s64>) = G_BUILD_VECTOR [[COPY6]](s64), [[COPY8]](s64)
+    ; CHECK: [[DEF:%[0-9]+]]:_(<2 x s64>) = G_IMPLICIT_DEF
     ; CHECK: G_STORE %v2s64_val(<2 x s64>), [[COPY2]](p0) :: (store (<2 x s64>))
     ; CHECK: G_STORE %v2s64_val2(<2 x s64>), [[COPY2]](p0) :: (store (<2 x s64>))
     ; CHECK: RET_ReallyLR
@@ -213,6 +217,7 @@ body:             |
     ; CHECK: [[COPY8:%[0-9]+]]:_(s64) = COPY $d5
     ; CHECK: %v2s64_val:_(<2 x s64>) = G_BUILD_VECTOR [[COPY5]](s64), [[COPY6]](s64)
     ; CHECK: %v2s64_val2:_(<2 x s64>) = G_BUILD_VECTOR [[COPY6]](s64), [[COPY8]](s64)
+    ; CHECK: [[DEF:%[0-9]+]]:_(<2 x s64>) = G_IMPLICIT_DEF
     ; CHECK: G_STORE %v2s64_val(<2 x s64>), [[COPY2]](p0) :: (store (<2 x s64>))
     ; CHECK: G_STORE %v2s64_val2(<2 x s64>), [[COPY2]](p0) :: (store (<2 x s64>))
     ; CHECK: RET_ReallyLR

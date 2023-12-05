@@ -11,13 +11,15 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::bugprone {
+namespace clang {
+namespace tidy {
+namespace bugprone {
 
 /// Checks if a 'continue' statement terminates the loop (i.e. the loop has
 ///	a condition which always evaluates to false).
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/bugprone/terminating-continue.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/bugprone-terminating-continue.html
 class TerminatingContinueCheck : public ClangTidyCheck {
 public:
   TerminatingContinueCheck(StringRef Name, ClangTidyContext *Context)
@@ -26,6 +28,8 @@ public:
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
 };
 
-} // namespace clang::tidy::bugprone
+} // namespace bugprone
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_BUGPRONE_TERMINATINGCONTINUECHECK_H

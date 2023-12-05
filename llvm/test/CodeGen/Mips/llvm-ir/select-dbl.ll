@@ -203,7 +203,6 @@ define double @tst_select_fcmp_olt_double(double %x, double %y) {
 ; M2-LABEL: tst_select_fcmp_olt_double:
 ; M2:       # %bb.0: # %entry
 ; M2-NEXT:    c.olt.d $f12, $f14
-; M2-NEXT:    nop
 ; M2-NEXT:    bc1t $BB2_2
 ; M2-NEXT:    mov.d $f0, $f12
 ; M2-NEXT:  # %bb.1: # %entry
@@ -237,7 +236,6 @@ define double @tst_select_fcmp_olt_double(double %x, double %y) {
 ; M3-LABEL: tst_select_fcmp_olt_double:
 ; M3:       # %bb.0: # %entry
 ; M3-NEXT:    c.olt.d $f12, $f13
-; M3-NEXT:    nop
 ; M3-NEXT:    bc1t .LBB2_2
 ; M3-NEXT:    mov.d $f0, $f12
 ; M3-NEXT:  # %bb.1: # %entry
@@ -285,7 +283,6 @@ define double @tst_select_fcmp_ole_double(double %x, double %y) {
 ; M2-LABEL: tst_select_fcmp_ole_double:
 ; M2:       # %bb.0: # %entry
 ; M2-NEXT:    c.ole.d $f12, $f14
-; M2-NEXT:    nop
 ; M2-NEXT:    bc1t $BB3_2
 ; M2-NEXT:    mov.d $f0, $f12
 ; M2-NEXT:  # %bb.1: # %entry
@@ -319,7 +316,6 @@ define double @tst_select_fcmp_ole_double(double %x, double %y) {
 ; M3-LABEL: tst_select_fcmp_ole_double:
 ; M3:       # %bb.0: # %entry
 ; M3-NEXT:    c.ole.d $f12, $f13
-; M3-NEXT:    nop
 ; M3-NEXT:    bc1t .LBB3_2
 ; M3-NEXT:    mov.d $f0, $f12
 ; M3-NEXT:  # %bb.1: # %entry
@@ -367,7 +363,6 @@ define double @tst_select_fcmp_ogt_double(double %x, double %y) {
 ; M2-LABEL: tst_select_fcmp_ogt_double:
 ; M2:       # %bb.0: # %entry
 ; M2-NEXT:    c.ule.d $f12, $f14
-; M2-NEXT:    nop
 ; M2-NEXT:    bc1f $BB4_2
 ; M2-NEXT:    mov.d $f0, $f12
 ; M2-NEXT:  # %bb.1: # %entry
@@ -401,7 +396,6 @@ define double @tst_select_fcmp_ogt_double(double %x, double %y) {
 ; M3-LABEL: tst_select_fcmp_ogt_double:
 ; M3:       # %bb.0: # %entry
 ; M3-NEXT:    c.ule.d $f12, $f13
-; M3-NEXT:    nop
 ; M3-NEXT:    bc1f .LBB4_2
 ; M3-NEXT:    mov.d $f0, $f12
 ; M3-NEXT:  # %bb.1: # %entry
@@ -449,7 +443,6 @@ define double @tst_select_fcmp_oge_double(double %x, double %y) {
 ; M2-LABEL: tst_select_fcmp_oge_double:
 ; M2:       # %bb.0: # %entry
 ; M2-NEXT:    c.ult.d $f12, $f14
-; M2-NEXT:    nop
 ; M2-NEXT:    bc1f $BB5_2
 ; M2-NEXT:    mov.d $f0, $f12
 ; M2-NEXT:  # %bb.1: # %entry
@@ -483,7 +476,6 @@ define double @tst_select_fcmp_oge_double(double %x, double %y) {
 ; M3-LABEL: tst_select_fcmp_oge_double:
 ; M3:       # %bb.0: # %entry
 ; M3-NEXT:    c.ult.d $f12, $f13
-; M3-NEXT:    nop
 ; M3-NEXT:    bc1f .LBB5_2
 ; M3-NEXT:    mov.d $f0, $f12
 ; M3-NEXT:  # %bb.1: # %entry
@@ -531,7 +523,6 @@ define double @tst_select_fcmp_oeq_double(double %x, double %y) {
 ; M2-LABEL: tst_select_fcmp_oeq_double:
 ; M2:       # %bb.0: # %entry
 ; M2-NEXT:    c.eq.d $f12, $f14
-; M2-NEXT:    nop
 ; M2-NEXT:    bc1t $BB6_2
 ; M2-NEXT:    mov.d $f0, $f12
 ; M2-NEXT:  # %bb.1: # %entry
@@ -565,7 +556,6 @@ define double @tst_select_fcmp_oeq_double(double %x, double %y) {
 ; M3-LABEL: tst_select_fcmp_oeq_double:
 ; M3:       # %bb.0: # %entry
 ; M3-NEXT:    c.eq.d $f12, $f13
-; M3-NEXT:    nop
 ; M3-NEXT:    bc1t .LBB6_2
 ; M3-NEXT:    mov.d $f0, $f12
 ; M3-NEXT:  # %bb.1: # %entry
@@ -613,7 +603,6 @@ define double @tst_select_fcmp_one_double(double %x, double %y) {
 ; M2-LABEL: tst_select_fcmp_one_double:
 ; M2:       # %bb.0: # %entry
 ; M2-NEXT:    c.ueq.d $f12, $f14
-; M2-NEXT:    nop
 ; M2-NEXT:    bc1f $BB7_2
 ; M2-NEXT:    mov.d $f0, $f12
 ; M2-NEXT:  # %bb.1: # %entry
@@ -648,7 +637,6 @@ define double @tst_select_fcmp_one_double(double %x, double %y) {
 ; M3-LABEL: tst_select_fcmp_one_double:
 ; M3:       # %bb.0: # %entry
 ; M3-NEXT:    c.ueq.d $f12, $f13
-; M3-NEXT:    nop
 ; M3-NEXT:    bc1f .LBB7_2
 ; M3-NEXT:    mov.d $f0, $f12
 ; M3-NEXT:  # %bb.1: # %entry

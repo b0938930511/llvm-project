@@ -1,40 +1,41 @@
 // RUN: %clang_cc1  -fsyntax-only -fobjc-arc -fobjc-runtime-has-weak  -Wdirect-ivar-access -verify -Wno-objc-root-class %s
+// rdar://6505197
 
 __attribute__((objc_root_class)) @interface MyObject {
 @public
-    id _myLeader;
+    id _myMaster;
     id _isTickledPink; // expected-error {{existing instance variable '_isTickledPink' for property 'isTickledPink'}}
     int _myIntProp;
 }
-@property(retain) id myLeader;
+@property(retain) id myMaster;
 @property(assign) id isTickledPink; // expected-note {{property declared here}}
 @property int myIntProp;
 @end
 
 @implementation MyObject
 
-@synthesize myLeader = _myLeader;
+@synthesize myMaster = _myMaster;
 @synthesize isTickledPink = _isTickledPink; // expected-note {{property synthesized here}}
 @synthesize myIntProp = _myIntProp;
 
 - (void) doSomething {
-    _myLeader = _isTickledPink; // expected-warning {{instance variable '_myLeader' is being directly accessed}} \
+    _myMaster = _isTickledPink; // expected-warning {{instance variable '_myMaster' is being directly accessed}} \
     // expected-warning {{instance variable '_isTickledPink' is being directly accessed}}
 }
 
 - (id) init {
-    _myLeader=0;
-    return _myLeader;
+    _myMaster=0;
+    return _myMaster;
 }
-- (void) dealloc { _myLeader = 0; }
+- (void) dealloc { _myMaster = 0; }
 @end
 
-MyObject * foo (void)
+MyObject * foo ()
 {
 	MyObject* p=0;
-        p.isTickledPink = p.myLeader;	// ok
-	p->_isTickledPink = (*p)._myLeader; // expected-warning {{instance variable '_isTickledPink' is being directly accessed}} \
-        // expected-warning {{instance variable '_myLeader' is being directly accessed}}
+        p.isTickledPink = p.myMaster;	// ok
+	p->_isTickledPink = (*p)._myMaster; // expected-warning {{instance variable '_isTickledPink' is being directly accessed}} \
+        // expected-warning {{instance variable '_myMaster' is being directly accessed}}
         if (p->_myIntProp) // expected-warning {{instance variable '_myIntProp' is being directly accessed}}
           p->_myIntProp = 0; // expected-warning {{instance variable '_myIntProp' is being directly accessed}}
 	return p->_isTickledPink; // expected-warning {{instance variable '_isTickledPink' is being directly accessed}}
@@ -53,6 +54,7 @@ id Test32(__weak ITest32 *x) {
            : (*x).ivar;  // expected-error {{dereferencing a __weak pointer is not allowed}}
 }
 
+// rdar://13142820
 @protocol PROTOCOL
 @property (copy, nonatomic) id property_in_protocol;
 @end

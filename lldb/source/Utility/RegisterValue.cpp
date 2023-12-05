@@ -35,20 +35,30 @@ bool RegisterValue::GetData(DataExtractor &data) const {
   return data.SetData(GetBytes(), GetByteSize(), GetByteOrder()) > 0;
 }
 
-uint32_t RegisterValue::GetAsMemoryData(const RegisterInfo &reg_info, void *dst,
+uint32_t RegisterValue::GetAsMemoryData(const RegisterInfo *reg_info, void *dst,
                                         uint32_t dst_len,
                                         lldb::ByteOrder dst_byte_order,
                                         Status &error) const {
+  if (reg_info == nullptr) {
+    error.SetErrorString("invalid register info argument.");
+    return 0;
+  }
+
   // ReadRegister should have already been called on this object prior to
   // calling this.
   if (GetType() == eTypeInvalid) {
     // No value has been read into this object...
     error.SetErrorStringWithFormat(
-        "invalid register value type for register %s", reg_info.name);
+        "invalid register value type for register %s", reg_info->name);
     return 0;
   }
 
-  const uint32_t src_len = reg_info.byte_size;
+  if (dst_len > kMaxRegisterByteSize) {
+    error.SetErrorString("destination is too big");
+    return 0;
+  }
+
+  const uint32_t src_len = reg_info->byte_size;
 
   // Extract the register data into a data extractor
   DataExtractor reg_data;
@@ -66,15 +76,20 @@ uint32_t RegisterValue::GetAsMemoryData(const RegisterInfo &reg_info, void *dst,
                                    dst_byte_order); // dst byte order
   if (bytes_copied == 0)
     error.SetErrorStringWithFormat(
-        "failed to copy data for register write of %s", reg_info.name);
+        "failed to copy data for register write of %s", reg_info->name);
 
   return bytes_copied;
 }
 
-uint32_t RegisterValue::SetFromMemoryData(const RegisterInfo &reg_info,
+uint32_t RegisterValue::SetFromMemoryData(const RegisterInfo *reg_info,
                                           const void *src, uint32_t src_len,
                                           lldb::ByteOrder src_byte_order,
                                           Status &error) {
+  if (reg_info == nullptr) {
+    error.SetErrorString("invalid register info argument.");
+    return 0;
+  }
+
   // Moving from addr into a register
   //
   // Case 1: src_len == dst_len
@@ -91,12 +106,18 @@ uint32_t RegisterValue::SetFromMemoryData(const RegisterInfo &reg_info,
   //   |AABB| Address contents
   //   |AABB0000| Register contents [on little-endian hardware]
   //   |0000AABB| Register contents [on big-endian hardware]
-  const uint32_t dst_len = reg_info.byte_size;
+  if (src_len > kMaxRegisterByteSize) {
+    error.SetErrorStringWithFormat(
+        "register buffer is too small to receive %u bytes of data.", src_len);
+    return 0;
+  }
+
+  const uint32_t dst_len = reg_info->byte_size;
 
   if (src_len > dst_len) {
     error.SetErrorStringWithFormat(
         "%u bytes is too big to store in register %s (%u bytes)", src_len,
-        reg_info.name, dst_len);
+        reg_info->name, dst_len);
     return 0;
   }
 
@@ -117,10 +138,9 @@ bool RegisterValue::GetScalarValue(Scalar &scalar) const {
   case eTypeInvalid:
     break;
   case eTypeBytes: {
-    DataExtractor data(buffer.bytes.data(), buffer.bytes.size(),
-                       buffer.byte_order, 1);
-    if (scalar.SetValueFromData(data, lldb::eEncodingUint, buffer.bytes.size())
-            .Success())
+    DataExtractor data(buffer.bytes, buffer.length, buffer.byte_order, 1);
+    if (scalar.SetValueFromData(data, lldb::eEncodingUint,
+	  buffer.length).Success())
       return true;
   } break;
   case eTypeUInt8:
@@ -139,20 +159,17 @@ bool RegisterValue::GetScalarValue(Scalar &scalar) const {
 
 void RegisterValue::Clear() { m_type = eTypeInvalid; }
 
-RegisterValue::Type RegisterValue::SetType(const RegisterInfo &reg_info) {
+RegisterValue::Type RegisterValue::SetType(const RegisterInfo *reg_info) {
   // To change the type, we simply copy the data in again, using the new format
   RegisterValue copy;
   DataExtractor copy_data;
-  if (copy.CopyValue(*this) && copy.GetData(copy_data)) {
-    Status error = SetValueFromData(reg_info, copy_data, 0, true);
-    assert(error.Success() && "Expected SetValueFromData to succeed.");
-    UNUSED_IF_ASSERT_DISABLED(error);
-  }
+  if (copy.CopyValue(*this) && copy.GetData(copy_data))
+    SetValueFromData(reg_info, copy_data, 0, true);
 
   return m_type;
 }
 
-Status RegisterValue::SetValueFromData(const RegisterInfo &reg_info,
+Status RegisterValue::SetValueFromData(const RegisterInfo *reg_info,
                                        DataExtractor &src,
                                        lldb::offset_t src_offset,
                                        bool partial_data_ok) {
@@ -163,40 +180,43 @@ Status RegisterValue::SetValueFromData(const RegisterInfo &reg_info,
     return error;
   }
 
-  if (reg_info.byte_size == 0) {
+  if (reg_info->byte_size == 0) {
     error.SetErrorString("invalid register info.");
     return error;
   }
 
   uint32_t src_len = src.GetByteSize() - src_offset;
 
-  if (!partial_data_ok && (src_len < reg_info.byte_size)) {
+  if (!partial_data_ok && (src_len < reg_info->byte_size)) {
     error.SetErrorString("not enough data.");
     return error;
   }
 
   // Cap the data length if there is more than enough bytes for this register
   // value
-  if (src_len > reg_info.byte_size)
-    src_len = reg_info.byte_size;
+  if (src_len > reg_info->byte_size)
+    src_len = reg_info->byte_size;
+
+  // Zero out the value in case we get partial data...
+  memset(buffer.bytes, 0, sizeof(buffer.bytes));
 
   type128 int128;
 
   m_type = eTypeInvalid;
-  switch (reg_info.encoding) {
+  switch (reg_info->encoding) {
   case eEncodingInvalid:
     break;
   case eEncodingUint:
   case eEncodingSint:
-    if (reg_info.byte_size == 1)
+    if (reg_info->byte_size == 1)
       SetUInt8(src.GetMaxU32(&src_offset, src_len));
-    else if (reg_info.byte_size <= 2)
+    else if (reg_info->byte_size <= 2)
       SetUInt16(src.GetMaxU32(&src_offset, src_len));
-    else if (reg_info.byte_size <= 4)
+    else if (reg_info->byte_size <= 4)
       SetUInt32(src.GetMaxU32(&src_offset, src_len));
-    else if (reg_info.byte_size <= 8)
+    else if (reg_info->byte_size <= 8)
       SetUInt64(src.GetMaxU64(&src_offset, src_len));
-    else if (reg_info.byte_size <= 16) {
+    else if (reg_info->byte_size <= 16) {
       uint64_t data1 = src.GetU64(&src_offset);
       uint64_t data2 = src.GetU64(&src_offset);
       if (src.GetByteSize() == eByteOrderBig) {
@@ -210,27 +230,29 @@ Status RegisterValue::SetValueFromData(const RegisterInfo &reg_info,
     }
     break;
   case eEncodingIEEE754:
-    if (reg_info.byte_size == sizeof(float))
+    if (reg_info->byte_size == sizeof(float))
       SetFloat(src.GetFloat(&src_offset));
-    else if (reg_info.byte_size == sizeof(double))
+    else if (reg_info->byte_size == sizeof(double))
       SetDouble(src.GetDouble(&src_offset));
-    else if (reg_info.byte_size == sizeof(long double))
+    else if (reg_info->byte_size == sizeof(long double))
       SetLongDouble(src.GetLongDouble(&src_offset));
     break;
   case eEncodingVector: {
     m_type = eTypeBytes;
-    assert(reg_info.byte_size <= kMaxRegisterByteSize);
-    buffer.bytes.resize(reg_info.byte_size);
+    buffer.length = reg_info->byte_size;
     buffer.byte_order = src.GetByteOrder();
+    assert(buffer.length <= kMaxRegisterByteSize);
+    if (buffer.length > kMaxRegisterByteSize)
+      buffer.length = kMaxRegisterByteSize;
     if (src.CopyByteOrderedData(
-            src_offset,          // offset within "src" to start extracting data
-            src_len,             // src length
-            buffer.bytes.data(), // dst buffer
-            buffer.bytes.size(), // dst length
+            src_offset,    // offset within "src" to start extracting data
+            src_len,       // src length
+            buffer.bytes,  // dst buffer
+            buffer.length, // dst length
             buffer.byte_order) == 0) // dst byte order
     {
       error.SetErrorStringWithFormat(
-          "failed to copy data for register write of %s", reg_info.name);
+          "failed to copy data for register write of %s", reg_info->name);
       return error;
     }
   }
@@ -238,7 +260,7 @@ Status RegisterValue::SetValueFromData(const RegisterInfo &reg_info,
 
   if (m_type == eTypeInvalid)
     error.SetErrorStringWithFormat(
-        "invalid register value type for register %s", reg_info.name);
+        "invalid register value type for register %s", reg_info->name);
   return error;
 }
 
@@ -342,8 +364,9 @@ Status RegisterValue::SetValueFromString(const RegisterInfo *reg_info,
       break;
     }
     if (value_str.getAsInteger(0, uval64)) {
-      error.SetErrorStringWithFormatv(
-          "'{0}' is not a valid unsigned integer string value", value_str);
+      error.SetErrorStringWithFormat(
+          "'%s' is not a valid unsigned integer string value",
+          value_str.str().c_str());
       break;
     }
 
@@ -370,8 +393,9 @@ Status RegisterValue::SetValueFromString(const RegisterInfo *reg_info,
     }
 
     if (value_str.getAsInteger(0, ival64)) {
-      error.SetErrorStringWithFormatv(
-          "'{0}' is not a valid signed integer string value", value_str);
+      error.SetErrorStringWithFormat(
+          "'%s' is not a valid signed integer string value",
+          value_str.str().c_str());
       break;
     }
 
@@ -471,7 +495,9 @@ bool RegisterValue::CopyValue(const RegisterValue &rhs) {
     m_scalar = rhs.m_scalar;
     break;
   case eTypeBytes:
-    buffer.bytes = rhs.buffer.bytes;
+    assert(rhs.buffer.length <= kMaxRegisterByteSize);
+    ::memcpy(buffer.bytes, rhs.buffer.bytes, kMaxRegisterByteSize);
+    buffer.length = rhs.buffer.length;
     buffer.byte_order = rhs.buffer.byte_order;
     break;
   }
@@ -490,12 +516,12 @@ uint16_t RegisterValue::GetAsUInt16(uint16_t fail_value,
   case eTypeUInt16:
     return m_scalar.UShort(fail_value);
   case eTypeBytes: {
-    switch (buffer.bytes.size()) {
+    switch (buffer.length) {
     default:
       break;
     case 1:
     case 2:
-      return *reinterpret_cast<const uint16_t *>(buffer.bytes.data());
+      return *reinterpret_cast<const uint16_t *>(buffer.bytes);
     }
   } break;
   }
@@ -519,13 +545,13 @@ uint32_t RegisterValue::GetAsUInt32(uint32_t fail_value,
   case eTypeLongDouble:
     return m_scalar.UInt(fail_value);
   case eTypeBytes: {
-    switch (buffer.bytes.size()) {
+    switch (buffer.length) {
     default:
       break;
     case 1:
     case 2:
     case 4:
-      return *reinterpret_cast<const uint32_t *>(buffer.bytes.data());
+      return *reinterpret_cast<const uint32_t *>(buffer.bytes);
     }
   } break;
   }
@@ -550,17 +576,17 @@ uint64_t RegisterValue::GetAsUInt64(uint64_t fail_value,
   case eTypeLongDouble:
     return m_scalar.ULongLong(fail_value);
   case eTypeBytes: {
-    switch (buffer.bytes.size()) {
+    switch (buffer.length) {
     default:
       break;
     case 1:
-      return *(const uint8_t *)buffer.bytes.data();
+      return *(const uint8_t *)buffer.bytes;
     case 2:
-      return *reinterpret_cast<const uint16_t *>(buffer.bytes.data());
+      return *reinterpret_cast<const uint16_t *>(buffer.bytes);
     case 4:
-      return *reinterpret_cast<const uint32_t *>(buffer.bytes.data());
+      return *reinterpret_cast<const uint32_t *>(buffer.bytes);
     case 8:
-      return *reinterpret_cast<const uint64_t *>(buffer.bytes.data());
+      return *reinterpret_cast<const uint64_t *>(buffer.bytes);
     }
   } break;
   }
@@ -586,7 +612,7 @@ llvm::APInt RegisterValue::GetAsUInt128(const llvm::APInt &fail_value,
   case eTypeLongDouble:
     return m_scalar.UInt128(fail_value);
   case eTypeBytes: {
-    switch (buffer.bytes.size()) {
+    switch (buffer.length) {
     default:
       break;
     case 1:
@@ -594,9 +620,8 @@ llvm::APInt RegisterValue::GetAsUInt128(const llvm::APInt &fail_value,
     case 4:
     case 8:
     case 16:
-      return llvm::APInt(
-          BITWIDTH_INT128, NUM_OF_WORDS_INT128,
-          (reinterpret_cast<const type128 *>(buffer.bytes.data()))->x);
+      return llvm::APInt(BITWIDTH_INT128, NUM_OF_WORDS_INT128,
+                         (reinterpret_cast<const type128 *>(buffer.bytes))->x);
     }
   } break;
   }
@@ -678,9 +703,9 @@ const void *RegisterValue::GetBytes() const {
   case eTypeDouble:
   case eTypeLongDouble:
     m_scalar.GetBytes(buffer.bytes);
-    return buffer.bytes.data();
+    return buffer.bytes;
   case eTypeBytes:
-    return buffer.bytes.data();
+    return buffer.bytes;
   }
   return nullptr;
 }
@@ -701,7 +726,7 @@ uint32_t RegisterValue::GetByteSize() const {
   case eTypeLongDouble:
     return m_scalar.GetByteSize();
   case eTypeBytes:
-    return buffer.bytes.size();
+    return buffer.length;
   }
   return 0;
 }
@@ -726,14 +751,19 @@ bool RegisterValue::SetUInt(uint64_t uint, uint32_t byte_size) {
 
 void RegisterValue::SetBytes(const void *bytes, size_t length,
                              lldb::ByteOrder byte_order) {
+  // If this assertion fires off we need to increase the size of buffer.bytes,
+  // or make it something that is allocated on the heap. Since the data buffer
+  // is in a union, we can't make it a collection class like SmallVector...
   if (bytes && length > 0) {
+    assert(length <= sizeof(buffer.bytes) &&
+           "Storing too many bytes in a RegisterValue.");
     m_type = eTypeBytes;
-    buffer.bytes.resize(length);
-    memcpy(buffer.bytes.data(), bytes, length);
+    buffer.length = length;
+    memcpy(buffer.bytes, bytes, length);
     buffer.byte_order = byte_order;
   } else {
     m_type = eTypeInvalid;
-    buffer.bytes.resize(0);
+    buffer.length = 0;
   }
 }
 
@@ -752,7 +782,15 @@ bool RegisterValue::operator==(const RegisterValue &rhs) const {
     case eTypeLongDouble:
       return m_scalar == rhs.m_scalar;
     case eTypeBytes:
-      return buffer.bytes == rhs.buffer.bytes;
+      if (buffer.length != rhs.buffer.length)
+        return false;
+      else {
+        uint16_t length = buffer.length;
+        if (length > kMaxRegisterByteSize)
+          length = kMaxRegisterByteSize;
+        return memcmp(buffer.bytes, rhs.buffer.bytes, length) == 0;
+      }
+      break;
     }
   }
   return false;
@@ -787,12 +825,12 @@ bool RegisterValue::ClearBit(uint32_t bit) {
         buffer.byte_order == eByteOrderLittle) {
       uint32_t byte_idx;
       if (buffer.byte_order == eByteOrderBig)
-        byte_idx = buffer.bytes.size() - (bit / 8) - 1;
+        byte_idx = buffer.length - (bit / 8) - 1;
       else
         byte_idx = bit / 8;
 
       const uint32_t byte_bit = bit % 8;
-      if (byte_idx < buffer.bytes.size()) {
+      if (byte_idx < buffer.length) {
         buffer.bytes[byte_idx] &= ~(1u << byte_bit);
         return true;
       }
@@ -827,12 +865,12 @@ bool RegisterValue::SetBit(uint32_t bit) {
         buffer.byte_order == eByteOrderLittle) {
       uint32_t byte_idx;
       if (buffer.byte_order == eByteOrderBig)
-        byte_idx = buffer.bytes.size() - (bit / 8) - 1;
+        byte_idx = buffer.length - (bit / 8) - 1;
       else
         byte_idx = bit / 8;
 
       const uint32_t byte_bit = bit % 8;
-      if (byte_idx < buffer.bytes.size()) {
+      if (byte_idx < buffer.length) {
         buffer.bytes[byte_idx] |= (1u << byte_bit);
         return true;
       }

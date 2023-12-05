@@ -25,14 +25,14 @@ void param(ObjTy *p) EXT_RET {
   // CHECK: ret
 }
 
-void local(void) {
+void local() {
   EXT_RET ObjTy *local = global;
   // CHECK-LABEL: define{{.*}} void @local
   // CHECK-NOT: llvm.objc.
   // CHECK: ret
 }
 
-void in_init(void) {
+void in_init() {
   // Test that we do the right thing when a variable appears in it's own
   // initializer. Here, we release the value stored in 'wat' after overwriting
   // it, in case it was somehow set to point to a non-null object while it's
@@ -45,20 +45,21 @@ void in_init(void) {
   // CHECK-NEXT: [[GLOBAL:%.*]] = load {{.*}} @global
   // CHECK-NEXT: [[WAT_LOAD:%.*]] = load {{.*}} [[WAT]]
   // CHECK-NEXT: store {{.*}} [[GLOBAL]], {{.*}} [[WAT]]
-  // CHECK-NEXT: call void @llvm.objc.release(ptr [[WAT_LOAD]])
+  // CHECK-NEXT: [[CASTED:%.*]] = bitcast {{.*}} [[WAT_LOAD]] to
+  // CHECK-NEXT: call void @llvm.objc.release(i8* [[CASTED]])
 
   // CHECK-NOT: llvm.objc.
   // CHECK: ret
 }
 
-void esc(void (^)(void));
+void esc(void (^)());
 
 void block_capture(ObjTy *obj) EXT_RET {
   esc(^{ (void)obj; });
 
   // CHECK-LABEL: define{{.*}} void @block_capture
   // CHECK-NOT: llvm.objc.
-  // CHECK: call ptr @llvm.objc.retain
+  // CHECK: call i8* @llvm.objc.retain
   // CHECK-NOT: llvm.objc.
   // CHECK: call void @esc
   // CHECK-NOT: llvm.objc.
@@ -81,7 +82,7 @@ void block_capture(ObjTy *obj) EXT_RET {
 
 void escp(void (^)(ObjTy *));
 
-void block_param(void) {
+void block_param() {
   escp(^(ObjTy *p) EXT_RET {});
 
   // CHECK-LABEL: define internal void @__block_param_block_invoke

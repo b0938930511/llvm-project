@@ -12,7 +12,10 @@
 #include "../ClangTidyCheck.h"
 #include "../utils/FileExtensionsUtils.h"
 
-namespace clang::tidy::google::build {
+namespace clang {
+namespace tidy {
+namespace google {
+namespace build {
 
 /// Finds anonymous namespaces in headers.
 ///
@@ -29,7 +32,7 @@ namespace clang::tidy::google::build {
 /// Corresponding cpplint.py check name: 'build/namespaces'.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/google/build-namespaces.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/google-build-namespaces.html
 class UnnamedNamespaceInHeaderCheck : public ClangTidyCheck {
 public:
   UnnamedNamespaceInHeaderCheck(StringRef Name, ClangTidyContext *Context);
@@ -41,10 +44,13 @@ public:
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
 
 private:
-  StringRef RawStringHeaderFileExtensions;
-  FileExtensionsSet HeaderFileExtensions;
+  const std::string RawStringHeaderFileExtensions;
+  utils::FileExtensionsSet HeaderFileExtensions;
 };
 
-} // namespace clang::tidy::google::build
+} // namespace build
+} // namespace google
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_GOOGLE_UNNAMEDNAMESPACEINHEADERCHECK_H

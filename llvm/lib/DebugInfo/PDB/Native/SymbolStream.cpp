@@ -8,7 +8,11 @@
 
 #include "llvm/DebugInfo/PDB/Native/SymbolStream.h"
 
+#include "llvm/DebugInfo/CodeView/CodeView.h"
+#include "llvm/DebugInfo/CodeView/SymbolRecord.h"
 #include "llvm/DebugInfo/MSF/MappedBlockStream.h"
+#include "llvm/Support/BinaryStreamReader.h"
+#include "llvm/Support/Endian.h"
 
 using namespace llvm;
 using namespace llvm::msf;
@@ -18,7 +22,7 @@ using namespace llvm::pdb;
 SymbolStream::SymbolStream(std::unique_ptr<MappedBlockStream> Stream)
     : Stream(std::move(Stream)) {}
 
-SymbolStream::~SymbolStream() = default;
+SymbolStream::~SymbolStream() {}
 
 Error SymbolStream::reload() {
   BinaryStreamReader Reader(*Stream);

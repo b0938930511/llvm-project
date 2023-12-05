@@ -33,9 +33,9 @@ public:
 
   static void Terminate();
 
-  static llvm::StringRef GetPluginNameStatic() { return "darwin-kernel"; }
+  static lldb_private::ConstString GetPluginNameStatic();
 
-  static llvm::StringRef GetPluginDescriptionStatic();
+  static const char *GetPluginDescriptionStatic();
 
   static lldb_private::DynamicLoader *
   CreateInstance(lldb_private::Process *process, bool force);
@@ -58,7 +58,9 @@ public:
   lldb_private::Status CanLoadImage() override;
 
   // PluginInterface protocol
-  llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
+  lldb_private::ConstString GetPluginName() override;
+
+  uint32_t GetPluginVersion() override;
 
 protected:
   void PrivateInitialize(lldb_private::Process *process);
@@ -176,7 +178,7 @@ protected:
 
     void SetProcessStopId(uint32_t stop_id);
 
-    bool operator==(const KextImageInfo &rhs) const;
+    bool operator==(const KextImageInfo &rhs);
 
     uint32_t GetAddressByteSize(); // as determined by Mach-O header
 

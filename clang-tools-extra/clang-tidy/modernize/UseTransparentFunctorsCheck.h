@@ -11,12 +11,14 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::modernize {
+namespace clang {
+namespace tidy {
+namespace modernize {
 
 /// Prefer using transparent functors to non-transparent ones.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/modernize/use-transparent-functors.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/modernize-use-transparent-functors.html
 class UseTransparentFunctorsCheck : public ClangTidyCheck {
 public:
   UseTransparentFunctorsCheck(StringRef Name, ClangTidyContext *Context);
@@ -30,6 +32,8 @@ private:
   const bool SafeMode;
 };
 
-} // namespace clang::tidy::modernize
+} // namespace modernize
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_MODERNIZE_USE_TRANSPARENT_FUNCTORS_H

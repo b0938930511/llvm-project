@@ -6,7 +6,7 @@ const c d = { 1 };
 struct Token {
   unsigned n : 31;
 };
-void sqlite3CodeSubselect(void){
+void sqlite3CodeSubselect(){
   struct Token one = { 1 };
 }
 

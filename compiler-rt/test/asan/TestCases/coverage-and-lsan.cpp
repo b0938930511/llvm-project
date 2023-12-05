@@ -11,10 +11,9 @@
 // REQUIRES: leak-detection
 // FIXME: sancov paths not work with adb
 // UNSUPPORTED: android
-int *g;
+int *g = new int;
 int main(int argc, char **argv) {
-  for (int i = 0; i < 10; ++i)
-    g = new int[i];
+  g = 0;
   return 0;
 }
 

@@ -5,8 +5,8 @@ add_mlir_dialect_library(MLIRAMXTransforms
   MLIRAMXConversionsIncGen
 
   LINK_LIBS PUBLIC
-  MLIRAMXDialect
+  MLIRAMX
   MLIRIR
   MLIRLLVMCommonConversion
-  MLIRLLVMDialect
+  MLIRLLVMIR
   )

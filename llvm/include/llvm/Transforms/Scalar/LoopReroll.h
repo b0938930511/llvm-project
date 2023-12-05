@@ -14,6 +14,8 @@
 
 namespace llvm {
 
+class Function;
+
 class LoopRerollPass : public PassInfoMixin<LoopRerollPass> {
 public:
   PreservedAnalyses run(Loop &L, LoopAnalysisManager &AM,

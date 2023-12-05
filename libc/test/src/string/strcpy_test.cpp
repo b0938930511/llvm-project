@@ -7,23 +7,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "src/string/strcpy.h"
-#include "test/UnitTest/Test.h"
-
-TEST(LlvmLibcStrCpyTest, EmptySrc) {
-  const char *empty = "";
-  char dest[4] = {'a', 'b', 'c', '\0'};
-
-  char *result = LIBC_NAMESPACE::strcpy(dest, empty);
-  ASSERT_EQ(dest, result);
-  ASSERT_STREQ(dest, result);
-  ASSERT_STREQ(dest, empty);
-}
+#include "utils/UnitTest/Test.h"
 
 TEST(LlvmLibcStrCpyTest, EmptyDest) {
   const char *abc = "abc";
   char dest[4];
 
-  char *result = LIBC_NAMESPACE::strcpy(dest, abc);
+  char *result = __llvm_libc::strcpy(dest, abc);
   ASSERT_EQ(dest, result);
   ASSERT_STREQ(dest, result);
   ASSERT_STREQ(dest, abc);
@@ -37,7 +27,7 @@ TEST(LlvmLibcStrCpyTest, OffsetDest) {
   dest[1] = 'y';
   dest[2] = 'z';
 
-  char *result = LIBC_NAMESPACE::strcpy(dest + 3, abc);
+  char *result = __llvm_libc::strcpy(dest + 3, abc);
   ASSERT_EQ(dest + 3, result);
   ASSERT_STREQ(dest + 3, result);
   ASSERT_STREQ(dest, "xyzabc");

@@ -30,7 +30,7 @@ class GISelChangeObserver {
   SmallPtrSet<MachineInstr *, 4> ChangingAllUsesOfReg;
 
 public:
-  virtual ~GISelChangeObserver() = default;
+  virtual ~GISelChangeObserver() {}
 
   /// An instruction is about to be erased.
   virtual void erasingInstr(MachineInstr &MI) = 0;
@@ -76,7 +76,7 @@ public:
   // Removes an observer from the list and does nothing if observer is not
   // present.
   void removeObserver(GISelChangeObserver *O) {
-    auto It = llvm::find(Observers, O);
+    auto It = std::find(Observers.begin(), Observers.end(), O);
     if (It != Observers.end())
       Observers.erase(It);
   }

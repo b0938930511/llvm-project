@@ -76,7 +76,7 @@ int main(int, char**)
     {
         testbuf<char> sb;
         std::ostream os(&sb);
-        std::hex(os);
+        hex(os);
         unsigned short n = 0xFFF6;
         os << n;
         assert(sb.str() == "fff6");

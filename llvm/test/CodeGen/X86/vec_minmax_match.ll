@@ -30,16 +30,14 @@ define <4 x i32> @smin_vec2(<4 x i32> %x) {
   ret <4 x i32> %sel
 }
 
-; TODO:
-; This and the next test were intended to become smin,
-; but that is not correct in general.
-
+; Z = X -nsw Y
+; (X >s Y) ? 0 : Z ==> (Z >s 0) ? 0 : Z ==> SMIN(Z, 0)
 define <4 x i32> @smin_vec3(<4 x i32> %x, <4 x i32> %y) {
 ; CHECK-LABEL: smin_vec3:
 ; CHECK:       # %bb.0:
-; CHECK-NEXT:    vpsubd %xmm1, %xmm0, %xmm2
-; CHECK-NEXT:    vpcmpgtd %xmm1, %xmm0, %xmm0
-; CHECK-NEXT:    vpandn %xmm2, %xmm0, %xmm0
+; CHECK-NEXT:    vpsubd %xmm1, %xmm0, %xmm0
+; CHECK-NEXT:    vpxor %xmm1, %xmm1, %xmm1
+; CHECK-NEXT:    vpminsd %xmm1, %xmm0, %xmm0
 ; CHECK-NEXT:    retq
   %sub = sub nsw <4 x i32> %x, %y
   %cmp = icmp sgt <4 x i32> %x, %y
@@ -47,12 +45,14 @@ define <4 x i32> @smin_vec3(<4 x i32> %x, <4 x i32> %y) {
   ret <4 x i32> %sel
 }
 
+; Z = X -nsw Y
+; (X <s Y) ? Z : 0 ==> (Z <s 0) ? Z : 0 ==> SMIN(Z, 0)
 define <4 x i32> @smin_vec4(<4 x i32> %x, <4 x i32> %y) {
 ; CHECK-LABEL: smin_vec4:
 ; CHECK:       # %bb.0:
-; CHECK-NEXT:    vpsubd %xmm1, %xmm0, %xmm2
-; CHECK-NEXT:    vpcmpgtd %xmm0, %xmm1, %xmm0
-; CHECK-NEXT:    vpand %xmm2, %xmm0, %xmm0
+; CHECK-NEXT:    vpsubd %xmm1, %xmm0, %xmm0
+; CHECK-NEXT:    vpxor %xmm1, %xmm1, %xmm1
+; CHECK-NEXT:    vpminsd %xmm1, %xmm0, %xmm0
 ; CHECK-NEXT:    retq
   %sub = sub nsw <4 x i32> %x, %y
   %cmp = icmp slt <4 x i32> %x, %y
@@ -86,16 +86,14 @@ define <4 x i32> @smax_vec2(<4 x i32> %x) {
   ret <4 x i32> %sel
 }
 
-; TODO:
-; This and the next test were intended to become smax,
-; but that is not correct in general.
-
+; Z = X -nsw Y
+; (X <s Y) ? 0 : Z ==> (Z <s 0) ? 0 : Z ==> SMAX(Z, 0)
 define <4 x i32> @smax_vec3(<4 x i32> %x, <4 x i32> %y) {
 ; CHECK-LABEL: smax_vec3:
 ; CHECK:       # %bb.0:
-; CHECK-NEXT:    vpsubd %xmm1, %xmm0, %xmm2
-; CHECK-NEXT:    vpcmpgtd %xmm0, %xmm1, %xmm0
-; CHECK-NEXT:    vpandn %xmm2, %xmm0, %xmm0
+; CHECK-NEXT:    vpsubd %xmm1, %xmm0, %xmm0
+; CHECK-NEXT:    vpxor %xmm1, %xmm1, %xmm1
+; CHECK-NEXT:    vpmaxsd %xmm1, %xmm0, %xmm0
 ; CHECK-NEXT:    retq
   %sub = sub nsw <4 x i32> %x, %y
   %cmp = icmp slt <4 x i32> %x, %y
@@ -103,12 +101,14 @@ define <4 x i32> @smax_vec3(<4 x i32> %x, <4 x i32> %y) {
   ret <4 x i32> %sel
 }
 
+; Z = X -nsw Y
+; (X >s Y) ? Z : 0 ==> (Z >s 0) ? Z : 0 ==> SMAX(Z, 0)
 define <4 x i32> @smax_vec4(<4 x i32> %x, <4 x i32> %y) {
 ; CHECK-LABEL: smax_vec4:
 ; CHECK:       # %bb.0:
-; CHECK-NEXT:    vpsubd %xmm1, %xmm0, %xmm2
-; CHECK-NEXT:    vpcmpgtd %xmm1, %xmm0, %xmm0
-; CHECK-NEXT:    vpand %xmm2, %xmm0, %xmm0
+; CHECK-NEXT:    vpsubd %xmm1, %xmm0, %xmm0
+; CHECK-NEXT:    vpxor %xmm1, %xmm1, %xmm1
+; CHECK-NEXT:    vpmaxsd %xmm1, %xmm0, %xmm0
 ; CHECK-NEXT:    retq
   %sub = sub nsw <4 x i32> %x, %y
   %cmp = icmp sgt <4 x i32> %x, %y

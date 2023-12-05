@@ -18,7 +18,8 @@
 #include "min_allocator.h"
 
 template <class C>
-TEST_CONSTEXPR_CXX20 void test(const C& x, const typename C::allocator_type& a)
+void
+test(const C& x, const typename C::allocator_type& a)
 {
     typename C::size_type s = x.size();
     C c(x, a);
@@ -27,7 +28,7 @@ TEST_CONSTEXPR_CXX20 void test(const C& x, const typename C::allocator_type& a)
     assert(c == x);
 }
 
-TEST_CONSTEXPR_CXX20 bool tests()
+int main(int, char**)
 {
     {
         bool a[] = {0, 1, 0, 0, 1, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 0};
@@ -60,14 +61,5 @@ TEST_CONSTEXPR_CXX20 bool tests()
     }
 #endif
 
-  return true;
-}
-
-int main(int, char**)
-{
-    tests();
-#if TEST_STD_VER > 17
-    static_assert(tests());
-#endif
-    return 0;
+  return 0;
 }

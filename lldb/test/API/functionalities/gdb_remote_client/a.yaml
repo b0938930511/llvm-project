@@ -1,9 +1,9 @@
---- !ELF
+!ELF
 FileHeader:
-  Class:           ELFCLASS64
+  Class:           ELFCLASS32
   Data:            ELFDATA2LSB
   Type:            ET_EXEC
-  Machine:         EM_X86_64
+  Machine:         EM_ARM
 Sections:
   - Name:            .text
     Type:            SHT_PROGBITS

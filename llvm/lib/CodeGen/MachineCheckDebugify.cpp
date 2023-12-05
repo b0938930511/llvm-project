@@ -11,15 +11,13 @@
 /// DILocalVariable which mir-debugifiy generated before.
 //===----------------------------------------------------------------------===//
 
-#include "llvm/ADT/StringExtras.h"
-#include "llvm/CodeGen/MachineBasicBlock.h"
-#include "llvm/CodeGen/MachineFunction.h"
+#include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineModuleInfo.h"
 #include "llvm/CodeGen/Passes.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/DebugInfoMetadata.h"
+#include "llvm/IR/DebugInfo.h"
 #include "llvm/InitializePasses.h"
-#include "llvm/Pass.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Transforms/Utils/Debugify.h"
 
 #define DEBUG_TYPE "mir-check-debugify"
 
@@ -29,15 +27,15 @@ namespace {
 
 struct CheckDebugMachineModule : public ModulePass {
   bool runOnModule(Module &M) override {
+    MachineModuleInfo &MMI =
+        getAnalysis<MachineModuleInfoWrapperPass>().getMMI();
+
     NamedMDNode *NMD = M.getNamedMetadata("llvm.mir.debugify");
     if (!NMD) {
       errs() << "WARNING: Please run mir-debugify to generate "
                 "llvm.mir.debugify metadata first.\n";
       return false;
     }
-
-    MachineModuleInfo &MMI =
-        getAnalysis<MachineModuleInfoWrapperPass>().getMMI();
 
     auto getDebugifyOperand = [&](unsigned Idx) -> unsigned {
       return mdconst::extract<ConstantInt>(NMD->getOperand(Idx)->getOperand(0))
@@ -108,7 +106,8 @@ struct CheckDebugMachineModule : public ModulePass {
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<MachineModuleInfoWrapperPass>();
-    AU.setPreservesAll();
+    AU.addPreserved<MachineModuleInfoWrapperPass>();
+    AU.setPreservesCFG();
   }
 
   static char ID; // Pass identification.

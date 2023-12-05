@@ -32,7 +32,7 @@ CommonStmt::CommonStmt(std::optional<Name> &&name,
 
 // R901 designator
 bool Designator::EndsInBareName() const {
-  return common::visit(
+  return std::visit(
       common::visitors{
           [](const DataRef &dr) {
             return std::holds_alternative<Name>(dr.u) ||
@@ -120,11 +120,11 @@ template <typename T> T WithSource(CharBlock source, T &&x) {
 }
 
 static Expr ActualArgToExpr(ActualArgSpec &arg) {
-  return common::visit(
+  return std::visit(
       common::visitors{
           [&](common::Indirection<Expr> &y) { return std::move(y.value()); },
           [&](common::Indirection<Variable> &y) {
-            return common::visit(
+            return std::visit(
                 common::visitors{
                     [&](common::Indirection<Designator> &z) {
                       return WithSource(
@@ -132,7 +132,7 @@ static Expr ActualArgToExpr(ActualArgSpec &arg) {
                     },
                     [&](common::Indirection<FunctionReference> &z) {
                       return WithSource(
-                          z.value().source, Expr{std::move(z.value())});
+                          z.value().v.source, Expr{std::move(z.value())});
                     },
                 },
                 y.value().u);
@@ -147,14 +147,14 @@ Designator FunctionReference::ConvertToArrayElementRef() {
   for (auto &arg : std::get<std::list<ActualArgSpec>>(v.t)) {
     args.emplace_back(ActualArgToExpr(arg));
   }
-  return common::visit(
+  return std::visit(
       common::visitors{
           [&](const Name &name) {
             return WithSource(
-                source, MakeArrayElementRef(name, std::move(args)));
+                v.source, MakeArrayElementRef(name, std::move(args)));
           },
           [&](ProcComponentRef &pcr) {
-            return WithSource(source,
+            return WithSource(v.source,
                 MakeArrayElementRef(std::move(pcr.v.thing), std::move(args)));
           },
       },
@@ -203,47 +203,41 @@ Substring ArrayElement::ConvertToSubstring() {
 }
 
 // R1544 stmt-function-stmt
-// Convert this stmt-function-stmt to an assignment to the result of a
-// pointer-valued function call -- which itself will be converted to a
-// much more likely array element assignment statement if it needs
-// to be.
+// Convert this stmt-function-stmt to an array element assignment statement.
 Statement<ActionStmt> StmtFunctionStmt::ConvertToAssignment() {
   auto &funcName{std::get<Name>(t)};
   auto &funcArgs{std::get<std::list<Name>>(t)};
   auto &funcExpr{std::get<Scalar<Expr>>(t).thing};
   CharBlock source{funcName.source};
-  // Extend source to include closing parenthesis
+  std::list<Expr> subscripts;
+  for (Name &arg : funcArgs) {
+    subscripts.push_back(WithSource(arg.source,
+        Expr{common::Indirection{
+            WithSource(arg.source, Designator{DataRef{Name{arg}}})}}));
+    source.ExtendToCover(arg.source);
+  }
+  // extend source to include closing paren
   if (funcArgs.empty()) {
     CHECK(*source.end() == '(');
     source = CharBlock{source.begin(), source.end() + 1};
   }
-  std::list<ActualArgSpec> actuals;
-  for (const Name &arg : funcArgs) {
-    actuals.emplace_back(std::optional<Keyword>{},
-        ActualArg{Expr{WithSource(
-            arg.source, Designator{DataRef{Name{arg.source, arg.symbol}}})}});
-    source.ExtendToCover(arg.source);
-  }
   CHECK(*source.end() == ')');
   source = CharBlock{source.begin(), source.end() + 1};
-  FunctionReference funcRef{
-      Call{ProcedureDesignator{Name{funcName.source, funcName.symbol}},
-          std::move(actuals)}};
-  funcRef.source = source;
-  auto variable{Variable{common::Indirection{std::move(funcRef)}}};
+  auto variable{Variable{common::Indirection{WithSource(
+      source, MakeArrayElementRef(funcName, std::move(subscripts)))}}};
   return Statement{std::nullopt,
       ActionStmt{common::Indirection{
           AssignmentStmt{std::move(variable), std::move(funcExpr)}}}};
 }
 
 CharBlock Variable::GetSource() const {
-  return common::visit(
+  return std::visit(
       common::visitors{
           [&](const common::Indirection<Designator> &des) {
             return des.value().source;
           },
           [&](const common::Indirection<parser::FunctionReference> &call) {
-            return call.value().source;
+            return call.value().v.source;
           },
       },
       u);

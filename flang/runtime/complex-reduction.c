@@ -8,7 +8,7 @@
  */
 
 #include "complex-reduction.h"
-#include <float.h>
+#include "flang/Common/long-double.h"
 
 struct CppComplexFloat {
   float r, i;
@@ -23,7 +23,7 @@ struct CppComplexLongDouble {
 /* Not all environments define CMPLXF, CMPLX, CMPLXL. */
 
 #ifndef CMPLXF
-#if defined(__clang_major__) && (__clang_major__ >= 12)
+#if __clang_major__ >= 12
 #define CMPLXF __builtin_complex
 #else
 static float_Complex_t CMPLXF(float r, float i) {
@@ -39,7 +39,7 @@ static float_Complex_t CMPLXF(float r, float i) {
 #endif
 
 #ifndef CMPLX
-#if defined(__clang_major__) && (__clang_major__ >= 12)
+#if __clang_major__ >= 12
 #define CMPLX __builtin_complex
 #else
 static double_Complex_t CMPLX(double r, double i) {
@@ -55,7 +55,7 @@ static double_Complex_t CMPLX(double r, double i) {
 #endif
 
 #ifndef CMPLXL
-#if defined(__clang_major__) && (__clang_major__ >= 12)
+#if __clang_major__ >= 12
 #define CMPLXL __builtin_complex
 #else
 static long_double_Complex_t CMPLXL(long double r, long double i) {
@@ -90,10 +90,10 @@ ADAPT_REDUCTION(SumComplex4, float_Complex_t, CppComplexFloat, CMPLXF,
     REDUCTION_ARGS, REDUCTION_ARG_NAMES)
 ADAPT_REDUCTION(SumComplex8, double_Complex_t, CppComplexDouble, CMPLX,
     REDUCTION_ARGS, REDUCTION_ARG_NAMES)
-#if LDBL_MANT_DIG == 64
+#if LONG_DOUBLE == 80
 ADAPT_REDUCTION(SumComplex10, long_double_Complex_t, CppComplexLongDouble,
     CMPLXL, REDUCTION_ARGS, REDUCTION_ARG_NAMES)
-#elif LDBL_MANT_DIG == 113
+#elif LONG_DOUBLE == 128
 ADAPT_REDUCTION(SumComplex16, long_double_Complex_t, CppComplexLongDouble,
     CMPLXL, REDUCTION_ARGS, REDUCTION_ARG_NAMES)
 #endif
@@ -103,10 +103,10 @@ ADAPT_REDUCTION(ProductComplex4, float_Complex_t, CppComplexFloat, CMPLXF,
     REDUCTION_ARGS, REDUCTION_ARG_NAMES)
 ADAPT_REDUCTION(ProductComplex8, double_Complex_t, CppComplexDouble, CMPLX,
     REDUCTION_ARGS, REDUCTION_ARG_NAMES)
-#if LDBL_MANT_DIG == 64
+#if LONG_DOUBLE == 80
 ADAPT_REDUCTION(ProductComplex10, long_double_Complex_t, CppComplexLongDouble,
     CMPLXL, REDUCTION_ARGS, REDUCTION_ARG_NAMES)
-#elif LDBL_MANT_DIG == 113
+#elif LONG_DOUBLE == 128
 ADAPT_REDUCTION(ProductComplex16, long_double_Complex_t, CppComplexLongDouble,
     CMPLXL, REDUCTION_ARGS, REDUCTION_ARG_NAMES)
 #endif
@@ -116,10 +116,10 @@ ADAPT_REDUCTION(DotProductComplex4, float_Complex_t, CppComplexFloat, CMPLXF,
     DOT_PRODUCT_ARGS, DOT_PRODUCT_ARG_NAMES)
 ADAPT_REDUCTION(DotProductComplex8, double_Complex_t, CppComplexDouble, CMPLX,
     DOT_PRODUCT_ARGS, DOT_PRODUCT_ARG_NAMES)
-#if LDBL_MANT_DIG == 64
+#if LONG_DOUBLE == 80
 ADAPT_REDUCTION(DotProductComplex10, long_double_Complex_t,
     CppComplexLongDouble, CMPLXL, DOT_PRODUCT_ARGS, DOT_PRODUCT_ARG_NAMES)
-#elif LDBL_MANT_DIG == 113
+#elif LONG_DOUBLE == 128
 ADAPT_REDUCTION(DotProductComplex16, long_double_Complex_t,
     CppComplexLongDouble, CMPLXL, DOT_PRODUCT_ARGS, DOT_PRODUCT_ARG_NAMES)
 #endif

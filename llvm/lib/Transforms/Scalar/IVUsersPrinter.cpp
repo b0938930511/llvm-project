@@ -8,6 +8,7 @@
 
 #include "llvm/Transforms/Scalar/IVUsersPrinter.h"
 #include "llvm/Analysis/IVUsers.h"
+#include "llvm/Support/Debug.h"
 using namespace llvm;
 
 #define DEBUG_TYPE "iv-users"

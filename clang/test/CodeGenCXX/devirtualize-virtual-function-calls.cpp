@@ -15,7 +15,7 @@ A g();
 void f(A a, A *ap, A& ar) {
   // This should not be a virtual function call.
   
-  // CHECK: call void @_ZN1A1fEv(ptr {{[^,]*}} %a)
+  // CHECK: call void @_ZN1A1fEv(%struct.A* {{[^,]*}} %a)
   a.f();
 
   // CHECK: call void %  
@@ -46,10 +46,10 @@ struct XD { D d; };
 D gd();
 
 void fd(D d, XD xd, D *p) {
-  // CHECK: call void @_ZN1A1fEv(ptr
+  // CHECK: call void @_ZN1A1fEv(%struct.A*
   d.f();
 
-  // CHECK: call void @_ZN1D1gEv(ptr
+  // CHECK: call void @_ZN1D1gEv(%struct.D*
   d.g();
 
   // CHECK: call void @_ZN1A1fEv
@@ -127,7 +127,7 @@ namespace test2 {
 
   void f(bar *b) {
     // CHECK: call void @_ZN5test23foo1fEv
-    // CHECK: call noundef ptr @_ZN5test23fooD1Ev
+    // CHECK: call %"struct.test2::foo"* @_ZN5test23fooD1Ev
     b->foo::f();
     b->foo::~foo();
   }

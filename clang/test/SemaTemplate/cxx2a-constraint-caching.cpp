@@ -1,4 +1,5 @@
 // RUN:  %clang_cc1 -std=c++2a -verify %s
+// RUN:  %clang_cc1 -std=c++2a -verify %s -fno-concept-satisfaction-caching -DNO_CACHE
 // expected-no-diagnostics
 
 template<typename T>
@@ -24,5 +25,10 @@ namespace a {
   // because the constraint satisfaction results are cached.
   constexpr void f(A a, int = 2) {}
 }
+#ifdef NO_CACHE
+static_assert(!C<a::A>);
+static_assert(!foo<a::A>());
+#else
 static_assert(C<a::A>);
 static_assert(foo<a::A>());
+#endif

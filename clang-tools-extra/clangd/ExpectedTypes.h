@@ -15,12 +15,11 @@
 // the index. Similar types (such as `int` and `long`) are folded together,
 // forming equivalence classes with the same encoding.
 //===----------------------------------------------------------------------===//
-#ifndef LLVM_CLANG_TOOLS_EXTRA_CLANGD_EXPECTEDTYPES_H
-#define LLVM_CLANG_TOOLS_EXTRA_CLANGD_EXPECTEDTYPES_H
+#ifndef LLVM_CLANG_TOOLS_EXTRA_CLANGD_EXPECTED_TYPES_H
+#define LLVM_CLANG_TOOLS_EXTRA_CLANGD_EXPECTED_TYPES_H
 
 #include "clang/AST/Type.h"
 #include "llvm/ADT/StringRef.h"
-#include <optional>
 
 namespace clang {
 class CodeCompletionResult;
@@ -35,11 +34,11 @@ namespace clangd {
 class OpaqueType {
 public:
   /// Create a type from a code completion result.
-  static std::optional<OpaqueType>
+  static llvm::Optional<OpaqueType>
   fromCompletionResult(ASTContext &Ctx, const CodeCompletionResult &R);
   /// Construct an instance from a clang::QualType. This is usually a
   /// PreferredType from a clang's completion context.
-  static std::optional<OpaqueType> fromType(ASTContext &Ctx, QualType Type);
+  static llvm::Optional<OpaqueType> fromType(ASTContext &Ctx, QualType Type);
 
   /// Get the raw byte representation of the type. You can only rely on the
   /// types being equal iff their raw representation is the same. The particular
@@ -55,7 +54,7 @@ public:
   }
 
 private:
-  static std::optional<OpaqueType> encode(ASTContext &Ctx, QualType Type);
+  static llvm::Optional<OpaqueType> encode(ASTContext &Ctx, QualType Type);
   explicit OpaqueType(std::string Data);
 
   std::string Data;

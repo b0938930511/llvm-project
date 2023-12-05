@@ -10,8 +10,6 @@
 #include "clang/AST/ASTConsumer.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
-#include "clang/AST/Decl.h"
-#include "clang/AST/TypeLoc.h"
 #include "clang/Frontend/FrontendAction.h"
 #include "clang/Tooling/Tooling.h"
 #include "llvm/ADT/FunctionExtras.h"
@@ -55,17 +53,7 @@ enum class VisitEvent {
   StartTraverseFunction,
   EndTraverseFunction,
   StartTraverseAttr,
-  EndTraverseAttr,
-  StartTraverseEnum,
-  EndTraverseEnum,
-  StartTraverseTypedefType,
-  EndTraverseTypedefType,
-  StartTraverseObjCInterface,
-  EndTraverseObjCInterface,
-  StartTraverseObjCProtocol,
-  EndTraverseObjCProtocol,
-  StartTraverseObjCProtocolLoc,
-  EndTraverseObjCProtocolLoc,
+  EndTraverseAttr
 };
 
 class CollectInterestingEvents
@@ -87,59 +75,18 @@ public:
     return Ret;
   }
 
-  bool TraverseEnumDecl(EnumDecl *D) {
-    Events.push_back(VisitEvent::StartTraverseEnum);
-    bool Ret = RecursiveASTVisitor::TraverseEnumDecl(D);
-    Events.push_back(VisitEvent::EndTraverseEnum);
-
-    return Ret;
-  }
-
-  bool TraverseTypedefTypeLoc(TypedefTypeLoc TL) {
-    Events.push_back(VisitEvent::StartTraverseTypedefType);
-    bool Ret = RecursiveASTVisitor::TraverseTypedefTypeLoc(TL);
-    Events.push_back(VisitEvent::EndTraverseTypedefType);
-
-    return Ret;
-  }
-
-  bool TraverseObjCInterfaceDecl(ObjCInterfaceDecl *ID) {
-    Events.push_back(VisitEvent::StartTraverseObjCInterface);
-    bool Ret = RecursiveASTVisitor::TraverseObjCInterfaceDecl(ID);
-    Events.push_back(VisitEvent::EndTraverseObjCInterface);
-
-    return Ret;
-  }
-
-  bool TraverseObjCProtocolDecl(ObjCProtocolDecl *PD) {
-    Events.push_back(VisitEvent::StartTraverseObjCProtocol);
-    bool Ret = RecursiveASTVisitor::TraverseObjCProtocolDecl(PD);
-    Events.push_back(VisitEvent::EndTraverseObjCProtocol);
-
-    return Ret;
-  }
-
-  bool TraverseObjCProtocolLoc(ObjCProtocolLoc ProtocolLoc) {
-    Events.push_back(VisitEvent::StartTraverseObjCProtocolLoc);
-    bool Ret = RecursiveASTVisitor::TraverseObjCProtocolLoc(ProtocolLoc);
-    Events.push_back(VisitEvent::EndTraverseObjCProtocolLoc);
-
-    return Ret;
-  }
-
   std::vector<VisitEvent> takeEvents() && { return std::move(Events); }
 
 private:
   std::vector<VisitEvent> Events;
 };
 
-std::vector<VisitEvent> collectEvents(llvm::StringRef Code,
-                                      const Twine &FileName = "input.cc") {
+std::vector<VisitEvent> collectEvents(llvm::StringRef Code) {
   CollectInterestingEvents Visitor;
   clang::tooling::runToolOnCode(
       std::make_unique<ProcessASTAction>(
           [&](clang::ASTContext &Ctx) { Visitor.TraverseAST(Ctx); }),
-      Code, FileName);
+      Code);
   return std::move(Visitor).takeEvents();
 }
 } // namespace
@@ -155,43 +102,4 @@ __attribute__((annotate("something"))) int foo() { return 10; }
                           VisitEvent::StartTraverseAttr,
                           VisitEvent::EndTraverseAttr,
                           VisitEvent::EndTraverseFunction));
-}
-
-TEST(RecursiveASTVisitorTest, EnumDeclWithBase) {
-  // Check enum and its integer base is visited.
-  llvm::StringRef Code = R"cpp(
-  typedef int Foo;
-  enum Bar : Foo;
-  )cpp";
-
-  EXPECT_THAT(collectEvents(Code),
-              ElementsAre(VisitEvent::StartTraverseEnum,
-                          VisitEvent::StartTraverseTypedefType,
-                          VisitEvent::EndTraverseTypedefType,
-                          VisitEvent::EndTraverseEnum));
-}
-
-TEST(RecursiveASTVisitorTest, InterfaceDeclWithProtocols) {
-  // Check interface and its protocols are visited.
-  llvm::StringRef Code = R"cpp(
-  @protocol Foo
-  @end
-  @protocol Bar
-  @end
-
-  @interface SomeObject <Foo, Bar>
-  @end
-  )cpp";
-
-  EXPECT_THAT(collectEvents(Code, "input.m"),
-              ElementsAre(VisitEvent::StartTraverseObjCProtocol,
-                          VisitEvent::EndTraverseObjCProtocol,
-                          VisitEvent::StartTraverseObjCProtocol,
-                          VisitEvent::EndTraverseObjCProtocol,
-                          VisitEvent::StartTraverseObjCInterface,
-                          VisitEvent::StartTraverseObjCProtocolLoc,
-                          VisitEvent::EndTraverseObjCProtocolLoc,
-                          VisitEvent::StartTraverseObjCProtocolLoc,
-                          VisitEvent::EndTraverseObjCProtocolLoc,
-                          VisitEvent::EndTraverseObjCInterface));
 }

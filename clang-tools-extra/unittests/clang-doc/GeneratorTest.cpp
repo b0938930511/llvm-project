@@ -24,7 +24,7 @@ TEST(GeneratorTest, emitIndex) {
   auto InfoC = std::make_unique<Info>();
   InfoC->Name = "C";
   InfoC->USR = serialize::hashUSR("3");
-  Reference RefB = Reference(SymbolID(), "B");
+  Reference RefB = Reference("B");
   RefB.USR = serialize::hashUSR("2");
   InfoC->Namespace = {std::move(RefB)};
   Generator::addInfoToIndex(Idx, InfoC.get());
@@ -34,9 +34,9 @@ TEST(GeneratorTest, emitIndex) {
   auto InfoF = std::make_unique<Info>();
   InfoF->Name = "F";
   InfoF->USR = serialize::hashUSR("6");
-  Reference RefD = Reference(SymbolID(), "D");
+  Reference RefD = Reference("D");
   RefD.USR = serialize::hashUSR("4");
-  Reference RefE = Reference(SymbolID(), "E");
+  Reference RefE = Reference("E");
   RefE.USR = serialize::hashUSR("5");
   InfoF->Namespace = {std::move(RefE), std::move(RefD)};
   Generator::addInfoToIndex(Idx, InfoF.get());

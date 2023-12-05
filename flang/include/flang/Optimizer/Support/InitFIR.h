@@ -14,60 +14,33 @@
 #define FORTRAN_OPTIMIZER_SUPPORT_INITFIR_H
 
 #include "flang/Optimizer/Dialect/FIRDialect.h"
-#include "flang/Optimizer/HLFIR/HLFIRDialect.h"
 #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Affine/Passes.h"
-#include "mlir/Dialect/Complex/IR/Complex.h"
-#include "mlir/Dialect/Func/Extensions/InlinerExtension.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/LocationSnapshot.h"
 #include "mlir/Transforms/Passes.h"
+#include "flang/Optimizer/CodeGen/CodeGen.h"
 
 namespace fir::support {
 
-#define FLANG_NONCODEGEN_DIALECT_LIST                                          \
-  mlir::affine::AffineDialect, FIROpsDialect, hlfir::hlfirDialect,             \
-      mlir::acc::OpenACCDialect, mlir::omp::OpenMPDialect,                     \
-      mlir::scf::SCFDialect, mlir::arith::ArithDialect,                        \
-      mlir::cf::ControlFlowDialect, mlir::func::FuncDialect,                   \
-      mlir::vector::VectorDialect, mlir::math::MathDialect,                    \
-      mlir::complex::ComplexDialect, mlir::DLTIDialect
-
-#define FLANG_CODEGEN_DIALECT_LIST FIRCodeGenDialect, mlir::LLVM::LLVMDialect
-
 // The definitive list of dialects used by flang.
 #define FLANG_DIALECT_LIST                                                     \
-  FLANG_NONCODEGEN_DIALECT_LIST, FLANG_CODEGEN_DIALECT_LIST
-
-inline void registerNonCodegenDialects(mlir::DialectRegistry &registry) {
-  registry.insert<FLANG_NONCODEGEN_DIALECT_LIST>();
-  mlir::func::registerInlinerExtension(registry);
-}
+  mlir::AffineDialect, FIROpsDialect, FIRCodeGenDialect,                       \
+      mlir::LLVM::LLVMDialect, mlir::acc::OpenACCDialect,                      \
+      mlir::omp::OpenMPDialect, mlir::scf::SCFDialect,                         \
+      mlir::StandardOpsDialect, mlir::vector::VectorDialect
 
 /// Register all the dialects used by flang.
 inline void registerDialects(mlir::DialectRegistry &registry) {
-  registerNonCodegenDialects(registry);
-  registry.insert<FLANG_CODEGEN_DIALECT_LIST>();
-}
-
-inline void loadNonCodegenDialects(mlir::MLIRContext &context) {
-  mlir::DialectRegistry registry;
-  registerNonCodegenDialects(registry);
-  context.appendDialectRegistry(registry);
-
-  context.loadDialect<FLANG_NONCODEGEN_DIALECT_LIST>();
+  registry.insert<FLANG_DIALECT_LIST>();
 }
 
 /// Forced load of all the dialects used by flang.  Lowering is not an MLIR
 /// pass, but a producer of FIR and MLIR. It is therefore a requirement that the
 /// dialects be preloaded to be able to build the IR.
 inline void loadDialects(mlir::MLIRContext &context) {
-  mlir::DialectRegistry registry;
-  registerDialects(registry);
-  context.appendDialectRegistry(registry);
-
   context.loadDialect<FLANG_DIALECT_LIST>();
 }
 
@@ -76,31 +49,31 @@ inline void loadDialects(mlir::MLIRContext &context) {
 inline void registerMLIRPassesForFortranTools() {
   mlir::registerCanonicalizerPass();
   mlir::registerCSEPass();
-  mlir::affine::registerAffineLoopFusionPass();
+  mlir::registerAffineLoopFusionPass();
   mlir::registerLoopInvariantCodeMotionPass();
-  mlir::affine::registerLoopCoalescingPass();
+  mlir::registerLoopCoalescingPass();
   mlir::registerStripDebugInfoPass();
   mlir::registerPrintOpStatsPass();
   mlir::registerInlinerPass();
   mlir::registerSCCPPass();
-  mlir::affine::registerAffineScalarReplacementPass();
+  mlir::registerAffineScalarReplacementPass();
   mlir::registerSymbolDCEPass();
   mlir::registerLocationSnapshotPass();
-  mlir::affine::registerAffinePipelineDataTransferPass();
+  mlir::registerAffinePipelineDataTransferPass();
 
-  mlir::affine::registerAffineVectorizePass();
-  mlir::affine::registerAffineLoopUnrollPass();
-  mlir::affine::registerAffineLoopUnrollAndJamPass();
-  mlir::affine::registerSimplifyAffineStructuresPass();
-  mlir::affine::registerAffineLoopInvariantCodeMotionPass();
-  mlir::affine::registerAffineLoopTilingPass();
-  mlir::affine::registerAffineDataCopyGenerationPass();
+  mlir::registerAffineVectorizePass();
+  mlir::registerAffineLoopUnrollPass();
+  mlir::registerAffineLoopUnrollAndJamPass();
+  mlir::registerSimplifyAffineStructuresPass();
+  mlir::registerAffineLoopInvariantCodeMotionPass();
+  mlir::registerAffineLoopTilingPass();
+  mlir::registerAffineDataCopyGenerationPass();
 
   mlir::registerConvertAffineToStandardPass();
-}
 
-/// Register the interfaces needed to lower to LLVM IR.
-void registerLLVMTranslation(mlir::MLIRContext &context);
+  // Flang passes
+  fir::registerOptCodeGenPasses();
+}
 
 } // namespace fir::support
 

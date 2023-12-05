@@ -227,10 +227,11 @@ int main(int Argc, char *Argv[]) {
   }
 
   // (5) Look up and run the JIT'd function.
-  auto MainAddr = ExitOnErr(J->lookup(MainFunctionName));
+  auto MainSym = ExitOnErr(J->lookup(MainFunctionName));
 
   using MainFnPtr = int (*)(int, char *[]);
-  auto *MainFunction = MainAddr.toPtr<MainFnPtr>();
+  MainFnPtr MainFunction =
+      jitTargetAddressToFunction<MainFnPtr>(MainSym.getAddress());
 
   int Result = runAsMain(MainFunction, {}, MainModulePath);
   outs() << "'" << MainFunctionName << "' finished with exit code: " << Result

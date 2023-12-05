@@ -16,5 +16,5 @@ body: |
     liveins: %0
 
     $eax = COPY $edi
-    RET64 $eax
+    RETQ $eax
 ...

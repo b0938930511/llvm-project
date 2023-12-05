@@ -20,11 +20,10 @@
 #include "clang/StaticAnalyzer/Checkers/BuiltinCheckerRegistration.h"
 #include "clang/StaticAnalyzer/Core/Checker.h"
 #include "clang/StaticAnalyzer/Core/CheckerManager.h"
-#include "clang/StaticAnalyzer/Core/PathSensitive/CallDescription.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CallEvent.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CheckerContext.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/DynamicType.h"
-#include <optional>
+#include "llvm/ADT/Optional.h"
 #include <utility>
 
 using namespace clang;
@@ -108,7 +107,7 @@ static const NoteTag *getNoteTag(CheckerContext &C,
                                  bool CastSucceeds, bool IsKnownCast) {
   std::string CastToName =
       CastInfo ? CastInfo->to()->getAsCXXRecordDecl()->getNameAsString()
-               : CastToTy.getAsString();
+               : CastToTy->getPointeeCXXRecordDecl()->getNameAsString();
   Object = Object->IgnoreParenImpCasts();
 
   return C.getNoteTag(
@@ -163,9 +162,9 @@ static const NoteTag *getNoteTag(CheckerContext &C,
         bool First = true;
         for (QualType CastToTy: CastToTyVec) {
           std::string CastToName =
-              CastToTy->getAsCXXRecordDecl()
-                  ? CastToTy->getAsCXXRecordDecl()->getNameAsString()
-                  : CastToTy.getAsString();
+            CastToTy->getAsCXXRecordDecl() ?
+            CastToTy->getAsCXXRecordDecl()->getNameAsString() :
+            CastToTy->getPointeeCXXRecordDecl()->getNameAsString();
           Out << ' ' << ((CastToTyVec.size() == 1) ? "not" :
                          (First ? "neither" : "nor")) << " a '" << CastToName
               << '\'';
@@ -250,7 +249,7 @@ static void addCastTransition(const CallEvent &Call, DefinedOrUnknownSVal DV,
                                       CastSucceeds);
 
   SVal V = CastSucceeds ? C.getSValBuilder().evalCast(DV, CastToTy, CastFromTy)
-                        : C.getSValBuilder().makeNullWithType(CastToTy);
+                        : C.getSValBuilder().makeNull();
   C.addTransition(
       State->BindExpr(Call.getOriginExpr(), C.getLocationContext(), V, false),
       getNoteTag(C, CastInfo, CastToTy, Object, CastSucceeds, IsKnownCast));
@@ -359,9 +358,7 @@ static void evalNullParamNullReturn(const CallEvent &Call,
   if (ProgramStateRef State = C.getState()->assume(DV, false))
     C.addTransition(State->BindExpr(Call.getOriginExpr(),
                                     C.getLocationContext(),
-                                    C.getSValBuilder().makeNullWithType(
-                                        Call.getOriginExpr()->getType()),
-                                    false),
+                                    C.getSValBuilder().makeNull(), false),
                     C.getNoteTag("Assuming null pointer is passed into cast",
                                  /*IsPrunable=*/true));
 }
@@ -472,7 +469,7 @@ bool CastValueChecker::evalCall(const CallEvent &Call,
   const CastCheck &Check = Lookup->first;
   CallKind Kind = Lookup->second;
 
-  std::optional<DefinedOrUnknownSVal> DV;
+  Optional<DefinedOrUnknownSVal> DV;
 
   switch (Kind) {
   case CallKind::Function: {

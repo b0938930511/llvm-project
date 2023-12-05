@@ -22,6 +22,8 @@
 #include "clang/StaticAnalyzer/Core/PathSensitive/ProgramStateTrait.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/ProgramState_Fwd.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/SymbolManager.h"
+#include "llvm/ADT/ImmutableMap.h"
+#include "llvm/ADT/Optional.h"
 
 namespace clang {
 namespace ento {
@@ -30,7 +32,6 @@ namespace ento {
 DynamicTypeInfo getDynamicTypeInfo(ProgramStateRef State, const MemRegion *MR);
 
 /// Get raw dynamic type information for the region \p MR.
-/// It might return null.
 const DynamicTypeInfo *getRawDynamicTypeInfo(ProgramStateRef State,
                                              const MemRegion *MR);
 

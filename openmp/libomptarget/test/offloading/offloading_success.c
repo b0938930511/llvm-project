@@ -1,12 +1,12 @@
 // RUN: %libomptarget-compile-run-and-check-generic
 
-#include <omp.h>
 #include <stdio.h>
+#include <omp.h>
 
 int main(void) {
   int isHost = -1;
 
-#pragma omp target map(from : isHost)
+#pragma omp target map(from: isHost)
   { isHost = omp_is_initial_device(); }
 
   if (isHost < 0) {

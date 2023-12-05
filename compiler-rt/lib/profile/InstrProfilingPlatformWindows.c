@@ -14,7 +14,6 @@
 #if defined(_MSC_VER)
 /* Merge read-write sections into .data. */
 #pragma comment(linker, "/MERGE:.lprfc=.data")
-#pragma comment(linker, "/MERGE:.lprfb=.data")
 #pragma comment(linker, "/MERGE:.lprfd=.data")
 #pragma comment(linker, "/MERGE:.lprfv=.data")
 #pragma comment(linker, "/MERGE:.lprfnd=.data")
@@ -31,8 +30,6 @@
 #pragma section(".lprfd$Z", read, write)
 #pragma section(".lprfc$A", read, write)
 #pragma section(".lprfc$Z", read, write)
-#pragma section(".lprfb$A", read, write)
-#pragma section(".lprfb$Z", read, write)
 #pragma section(".lorderfile$A", read, write)
 #pragma section(".lprfnd$A", read, write)
 #pragma section(".lprfnd$Z", read, write)
@@ -44,10 +41,8 @@ __llvm_profile_data COMPILER_RT_SECTION(".lprfd$Z") DataEnd = {0};
 const char COMPILER_RT_SECTION(".lprfn$A") NamesStart = '\0';
 const char COMPILER_RT_SECTION(".lprfn$Z") NamesEnd = '\0';
 
-char COMPILER_RT_SECTION(".lprfc$A") CountersStart;
-char COMPILER_RT_SECTION(".lprfc$Z") CountersEnd;
-char COMPILER_RT_SECTION(".lprfb$A") BitmapStart;
-char COMPILER_RT_SECTION(".lprfb$Z") BitmapEnd;
+uint64_t COMPILER_RT_SECTION(".lprfc$A") CountersStart;
+uint64_t COMPILER_RT_SECTION(".lprfc$Z") CountersEnd;
 uint32_t COMPILER_RT_SECTION(".lorderfile$A") OrderFileStart;
 
 ValueProfNode COMPILER_RT_SECTION(".lprfnd$A") VNodesStart;
@@ -61,10 +56,8 @@ const __llvm_profile_data *__llvm_profile_end_data(void) { return &DataEnd; }
 const char *__llvm_profile_begin_names(void) { return &NamesStart + 1; }
 const char *__llvm_profile_end_names(void) { return &NamesEnd; }
 
-char *__llvm_profile_begin_counters(void) { return &CountersStart + 1; }
-char *__llvm_profile_end_counters(void) { return &CountersEnd; }
-char *__llvm_profile_begin_bitmap(void) { return &BitmapStart + 1; }
-char *__llvm_profile_end_bitmap(void) { return &BitmapEnd; }
+uint64_t *__llvm_profile_begin_counters(void) { return &CountersStart + 1; }
+uint64_t *__llvm_profile_end_counters(void) { return &CountersEnd; }
 uint32_t *__llvm_profile_begin_orderfile(void) { return &OrderFileStart; }
 
 ValueProfNode *__llvm_profile_begin_vnodes(void) { return &VNodesStart + 1; }

@@ -186,6 +186,7 @@ size_t RegisterContextFreeBSD_powerpc::GetGPRSize() const {
 }
 
 const RegisterInfo *RegisterContextFreeBSD_powerpc::GetRegisterInfo() const {
+  // assert (m_target_arch.GetCore() == ArchSpec::eCore_powerpc);
   llvm_unreachable("Abstract class!");
   return nullptr;
 }
@@ -203,6 +204,7 @@ size_t RegisterContextFreeBSD_powerpc32::GetGPRSize() const {
 }
 
 const RegisterInfo *RegisterContextFreeBSD_powerpc32::GetRegisterInfo() const {
+  // assert (m_target_arch.GetCore() == ArchSpec::eCore_powerpc);
   return g_register_infos_powerpc32;
 }
 
@@ -222,7 +224,8 @@ size_t RegisterContextFreeBSD_powerpc64::GetGPRSize() const {
 }
 
 const RegisterInfo *RegisterContextFreeBSD_powerpc64::GetRegisterInfo() const {
-  if (GetTargetArchitecture().GetMachine() == llvm::Triple::ppc)
+  // assert (m_target_arch.GetCore() == ArchSpec::eCore_powerpc);
+  if (m_target_arch.GetMachine() == llvm::Triple::ppc)
     return g_register_infos_powerpc64_32;
   return g_register_infos_powerpc64;
 }

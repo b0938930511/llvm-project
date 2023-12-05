@@ -200,7 +200,8 @@ static inline MemOpKey getMemOpKey(const MachineInstr &MI, unsigned N) {
 
 static inline bool isIdenticalOp(const MachineOperand &MO1,
                                  const MachineOperand &MO2) {
-  return MO1.isIdenticalTo(MO2) && (!MO1.isReg() || !MO1.getReg().isPhysical());
+  return MO1.isIdenticalTo(MO2) &&
+         (!MO1.isReg() || !Register::isPhysicalRegister(MO1.getReg()));
 }
 
 #ifndef NDEBUG
@@ -321,7 +322,8 @@ int X86OptimizeLEAPass::calcInstrDist(const MachineInstr &First,
   // presented in InstrPos.
   assert(Last.getParent() == First.getParent() &&
          "Instructions are in different basic blocks");
-  assert(InstrPos.contains(&First) && InstrPos.contains(&Last) &&
+  assert(InstrPos.find(&First) != InstrPos.end() &&
+         InstrPos.find(&Last) != InstrPos.end() &&
          "Instructions' positions are undefined");
 
   return InstrPos[&Last] - InstrPos[&First];
@@ -347,7 +349,7 @@ bool X86OptimizeLEAPass::chooseBestLEA(
   BestLEA = nullptr;
 
   // Loop over all LEA instructions.
-  for (auto *DefMI : List) {
+  for (auto DefMI : List) {
     // Get new address displacement.
     int64_t AddrDispShiftTemp = getAddrDispShift(MI, MemOpNo, *DefMI, 1);
 
@@ -501,7 +503,9 @@ bool X86OptimizeLEAPass::removeRedundantAddrCalc(MemOpMap &LEAs) {
   MachineBasicBlock *MBB = (*LEAs.begin()->second.begin())->getParent();
 
   // Process all instructions in basic block.
-  for (MachineInstr &MI : llvm::make_early_inc_range(*MBB)) {
+  for (auto I = MBB->begin(), E = MBB->end(); I != E;) {
+    MachineInstr &MI = *I++;
+
     // Instruction must be load or store.
     if (!MI.mayLoadOrStore())
       continue;
@@ -608,7 +612,7 @@ MachineInstr *X86OptimizeLEAPass::replaceDebugValue(MachineInstr &MI,
   auto replaceOldReg = [OldReg, NewReg](const MachineOperand &Op) {
     if (Op.isReg() && Op.getReg() == OldReg)
       return MachineOperand::CreateReg(NewReg, false, false, false, false,
-                                       false, false, false, false, false,
+                                       false, false, false, false, 0,
                                        /*IsRenamable*/ true);
     return Op;
   };
@@ -651,12 +655,9 @@ bool X86OptimizeLEAPass::removeRedundantLEAs(MemOpMap &LEAs) {
         // isReplaceable function.
         Register FirstVReg = First.getOperand(0).getReg();
         Register LastVReg = Last.getOperand(0).getReg();
-        // We use MRI->use_empty here instead of the combination of
-        // llvm::make_early_inc_range and MRI->use_operands because we could
-        // replace two or more uses in a debug instruction in one iteration, and
-        // that would deeply confuse llvm::make_early_inc_range.
-        while (!MRI->use_empty(LastVReg)) {
-          MachineOperand &MO = *MRI->use_begin(LastVReg);
+        for (auto UI = MRI->use_begin(LastVReg), UE = MRI->use_end();
+             UI != UE;) {
+          MachineOperand &MO = *UI++;
           MachineInstr &MI = *MO.getParent();
 
           if (MI.isDebugValue()) {

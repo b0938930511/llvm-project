@@ -77,7 +77,7 @@ bool RegisterContextCorePOSIX_s390x::ReadRegister(const RegisterInfo *reg_info,
 }
 
 bool RegisterContextCorePOSIX_s390x::ReadAllRegisterValues(
-    lldb::WritableDataBufferSP &data_sp) {
+    lldb::DataBufferSP &data_sp) {
   return false;
 }
 

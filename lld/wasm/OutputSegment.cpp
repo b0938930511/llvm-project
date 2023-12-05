@@ -15,14 +15,16 @@
 using namespace llvm;
 using namespace llvm::wasm;
 
-namespace lld::wasm {
+namespace lld {
+
+namespace wasm {
 
 void OutputSegment::addInputSegment(InputChunk *inSeg) {
   alignment = std::max(alignment, inSeg->alignment);
   inputSegments.push_back(inSeg);
   size = llvm::alignTo(size, 1ULL << inSeg->alignment);
-  LLVM_DEBUG(dbgs() << "addInputSegment: " << inSeg->name << " oname=" << name
-                    << " size=" << inSeg->getSize()
+  LLVM_DEBUG(dbgs() << "addInputSegment: " << inSeg->getName()
+                    << " oname=" << name << " size=" << inSeg->getSize()
                     << " align=" << inSeg->alignment << " at:" << size << "\n");
   inSeg->outputSeg = this;
   inSeg->outputSegmentOffset = size;
@@ -73,11 +75,12 @@ void OutputSegment::finalizeInputSegments() {
   size = 0;
   for (InputChunk *seg : inputSegments) {
     size = llvm::alignTo(size, 1ULL << seg->alignment);
-    LLVM_DEBUG(llvm::dbgs() << "outputSegmentOffset set: " << seg->name
+    LLVM_DEBUG(llvm::dbgs() << "outputSegmentOffset set: " << seg->getName()
                             << " -> " << size << "\n");
     seg->outputSegmentOffset = size;
     size += seg->getSize();
   }
 }
 
-} // namespace lld::wasm
+} // namespace wasm
+} // namespace lld

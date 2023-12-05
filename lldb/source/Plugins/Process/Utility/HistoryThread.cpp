@@ -15,7 +15,6 @@
 
 #include "lldb/Target/Process.h"
 #include "lldb/Target/StackFrameList.h"
-#include "lldb/Utility/LLDBLog.h"
 #include "lldb/Utility/Log.h"
 
 #include <memory>
@@ -34,14 +33,14 @@ HistoryThread::HistoryThread(lldb_private::Process &process, lldb::tid_t tid,
       m_queue_id(LLDB_INVALID_QUEUE_ID) {
   m_unwinder_up =
       std::make_unique<HistoryUnwind>(*this, pcs, pcs_are_call_addresses);
-  Log *log = GetLog(LLDBLog::Object);
+  Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_OBJECT));
   LLDB_LOGF(log, "%p HistoryThread::HistoryThread", static_cast<void *>(this));
 }
 
 //  Destructor
 
 HistoryThread::~HistoryThread() {
-  Log *log = GetLog(LLDBLog::Object);
+  Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_OBJECT));
   LLDB_LOGF(log, "%p HistoryThread::~HistoryThread (tid=0x%" PRIx64 ")",
             static_cast<void *>(this), GetID());
   DestroyThread();

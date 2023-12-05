@@ -15,33 +15,32 @@
 
 // PGOGEN-LABEL: define {{.*}}void @_Z7lambdasv()
 // PGOUSE-LABEL: define {{.*}}void @_Z7lambdasv()
-// PGOGEN: store {{.*}} @[[LWC]]
+// PGOGEN: store {{.*}} @[[LWC]], i64 0, i64 0
 void lambdas() {
   int i = 1;
 
-  // LMBGEN-LABEL: define internal{{( [0-9_a-z]*cc)?( noundef)?( zeroext)?}} i1 @"_ZZ7lambdasvENK3$_0clEi"(
-  // LMBUSE-LABEL: define internal{{( [0-9_a-z]*cc)?( noundef)?( zeroext)?}} i1 @"_ZZ7lambdasvENK3$_0clEi"(
-  // LMBGEN: store {{.*}} @[[LFC]]
+  // LMBGEN-LABEL: define internal{{( [0-9_a-z]*cc)?( zeroext)?}} i1 @"_ZZ7lambdasvENK3$_0clEi"(
+  // LMBUSE-LABEL: define internal{{( [0-9_a-z]*cc)?( zeroext)?}} i1 @"_ZZ7lambdasvENK3$_0clEi"(
+  // LMBGEN: store {{.*}} @[[LFC]], i64 0, i64 0
   auto f = [&i](int k) {
-    // LMBGEN: store {{.*}} @[[LFC]], i32 0, i32 1
+    // LMBGEN: store {{.*}} @[[LFC]], i64 0, i64 1
     // LMBUSE: br {{.*}} !prof ![[LF1:[0-9]+]]
-    if (i > 0) {
-    }
-    // LMBGEN: store {{.*}} @[[LFC]], i32 0, i32 2
+    if (i > 0) {}
+    // LMBGEN: store {{.*}} @[[LFC]], i64 0, i64 2
     // LMBUSE: br {{.*}} !prof ![[LF2:[0-9]+]]
     return k && i;
   };
 
-  // PGOGEN: store {{.*}} @[[LWC]], i32 0, i32 1
+  // PGOGEN: store {{.*}} @[[LWC]], i64 0, i64 1
   // PGOUSE: br {{.*}} !prof ![[LW1:[0-9]+]]
   if (i) {}
 
-  // PGOGEN: store {{.*}} @[[LWC]], i32 0, i32 2
+  // PGOGEN: store {{.*}} @[[LWC]], i64 0, i64 2
   // PGOUSE: br {{.*}} !prof ![[LW2:[0-9]+]]
   for (i = 0; i < 10; ++i)
     f(9 - i);
 
-  // PGOGEN: store {{.*}} @[[LWC]], i32 0, i32 3
+  // PGOGEN: store {{.*}} @[[LWC]], i64 0, i64 3
   // PGOUSE: br {{.*}} !prof ![[LW3:[0-9]+]]
   if (i) {}
 }

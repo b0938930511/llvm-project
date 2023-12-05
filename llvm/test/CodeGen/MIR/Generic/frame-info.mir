@@ -37,7 +37,6 @@ tracksRegLiveness: true
 # CHECK-NEXT: adjustsStack: false
 # CHECK-NEXT: hasCalls: false
 # CHECK-NEXT: stackProtector:  ''
-# CHECK-NEXT: functionContext:  ''
 # CHECK-NEXT: maxCallFrameSize:
 # CHECK-NEXT: cvBytesOfCalleeSavedRegisters: 0
 # CHECK-NEXT: hasOpaqueSPAdjustment: false
@@ -56,8 +55,6 @@ body: |
 ---
 name:            test2
 tracksRegLiveness: true
-stack:
-  - { id: 0, offset: -40, size: 8, alignment: 8 }
 
 # CHECK: test2
 # CHECK: frameInfo:
@@ -72,7 +69,6 @@ stack:
 # CHECK-NEXT: adjustsStack: true
 # CHECK-NEXT: hasCalls: true
 # CHECK-NEXT: stackProtector:  ''
-# CHECK-NEXT: functionContext:  '%stack.0'
 # CHECK-NEXT: maxCallFrameSize: 4
 # CHECK-NEXT: cvBytesOfCalleeSavedRegisters: 8
 # CHECK-NEXT: hasOpaqueSPAdjustment: true
@@ -90,7 +86,6 @@ frameInfo:
   maxAlignment:    4
   adjustsStack:    true
   hasCalls:        true
-  functionContext: '%stack.0'
   maxCallFrameSize: 4
   cvBytesOfCalleeSavedRegisters: 8
   hasOpaqueSPAdjustment: true

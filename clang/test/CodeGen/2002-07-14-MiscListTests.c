@@ -21,7 +21,7 @@ typedef struct list {
 
 list *Data;
 
-void foo(void) {
+void foo() {
   static int Foo = 0;            // Test static local variable
   Foo += 1;                      // Increment static variable
 
@@ -56,7 +56,7 @@ list *FindData(list *L, int Data) {
 void foundIt(void);
 
 // Driver fn...
-void DoListStuff(void) {
+void DoListStuff() {
   list *MyList = 0;
   InsertIntoListTail(&MyList, 100);
   InsertIntoListTail(&MyList, 12);

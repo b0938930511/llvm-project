@@ -82,6 +82,9 @@ public:
   /// Delete the set of alternative alias bases
   void resetAlternativeAliasBases() { AlternativeAliasBases.clear(); }
 
+  /// Add inter iteration alias-free base pointer @p BasePtr.
+  void addInterIterationAliasFreeBasePtr(llvm::Value *BasePtr);
+
   /// Stack for surrounding BandAttr annotations.
   llvm::SmallVector<BandAttr *, 8> LoopAttrEnv;
   BandAttr *&getStagingAttrEnv() { return LoopAttrEnv.back(); }
@@ -90,6 +93,16 @@ public:
   }
 
 private:
+  /// Annotate with the second level alias metadata
+  ///
+  /// Annotate the instruction @p I with the second level alias metadata
+  /// to distinguish the individual non-aliasing accesses that have inter
+  /// iteration alias-free base pointers.
+  ///
+  /// @param I The instruction to be annotated.
+  /// @param BasePtr The base pointer of @p I.
+  void annotateSecondLevel(llvm::Instruction *I, llvm::Value *BasePtr);
+
   /// The ScalarEvolution analysis we use to find base pointers.
   llvm::ScalarEvolution *SE;
 
@@ -109,6 +122,16 @@ private:
   llvm::DenseMap<llvm::AssertingVH<llvm::Value>, llvm::MDNode *>
       OtherAliasScopeListMap;
 
+  /// A map from pointers to second level alias scopes.
+  llvm::DenseMap<const llvm::SCEV *, llvm::MDNode *> SecondLevelAliasScopeMap;
+
+  /// A map from pointers to second level alias scope list of other pointers.
+  llvm::DenseMap<const llvm::SCEV *, llvm::MDNode *>
+      SecondLevelOtherAliasScopeListMap;
+
+  /// Inter iteration alias-free base pointers.
+  llvm::SmallPtrSet<llvm::Value *, 4> InterIterationAliasFreeBasePtrs;
+
   llvm::DenseMap<llvm::AssertingVH<llvm::Value>, llvm::AssertingVH<llvm::Value>>
       AlternativeAliasBases;
 };
@@ -120,7 +143,7 @@ private:
 class IRInserter final : public llvm::IRBuilderDefaultInserter {
 public:
   IRInserter() = default;
-  IRInserter(ScopAnnotator &A) : Annotator(&A) {}
+  IRInserter(class ScopAnnotator &A) : Annotator(&A) {}
 
   void InsertHelper(llvm::Instruction *I, const llvm::Twine &Name,
                     llvm::BasicBlock *BB,
@@ -131,7 +154,7 @@ public:
   }
 
 private:
-  ScopAnnotator *Annotator = nullptr;
+  class ScopAnnotator *Annotator = nullptr;
 };
 
 // TODO: We should not name instructions in NDEBUG builds.

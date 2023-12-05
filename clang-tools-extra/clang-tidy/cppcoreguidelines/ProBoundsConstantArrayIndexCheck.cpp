@@ -11,18 +11,18 @@
 #include "clang/ASTMatchers/ASTMatchFinder.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Lex/Preprocessor.h"
-#include <optional>
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::cppcoreguidelines {
+namespace clang {
+namespace tidy {
+namespace cppcoreguidelines {
 
 ProBoundsConstantArrayIndexCheck::ProBoundsConstantArrayIndexCheck(
     StringRef Name, ClangTidyContext *Context)
     : ClangTidyCheck(Name, Context), GslHeader(Options.get("GslHeader", "")),
       Inserter(Options.getLocalOrGlobal("IncludeStyle",
-                                        utils::IncludeSorter::IS_LLVM),
-               areDiagsSelfContained()) {}
+                                        utils::IncludeSorter::IS_LLVM)) {}
 
 void ProBoundsConstantArrayIndexCheck::storeOptions(
     ClangTidyOptions::OptionMap &Opts) {
@@ -38,18 +38,18 @@ void ProBoundsConstantArrayIndexCheck::registerPPCallbacks(
 void ProBoundsConstantArrayIndexCheck::registerMatchers(MatchFinder *Finder) {
   // Note: if a struct contains an array member, the compiler-generated
   // constructor has an arraySubscriptExpr.
-  Finder->addMatcher(arraySubscriptExpr(hasBase(ignoringImpCasts(hasType(
-                                            constantArrayType().bind("type")))),
-                                        hasIndex(expr().bind("index")),
-                                        unless(hasAncestor(decl(isImplicit()))))
-                         .bind("expr"),
-                     this);
+  Finder->addMatcher(
+      arraySubscriptExpr(
+          hasBase(ignoringImpCasts(hasType(constantArrayType().bind("type")))),
+          hasIndex(expr().bind("index")), unless(hasAncestor(isImplicit())))
+          .bind("expr"),
+      this);
 
   Finder->addMatcher(
       cxxOperatorCallExpr(
           hasOverloadedOperatorName("[]"),
-          callee(cxxMethodDecl(
-              ofClass(cxxRecordDecl(hasName("::std::array")).bind("type")))),
+          hasArgument(
+              0, hasType(cxxRecordDecl(hasName("::std::array")).bind("type"))),
           hasArgument(1, expr().bind("index")))
           .bind("expr"),
       this);
@@ -60,16 +60,10 @@ void ProBoundsConstantArrayIndexCheck::check(
   const auto *Matched = Result.Nodes.getNodeAs<Expr>("expr");
   const auto *IndexExpr = Result.Nodes.getNodeAs<Expr>("index");
 
-  // This expression can only appear inside ArrayInitLoopExpr, which
-  // is always implicitly generated. ArrayInitIndexExpr is not a
-  // constant, but we shouldn't report a warning for it.
-  if (isa<ArrayInitIndexExpr>(IndexExpr))
-    return;
-
   if (IndexExpr->isValueDependent())
     return; // We check in the specialization.
 
-  std::optional<llvm::APSInt> Index =
+  Optional<llvm::APSInt> Index =
       IndexExpr->getIntegerConstantExpr(*Result.Context);
   if (!Index) {
     SourceRange BaseRange;
@@ -77,12 +71,13 @@ void ProBoundsConstantArrayIndexCheck::check(
       BaseRange = ArraySubscriptE->getBase()->getSourceRange();
     else
       BaseRange =
-          cast<CXXOperatorCallExpr>(Matched)->getArg(0)->getSourceRange();
+          dyn_cast<CXXOperatorCallExpr>(Matched)->getArg(0)->getSourceRange();
     SourceRange IndexRange = IndexExpr->getSourceRange();
 
     auto Diag = diag(Matched->getExprLoc(),
                      "do not use array subscript when the index is "
-                     "not an integer constant expression");
+                     "not an integer constant expression; use gsl::at() "
+                     "instead");
     if (!GslHeader.empty()) {
       Diag << FixItHint::CreateInsertion(BaseRange.getBegin(), "gsl::at(")
            << FixItHint::CreateReplacement(
@@ -127,4 +122,6 @@ void ProBoundsConstantArrayIndexCheck::check(
   }
 }
 
-} // namespace clang::tidy::cppcoreguidelines
+} // namespace cppcoreguidelines
+} // namespace tidy
+} // namespace clang

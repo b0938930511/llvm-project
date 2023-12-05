@@ -12,17 +12,17 @@ extern void foo(void(^)(void));
 @interface A:NSObject @end
 @implementation A
 - (void) helper {
- int controller = 0;
+ int master = 0;
  __block int m2 = 0;
  __block int dbTransaction = 0;
  int (^x)(void) = ^(void) { (void) self; 
-	(void) controller; 
+	(void) master; 
 	(void) dbTransaction; 
 	m2++;
 	return m2;
 
 	};
-  controller = x();
+  master = x();
 }
 @end
 

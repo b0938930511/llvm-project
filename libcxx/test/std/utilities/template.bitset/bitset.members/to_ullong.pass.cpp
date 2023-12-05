@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// unsigned long long to_ullong() const; // constexpr since C++23
+// test unsigned long long to_ullong() const;
 
 #include <bitset>
 #include <algorithm>
@@ -17,7 +17,7 @@
 #include "test_macros.h"
 
 template <std::size_t N>
-TEST_CONSTEXPR_CXX23 void test_to_ullong() {
+void test_to_ullong() {
     const std::size_t M = sizeof(unsigned long long) * CHAR_BIT < N ? sizeof(unsigned long long) * CHAR_BIT : N;
     const bool is_M_zero = std::integral_constant<bool, M == 0>::value; // avoid compiler warnings
     const std::size_t X = is_M_zero ? sizeof(unsigned long long) * CHAR_BIT - 1 : sizeof(unsigned long long) * CHAR_BIT - M;
@@ -32,8 +32,9 @@ TEST_CONSTEXPR_CXX23 void test_to_ullong() {
         std::min(max, max-1),
         max
     };
-    for (unsigned long long j : tests) {
-         std::bitset<N> v(j);
+    for (std::size_t i = 0; i < sizeof(tests)/sizeof(tests[0]); ++i) {
+        unsigned long long j = tests[i];
+        std::bitset<N> v(j);
         assert(j == v.to_ullong());
     }
     { // test values bigger than can fit into the bitset
@@ -45,25 +46,16 @@ TEST_CONSTEXPR_CXX23 void test_to_ullong() {
     }
 }
 
-TEST_CONSTEXPR_CXX23 bool test() {
-  test_to_ullong<0>();
-  test_to_ullong<1>();
-  test_to_ullong<31>();
-  test_to_ullong<32>();
-  test_to_ullong<33>();
-  test_to_ullong<63>();
-  test_to_ullong<64>();
-  test_to_ullong<65>();
-  test_to_ullong<1000>();
-
-  return true;
-}
-
 int main(int, char**) {
-  test();
-#if TEST_STD_VER > 20
-  static_assert(test());
-#endif
+//     test_to_ullong<0>();
+    test_to_ullong<1>();
+    test_to_ullong<31>();
+    test_to_ullong<32>();
+    test_to_ullong<33>();
+    test_to_ullong<63>();
+    test_to_ullong<64>();
+    test_to_ullong<65>();
+    test_to_ullong<1000>();
 
-  return 0;
+    return 0;
 }

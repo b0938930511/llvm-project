@@ -136,7 +136,7 @@ void ok_pif(int x) {
 
 int getValue(bool *isPositive);
 void use(int a);
-void foo(void) {
+void foo() {
   bool isPositive;
   int x = getValue(&isPositive);
   if (isPositive) {
@@ -147,8 +147,8 @@ void foo(void) {
   }
 }
 
-int getValue2(void);
-void foo2(void) {
+int getValue2();
+void foo2() {
   int x = getValue2();
   int y = x;
 

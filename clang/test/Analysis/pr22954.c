@@ -3,7 +3,7 @@
 // At the moment the whole of the destination array content is invalidated.
 // If a.s1 region has a symbolic offset, the whole region of 'a' is invalidated.
 // Specific triple set to test structures of size 0.
-// RUN: %clang_analyze_cc1 -triple x86_64-pc-linux-gnu -analyzer-checker=core,unix.Malloc,debug.ExprInspection -Wno-error=int-conversion -verify -analyzer-config eagerly-assume=false %s
+// RUN: %clang_analyze_cc1 -triple x86_64-pc-linux-gnu -analyzer-checker=core,unix.Malloc,debug.ExprInspection -analyzer-store=region -verify -analyzer-config eagerly-assume=false %s
 
 typedef __typeof(sizeof(int)) size_t;
 
@@ -20,7 +20,7 @@ struct aa {
 };
 
 // Test different types of structure initialisation.
-int f0(void) {
+int f0() {
   struct aa a0 = {{1, 2, 3, 4}, 0};
   a0.s2 = strdup("hello");
   char input[] = {'a', 'b', 'c', 'd'};
@@ -34,7 +34,7 @@ int f0(void) {
   return 0;
 }
 
-int f1(void) {
+int f1() {
   struct aa a1;
   a1.s2 = strdup("hello");
   char input[] = {'a', 'b', 'c', 'd'};
@@ -48,7 +48,7 @@ int f1(void) {
   return 0;
 }
 
-int f2(void) {
+int f2() {
   struct aa a2 = {{1, 2}};
   a2.s2 = strdup("hello");
   char input[] = {'a', 'b', 'c', 'd'};
@@ -62,7 +62,7 @@ int f2(void) {
   return 0;
 }
 
-int f3(void) {
+int f3() {
   struct aa a3 = {{1, 2, 3, 4}, 0};
   a3.s2 = strdup("hello");
   char input[] = {'a', 'b', 'c', 'd'};
@@ -86,7 +86,7 @@ struct bb {
   char * s2;
 };
 
-int f4(void) {
+int f4() {
   struct bb b0 = {{1, 2, 3, 4}, 0};
   b0.s2 = strdup("hello");
   b0.a.s2 = strdup("hola");
@@ -108,7 +108,7 @@ int f4(void) {
 }
 
 // Test that memory leaks are caught.
-int f5(void) {
+int f5() {
   struct aa a0 = {{1, 2, 3, 4}, 0};
   a0.s2 = strdup("hello");
   char input[] = {'a', 'b', 'c', 'd'};
@@ -116,7 +116,7 @@ int f5(void) {
   return 0; // expected-warning{{Potential leak of memory pointed to by 'a0.s2'}}
 }
 
-int f6(void) {
+int f6() {
   struct aa a1;
   a1.s2 = strdup("hello");
   char input[] = {'a', 'b', 'c', 'd'};
@@ -124,7 +124,7 @@ int f6(void) {
   return 0; // expected-warning{{Potential leak of memory pointed to by 'a1.s2'}}
 }
 
-int f7(void) {
+int f7() {
   struct aa a2 = {{1, 2}};
   a2.s2 = strdup("hello");
   char input[] = {'a', 'b', 'c', 'd'};
@@ -132,7 +132,7 @@ int f7(void) {
   return 0; // expected-warning{{Potential leak of memory pointed to by 'a2.s2'}}
 }
 
-int f8(void) {
+int f8() {
   struct aa a3 = {{1, 2, 3, 4}, 0};
   a3.s2 = strdup("hello");
   char input[] = {'a', 'b', 'c', 'd'};
@@ -141,7 +141,7 @@ int f8(void) {
   return 0; // expected-warning{{Potential leak of memory pointed to by 'a3.s2'}}
 }
 
-int f9(void) {
+int f9() {
   struct bb b0 = {{1, 2, 3, 4}, 0};
   b0.s2 = strdup("hello");
   b0.a.s2 = strdup("hola");
@@ -152,7 +152,7 @@ int f9(void) {
   return 0;
 }
 
-int f10(void) {
+int f10() {
   struct bb b0 = {{1, 2, 3, 4}, 0};
   b0.s2 = strdup("hello");
   b0.a.s2 = strdup("hola");
@@ -169,7 +169,7 @@ struct cc {
   char * s2;
 };
 
-int f11(void) {
+int f11() {
   char x[4] = {1, 2};
   x[0] = 1;
   x[1] = 2;
@@ -194,7 +194,7 @@ struct dd {
   char s1[4];
 };
 
-int f12(void) {
+int f12() {
   struct dd d0 = {0, {1, 2, 3, 4}};
   d0.s2 = strdup("hello");
   char input[] = {'a', 'b', 'c', 'd'};
@@ -219,7 +219,7 @@ struct EE {
   char * s2;
 };
 
-int f13(void) {
+int f13() {
   struct EE E0 = {{{1, 2}, {3, 4}}, 0};
   E0.s2 = strdup("hello");
   char input[] = {'a', 'b', 'c', 'd'};
@@ -236,7 +236,7 @@ int f13(void) {
 // Test global parameters.
 struct aa a15 = {{1, 2, 3, 4}, 0};
 
-int f15(void) {
+int f15() {
   a15.s2 = strdup("hello");
   char input[] = {'a', 'b', 'c', 'd'};
   memcpy(a15.s1, input, 4);
@@ -256,7 +256,7 @@ struct gg {
   char * s2;
 };
 
-int f16(void) {
+int f16() {
   struct gg g0 = {{}, 0};
   g0.s2 = strdup("hello");
   char input[] = {'a', 'b', 'c', 'd'};
@@ -277,7 +277,7 @@ struct hh {
   char * s2;
 };
 
-int f17(void) {
+int f17() {
   struct hh h0;
   h0.s2 = strdup("hello");
   char input[] = {'a', 'b', 'c', 'd'};
@@ -297,7 +297,7 @@ struct ii {
   char * s2;
 };
 
-int f18(void) {
+int f18() {
   struct ii i18 = {{1, 2, 3, 4}, 5, 6};
   i18.i = 10;
   i18.j = 11;
@@ -314,7 +314,7 @@ int f18(void) {
   return 0;
 }
 
-int f181(void) {
+int f181() {
   struct ii i181 = {{1, 2, 3, 4}, 5, 6};
   i181.i = 10;
   i181.j = 11;
@@ -453,7 +453,7 @@ struct mm {
   char * s4;
 };
 
-int f24(void) {
+int f24() {
   struct ll l24 = {{1, 2, 3, 4}, 0};
   struct mm * m24 = (struct mm *)&l24;
   m24->s4 = strdup("hello");
@@ -518,7 +518,7 @@ int f26(int i) {
 }
 
 // Test sizeof as a size argument.
-int f261(void) {
+int f261() {
   struct aa a261 = {{1, 2, 3, 4}, 0};
   a261.s2 = strdup("hello");
   char input[] = {'a', 'b', 'c', 'd'};
@@ -532,7 +532,7 @@ int f261(void) {
 }
 
 // Test negative size argument.
-int f262(void) {
+int f262() {
   struct aa a262 = {{1, 2, 3, 4}, 0};
   a262.s2 = strdup("hello");
   char input[] = {'a', 'b', 'c', 'd'};
@@ -556,13 +556,12 @@ int f263(int n, char * len) {
   x263.s2 = strdup("hello");
   char input[] = {'a', 'b', 'c', 'd'};
   memcpy(x263.s1, input, *(len + n));
-  clang_analyzer_eval(x263.s1[0] == 0); // expected-warning{{UNKNOWN}}\
-  expected-warning{{Potential leak of memory pointed to by 'x263.s2'}}
+  clang_analyzer_eval(x263.s1[0] == 0); // expected-warning{{UNKNOWN}}
   clang_analyzer_eval(x263.s1[1] == 0); // expected-warning{{UNKNOWN}}
   clang_analyzer_eval(x263.s1[2] == 0); // expected-warning{{UNKNOWN}}
   clang_analyzer_eval(x263.s1[3] == 0); // expected-warning{{UNKNOWN}}
   clang_analyzer_eval(x263.s2 == 0); // expected-warning{{UNKNOWN}}
-  return 0;
+  return 0; // expected-warning{{Potential leak of memory pointed to by 'x263.s2'}}
 }
 
 
@@ -640,7 +639,7 @@ union uu {
   char s1[4];
 };
 
-int f30(void) {
+int f30() {
   union uu u30 = { .s1 = {1, 2, 3, 4}};
   char input[] = {1, 2, 3, 4};
   memcpy(u30.s1, input, 4);
@@ -657,7 +656,7 @@ struct kk {
   char * s2;
 };
 
-int f31(void) {
+int f31() {
   struct kk k31;
   k31.s2 = strdup("hello");
   k31.u.x = 1;
@@ -678,7 +677,7 @@ union vv {
   char * s2;
 };
 
-int f32(void) {
+int f32() {
   union vv v32;
   v32.s2 = strdup("hello");
   char input[] = {'a', 'b', 'c', 'd'};
@@ -700,7 +699,7 @@ struct nn {
 };
 
 // Test bad types to dest buffer.
-int f33(void) {
+int f33() {
   struct nn n33 = {1, 2, 3, 4, 0};
   n33.s2 = strdup("hello");
   char input[] = {'a', 'b', 'c', 'd'};

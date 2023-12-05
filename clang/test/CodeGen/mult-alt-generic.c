@@ -15,14 +15,14 @@ int min1;
 int marray[2];
 
 // CHECK: @single_m
-void single_m(void)
+void single_m()
 {
-  // CHECK: call void asm "foo $1,$0", "=*m,*m[[CLOBBERS:[a-zA-Z0-9@%{},~_$ ]*\"]](ptr elementtype(i32) {{[a-zA-Z0-9@%]+}}, ptr elementtype(i32) {{[a-zA-Z0-9@%]+}})
+  // CHECK: call void asm "foo $1,$0", "=*m,*m[[CLOBBERS:[a-zA-Z0-9@%{},~_$ ]*\"]](i32* {{[a-zA-Z0-9@%]+}}, i32* {{[a-zA-Z0-9@%]+}})
   asm("foo %1,%0" : "=m" (mout0) : "m" (min1));
 }
 
 // CHECK: @single_o
-void single_o(void)
+void single_o()
 {
   register int out0 = 0;
   register int index = 1;
@@ -31,13 +31,13 @@ void single_o(void)
 }
 
 // CHECK: @single_V
-void single_V(void)
+void single_V()
 {
 //  asm("foo %1,%0" : "=m" (mout0) : "V" (min1));
 }
 
 // CHECK: @single_lt
-void single_lt(void)
+void single_lt()
 {
   register int out0 = 0;
   register int in1 = 1;
@@ -48,7 +48,7 @@ void single_lt(void)
 }
 
 // CHECK: @single_gt
-void single_gt(void)
+void single_gt()
 {
   register int out0 = 0;
   register int in1 = 1;
@@ -59,7 +59,7 @@ void single_gt(void)
 }
 
 // CHECK: @single_r
-void single_r(void)
+void single_r()
 {
   register int out0 = 0;
   register int in1 = 1;
@@ -68,7 +68,7 @@ void single_r(void)
 }
 
 // CHECK: @single_i
-void single_i(void)
+void single_i()
 {
   register int out0 = 0;
   // CHECK: call i32 asm "foo $1,$0", "=r,i[[CLOBBERS]](i32 1)
@@ -76,7 +76,7 @@ void single_i(void)
 }
 
 // CHECK: @single_n
-void single_n(void)
+void single_n()
 {
   register int out0 = 0;
   // CHECK: call i32 asm "foo $1,$0", "=r,n[[CLOBBERS]](i32 1)
@@ -84,7 +84,7 @@ void single_n(void)
 }
 
 // CHECK: @single_E
-void single_E(void)
+void single_E()
 {
   register double out0 = 0.0;
   // CHECK: call double asm "foo $1,$0", "=r,E[[CLOBBERS]](double {{[0-9.eE+-]+}})
@@ -92,7 +92,7 @@ void single_E(void)
 }
 
 // CHECK: @single_F
-void single_F(void)
+void single_F()
 {
   register double out0 = 0.0;
   // CHECK: call double asm "foo $1,$0", "=r,F[[CLOBBERS]](double {{[0-9.eE+-]+}})
@@ -100,14 +100,14 @@ void single_F(void)
 }
 
 // CHECK: @single_s
-void single_s(void)
+void single_s()
 {
   register int out0 = 0;
   //asm("foo %1,%0" : "=r" (out0) : "s" (single_s));
 }
 
 // CHECK: @single_g
-void single_g(void)
+void single_g()
 {
   register int out0 = 0;
   register int in1 = 1;
@@ -120,7 +120,7 @@ void single_g(void)
 }
 
 // CHECK: @single_X
-void single_X(void)
+void single_X()
 {
   register int out0 = 0;
   register int in1 = 1;
@@ -130,7 +130,7 @@ void single_X(void)
   asm("foo %1,%0" : "=r" (out0) : "X" (min1));
   // CHECK: call i32 asm "foo $1,$0", "=r,X[[CLOBBERS]](i32 1)
   asm("foo %1,%0" : "=r" (out0) : "X" (1));
-  // CHECK: call i32 asm "foo $1,$0", "=r,X[[CLOBBERS]](ptr {{[a-zA-Z0-9@%]+}})
+  // CHECK: call i32 asm "foo $1,$0", "=r,X[[CLOBBERS]](i32* getelementptr inbounds ([2 x i32], [2 x i32]* {{[a-zA-Z0-9@%]+}}, i{{32|64}} 0, i{{32|64}} 0))
   asm("foo %1,%0" : "=r" (out0) : "X" (marray));
   // CHECK: call i32 asm "foo $1,$0", "=r,X[[CLOBBERS]](double {{[0-9.eE+-]+}})
   asm("foo %1,%0" : "=r" (out0) : "X" (1.0e+01));
@@ -139,23 +139,23 @@ void single_X(void)
 }
 
 // CHECK: @single_p
-void single_p(void)
+void single_p()
 {
   register int out0 = 0;
   // Constraint converted differently on different platforms moved to platform-specific.
-  // : call i32 asm "foo $1,$0", "=r,im[[CLOBBERS]](ptr getelementptr inbounds ([2 x i32], ptr {{[a-zA-Z0-9@%]+}}, i{{32|64}} 0, i{{32|64}} 0))
+  // : call i32 asm "foo $1,$0", "=r,im[[CLOBBERS]](i32* getelementptr inbounds ([2 x i32], [2 x i32]* {{[a-zA-Z0-9@%]+}}, i{{32|64}} 0, i{{32|64}} 0))
   asm("foo %1,%0" : "=r" (out0) : "p" (marray));
 }
 
 // CHECK: @multi_m
-void multi_m(void)
+void multi_m()
 {
-  // CHECK: call void asm "foo $1,$0", "=*m|r,m|r[[CLOBBERS]](ptr elementtype(i32) {{[a-zA-Z0-9@%]+}}, i32 {{[a-zA-Z0-9@%]+}})
+  // CHECK: call void asm "foo $1,$0", "=*m|r,m|r[[CLOBBERS]](i32* {{[a-zA-Z0-9@%]+}}, i32 {{[a-zA-Z0-9@%]+}})
   asm("foo %1,%0" : "=m,r" (mout0) : "m,r" (min1));
 }
 
 // CHECK: @multi_o
-void multi_o(void)
+void multi_o()
 {
   register int out0 = 0;
   register int index = 1;
@@ -164,13 +164,13 @@ void multi_o(void)
 }
 
 // CHECK: @multi_V
-void multi_V(void)
+void multi_V()
 {
 //  asm("foo %1,%0" : "=m,r" (mout0) : "r,V" (min1));
 }
 
 // CHECK: @multi_lt
-void multi_lt(void)
+void multi_lt()
 {
   register int out0 = 0;
   register int in1 = 1;
@@ -181,7 +181,7 @@ void multi_lt(void)
 }
 
 // CHECK: @multi_gt
-void multi_gt(void)
+void multi_gt()
 {
   register int out0 = 0;
   register int in1 = 1;
@@ -192,7 +192,7 @@ void multi_gt(void)
 }
 
 // CHECK: @multi_r
-void multi_r(void)
+void multi_r()
 {
   register int out0 = 0;
   register int in1 = 1;
@@ -201,7 +201,7 @@ void multi_r(void)
 }
 
 // CHECK: @multi_i
-void multi_i(void)
+void multi_i()
 {
   register int out0 = 0;
   // CHECK: call i32 asm "foo $1,$0", "=r|r,r|i[[CLOBBERS]](i32 1)
@@ -209,7 +209,7 @@ void multi_i(void)
 }
 
 // CHECK: @multi_n
-void multi_n(void)
+void multi_n()
 {
   register int out0 = 0;
   // CHECK: call i32 asm "foo $1,$0", "=r|r,r|n[[CLOBBERS]](i32 1)
@@ -217,7 +217,7 @@ void multi_n(void)
 }
 
 // CHECK: @multi_E
-void multi_E(void)
+void multi_E()
 {
   register double out0 = 0.0;
   // CHECK: call double asm "foo $1,$0", "=r|r,r|E[[CLOBBERS]](double {{[0-9.eE+-]+}})
@@ -225,7 +225,7 @@ void multi_E(void)
 }
 
 // CHECK: @multi_F
-void multi_F(void)
+void multi_F()
 {
   register double out0 = 0.0;
   // CHECK: call double asm "foo $1,$0", "=r|r,r|F[[CLOBBERS]](double {{[0-9.eE+-]+}})
@@ -233,14 +233,14 @@ void multi_F(void)
 }
 
 // CHECK: @multi_s
-void multi_s(void)
+void multi_s()
 {
   register int out0 = 0;
   //asm("foo %1,%0" : "=r,r" (out0) : "r,s" (multi_s));
 }
 
 // CHECK: @multi_g
-void multi_g(void)
+void multi_g()
 {
   register int out0 = 0;
   register int in1 = 1;
@@ -253,7 +253,7 @@ void multi_g(void)
 }
 
 // CHECK: @multi_X
-void multi_X(void)
+void multi_X()
 {
   register int out0 = 0;
   register int in1 = 1;
@@ -263,7 +263,7 @@ void multi_X(void)
   asm("foo %1,%0" : "=r,r" (out0) : "r,X" (min1));
   // CHECK: call i32 asm "foo $1,$0", "=r|r,r|X[[CLOBBERS]](i32 1)
   asm("foo %1,%0" : "=r,r" (out0) : "r,X" (1));
-  // CHECK: call i32 asm "foo $1,$0", "=r|r,r|X[[CLOBBERS]](ptr {{[a-zA-Z0-9@%]+}})
+  // CHECK: call i32 asm "foo $1,$0", "=r|r,r|X[[CLOBBERS]](i32* getelementptr inbounds ([2 x i32], [2 x i32]* {{[a-zA-Z0-9@%]+}}, i{{32|64}} 0, i{{32|64}} 0))
   asm("foo %1,%0" : "=r,r" (out0) : "r,X" (marray));
   // CHECK: call i32 asm "foo $1,$0", "=r|r,r|X[[CLOBBERS]](double {{[0-9.eE+-]+}})
   asm("foo %1,%0" : "=r,r" (out0) : "r,X" (1.0e+01));
@@ -272,10 +272,10 @@ void multi_X(void)
 }
 
 // CHECK: @multi_p
-void multi_p(void)
+void multi_p()
 {
   register int out0 = 0;
   // Constraint converted differently on different platforms moved to platform-specific.
-  // : call i32 asm "foo $1,$0", "=r|r,r|im[[CLOBBERS]](ptr getelementptr inbounds ([2 x i32], ptr {{[a-zA-Z0-9@%]+}}, {{i[0-9]*}} 0, {{i[0-9]*}} 0))
+  // : call i32 asm "foo $1,$0", "=r|r,r|im[[CLOBBERS]](i32* getelementptr inbounds ([2 x i32], [2 x i32]* {{[a-zA-Z0-9@%]+}}, {{i[0-9]*}} 0, {{i[0-9]*}} 0))
   asm("foo %1,%0" : "=r,r" (out0) : "r,p" (marray));
 }

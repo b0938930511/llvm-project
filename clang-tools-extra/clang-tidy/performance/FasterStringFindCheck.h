@@ -14,14 +14,16 @@
 #include <string>
 #include <vector>
 
-namespace clang::tidy::performance {
+namespace clang {
+namespace tidy {
+namespace performance {
 
 /// Optimize calls to std::string::find() and friends when the needle passed is
 /// a single character string literal.
 /// The character literal overload is more efficient.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/performance/faster-string-find.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/performance-faster-string-find.html
 class FasterStringFindCheck : public ClangTidyCheck {
 public:
   FasterStringFindCheck(StringRef Name, ClangTidyContext *Context);
@@ -33,9 +35,11 @@ public:
   void storeOptions(ClangTidyOptions::OptionMap &Opts) override;
 
 private:
-  const std::vector<StringRef> StringLikeClasses;
+  const std::vector<std::string> StringLikeClasses;
 };
 
-} // namespace clang::tidy::performance
+} // namespace performance
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_PERFORMANCE_FASTER_STRING_FIND_H

@@ -73,10 +73,10 @@ private:
   };
 
   ExecutionContextRef m_exe_ctx_ref;
-  uint8_t m_ptr_size = 8;
-  DataDescriptor_32 *m_data_32 = nullptr;
-  DataDescriptor_64 *m_data_64 = nullptr;
-  lldb::addr_t m_data_ptr = LLDB_INVALID_ADDRESS;
+  uint8_t m_ptr_size;
+  DataDescriptor_32 *m_data_32;
+  DataDescriptor_64 *m_data_64;
+  lldb::addr_t m_data_ptr;
   std::vector<SetItemDescriptor> m_children;
 };
 
@@ -101,8 +101,8 @@ private:
   };
 
   ExecutionContextRef m_exe_ctx_ref;
-  uint8_t m_ptr_size = 8;
-  lldb::ByteOrder m_order = lldb::eByteOrderInvalid;
+  uint8_t m_ptr_size;
+  lldb::ByteOrder m_order;
 
   CFBasicHash m_hashtable;
 
@@ -135,7 +135,7 @@ private:
   };
 
   ExecutionContextRef m_exe_ctx_ref;
-  uint8_t m_ptr_size = 8;
+  uint8_t m_ptr_size;
   D32 *m_data_32;
   D64 *m_data_64;
   std::vector<SetItemDescriptor> m_children;
@@ -249,7 +249,7 @@ public:
 template <bool cf_style>
 bool lldb_private::formatters::NSSetSummaryProvider(
     ValueObject &valobj, Stream &stream, const TypeSummaryOptions &options) {
-  static constexpr llvm::StringLiteral g_TypeHint("NSSet");
+  static ConstString g_TypeHint("NSSet");
 
   ProcessSP process_sp = valobj.GetProcessSP();
   if (!process_sp)
@@ -322,13 +322,17 @@ bool lldb_private::formatters::NSSetSummaryProvider(
       return false;
   }
 
-  llvm::StringRef prefix, suffix;
-  if (Language *language = Language::FindPlugin(options.GetLanguage()))
-    std::tie(prefix, suffix) = language->GetFormatterPrefixSuffix(g_TypeHint);
+  std::string prefix, suffix;
+  if (Language *language = Language::FindPlugin(options.GetLanguage())) {
+    if (!language->GetFormatterPrefixSuffix(valobj, g_TypeHint, prefix,
+                                            suffix)) {
+      prefix.clear();
+      suffix.clear();
+    }
+  }
 
-  stream << prefix;
-  stream.Printf("%" PRIu64 " %s%s", value, "element", value == 1 ? "" : "s");
-  stream << suffix;
+  stream.Printf("%s%" PRIu64 " %s%s%s", prefix.c_str(), value, "element",
+                value == 1 ? "" : "s", suffix.c_str());
   return true;
 }
 
@@ -397,7 +401,8 @@ lldb_private::formatters::NSSetSyntheticFrontEndCreator(
 
 lldb_private::formatters::NSSetISyntheticFrontEnd::NSSetISyntheticFrontEnd(
     lldb::ValueObjectSP valobj_sp)
-    : SyntheticChildrenFrontEnd(*valobj_sp), m_exe_ctx_ref() {
+    : SyntheticChildrenFrontEnd(*valobj_sp), m_exe_ctx_ref(), m_ptr_size(8),
+      m_data_32(nullptr), m_data_64(nullptr) {
   if (valobj_sp)
     Update();
 }
@@ -457,7 +462,7 @@ bool lldb_private::formatters::NSSetISyntheticFrontEnd::Update() {
   if (error.Fail())
     return false;
   m_data_ptr = data_location + m_ptr_size;
-  return true;
+  return false;
 }
 
 bool lldb_private::formatters::NSSetISyntheticFrontEnd::MightHaveChildren() {
@@ -541,8 +546,8 @@ lldb_private::formatters::NSSetISyntheticFrontEnd::GetChildAtIndex(size_t idx) {
 
 lldb_private::formatters::NSCFSetSyntheticFrontEnd::NSCFSetSyntheticFrontEnd(
     lldb::ValueObjectSP valobj_sp)
-    : SyntheticChildrenFrontEnd(*valobj_sp), m_exe_ctx_ref(), m_hashtable(),
-      m_pair_type() {}
+    : SyntheticChildrenFrontEnd(*valobj_sp), m_exe_ctx_ref(), m_ptr_size(8),
+      m_order(lldb::eByteOrderInvalid), m_hashtable(), m_pair_type() {}
 
 size_t
 lldb_private::formatters::NSCFSetSyntheticFrontEnd::GetIndexOfChildWithName(
@@ -631,7 +636,7 @@ lldb_private::formatters::NSCFSetSyntheticFrontEnd::GetChildAtIndex(
   SetItemDescriptor &set_item = m_children[idx];
   if (!set_item.valobj_sp) {
 
-    WritableDataBufferSP buffer_sp(new DataBufferHeap(m_ptr_size, 0));
+    DataBufferSP buffer_sp(new DataBufferHeap(m_ptr_size, 0));
 
     switch (m_ptr_size) {
     case 0: // architecture has no clue - fail
@@ -662,9 +667,10 @@ lldb_private::formatters::NSCFSetSyntheticFrontEnd::GetChildAtIndex(
 }
 
 template <typename D32, typename D64>
-lldb_private::formatters::GenericNSSetMSyntheticFrontEnd<
-    D32, D64>::GenericNSSetMSyntheticFrontEnd(lldb::ValueObjectSP valobj_sp)
-    : SyntheticChildrenFrontEnd(*valobj_sp), m_exe_ctx_ref(),
+lldb_private::formatters::
+  GenericNSSetMSyntheticFrontEnd<D32, D64>::GenericNSSetMSyntheticFrontEnd(
+    lldb::ValueObjectSP valobj_sp)
+    : SyntheticChildrenFrontEnd(*valobj_sp), m_exe_ctx_ref(), m_ptr_size(8),
       m_data_32(nullptr), m_data_64(nullptr) {
   if (valobj_sp)
     Update();
@@ -731,7 +737,9 @@ lldb_private::formatters::
     process_sp->ReadMemory(data_location, m_data_64, sizeof(D64),
                            error);
   }
-  return error.Success();
+  if (error.Fail())
+    return false;
+  return false;
 }
 
 template <typename D32, typename D64>

@@ -1,6 +1,6 @@
 ; Make sure that the constant propagator doesn't cause a sigfpe
 ;
-; RUN: opt < %s -passes=instsimplify
+; RUN: opt < %s -instsimplify
 ;
 
 define i32 @test() {

@@ -25,7 +25,7 @@ class RecordPrinter : public RecordVisitor {
 
 public:
   explicit RecordPrinter(raw_ostream &O, std::string D)
-      : OS(O), Delim(std::move(D)) {}
+      : RecordVisitor(), OS(O), Delim(std::move(D)) {}
 
   explicit RecordPrinter(raw_ostream &O) : RecordPrinter(O, ""){};
 

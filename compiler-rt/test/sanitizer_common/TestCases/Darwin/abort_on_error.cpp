@@ -16,8 +16,8 @@ int global;
 
 int main() {
 #if defined(USING_ubsan)
-  volatile int *null = 0;
-  *null = 0;
+  int value = 5;
+  int computation = value / 0; // Division by zero.
 #else
   volatile int *a = new int[100];
   delete[] a;

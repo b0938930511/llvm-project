@@ -9,20 +9,21 @@
 #ifndef LLVM_MC_MCPARSER_MCASMPARSER_H
 #define LLVM_MC_MCPARSER_MCASMPARSER_H
 
-#include "llvm/ADT/STLFunctionalExtras.h"
+#include "llvm/ADT/None.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
-#include "llvm/MC/MCAsmMacro.h"
+#include "llvm/MC/MCParser/MCAsmLexer.h"
 #include "llvm/Support/SMLoc.h"
 #include <cstdint>
+#include <ctime>
 #include <string>
 #include <utility>
 
 namespace llvm {
 
-class MCAsmLexer;
 class MCAsmInfo;
 class MCAsmParserExtension;
 class MCContext;
@@ -83,11 +84,11 @@ struct InlineAsmIdentifierInfo {
     Var.Type = type;
     Var.Length = size / type;
   }
-  InlineAsmIdentifierInfo() = default;
+  InlineAsmIdentifierInfo() : Kind(IK_Invalid) {}
 
 private:
   // Discriminate using the current kind.
-  IdKind Kind = IK_Invalid;
+  IdKind Kind;
 };
 
 // Generic type information for an assembly object.
@@ -209,34 +210,31 @@ public:
       const MCInstPrinter *IP, MCAsmParserSemaCallback &SI) = 0;
 
   /// Emit a note at the location \p L, with the message \p Msg.
-  virtual void Note(SMLoc L, const Twine &Msg,
-                    SMRange Range = std::nullopt) = 0;
+  virtual void Note(SMLoc L, const Twine &Msg, SMRange Range = None) = 0;
 
   /// Emit a warning at the location \p L, with the message \p Msg.
   ///
   /// \return The return value is true, if warnings are fatal.
-  virtual bool Warning(SMLoc L, const Twine &Msg,
-                       SMRange Range = std::nullopt) = 0;
+  virtual bool Warning(SMLoc L, const Twine &Msg, SMRange Range = None) = 0;
 
   /// Return an error at the location \p L, with the message \p Msg. This
   /// may be modified before being emitted.
   ///
   /// \return The return value is always true, as an idiomatic convenience to
   /// clients.
-  bool Error(SMLoc L, const Twine &Msg, SMRange Range = std::nullopt);
+  bool Error(SMLoc L, const Twine &Msg, SMRange Range = None);
 
   /// Emit an error at the location \p L, with the message \p Msg.
   ///
   /// \return The return value is always true, as an idiomatic convenience to
   /// clients.
-  virtual bool printError(SMLoc L, const Twine &Msg,
-                          SMRange Range = std::nullopt) = 0;
+  virtual bool printError(SMLoc L, const Twine &Msg, SMRange Range = None) = 0;
 
   bool hasPendingError() { return !PendingErrors.empty(); }
 
   bool printPendingErrors() {
     bool rv = !PendingErrors.empty();
-    for (auto &Err : PendingErrors) {
+    for (auto Err : PendingErrors) {
       printError(Err.Loc, Twine(Err.Msg), Err.Range);
     }
     PendingErrors.clear();
@@ -255,7 +253,7 @@ public:
   const AsmToken &getTok() const;
 
   /// Report an error at the current lexer location.
-  bool TokError(const Twine &Msg, SMRange Range = std::nullopt);
+  bool TokError(const Twine &Msg, SMRange Range = None);
 
   bool parseTokenLoc(SMLoc &Loc);
   bool parseToken(AsmToken::TokenKind T, const Twine &Msg = "unexpected token");
@@ -264,7 +262,6 @@ public:
   bool parseOptionalToken(AsmToken::TokenKind T);
 
   bool parseComma() { return parseToken(AsmToken::Comma, "expected comma"); }
-  bool parseRParen() { return parseToken(AsmToken::RParen, "expected ')'"); }
   bool parseEOL();
   bool parseEOL(const Twine &ErrMsg);
 

@@ -17,7 +17,7 @@
 #ifndef LLVM_UTILS_TABLEGEN_X86MODRMFILTERS_H
 #define LLVM_UTILS_TABLEGEN_X86MODRMFILTERS_H
 
-#include <cstdint>
+#include "llvm/Support/DataTypes.h"
 
 namespace llvm {
 
@@ -73,7 +73,10 @@ public:
   ///                 otherwise.  The name r derives from the fact that the mod
   ///                 bits indicate whether the R/M bits [bits 2-0] signify a
   ///                 register or a memory operand.
-  ModFilter(bool r) : R(r) {}
+  ModFilter(bool r) :
+    ModRMFilter(),
+    R(r) {
+  }
 
   bool accepts(uint8_t modRM) const override {
     return (R == ((modRM & 0xc0) == 0xc0));
@@ -92,7 +95,11 @@ public:
   /// \param r   True if the mod field must be set to 11; false otherwise.
   ///            The name is explained at ModFilter.
   /// \param nnn The required value of the nnn field.
-  ExtendedFilter(bool r, uint8_t nnn) : R(r), NNN(nnn) {}
+  ExtendedFilter(bool r, uint8_t nnn) :
+    ModRMFilter(),
+    R(r),
+    NNN(nnn) {
+  }
 
   bool accepts(uint8_t modRM) const override {
     return (((R  && ((modRM & 0xc0) == 0xc0)) ||
@@ -113,7 +120,11 @@ public:
   /// \param r   True if the mod field must be set to 11; false otherwise.
   ///            The name is explained at ModFilter.
   /// \param nnn The required value of the nnn field.
-  ExtendedRMFilter(bool r, uint8_t nnn) : R(r), NNN(nnn) {}
+  ExtendedRMFilter(bool r, uint8_t nnn) :
+    ModRMFilter(),
+    R(r),
+    NNN(nnn) {
+  }
 
   bool accepts(uint8_t modRM) const override {
     return ((R && ((modRM & 0xc0) == 0xc0)) &&
@@ -129,7 +140,10 @@ public:
   /// Constructor
   ///
   /// \param modRM The required value of the full ModR/M byte.
-  ExactFilter(uint8_t modRM) : ModRM(modRM) {}
+  ExactFilter(uint8_t modRM) :
+    ModRMFilter(),
+    ModRM(modRM) {
+  }
 
   bool accepts(uint8_t modRM) const override {
     return (ModRM == modRM);

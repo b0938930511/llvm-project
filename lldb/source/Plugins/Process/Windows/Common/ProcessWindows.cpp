@@ -18,7 +18,6 @@
 #include "lldb/Core/PluginManager.h"
 #include "lldb/Core/Section.h"
 #include "lldb/Host/FileSystem.h"
-#include "lldb/Host/HostInfo.h"
 #include "lldb/Host/HostNativeProcessBase.h"
 #include "lldb/Host/HostProcess.h"
 #include "lldb/Host/windows/HostThreadWindows.h"
@@ -107,7 +106,12 @@ void ProcessWindows::Initialize() {
 
 void ProcessWindows::Terminate() {}
 
-llvm::StringRef ProcessWindows::GetPluginDescriptionStatic() {
+lldb_private::ConstString ProcessWindows::GetPluginNameStatic() {
+  static ConstString g_name("windows");
+  return g_name;
+}
+
+const char *ProcessWindows::GetPluginDescriptionStatic() {
   return "Process plugin for Windows";
 }
 
@@ -138,11 +142,19 @@ size_t ProcessWindows::PutSTDIN(const char *buf, size_t buf_size,
   return 0;
 }
 
+// ProcessInterface protocol.
+
+lldb_private::ConstString ProcessWindows::GetPluginName() {
+  return GetPluginNameStatic();
+}
+
+uint32_t ProcessWindows::GetPluginVersion() { return 1; }
+
 Status ProcessWindows::EnableBreakpointSite(BreakpointSite *bp_site) {
   if (bp_site->HardwareRequired())
     return Status("Hardware breakpoints are not supported.");
 
-  Log *log = GetLog(WindowsLog::Breakpoints);
+  Log *log = ProcessWindowsLog::GetLogIfAny(WINDOWS_LOG_BREAKPOINTS);
   LLDB_LOG(log, "bp_site = {0:x}, id={1}, addr={2:x}", bp_site,
            bp_site->GetID(), bp_site->GetLoadAddress());
 
@@ -153,7 +165,7 @@ Status ProcessWindows::EnableBreakpointSite(BreakpointSite *bp_site) {
 }
 
 Status ProcessWindows::DisableBreakpointSite(BreakpointSite *bp_site) {
-  Log *log = GetLog(WindowsLog::Breakpoints);
+  Log *log = ProcessWindowsLog::GetLogIfAny(WINDOWS_LOG_BREAKPOINTS);
   LLDB_LOG(log, "bp_site = {0:x}, id={1}, addr={2:x}", bp_site,
            bp_site->GetID(), bp_site->GetLoadAddress());
 
@@ -166,7 +178,7 @@ Status ProcessWindows::DisableBreakpointSite(BreakpointSite *bp_site) {
 
 Status ProcessWindows::DoDetach(bool keep_stopped) {
   Status error;
-  Log *log = GetLog(WindowsLog::Process);
+  Log *log = ProcessWindowsLog::GetLogIfAny(WINDOWS_LOG_PROCESS);
   StateType private_state = GetPrivateState();
   if (private_state != eStateExited && private_state != eStateDetached) {
     error = DetachProcess();
@@ -204,7 +216,7 @@ ProcessWindows::DoAttachToProcessWithID(lldb::pid_t pid,
 }
 
 Status ProcessWindows::DoResume() {
-  Log *log = GetLog(WindowsLog::Process);
+  Log *log = ProcessWindowsLog::GetLogIfAny(WINDOWS_LOG_PROCESS);
   llvm::sys::ScopedLock lock(m_mutex);
   Status error;
 
@@ -350,7 +362,7 @@ DumpAdditionalExceptionInformation(llvm::raw_ostream &stream,
 }
 
 void ProcessWindows::RefreshStateAfterStop() {
-  Log *log = GetLog(WindowsLog::Exception);
+  Log *log = ProcessWindowsLog::GetLogIfAny(WINDOWS_LOG_EXCEPTION);
   llvm::sys::ScopedLock lock(m_mutex);
 
   if (!m_session_data) {
@@ -405,6 +417,10 @@ void ProcessWindows::RefreshStateAfterStop() {
                "{1:x} with watchpoint {2}",
                m_session_data->m_debugger->GetProcess().GetProcessId(), pc, id);
 
+      if (lldb::WatchpointSP wp_sp =
+              GetTarget().GetWatchpointList().FindByID(id))
+        wp_sp->SetHardwareIndex(slot_id);
+
       stop_info = StopInfo::CreateStopReasonWithWatchpointID(
           *stop_thread, id, m_watchpoints[id].address);
       stop_thread->SetStopInfo(stop_info);
@@ -422,29 +438,8 @@ void ProcessWindows::RefreshStateAfterStop() {
   case EXCEPTION_BREAKPOINT: {
     RegisterContextSP register_context = stop_thread->GetRegisterContext();
 
-    int breakpoint_size = 1;
-    switch (GetTarget().GetArchitecture().GetMachine()) {
-    case llvm::Triple::aarch64:
-      breakpoint_size = 4;
-      break;
-
-    case llvm::Triple::arm:
-    case llvm::Triple::thumb:
-      breakpoint_size = 2;
-      break;
-
-    case llvm::Triple::x86:
-    case llvm::Triple::x86_64:
-      breakpoint_size = 1;
-      break;
-
-    default:
-      LLDB_LOG(log, "Unknown breakpoint size for architecture");
-      break;
-    }
-
-    // The current PC is AFTER the BP opcode, on all architectures.
-    uint64_t pc = register_context->GetPC() - breakpoint_size;
+    // The current EIP is AFTER the BP opcode, which is one byte.
+    uint64_t pc = register_context->GetPC() - 1;
 
     BreakpointSiteSP site(GetBreakpointSiteList().FindByAddress(pc));
     if (site) {
@@ -479,7 +474,7 @@ void ProcessWindows::RefreshStateAfterStop() {
                "Creating stop info with the exception.");
       // FALLTHROUGH:  We'll treat this as a generic exception record in the
       // default case.
-      [[fallthrough]];
+      LLVM_FALLTHROUGH;
     }
   }
 
@@ -517,7 +512,7 @@ bool ProcessWindows::CanDebug(lldb::TargetSP target_sp,
 
 bool ProcessWindows::DoUpdateThreadList(ThreadList &old_thread_list,
                                         ThreadList &new_thread_list) {
-  Log *log = GetLog(WindowsLog::Thread);
+  Log *log = ProcessWindowsLog::GetLogIfAny(WINDOWS_LOG_THREAD);
   // Add all the threads that were previously running and for which we did not
   // detect a thread exited event.
   int new_size = 0;
@@ -573,10 +568,6 @@ bool ProcessWindows::IsAlive() {
   }
 }
 
-ArchSpec ProcessWindows::GetSystemArchitecture() {
-  return HostInfo::GetArchitecture();
-}
-
 size_t ProcessWindows::DoReadMemory(lldb::addr_t vm_addr, void *buf,
                                     size_t size, Status &error) {
   size_t bytes_read = 0;
@@ -602,8 +593,8 @@ Status ProcessWindows::DoDeallocateMemory(lldb::addr_t ptr) {
   return ProcessDebugger::DeallocateMemory(ptr);
 }
 
-Status ProcessWindows::DoGetMemoryRegionInfo(lldb::addr_t vm_addr,
-                                             MemoryRegionInfo &info) {
+Status ProcessWindows::GetMemoryRegionInfo(lldb::addr_t vm_addr,
+                                           MemoryRegionInfo &info) {
   return ProcessDebugger::GetMemoryRegionInfo(vm_addr, info);
 }
 
@@ -620,13 +611,13 @@ lldb::addr_t ProcessWindows::GetImageInfoAddress() {
 DynamicLoaderWindowsDYLD *ProcessWindows::GetDynamicLoader() {
   if (m_dyld_up.get() == NULL)
     m_dyld_up.reset(DynamicLoader::FindPlugin(
-        this, DynamicLoaderWindowsDYLD::GetPluginNameStatic()));
+        this, DynamicLoaderWindowsDYLD::GetPluginNameStatic().GetCString()));
   return static_cast<DynamicLoaderWindowsDYLD *>(m_dyld_up.get());
 }
 
 void ProcessWindows::OnExitProcess(uint32_t exit_code) {
   // No need to acquire the lock since m_session_data isn't accessed.
-  Log *log = GetLog(WindowsLog::Process);
+  Log *log = ProcessWindowsLog::GetLogIfAny(WINDOWS_LOG_PROCESS);
   LLDB_LOG(log, "Process {0} exited with code {1}", GetID(), exit_code);
 
   TargetSP target = CalculateTarget();
@@ -645,29 +636,31 @@ void ProcessWindows::OnExitProcess(uint32_t exit_code) {
 
 void ProcessWindows::OnDebuggerConnected(lldb::addr_t image_base) {
   DebuggerThreadSP debugger = m_session_data->m_debugger;
-  Log *log = GetLog(WindowsLog::Process);
+  Log *log = ProcessWindowsLog::GetLogIfAny(WINDOWS_LOG_PROCESS);
   LLDB_LOG(log, "Debugger connected to process {0}.  Image base = {1:x}",
            debugger->GetProcess().GetProcessId(), image_base);
 
-  ModuleSP module;
-  // During attach, we won't have the executable module, so find it now.
-  const DWORD pid = debugger->GetProcess().GetProcessId();
-  const std::string file_name = GetProcessExecutableName(pid);
-  if (file_name.empty()) {
-    return;
-  }
-
-  FileSpec executable_file(file_name);
-  FileSystem::Instance().Resolve(executable_file);
-  ModuleSpec module_spec(executable_file);
-  Status error;
-  module =
-      GetTarget().GetOrCreateModule(module_spec, true /* notify */, &error);
+  ModuleSP module = GetTarget().GetExecutableModule();
   if (!module) {
-    return;
-  }
+    // During attach, we won't have the executable module, so find it now.
+    const DWORD pid = debugger->GetProcess().GetProcessId();
+    const std::string file_name = GetProcessExecutableName(pid);
+    if (file_name.empty()) {
+      return;
+    }
 
-  GetTarget().SetExecutableModule(module, eLoadDependentsNo);
+    FileSpec executable_file(file_name);
+    FileSystem::Instance().Resolve(executable_file);
+    ModuleSpec module_spec(executable_file);
+    Status error;
+    module =
+        GetTarget().GetOrCreateModule(module_spec, true /* notify */, &error);
+    if (!module) {
+      return;
+    }
+
+    GetTarget().SetExecutableModule(module, eLoadDependentsNo);
+  }
 
   if (auto dyld = GetDynamicLoader())
     dyld->OnLoadModule(module, ModuleSpec(), image_base);
@@ -691,7 +684,7 @@ void ProcessWindows::OnDebuggerConnected(lldb::addr_t image_base) {
 ExceptionResult
 ProcessWindows::OnDebugException(bool first_chance,
                                  const ExceptionRecord &record) {
-  Log *log = GetLog(WindowsLog::Exception);
+  Log *log = ProcessWindowsLog::GetLogIfAny(WINDOWS_LOG_EXCEPTION);
   llvm::sys::ScopedLock lock(m_mutex);
 
   // FIXME: Without this check, occasionally when running the test suite there
@@ -808,7 +801,7 @@ void ProcessWindows::OnDebugString(const std::string &string) {}
 
 void ProcessWindows::OnDebuggerError(const Status &error, uint32_t type) {
   llvm::sys::ScopedLock lock(m_mutex);
-  Log *log = GetLog(WindowsLog::Process);
+  Log *log = ProcessWindowsLog::GetLogIfAny(WINDOWS_LOG_PROCESS);
 
   if (m_session_data->m_initial_stop_received) {
     // This happened while debugging.  Do we shutdown the debugging session,
@@ -831,15 +824,22 @@ void ProcessWindows::OnDebuggerError(const Status &error, uint32_t type) {
   }
 }
 
-std::optional<uint32_t> ProcessWindows::GetWatchpointSlotCount() {
-  return RegisterContextWindows::GetNumHardwareBreakpointSlots();
+Status ProcessWindows::GetWatchpointSupportInfo(uint32_t &num) {
+  num = RegisterContextWindows::GetNumHardwareBreakpointSlots();
+  return {};
 }
 
-Status ProcessWindows::EnableWatchpoint(WatchpointSP wp_sp, bool notify) {
+Status ProcessWindows::GetWatchpointSupportInfo(uint32_t &num, bool &after) {
+  num = RegisterContextWindows::GetNumHardwareBreakpointSlots();
+  after = RegisterContextWindows::DoHardwareBreakpointsTriggerAfter();
+  return {};
+}
+
+Status ProcessWindows::EnableWatchpoint(Watchpoint *wp, bool notify) {
   Status error;
 
-  if (wp_sp->IsEnabled()) {
-    wp_sp->SetEnabled(true, notify);
+  if (wp->IsEnabled()) {
+    wp->SetEnabled(true, notify);
     return error;
   }
 
@@ -851,13 +851,13 @@ Status ProcessWindows::EnableWatchpoint(WatchpointSP wp_sp, bool notify) {
       break;
   if (info.slot_id == RegisterContextWindows::GetNumHardwareBreakpointSlots()) {
     error.SetErrorStringWithFormat("Can't find free slot for watchpoint %i",
-                                   wp_sp->GetID());
+                                   wp->GetID());
     return error;
   }
-  info.address = wp_sp->GetLoadAddress();
-  info.size = wp_sp->GetByteSize();
-  info.read = wp_sp->WatchpointRead();
-  info.write = wp_sp->WatchpointWrite();
+  info.address = wp->GetLoadAddress();
+  info.size = wp->GetByteSize();
+  info.read = wp->WatchpointRead();
+  info.write = wp->WatchpointWrite();
 
   for (unsigned i = 0U; i < m_thread_list.GetSize(); i++) {
     Thread *thread = m_thread_list.GetThreadAtIndex(i).get();
@@ -866,7 +866,7 @@ Status ProcessWindows::EnableWatchpoint(WatchpointSP wp_sp, bool notify) {
     if (!reg_ctx->AddHardwareBreakpoint(info.slot_id, info.address, info.size,
                                         info.read, info.write)) {
       error.SetErrorStringWithFormat(
-          "Can't enable watchpoint %i on thread 0x%llx", wp_sp->GetID(),
+          "Can't enable watchpoint %i on thread 0x%llx", wp->GetID(),
           thread->GetID());
       break;
     }
@@ -881,26 +881,26 @@ Status ProcessWindows::EnableWatchpoint(WatchpointSP wp_sp, bool notify) {
     return error;
   }
 
-  m_watchpoints[wp_sp->GetID()] = info;
-  m_watchpoint_ids[info.slot_id] = wp_sp->GetID();
+  m_watchpoints[wp->GetID()] = info;
+  m_watchpoint_ids[info.slot_id] = wp->GetID();
 
-  wp_sp->SetEnabled(true, notify);
+  wp->SetEnabled(true, notify);
 
   return error;
 }
 
-Status ProcessWindows::DisableWatchpoint(WatchpointSP wp_sp, bool notify) {
+Status ProcessWindows::DisableWatchpoint(Watchpoint *wp, bool notify) {
   Status error;
 
-  if (!wp_sp->IsEnabled()) {
-    wp_sp->SetEnabled(false, notify);
+  if (!wp->IsEnabled()) {
+    wp->SetEnabled(false, notify);
     return error;
   }
 
-  auto it = m_watchpoints.find(wp_sp->GetID());
+  auto it = m_watchpoints.find(wp->GetID());
   if (it == m_watchpoints.end()) {
     error.SetErrorStringWithFormat("Info about watchpoint %i is not found",
-                                   wp_sp->GetID());
+                                   wp->GetID());
     return error;
   }
 
@@ -910,7 +910,7 @@ Status ProcessWindows::DisableWatchpoint(WatchpointSP wp_sp, bool notify) {
         thread->GetRegisterContext().get());
     if (!reg_ctx->RemoveHardwareBreakpoint(it->second.slot_id)) {
       error.SetErrorStringWithFormat(
-          "Can't disable watchpoint %i on thread 0x%llx", wp_sp->GetID(),
+          "Can't disable watchpoint %i on thread 0x%llx", wp->GetID(),
           thread->GetID());
       break;
     }
@@ -921,7 +921,7 @@ Status ProcessWindows::DisableWatchpoint(WatchpointSP wp_sp, bool notify) {
   m_watchpoint_ids[it->second.slot_id] = LLDB_INVALID_BREAK_ID;
   m_watchpoints.erase(it);
 
-  wp_sp->SetEnabled(false, notify);
+  wp->SetEnabled(false, notify);
 
   return error;
 }

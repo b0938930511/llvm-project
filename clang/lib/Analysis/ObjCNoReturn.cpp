@@ -54,9 +54,12 @@ bool ObjCNoReturn::isImplicitNoReturn(const ObjCMessageExpr *ME) {
   }
 
   if (const ObjCInterfaceDecl *ID = ME->getReceiverInterface()) {
-    if (isSubclass(ID, NSExceptionII) &&
-        llvm::is_contained(NSExceptionInstanceRaiseSelectors, S))
-      return true;
+    if (isSubclass(ID, NSExceptionII)) {
+      for (unsigned i = 0; i < NUM_RAISE_SELECTORS; ++i) {
+        if (S == NSExceptionInstanceRaiseSelectors[i])
+          return true;
+      }
+    }
   }
 
   return false;

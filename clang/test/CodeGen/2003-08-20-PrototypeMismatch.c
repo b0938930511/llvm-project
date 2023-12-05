@@ -10,6 +10,6 @@ char C;
   return C;
 }
 
-void test(void) {
+void test() {
   foo(7);
 }

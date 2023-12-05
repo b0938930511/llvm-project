@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "mlir-c/Bindings/Python/Interop.h"
 #include "mlir-c/ExecutionEngine.h"
 #include "mlir/Bindings/Python/PybindAdaptors.h"
 
@@ -30,19 +31,10 @@ public:
   }
   MlirExecutionEngine get() { return executionEngine; }
 
-  void release() {
-    executionEngine.ptr = nullptr;
-    referencedObjects.clear();
-  }
+  void release() { executionEngine.ptr = nullptr; }
   pybind11::object getCapsule() {
     return py::reinterpret_steal<py::object>(
         mlirPythonExecutionEngineToCapsule(get()));
-  }
-
-  // Add an object to the list of referenced objects whose lifetime must exceed
-  // those of the ExecutionEngine.
-  void addReferencedObject(const pybind11::object &obj) {
-    referencedObjects.push_back(obj);
   }
 
   static pybind11::object createFromCapsule(pybind11::object capsule) {
@@ -55,13 +47,9 @@ public:
 
 private:
   MlirExecutionEngine executionEngine;
-  // We support Python ctypes closures as callbacks. Keep a list of the objects
-  // so that they don't get garbage collected. (The ExecutionEngine itself
-  // just holds raw pointers with no lifetime semantics).
-  std::vector<py::object> referencedObjects;
 };
 
-} // namespace
+} // anonymous namespace
 
 /// Create the `mlir.execution_engine` module here.
 PYBIND11_MODULE(_mlirExecutionEngine, m) {
@@ -70,16 +58,14 @@ PYBIND11_MODULE(_mlirExecutionEngine, m) {
   //----------------------------------------------------------------------------
   // Mapping of the top-level PassManager
   //----------------------------------------------------------------------------
-  py::class_<PyExecutionEngine>(m, "ExecutionEngine", py::module_local())
+  py::class_<PyExecutionEngine>(m, "ExecutionEngine")
       .def(py::init<>([](MlirModule module, int optLevel,
-                         const std::vector<std::string> &sharedLibPaths,
-                         bool enableObjectDump) {
+                         const std::vector<std::string> &sharedLibPaths) {
              llvm::SmallVector<MlirStringRef, 4> libPaths;
              for (const std::string &path : sharedLibPaths)
                libPaths.push_back({path.c_str(), path.length()});
-             MlirExecutionEngine executionEngine =
-                 mlirExecutionEngineCreate(module, optLevel, libPaths.size(),
-                                           libPaths.data(), enableObjectDump);
+             MlirExecutionEngine executionEngine = mlirExecutionEngineCreate(
+                 module, optLevel, libPaths.size(), libPaths.data());
              if (mlirExecutionEngineIsNull(executionEngine))
                throw std::runtime_error(
                    "Failure while creating the ExecutionEngine.");
@@ -87,7 +73,6 @@ PYBIND11_MODULE(_mlirExecutionEngine, m) {
            }),
            py::arg("module"), py::arg("opt_level") = 2,
            py::arg("shared_libs") = py::list(),
-           py::arg("enable_object_dump") = true,
            "Create a new ExecutionEngine instance for the given Module. The "
            "module must contain only dialects that can be translated to LLVM. "
            "Perform transformations and code generation at the optimization "
@@ -102,27 +87,22 @@ PYBIND11_MODULE(_mlirExecutionEngine, m) {
       .def(
           "raw_lookup",
           [](PyExecutionEngine &executionEngine, const std::string &func) {
-            auto *res = mlirExecutionEngineLookupPacked(
+            auto *res = mlirExecutionEngineLookup(
                 executionEngine.get(),
                 mlirStringRefCreate(func.c_str(), func.size()));
             return reinterpret_cast<uintptr_t>(res);
           },
-          py::arg("func_name"),
           "Lookup function `func` in the ExecutionEngine.")
       .def(
           "raw_register_runtime",
           [](PyExecutionEngine &executionEngine, const std::string &name,
-             py::object callbackObj) {
-            executionEngine.addReferencedObject(callbackObj);
-            uintptr_t rawSym =
-                py::cast<uintptr_t>(py::getattr(callbackObj, "value"));
+             uintptr_t sym) {
             mlirExecutionEngineRegisterSymbol(
                 executionEngine.get(),
                 mlirStringRefCreate(name.c_str(), name.size()),
-                reinterpret_cast<void *>(rawSym));
+                reinterpret_cast<void *>(sym));
           },
-          py::arg("name"), py::arg("callback"),
-          "Register `callback` as the runtime symbol `name`.")
+          "Lookup function `func` in the ExecutionEngine.")
       .def(
           "dump_to_object_file",
           [](PyExecutionEngine &executionEngine, const std::string &fileName) {
@@ -130,5 +110,5 @@ PYBIND11_MODULE(_mlirExecutionEngine, m) {
                 executionEngine.get(),
                 mlirStringRefCreate(fileName.c_str(), fileName.size()));
           },
-          py::arg("file_name"), "Dump ExecutionEngine to an object file.");
+          "Dump ExecutionEngine to an object file.");
 }

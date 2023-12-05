@@ -3,22 +3,30 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <omp.h>
-#include "omp_testsuite.h"
 
 int main(int argc, char** argv) {
   omp_set_affinity_format("TESTER: tl:%L tn:%n nt:%N");
   // should print all for first parallel
-  go_parallel_nthreads(4);
+  omp_set_num_threads(4);
+  #pragma omp parallel
+  { }
   // should print all because of new threads
-  go_parallel_nthreads(8);
+  omp_set_num_threads(8);
+  #pragma omp parallel
+  { }
   // should not print anything here
-  go_parallel_nthreads(6);
+  omp_set_num_threads(6);
+  #pragma omp parallel
+  { }
   // should print all because of new thread
-  go_parallel_nthreads(9);
+  omp_set_num_threads(9);
+  #pragma omp parallel
+  { }
   // should not print anything here
-  go_parallel_nthreads(2);
-
-  return get_exit_value();
+  omp_set_num_threads(2);
+  #pragma omp parallel
+  { }
+  return 0;
 }
 
 // CHECK: num_threads=4 TESTER: tl:1 tn:[0-3] nt:4

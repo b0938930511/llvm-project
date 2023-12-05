@@ -1,5 +1,6 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s
 // expected-no-diagnostics
+// rdar://8528170
 
 @interface NSObject @end
 
@@ -11,7 +12,7 @@
 @interface MyClass : NSObject <MyProtocol>
 @end
 
-int main (void)
+int main ()
 {
     id<MyProtocol> c;
     c.level = 10;

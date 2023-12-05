@@ -1,14 +1,15 @@
+// REQUIRES: clang-driver
 // REQUIRES: x86-registered-target
 // REQUIRES: amdgpu-registered-target
 
-// RUN: %clang -### --target=x86_64-linux-gnu \
+// RUN: %clang -### -target x86_64-linux-gnu \
 // RUN:   -x hip \
 // RUN:   --offload-arch=gfx908:xnack+:sramecc+ \
 // RUN:   --offload-arch=gfx908:xnack+:sramecc- \
 // RUN:   --rocm-path=%S/Inputs/rocm \
 // RUN:   %s 2>&1 | FileCheck %s
 
-// RUN: %clang -### --target=x86_64-linux-gnu \
+// RUN: %clang -### -target x86_64-linux-gnu \
 // RUN:   -x hip \
 // RUN:   --offload-arch=gfx908:xnack+:sramecc+ \
 // RUN:   --offload-arch=gfx908:xnack+:sramecc- \
@@ -16,7 +17,7 @@
 // RUN:   -save-temps \
 // RUN:   %s 2>&1 | FileCheck --check-prefixes=CHECK,TMP %s
 
-// RUN: %clang -### --target=x86_64-linux-gnu \
+// RUN: %clang -### -target x86_64-linux-gnu \
 // RUN:   -x hip \
 // RUN:   --offload-arch=gfx908:xnack+:sramecc+ \
 // RUN:   --offload-arch=gfx908:xnack+:sramecc- \
@@ -50,7 +51,7 @@
 
 // Check canonicalization and repeating of target ID.
 
-// RUN: %clang -### --target=x86_64-linux-gnu \
+// RUN: %clang -### -target x86_64-linux-gnu \
 // RUN:   -x hip \
 // RUN:   --offload-arch=fiji \
 // RUN:   --offload-arch=gfx803 \
@@ -59,7 +60,7 @@
 // RUN:   %s 2>&1 | FileCheck -check-prefix=FIJI %s
 // FIJI: "-targets=host-x86_64-unknown-linux,hipv4-amdgcn-amd-amdhsa--gfx803"
 
-// RUN: not %clang -### --target=x86_64-linux-gnu \
+// RUN: %clang -### -target x86_64-linux-gnu \
 // RUN:   -x hip \
 // RUN:   --offload-arch=gfx900:xnack- \
 // RUN:   --offload-arch=gfx900:xnack+ \

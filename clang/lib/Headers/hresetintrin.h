@@ -25,7 +25,7 @@
 ///
 /// This intrinsic corresponds to the <c> HRESET </c> instruction.
 ///
-/// \code{.operation}
+/// \operation
 ///    IF __eax == 0
 ///      // nop
 ///    ELSE
@@ -35,7 +35,7 @@
 ///        FI
 ///      ENDFOR
 ///    FI
-/// \endcode
+/// \endoperation
 static __inline void __DEFAULT_FN_ATTRS
 _hreset(int __eax)
 {

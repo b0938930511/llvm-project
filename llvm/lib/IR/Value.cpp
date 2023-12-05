@@ -13,6 +13,7 @@
 #include "llvm/IR/Value.h"
 #include "LLVMContextImpl.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/Constants.h"
@@ -26,11 +27,12 @@
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Operator.h"
-#include "llvm/IR/TypedPointerType.h"
 #include "llvm/IR/ValueHandle.h"
 #include "llvm/IR/ValueSymbolTable.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 
@@ -45,8 +47,6 @@ static cl::opt<unsigned> UseDerefAtPointSemantics(
 //===----------------------------------------------------------------------===//
 static inline Type *checkType(Type *Ty) {
   assert(Ty && "Value defined with a null type: Error!");
-  assert(!isa<TypedPointerType>(Ty->getScalarType()) &&
-         "Cannot have values with typed pointer types");
   return Ty;
 }
 
@@ -171,18 +171,6 @@ Use *Value::getSingleUndroppableUse() {
       if (Result)
         return nullptr;
       Result = &U;
-    }
-  }
-  return Result;
-}
-
-User *Value::getUniqueUndroppableUser() {
-  User *Result = nullptr;
-  for (auto *U : users()) {
-    if (!U->isDroppable()) {
-      if (Result && Result != U)
-        return nullptr;
-      Result = U;
     }
   }
   return Result;
@@ -316,12 +304,8 @@ StringRef Value::getName() const {
 }
 
 void Value::setNameImpl(const Twine &NewName) {
-  bool NeedNewName =
-      !getContext().shouldDiscardValueNames() || isa<GlobalValue>(this);
-
   // Fast-path: LLVMContext can be set to strip out non-GlobalValue names
-  // and there is no need to delete the old name.
-  if (!NeedNewName && !hasName())
+  if (getContext().shouldDiscardValueNames() && !isa<GlobalValue>(this))
     return;
 
   // Fast path for common IRBuilder case of setName("") when there is no name.
@@ -329,8 +313,9 @@ void Value::setNameImpl(const Twine &NewName) {
     return;
 
   SmallString<256> NameData;
-  StringRef NameRef = NeedNewName ? NewName.toStringRef(NameData) : "";
-  assert(!NameRef.contains(0) && "Null bytes are not allowed in names");
+  StringRef NameRef = NewName.toStringRef(NameData);
+  assert(NameRef.find_first_of(0) == StringRef::npos &&
+         "Null bytes are not allowed in names");
 
   // Name isn't changing?
   if (getName() == NameRef)
@@ -344,17 +329,20 @@ void Value::setNameImpl(const Twine &NewName) {
     return;  // Cannot set a name on this value (e.g. constant).
 
   if (!ST) { // No symbol table to update?  Just do the change.
+    if (NameRef.empty()) {
+      // Free the name for this value.
+      destroyValueName();
+      return;
+    }
+
     // NOTE: Could optimize for the case the name is shrinking to not deallocate
     // then reallocated.
     destroyValueName();
 
-    if (!NameRef.empty()) {
-      // Create the new name.
-      assert(NeedNewName);
-      MallocAllocator Allocator;
-      setValueName(ValueName::create(NameRef, Allocator));
-      getValueName()->setValue(this);
-    }
+    // Create the new name.
+    MallocAllocator Allocator;
+    setValueName(ValueName::Create(NameRef, Allocator));
+    getValueName()->setValue(this);
     return;
   }
 
@@ -370,18 +358,16 @@ void Value::setNameImpl(const Twine &NewName) {
   }
 
   // Name is changing to something new.
-  assert(NeedNewName);
   setValueName(ST->createValueName(NameRef, this));
 }
 
 void Value::setName(const Twine &NewName) {
   setNameImpl(NewName);
   if (Function *F = dyn_cast<Function>(this))
-    F->updateAfterNameChange();
+    F->recalculateIntrinsicID();
 }
 
 void Value::takeName(Value *V) {
-  assert(V != this && "Illegal call to this->takeName(this)!");
   ValueSymbolTable *ST = nullptr;
   // If this value has a name, drop it.
   if (hasName()) {
@@ -413,7 +399,7 @@ void Value::takeName(Value *V) {
     }
   }
 
-  // Get V's ST, this should always succeed, because V has a name.
+  // Get V's ST, this should always succed, because V has a name.
   ValueSymbolTable *VST;
   bool Failure = getSymTab(V, VST);
   assert(!Failure && "V has a name, so it should have a ST!"); (void)Failure;
@@ -548,7 +534,9 @@ void Value::replaceUsesWithIf(Value *New,
   SmallVector<TrackingVH<Constant>, 8> Consts;
   SmallPtrSet<Constant *, 8> Visited;
 
-  for (Use &U : llvm::make_early_inc_range(uses())) {
+  for (use_iterator UI = use_begin(), E = use_end(); UI != E;) {
+    Use &U = *UI;
+    ++UI;
     if (!ShouldReplace(U))
       continue;
     // Must handle Constants specially, we cannot call replaceUsesOfWith on a
@@ -574,16 +562,10 @@ void Value::replaceUsesWithIf(Value *New,
 /// with New.
 static void replaceDbgUsesOutsideBlock(Value *V, Value *New, BasicBlock *BB) {
   SmallVector<DbgVariableIntrinsic *> DbgUsers;
-  SmallVector<DPValue *> DPUsers;
-  findDbgUsers(DbgUsers, V, &DPUsers);
+  findDbgUsers(DbgUsers, V);
   for (auto *DVI : DbgUsers) {
     if (DVI->getParent() != BB)
       DVI->replaceVariableLocationOp(V, New);
-  }
-  for (auto *DPV : DPUsers) {
-    DPMarker *Marker = DPV->getMarker();
-    if (Marker->getParent() != BB)
-      DPV->replaceVariableLocationOp(V, New);
   }
 }
 
@@ -644,7 +626,7 @@ static const Value *stripPointerCastsAndOffsets(
       case PSK_InBoundsConstantIndices:
         if (!GEP->hasAllConstantIndices())
           return V;
-        [[fallthrough]];
+        LLVM_FALLTHROUGH;
       case PSK_InBounds:
         if (!GEP->isInBounds())
           return V;
@@ -712,7 +694,6 @@ const Value *Value::stripPointerCastsForAliasAnalysis() const {
 
 const Value *Value::stripAndAccumulateConstantOffsets(
     const DataLayout &DL, APInt &Offset, bool AllowNonInbounds,
-    bool AllowInvariantGroup,
     function_ref<bool(Value &, APInt &)> ExternalAnalysis) const {
   if (!getType()->isPtrOrPtrVectorTy())
     return this;
@@ -745,7 +726,7 @@ const Value *Value::stripAndAccumulateConstantOffsets(
       // Stop traversal if the pointer offset wouldn't fit in the bit-width
       // provided by the Offset argument. This can happen due to AddrSpaceCast
       // stripping.
-      if (GEPOffset.getSignificantBits() > BitWidth)
+      if (GEPOffset.getMinSignedBits() > BitWidth)
         return V;
 
       // External Analysis can return a result higher/lower than the value
@@ -772,8 +753,6 @@ const Value *Value::stripAndAccumulateConstantOffsets(
     } else if (const auto *Call = dyn_cast<CallBase>(V)) {
         if (const Value *RV = Call->getReturnedArgOperand())
           V = RV;
-        if (AllowInvariantGroup && Call->isLaunderOrStripInvariantGroup())
-          V = Call->getArgOperand(0);
     }
     assert(V->getType()->isPtrOrPtrVectorTy() && "Unexpected operand type!");
   } while (Visited.insert(V).second);
@@ -863,7 +842,7 @@ uint64_t Value::getPointerDereferenceableBytes(const DataLayout &DL,
       if (Type *ArgMemTy = A->getPointeeInMemoryValueType()) {
         if (ArgMemTy->isSized()) {
           // FIXME: Why isn't this the type alloc size?
-          DerefBytes = DL.getTypeStoreSize(ArgMemTy).getKnownMinValue();
+          DerefBytes = DL.getTypeStoreSize(ArgMemTy).getKnownMinSize();
         }
       }
     }
@@ -873,9 +852,10 @@ uint64_t Value::getPointerDereferenceableBytes(const DataLayout &DL,
       CanBeNull = true;
     }
   } else if (const auto *Call = dyn_cast<CallBase>(this)) {
-    DerefBytes = Call->getRetDereferenceableBytes();
+    DerefBytes = Call->getDereferenceableBytes(AttributeList::ReturnIndex);
     if (DerefBytes == 0) {
-      DerefBytes = Call->getRetDereferenceableOrNullBytes();
+      DerefBytes =
+          Call->getDereferenceableOrNullBytes(AttributeList::ReturnIndex);
       CanBeNull = true;
     }
   } else if (const LoadInst *LI = dyn_cast<LoadInst>(this)) {
@@ -907,7 +887,7 @@ uint64_t Value::getPointerDereferenceableBytes(const DataLayout &DL,
   } else if (auto *AI = dyn_cast<AllocaInst>(this)) {
     if (!AI->isArrayAllocation()) {
       DerefBytes =
-          DL.getTypeStoreSize(AI->getAllocatedType()).getKnownMinValue();
+          DL.getTypeStoreSize(AI->getAllocatedType()).getKnownMinSize();
       CanBeNull = false;
       CanBeFreed = false;
     }
@@ -915,7 +895,7 @@ uint64_t Value::getPointerDereferenceableBytes(const DataLayout &DL,
     if (GV->getValueType()->isSized() && !GV->hasExternalWeakLinkage()) {
       // TODO: Don't outright reject hasExternalWeakLinkage but set the
       // CanBeNull flag.
-      DerefBytes = DL.getTypeStoreSize(GV->getValueType()).getFixedValue();
+      DerefBytes = DL.getTypeStoreSize(GV->getValueType()).getFixedSize();
       CanBeNull = false;
       CanBeFreed = false;
     }
@@ -936,7 +916,7 @@ Align Value::getPointerAlignment(const DataLayout &DL) const {
       }
       llvm_unreachable("Unhandled FunctionPtrAlignType");
     }
-    const MaybeAlign Alignment(GO->getAlign());
+    const MaybeAlign Alignment(GO->getAlignment());
     if (!Alignment) {
       if (auto *GVar = dyn_cast<GlobalVariable>(GO)) {
         Type *ObjectType = GVar->getValueType();
@@ -974,13 +954,10 @@ Align Value::getPointerAlignment(const DataLayout &DL) const {
       return Align(CI->getLimitedValue());
     }
   } else if (auto *CstPtr = dyn_cast<Constant>(this)) {
-    // Strip pointer casts to avoid creating unnecessary ptrtoint expression
-    // if the only "reduction" is combining a bitcast + ptrtoint.
-    CstPtr = CstPtr->stripPointerCasts();
     if (auto *CstInt = dyn_cast_or_null<ConstantInt>(ConstantExpr::getPtrToInt(
             const_cast<Constant *>(CstPtr), DL.getIntPtrType(getType()),
             /*OnlyIfReduced=*/true))) {
-      size_t TrailingZeros = CstInt->getValue().countr_zero();
+      size_t TrailingZeros = CstInt->getValue().countTrailingZeros();
       // While the actual alignment may be large, elsewhere we have
       // an arbitrary upper alignmet limit, so let's clamp to it.
       return Align(TrailingZeros < Value::MaxAlignmentExponent
@@ -989,78 +966,6 @@ Align Value::getPointerAlignment(const DataLayout &DL) const {
     }
   }
   return Align(1);
-}
-
-static std::optional<int64_t>
-getOffsetFromIndex(const GEPOperator *GEP, unsigned Idx, const DataLayout &DL) {
-  // Skip over the first indices.
-  gep_type_iterator GTI = gep_type_begin(GEP);
-  for (unsigned i = 1; i != Idx; ++i, ++GTI)
-    /*skip along*/;
-
-  // Compute the offset implied by the rest of the indices.
-  int64_t Offset = 0;
-  for (unsigned i = Idx, e = GEP->getNumOperands(); i != e; ++i, ++GTI) {
-    ConstantInt *OpC = dyn_cast<ConstantInt>(GEP->getOperand(i));
-    if (!OpC)
-      return std::nullopt;
-    if (OpC->isZero())
-      continue; // No offset.
-
-    // Handle struct indices, which add their field offset to the pointer.
-    if (StructType *STy = GTI.getStructTypeOrNull()) {
-      Offset += DL.getStructLayout(STy)->getElementOffset(OpC->getZExtValue());
-      continue;
-    }
-
-    // Otherwise, we have a sequential type like an array or fixed-length
-    // vector. Multiply the index by the ElementSize.
-    TypeSize Size = DL.getTypeAllocSize(GTI.getIndexedType());
-    if (Size.isScalable())
-      return std::nullopt;
-    Offset += Size.getFixedValue() * OpC->getSExtValue();
-  }
-
-  return Offset;
-}
-
-std::optional<int64_t> Value::getPointerOffsetFrom(const Value *Other,
-                                                   const DataLayout &DL) const {
-  const Value *Ptr1 = Other;
-  const Value *Ptr2 = this;
-  APInt Offset1(DL.getIndexTypeSizeInBits(Ptr1->getType()), 0);
-  APInt Offset2(DL.getIndexTypeSizeInBits(Ptr2->getType()), 0);
-  Ptr1 = Ptr1->stripAndAccumulateConstantOffsets(DL, Offset1, true);
-  Ptr2 = Ptr2->stripAndAccumulateConstantOffsets(DL, Offset2, true);
-
-  // Handle the trivial case first.
-  if (Ptr1 == Ptr2)
-    return Offset2.getSExtValue() - Offset1.getSExtValue();
-
-  const GEPOperator *GEP1 = dyn_cast<GEPOperator>(Ptr1);
-  const GEPOperator *GEP2 = dyn_cast<GEPOperator>(Ptr2);
-
-  // Right now we handle the case when Ptr1/Ptr2 are both GEPs with an identical
-  // base.  After that base, they may have some number of common (and
-  // potentially variable) indices.  After that they handle some constant
-  // offset, which determines their offset from each other.  At this point, we
-  // handle no other case.
-  if (!GEP1 || !GEP2 || GEP1->getOperand(0) != GEP2->getOperand(0) ||
-      GEP1->getSourceElementType() != GEP2->getSourceElementType())
-    return std::nullopt;
-
-  // Skip any common indices and track the GEP types.
-  unsigned Idx = 1;
-  for (; Idx != GEP1->getNumOperands() && Idx != GEP2->getNumOperands(); ++Idx)
-    if (GEP1->getOperand(Idx) != GEP2->getOperand(Idx))
-      break;
-
-  auto IOffset1 = getOffsetFromIndex(GEP1, Idx, DL);
-  auto IOffset2 = getOffsetFromIndex(GEP2, Idx, DL);
-  if (!IOffset1 || !IOffset2)
-    return std::nullopt;
-  return *IOffset2 - *IOffset1 + Offset2.getSExtValue() -
-         Offset1.getSExtValue();
 }
 
 const Value *Value::DoPHITranslation(const BasicBlock *CurBB,
@@ -1100,6 +1005,27 @@ bool Value::isSwiftError() const {
   if (!Alloca)
     return false;
   return Alloca->isSwiftError();
+}
+
+bool Value::isTransitiveUsedByMetadataOnly() const {
+  if (use_empty())
+    return false;
+  llvm::SmallVector<const User *, 32> WorkList;
+  llvm::SmallPtrSet<const User *, 32> Visited;
+  WorkList.insert(WorkList.begin(), user_begin(), user_end());
+  while (!WorkList.empty()) {
+    const User *U = WorkList.back();
+    WorkList.pop_back();
+    Visited.insert(U);
+    // If it is transitively used by a global value or a non-constant value,
+    // it's obviously not only used by metadata.
+    if (!isa<Constant>(U) || isa<GlobalValue>(U))
+      return false;
+    for (const User *UU : U->users())
+      if (!Visited.count(UU))
+        WorkList.push_back(UU);
+  }
+  return true;
 }
 
 //===----------------------------------------------------------------------===//

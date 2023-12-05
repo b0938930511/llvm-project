@@ -18,7 +18,17 @@
 using namespace clang::ast_matchers;
 using namespace clang::ast_matchers::internal;
 
-namespace clang::tidy::cppcoreguidelines {
+namespace clang {
+namespace tidy {
+namespace cppcoreguidelines {
+
+namespace {
+Matcher<FunctionDecl> hasAnyListedName(const std::string &FunctionNames) {
+  const std::vector<std::string> NameList =
+      utils::options::parseStringList(FunctionNames);
+  return hasAnyName(std::vector<StringRef>(NameList.begin(), NameList.end()));
+}
+} // namespace
 
 void NoMallocCheck::storeOptions(ClangTidyOptions::OptionMap &Opts) {
   Options.store(Opts, "Allocations", AllocList);
@@ -28,22 +38,19 @@ void NoMallocCheck::storeOptions(ClangTidyOptions::OptionMap &Opts) {
 
 void NoMallocCheck::registerMatchers(MatchFinder *Finder) {
   // Registering malloc, will suggest RAII.
-  Finder->addMatcher(callExpr(callee(functionDecl(hasAnyName(
-                                  utils::options::parseStringList(AllocList)))))
+  Finder->addMatcher(callExpr(callee(functionDecl(hasAnyListedName(AllocList))))
                          .bind("allocation"),
                      this);
 
   // Registering realloc calls, suggest std::vector or std::string.
   Finder->addMatcher(
-      callExpr(callee(functionDecl(
-                   hasAnyName(utils::options::parseStringList((ReallocList))))))
+      callExpr(callee(functionDecl(hasAnyListedName(ReallocList))))
           .bind("realloc"),
       this);
 
   // Registering free calls, will suggest RAII instead.
   Finder->addMatcher(
-      callExpr(callee(functionDecl(
-                   hasAnyName(utils::options::parseStringList((DeallocList))))))
+      callExpr(callee(functionDecl(hasAnyListedName(DeallocList))))
           .bind("free"),
       this);
 }
@@ -65,4 +72,6 @@ void NoMallocCheck::check(const MatchFinder::MatchResult &Result) {
       << Recommendation << SourceRange(Call->getBeginLoc(), Call->getEndLoc());
 }
 
-} // namespace clang::tidy::cppcoreguidelines
+} // namespace cppcoreguidelines
+} // namespace tidy
+} // namespace clang

@@ -17,8 +17,6 @@ void *start(void *ptr)
   return buffer;
 }
 
-extern unsigned sleep(unsigned seconds);
-
 int main(int argc, char **argv)
 {
   int arg = atoi(argv[1]);

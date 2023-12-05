@@ -14,13 +14,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "clang/StaticAnalyzer/Checkers/BuiltinCheckerRegistration.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/AST/StmtVisitor.h"
 #include "clang/Lex/Lexer.h"
-#include "clang/StaticAnalyzer/Checkers/BuiltinCheckerRegistration.h"
 #include "clang/StaticAnalyzer/Core/BugReporter/BugReporter.h"
 #include "clang/StaticAnalyzer/Core/BugReporter/BugType.h"
 #include "clang/StaticAnalyzer/Core/Checker.h"
@@ -28,9 +28,7 @@
 #include "clang/StaticAnalyzer/Core/PathSensitive/CallEvent.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CheckerContext.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/ExprEngine.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Unicode.h"
-#include <optional>
 
 using namespace clang;
 using namespace ento;
@@ -94,7 +92,7 @@ public:
   // When this parameter is set to true, the checker assumes all
   // methods that return NSStrings are unlocalized. Thus, more false
   // positives will be reported.
-  bool IsAggressive = false;
+  DefaultBool IsAggressive;
 
   void checkPreObjCMessage(const ObjCMethodCall &msg, CheckerContext &C) const;
   void checkPostObjCMessage(const ObjCMethodCall &msg, CheckerContext &C) const;
@@ -848,9 +846,10 @@ void NonLocalizedStringChecker::checkPreObjCMessage(const ObjCMethodCall &msg,
   if (argumentNumber < 0) { // There was no match in UIMethods
     if (const Decl *D = msg.getDecl()) {
       if (const ObjCMethodDecl *OMD = dyn_cast_or_null<ObjCMethodDecl>(D)) {
-        for (auto [Idx, FormalParam] : llvm::enumerate(OMD->parameters())) {
-          if (isAnnotatedAsTakingLocalized(FormalParam)) {
-            argumentNumber = Idx;
+        auto formals = OMD->parameters();
+        for (unsigned i = 0, ei = formals.size(); i != ei; ++i) {
+          if (isAnnotatedAsTakingLocalized(formals[i])) {
+            argumentNumber = i;
             break;
           }
         }
@@ -950,7 +949,7 @@ void NonLocalizedStringChecker::checkPostCall(const CallEvent &Call,
   const IdentifierInfo *Identifier = Call.getCalleeIdentifier();
 
   SVal sv = Call.getReturnValue();
-  if (isAnnotatedAsReturningLocalized(D) || LSF.contains(Identifier)) {
+  if (isAnnotatedAsReturningLocalized(D) || LSF.count(Identifier) != 0) {
     setLocalizedState(sv, C);
   } else if (isNSStringType(RT, C.getASTContext()) &&
              !hasLocalizedState(sv, C)) {
@@ -1005,8 +1004,8 @@ NonLocalizedStringBRVisitor::VisitNode(const ExplodedNode *Succ,
   if (Satisfied)
     return nullptr;
 
-  std::optional<StmtPoint> Point = Succ->getLocation().getAs<StmtPoint>();
-  if (!Point)
+  Optional<StmtPoint> Point = Succ->getLocation().getAs<StmtPoint>();
+  if (!Point.hasValue())
     return nullptr;
 
   auto *LiteralExpr = dyn_cast<ObjCStringLiteral>(Point->getStmt());
@@ -1142,12 +1141,12 @@ void EmptyLocalizationContextChecker::MethodCrawler::VisitObjCMessageExpr(
     SE = Mgr.getSourceManager().getSLocEntry(SLInfo.first);
   }
 
-  std::optional<llvm::MemoryBufferRef> BF =
+  llvm::Optional<llvm::MemoryBufferRef> BF =
       Mgr.getSourceManager().getBufferOrNone(SLInfo.first, SL);
   if (!BF)
     return;
-  LangOptions LangOpts;
-  Lexer TheLexer(SL, LangOpts, BF->getBufferStart(),
+
+  Lexer TheLexer(SL, LangOptions(), BF->getBufferStart(),
                  BF->getBufferStart() + SLInfo.second, BF->getBufferEnd());
 
   Token I;
@@ -1340,10 +1339,7 @@ bool PluralMisuseChecker::MethodCrawler::EndVisitIfStmt(IfStmt *I) {
 }
 
 bool PluralMisuseChecker::MethodCrawler::VisitIfStmt(const IfStmt *I) {
-  const Expr *Condition = I->getCond();
-  if (!Condition)
-    return true;
-  Condition = Condition->IgnoreParenImpCasts();
+  const Expr *Condition = I->getCond()->IgnoreParenImpCasts();
   if (isCheckingPlurality(Condition)) {
     MatchingStatements.push_back(I);
     InMatchingStatement = true;

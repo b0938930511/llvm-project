@@ -9,17 +9,13 @@
 #ifndef LLVM_TEXTAPI_TARGET_H
 #define LLVM_TEXTAPI_TARGET_H
 
+#include "llvm/ADT/Triple.h"
 #include "llvm/Support/Error.h"
-#include "llvm/Support/VersionTuple.h"
-#include "llvm/TargetParser/Triple.h"
 #include "llvm/TextAPI/Architecture.h"
 #include "llvm/TextAPI/ArchitectureSet.h"
 #include "llvm/TextAPI/Platform.h"
 
 namespace llvm {
-
-class Triple;
-
 namespace MachO {
 
 // This is similar to a llvm Triple, but the triple doesn't have all the
@@ -28,33 +24,28 @@ namespace MachO {
 class Target {
 public:
   Target() = default;
-  Target(Architecture Arch, PlatformType Platform,
-         VersionTuple MinDeployment = {})
-      : Arch(Arch), Platform(Platform), MinDeployment(MinDeployment) {}
+  Target(Architecture Arch, PlatformKind Platform)
+      : Arch(Arch), Platform(Platform) {}
   explicit Target(const llvm::Triple &Triple)
-      : Arch(mapToArchitecture(Triple)), Platform(mapToPlatformType(Triple)),
-        MinDeployment(mapToSupportedOSVersion(Triple)) {}
+      : Arch(mapToArchitecture(Triple)), Platform(mapToPlatformKind(Triple)) {}
 
   static llvm::Expected<Target> create(StringRef Target);
 
   operator std::string() const;
 
   Architecture Arch;
-  PlatformType Platform;
-  VersionTuple MinDeployment;
+  PlatformKind Platform;
 };
 
 inline bool operator==(const Target &LHS, const Target &RHS) {
-  // In most cases the deployment version is not useful to compare.
   return std::tie(LHS.Arch, LHS.Platform) == std::tie(RHS.Arch, RHS.Platform);
 }
 
 inline bool operator!=(const Target &LHS, const Target &RHS) {
-  return !(LHS == RHS);
+  return std::tie(LHS.Arch, LHS.Platform) != std::tie(RHS.Arch, RHS.Platform);
 }
 
 inline bool operator<(const Target &LHS, const Target &RHS) {
-  // In most cases the deployment version is not useful to compare.
   return std::tie(LHS.Arch, LHS.Platform) < std::tie(RHS.Arch, RHS.Platform);
 }
 
@@ -66,7 +57,6 @@ inline bool operator!=(const Target &LHS, const Architecture &RHS) {
   return LHS.Arch != RHS;
 }
 
-PlatformVersionSet mapToPlatformVersionSet(ArrayRef<Target> Targets);
 PlatformSet mapToPlatformSet(ArrayRef<Target> Targets);
 ArchitectureSet mapToArchitectureSet(ArrayRef<Target> Targets);
 

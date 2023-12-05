@@ -2,6 +2,6 @@
 
 int constant c[3] = {0};
 
-void foo(void) {
+void foo() {
   c[0] = 1; //expected-error{{read-only variable is not assignable}}
 }

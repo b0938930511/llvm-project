@@ -15,22 +15,18 @@
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/DialectImplementation.h"
-#include "mlir/IR/DialectResourceBlobManager.h"
 #include "mlir/IR/IntegerSet.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/Operation.h"
-#include "mlir/IR/Verifier.h"
+#include "mlir/IR/SubElementInterfaces.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallString.h"
@@ -38,55 +34,30 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Debug.h"
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/SaveAndRestore.h"
-#include "llvm/Support/Threading.h"
-#include "llvm/Support/raw_ostream.h"
 
-#include <optional>
 #include <tuple>
 
 using namespace mlir;
 using namespace mlir::detail;
 
-#define DEBUG_TYPE "mlir-asm-printer"
+void Identifier::print(raw_ostream &os) const { os << str(); }
+
+void Identifier::dump() const { print(llvm::errs()); }
 
 void OperationName::print(raw_ostream &os) const { os << getStringRef(); }
 
 void OperationName::dump() const { print(llvm::errs()); }
 
+DialectAsmPrinter::~DialectAsmPrinter() {}
+
 //===--------------------------------------------------------------------===//
-// AsmParser
-//===--------------------------------------------------------------------===//
-
-AsmParser::~AsmParser() = default;
-DialectAsmParser::~DialectAsmParser() = default;
-OpAsmParser::~OpAsmParser() = default;
-
-MLIRContext *AsmParser::getContext() const { return getBuilder().getContext(); }
-
-/// Parse a type list.
-/// This is out-of-line to work-around https://github.com/llvm/llvm-project/issues/62918
-ParseResult AsmParser::parseTypeList(SmallVectorImpl<Type> &result) {
-    return parseCommaSeparatedList(
-        [&]() { return parseType(result.emplace_back()); });
-  }
-
-
-
-//===----------------------------------------------------------------------===//
-// DialectAsmPrinter
-//===----------------------------------------------------------------------===//
-
-DialectAsmPrinter::~DialectAsmPrinter() = default;
-
-//===----------------------------------------------------------------------===//
 // OpAsmPrinter
-//===----------------------------------------------------------------------===//
+//===--------------------------------------------------------------------===//
 
-OpAsmPrinter::~OpAsmPrinter() = default;
+OpAsmPrinter::~OpAsmPrinter() {}
 
 void OpAsmPrinter::printFunctionalType(Operation *op) {
   auto &os = getStream();
@@ -101,7 +72,7 @@ void OpAsmPrinter::printFunctionalType(Operation *op) {
   // it is a function (avoiding a grammar ambiguity).
   bool wrapped = op->getNumResults() != 1;
   if (!wrapped && op->getResult(0).getType() &&
-      llvm::isa<FunctionType>(op->getResult(0).getType()))
+      op->getResult(0).getType().isa<FunctionType>())
     wrapped = true;
 
   if (wrapped)
@@ -116,19 +87,12 @@ void OpAsmPrinter::printFunctionalType(Operation *op) {
     os << ')';
 }
 
-//===----------------------------------------------------------------------===//
+//===--------------------------------------------------------------------===//
 // Operation OpAsm interface.
-//===----------------------------------------------------------------------===//
+//===--------------------------------------------------------------------===//
 
 /// The OpAsmOpInterface, see OpAsmInterface.td for more details.
 #include "mlir/IR/OpAsmInterface.cpp.inc"
-
-LogicalResult
-OpAsmDialectInterface::parseResource(AsmParsedResourceEntry &entry) const {
-  return entry.emitError() << "unknown 'resource' key '" << entry.getKey()
-                           << "' for dialect '" << getDialect()->getNamespace()
-                           << "'";
-}
 
 //===----------------------------------------------------------------------===//
 // OpPrintingFlags
@@ -150,11 +114,6 @@ struct AsmPrinterOptions {
       llvm::cl::desc("Elide ElementsAttrs with \"...\" that have "
                      "more elements than the given upper limit")};
 
-  llvm::cl::opt<unsigned> elideResourceStringsIfLarger{
-      "mlir-elide-resource-strings-if-larger",
-      llvm::cl::desc(
-          "Elide printing value of resources if string is too long in chars.")};
-
   llvm::cl::opt<bool> printDebugInfoOpt{
       "mlir-print-debuginfo", llvm::cl::init(false),
       llvm::cl::desc("Print debug info in MLIR output")};
@@ -169,22 +128,12 @@ struct AsmPrinterOptions {
       "mlir-print-op-generic", llvm::cl::init(false),
       llvm::cl::desc("Print the generic op form"), llvm::cl::Hidden};
 
-  llvm::cl::opt<bool> assumeVerifiedOpt{
-      "mlir-print-assume-verified", llvm::cl::init(false),
-      llvm::cl::desc("Skip op verification when using custom printers"),
-      llvm::cl::Hidden};
-
   llvm::cl::opt<bool> printLocalScopeOpt{
       "mlir-print-local-scope", llvm::cl::init(false),
-      llvm::cl::desc("Print with local scope and inline information (eliding "
-                     "aliases for attributes, types, and locations")};
-
-  llvm::cl::opt<bool> printValueUsers{
-      "mlir-print-value-users", llvm::cl::init(false),
-      llvm::cl::desc(
-          "Print users of operation results and block arguments as a comment")};
+      llvm::cl::desc("Print assuming in local scope by default"),
+      llvm::cl::Hidden};
 };
-} // namespace
+} // end anonymous namespace
 
 static llvm::ManagedStatic<AsmPrinterOptions> clOptions;
 
@@ -198,22 +147,16 @@ void mlir::registerAsmPrinterCLOptions() {
 /// Initialize the printing flags with default supplied by the cl::opts above.
 OpPrintingFlags::OpPrintingFlags()
     : printDebugInfoFlag(false), printDebugInfoPrettyFormFlag(false),
-      printGenericOpFormFlag(false), skipRegionsFlag(false),
-      assumeVerifiedFlag(false), printLocalScope(false),
-      printValueUsersFlag(false) {
+      printGenericOpFormFlag(false), printLocalScope(false) {
   // Initialize based upon command line options, if they are available.
   if (!clOptions.isConstructed())
     return;
   if (clOptions->elideElementsAttrIfLarger.getNumOccurrences())
     elementsAttrElementLimit = clOptions->elideElementsAttrIfLarger;
-  if (clOptions->elideResourceStringsIfLarger.getNumOccurrences())
-    resourceStringCharLimit = clOptions->elideResourceStringsIfLarger;
   printDebugInfoFlag = clOptions->printDebugInfoOpt;
   printDebugInfoPrettyFormFlag = clOptions->printPrettyDebugInfoOpt;
   printGenericOpFormFlag = clOptions->printGenericOpFormOpt;
-  assumeVerifiedFlag = clOptions->assumeVerifiedOpt;
   printLocalScope = clOptions->printLocalScopeOpt;
-  printValueUsersFlag = clOptions->printValueUsers;
 }
 
 /// Enable the elision of large elements attributes, by printing a '...'
@@ -226,36 +169,17 @@ OpPrintingFlags::elideLargeElementsAttrs(int64_t largeElementLimit) {
   return *this;
 }
 
-OpPrintingFlags &
-OpPrintingFlags::elideLargeResourceString(int64_t largeResourceLimit) {
-  resourceStringCharLimit = largeResourceLimit;
-  return *this;
-}
-
 /// Enable printing of debug information. If 'prettyForm' is set to true,
 /// debug information is printed in a more readable 'pretty' form.
-OpPrintingFlags &OpPrintingFlags::enableDebugInfo(bool enable,
-                                                  bool prettyForm) {
-  printDebugInfoFlag = enable;
+OpPrintingFlags &OpPrintingFlags::enableDebugInfo(bool prettyForm) {
+  printDebugInfoFlag = true;
   printDebugInfoPrettyFormFlag = prettyForm;
   return *this;
 }
 
 /// Always print operations in the generic form.
-OpPrintingFlags &OpPrintingFlags::printGenericOpForm(bool enable) {
-  printGenericOpFormFlag = enable;
-  return *this;
-}
-
-/// Always skip Regions.
-OpPrintingFlags &OpPrintingFlags::skipRegions(bool skip) {
-  skipRegionsFlag = skip;
-  return *this;
-}
-
-/// Do not verify the operation when using custom operation printers.
-OpPrintingFlags &OpPrintingFlags::assumeVerified() {
-  assumeVerifiedFlag = true;
+OpPrintingFlags &OpPrintingFlags::printGenericOpForm() {
+  printGenericOpFormFlag = true;
   return *this;
 }
 
@@ -267,27 +191,16 @@ OpPrintingFlags &OpPrintingFlags::useLocalScope() {
   return *this;
 }
 
-/// Print users of values as comments.
-OpPrintingFlags &OpPrintingFlags::printValueUsers() {
-  printValueUsersFlag = true;
-  return *this;
-}
-
 /// Return if the given ElementsAttr should be elided.
 bool OpPrintingFlags::shouldElideElementsAttr(ElementsAttr attr) const {
-  return elementsAttrElementLimit &&
+  return elementsAttrElementLimit.hasValue() &&
          *elementsAttrElementLimit < int64_t(attr.getNumElements()) &&
-         !llvm::isa<SplatElementsAttr>(attr);
+         !attr.isa<SplatElementsAttr>();
 }
 
 /// Return the size limit for printing large ElementsAttr.
-std::optional<int64_t> OpPrintingFlags::getLargeElementsAttrLimit() const {
+Optional<int64_t> OpPrintingFlags::getLargeElementsAttrLimit() const {
   return elementsAttrElementLimit;
-}
-
-/// Return the size limit for printing large ElementsAttr.
-std::optional<uint64_t> OpPrintingFlags::getLargeResourceStringLimit() const {
-  return resourceStringCharLimit;
 }
 
 /// Return if debug information should be printed.
@@ -305,21 +218,8 @@ bool OpPrintingFlags::shouldPrintGenericOpForm() const {
   return printGenericOpFormFlag;
 }
 
-/// Return if Region should be skipped.
-bool OpPrintingFlags::shouldSkipRegions() const { return skipRegionsFlag; }
-
-/// Return if operation verification should be skipped.
-bool OpPrintingFlags::shouldAssumeVerified() const {
-  return assumeVerifiedFlag;
-}
-
 /// Return if the printer should use local scope when dumping the IR.
 bool OpPrintingFlags::shouldUseLocalScope() const { return printLocalScope; }
-
-/// Return if the printer should print users of values.
-bool OpPrintingFlags::shouldPrintValueUsers() const {
-  return printValueUsersFlag;
-}
 
 /// Returns true if an ElementsAttr with the given number of elements should be
 /// printed with hex.
@@ -349,140 +249,12 @@ namespace {
 struct NewLineCounter {
   unsigned curLine = 1;
 };
+} // end anonymous namespace
 
 static raw_ostream &operator<<(raw_ostream &os, NewLineCounter &newLine) {
   ++newLine.curLine;
   return os << '\n';
 }
-} // namespace
-
-//===----------------------------------------------------------------------===//
-// AsmPrinter::Impl
-//===----------------------------------------------------------------------===//
-
-namespace mlir {
-class AsmPrinter::Impl {
-public:
-  Impl(raw_ostream &os, AsmStateImpl &state);
-  explicit Impl(Impl &other) : Impl(other.os, other.state) {}
-
-  /// Returns the output stream of the printer.
-  raw_ostream &getStream() { return os; }
-
-  template <typename Container, typename UnaryFunctor>
-  inline void interleaveComma(const Container &c, UnaryFunctor eachFn) const {
-    llvm::interleaveComma(c, os, eachFn);
-  }
-
-  /// This enum describes the different kinds of elision for the type of an
-  /// attribute when printing it.
-  enum class AttrTypeElision {
-    /// The type must not be elided,
-    Never,
-    /// The type may be elided when it matches the default used in the parser
-    /// (for example i64 is the default for integer attributes).
-    May,
-    /// The type must be elided.
-    Must
-  };
-
-  /// Print the given attribute or an alias.
-  void printAttribute(Attribute attr,
-                      AttrTypeElision typeElision = AttrTypeElision::Never);
-  /// Print the given attribute without considering an alias.
-  void printAttributeImpl(Attribute attr,
-                          AttrTypeElision typeElision = AttrTypeElision::Never);
-
-  /// Print the alias for the given attribute, return failure if no alias could
-  /// be printed.
-  LogicalResult printAlias(Attribute attr);
-
-  /// Print the given type or an alias.
-  void printType(Type type);
-  /// Print the given type.
-  void printTypeImpl(Type type);
-
-  /// Print the alias for the given type, return failure if no alias could
-  /// be printed.
-  LogicalResult printAlias(Type type);
-
-  /// Print the given location to the stream. If `allowAlias` is true, this
-  /// allows for the internal location to use an attribute alias.
-  void printLocation(LocationAttr loc, bool allowAlias = false);
-
-  /// Print a reference to the given resource that is owned by the given
-  /// dialect.
-  void printResourceHandle(const AsmDialectResourceHandle &resource);
-
-  void printAffineMap(AffineMap map);
-  void
-  printAffineExpr(AffineExpr expr,
-                  function_ref<void(unsigned, bool)> printValueName = nullptr);
-  void printAffineConstraint(AffineExpr expr, bool isEq);
-  void printIntegerSet(IntegerSet set);
-
-  LogicalResult pushCyclicPrinting(const void *opaquePointer);
-
-  void popCyclicPrinting();
-
-protected:
-  void printOptionalAttrDict(ArrayRef<NamedAttribute> attrs,
-                             ArrayRef<StringRef> elidedAttrs = {},
-                             bool withKeyword = false);
-  void printNamedAttribute(NamedAttribute attr);
-  void printTrailingLocation(Location loc, bool allowAlias = true);
-  void printLocationInternal(LocationAttr loc, bool pretty = false,
-                             bool isTopLevel = false);
-
-  /// Print a dense elements attribute. If 'allowHex' is true, a hex string is
-  /// used instead of individual elements when the elements attr is large.
-  void printDenseElementsAttr(DenseElementsAttr attr, bool allowHex);
-
-  /// Print a dense string elements attribute.
-  void printDenseStringElementsAttr(DenseStringElementsAttr attr);
-
-  /// Print a dense elements attribute. If 'allowHex' is true, a hex string is
-  /// used instead of individual elements when the elements attr is large.
-  void printDenseIntOrFPElementsAttr(DenseIntOrFPElementsAttr attr,
-                                     bool allowHex);
-
-  /// Print a dense array attribute.
-  void printDenseArrayAttr(DenseArrayAttr attr);
-
-  void printDialectAttribute(Attribute attr);
-  void printDialectType(Type type);
-
-  /// Print an escaped string, wrapped with "".
-  void printEscapedString(StringRef str);
-
-  /// Print a hex string, wrapped with "".
-  void printHexString(StringRef str);
-  void printHexString(ArrayRef<char> data);
-
-  /// This enum is used to represent the binding strength of the enclosing
-  /// context that an AffineExprStorage is being printed in, so we can
-  /// intelligently produce parens.
-  enum class BindingStrength {
-    Weak,   // + and -
-    Strong, // All other binary operators.
-  };
-  void printAffineExprInternal(
-      AffineExpr expr, BindingStrength enclosingTightness,
-      function_ref<void(unsigned, bool)> printValueName = nullptr);
-
-  /// The output stream for the printer.
-  raw_ostream &os;
-
-  /// An underlying assembly printer state.
-  AsmStateImpl &state;
-
-  /// A set of flags to control the printer's behavior.
-  OpPrintingFlags printerFlags;
-
-  /// A tracker for the number of new lines emitted during printing.
-  NewLineCounter newLine;
-};
-} // namespace mlir
 
 //===----------------------------------------------------------------------===//
 // AliasInitializer
@@ -492,20 +264,19 @@ namespace {
 /// This class represents a specific instance of a symbol Alias.
 class SymbolAlias {
 public:
-  SymbolAlias(StringRef name, uint32_t suffixIndex, bool isType,
-              bool isDeferrable)
-      : name(name), suffixIndex(suffixIndex), isType(isType),
+  SymbolAlias(StringRef name, bool isDeferrable)
+      : name(name), suffixIndex(0), hasSuffixIndex(false),
+        isDeferrable(isDeferrable) {}
+  SymbolAlias(StringRef name, uint32_t suffixIndex, bool isDeferrable)
+      : name(name), suffixIndex(suffixIndex), hasSuffixIndex(true),
         isDeferrable(isDeferrable) {}
 
   /// Print this alias to the given stream.
   void print(raw_ostream &os) const {
-    os << (isType ? "!" : "#") << name;
-    if (suffixIndex)
+    os << name;
+    if (hasSuffixIndex)
       os << suffixIndex;
   }
-
-  /// Returns true if this is a type alias.
-  bool isTypeAlias() const { return isType; }
 
   /// Returns true if this alias supports deferred resolution when parsing.
   bool canBeDeferred() const { return isDeferrable; }
@@ -513,10 +284,11 @@ public:
 private:
   /// The main name of the alias.
   StringRef name;
-  /// The suffix index of the alias.
+  /// The optional suffix index of the alias, if multiple aliases had the same
+  /// name.
   uint32_t suffixIndex : 30;
-  /// A flag indicating whether this alias is for a type.
-  bool isType : 1;
+  /// A flag indicating whether this alias has a suffix or not.
+  bool hasSuffixIndex : 1;
   /// A flag indicating whether this alias may be deferred or not.
   bool isDeferrable : 1;
 };
@@ -533,91 +305,44 @@ public:
         aliasOS(aliasBuffer) {}
 
   void initialize(Operation *op, const OpPrintingFlags &printerFlags,
-                  llvm::MapVector<const void *, SymbolAlias> &attrTypeToAlias);
+                  llvm::MapVector<Attribute, SymbolAlias> &attrToAlias,
+                  llvm::MapVector<Type, SymbolAlias> &typeToAlias);
 
   /// Visit the given attribute to see if it has an alias. `canBeDeferred` is
   /// set to true if the originator of this attribute can resolve the alias
   /// after parsing has completed (e.g. in the case of operation locations).
-  /// `elideType` indicates if the type of the attribute should be skipped when
-  /// looking for nested aliases. Returns the maximum alias depth of the
-  /// attribute, and the alias index of this attribute.
-  std::pair<size_t, size_t> visit(Attribute attr, bool canBeDeferred = false,
-                                  bool elideType = false) {
-    return visitImpl(attr, aliases, canBeDeferred, elideType);
-  }
+  void visit(Attribute attr, bool canBeDeferred = false);
 
-  /// Visit the given type to see if it has an alias. `canBeDeferred` is
-  /// set to true if the originator of this attribute can resolve the alias
-  /// after parsing has completed. Returns the maximum alias depth of the type,
-  /// and the alias index of this type.
-  std::pair<size_t, size_t> visit(Type type, bool canBeDeferred = false) {
-    return visitImpl(type, aliases, canBeDeferred);
-  }
+  /// Visit the given type to see if it has an alias.
+  void visit(Type type);
 
 private:
-  struct InProgressAliasInfo {
-    InProgressAliasInfo()
-        : aliasDepth(0), isType(false), canBeDeferred(false) {}
-    InProgressAliasInfo(StringRef alias, bool isType, bool canBeDeferred)
-        : alias(alias), aliasDepth(1), isType(isType),
-          canBeDeferred(canBeDeferred) {}
-
-    bool operator<(const InProgressAliasInfo &rhs) const {
-      // Order first by depth, then by attr/type kind, and then by name.
-      if (aliasDepth != rhs.aliasDepth)
-        return aliasDepth < rhs.aliasDepth;
-      if (isType != rhs.isType)
-        return isType;
-      return alias < rhs.alias;
-    }
-
-    /// The alias for the attribute or type, or std::nullopt if the value has no
-    /// alias.
-    std::optional<StringRef> alias;
-    /// The alias depth of this attribute or type, i.e. an indication of the
-    /// relative ordering of when to print this alias.
-    unsigned aliasDepth : 30;
-    /// If this alias represents a type or an attribute.
-    bool isType : 1;
-    /// If this alias can be deferred or not.
-    bool canBeDeferred : 1;
-    /// Indices for child aliases.
-    SmallVector<size_t> childIndices;
-  };
-
-  /// Visit the given attribute or type to see if it has an alias.
-  /// `canBeDeferred` is set to true if the originator of this value can resolve
-  /// the alias after parsing has completed (e.g. in the case of operation
-  /// locations). Returns the maximum alias depth of the value, and its alias
-  /// index.
-  template <typename T, typename... PrintArgs>
-  std::pair<size_t, size_t>
-  visitImpl(T value,
-            llvm::MapVector<const void *, InProgressAliasInfo> &aliases,
-            bool canBeDeferred, PrintArgs &&...printArgs);
-
-  /// Mark the given alias as non-deferrable.
-  void markAliasNonDeferrable(size_t aliasIndex);
-
   /// Try to generate an alias for the provided symbol. If an alias is
   /// generated, the provided alias mapping and reverse mapping are updated.
+  /// Returns success if an alias was generated, failure otherwise.
   template <typename T>
-  void generateAlias(T symbol, InProgressAliasInfo &alias, bool canBeDeferred);
-
-  /// Given a collection of aliases and symbols, initialize a mapping from a
-  /// symbol to a given alias.
-  static void initializeAliases(
-      llvm::MapVector<const void *, InProgressAliasInfo> &visitedSymbols,
-      llvm::MapVector<const void *, SymbolAlias> &symbolToAlias);
+  LogicalResult
+  generateAlias(T symbol,
+                llvm::MapVector<StringRef, std::vector<T>> &aliasToSymbol);
 
   /// The set of asm interfaces within the context.
   DialectInterfaceCollection<OpAsmDialectInterface> &interfaces;
 
+  /// Mapping between an alias and the set of symbols mapped to it.
+  llvm::MapVector<StringRef, std::vector<Attribute>> aliasToAttr;
+  llvm::MapVector<StringRef, std::vector<Type>> aliasToType;
+
   /// An allocator used for alias names.
   llvm::BumpPtrAllocator &aliasAllocator;
 
-  /// The set of built aliases.
-  llvm::MapVector<const void *, InProgressAliasInfo> aliases;
+  /// The set of visited attributes.
+  DenseSet<Attribute> visitedAttributes;
+
+  /// The set of attributes that have aliases *and* can be deferred.
+  DenseSet<Attribute> deferrableAttributes;
+
+  /// The set of visited types.
+  DenseSet<Type> visitedTypes;
 
   /// Storage and stream used when generating an alias.
   SmallString<32> aliasBuffer;
@@ -635,17 +360,20 @@ public:
                                       AliasInitializer &initializer)
       : printerFlags(printerFlags), initializer(initializer) {}
 
-  /// Prints the entire operation with the custom assembly form, if available,
-  /// or the generic assembly form, otherwise.
-  void printCustomOrGenericOp(Operation *op) override {
+  /// Print the given operation.
+  void print(Operation *op) {
     // Visit the operation location.
     if (printerFlags.shouldPrintDebugInfo())
       initializer.visit(op->getLoc(), /*canBeDeferred=*/true);
 
     // If requested, always print the generic form.
     if (!printerFlags.shouldPrintGenericOpForm()) {
-      op->getName().printAssembly(op, *this, /*defaultDialect=*/"");
-      return;
+      // Check to see if this is a known operation.  If so, use the registered
+      // custom printer hook.
+      if (auto *opInfo = op->getAbstractOperation()) {
+        opInfo->printAssembly(op, *this);
+        return;
+      }
     }
 
     // Otherwise print with the generic assembly form.
@@ -654,9 +382,9 @@ public:
 
 private:
   /// Print the given operation in the generic form.
-  void printGenericOp(Operation *op, bool printOpName = true) override {
+  void printGenericOp(Operation *op) override {
     // Consider nested operations for aliases.
-    if (!printerFlags.shouldSkipRegions()) {
+    if (op->getNumRegions() != 0) {
       for (Region &region : op->getRegions())
         printRegion(region, /*printEntryBlockArgs=*/true,
                     /*printBlockTerminators=*/true);
@@ -670,7 +398,7 @@ private:
 
     // Consider the attributes of the operation for aliases.
     for (const NamedAttribute &attr : op->getAttrs())
-      printAttribute(attr.getValue());
+      printAttribute(attr.second);
   }
 
   /// Print the given block. If 'printBlockArgs' is false, the arguments of the
@@ -700,7 +428,7 @@ private:
         std::prev(block->end(),
                   (!hasTerminator || printBlockTerminator) ? 0 : 1));
     for (Operation &op : range)
-      printCustomOrGenericOp(&op);
+      print(&op);
   }
 
   /// Print the given region.
@@ -709,10 +437,6 @@ private:
                    bool printEmptyBlock = false) override {
     if (region.empty())
       return;
-    if (printerFlags.shouldSkipRegions()) {
-      os << "{...}";
-      return;
-    }
 
     auto *entryBlock = &region.front();
     print(entryBlock, printEntryBlockArgs, printBlockTerminators);
@@ -737,19 +461,6 @@ private:
   void printAttributeWithoutType(Attribute attr) override {
     printAttribute(attr);
   }
-  LogicalResult printAlias(Attribute attr) override {
-    initializer.visit(attr);
-    return success();
-  }
-  LogicalResult printAlias(Type type) override {
-    initializer.visit(type);
-    return success();
-  }
-
-  /// Consider the given location to be printed for an alias.
-  void printOptionalLocationSpecifier(Location loc) override {
-    printAttribute(loc);
-  }
 
   /// Print the given set of attributes with names not included within
   /// 'elidedAttrs'.
@@ -759,14 +470,14 @@ private:
       return;
     if (elidedAttrs.empty()) {
       for (const NamedAttribute &attr : attrs)
-        printAttribute(attr.getValue());
+        printAttribute(attr.second);
       return;
     }
     llvm::SmallDenseSet<StringRef> elidedAttrsSet(elidedAttrs.begin(),
                                                   elidedAttrs.end());
     for (const NamedAttribute &attr : attrs)
-      if (!elidedAttrsSet.contains(attr.getName().strref()))
-        printAttribute(attr.getValue());
+      if (!elidedAttrsSet.contains(attr.first.strref()))
+        printAttribute(attr.second);
   }
   void printOptionalAttrDictWithKeyword(
       ArrayRef<NamedAttribute> attrs,
@@ -780,12 +491,9 @@ private:
 
   /// The following are hooks of `OpAsmPrinter` that are not necessary for
   /// determining potential aliases.
-  void printFloat(const APFloat &) override {}
   void printAffineMapOfSSAIds(AffineMapAttr, ValueRange) override {}
   void printAffineExprOfSSAIds(AffineExpr, ValueRange, ValueRange) override {}
   void printNewline() override {}
-  void increaseIndent() override {}
-  void decreaseIndent() override {}
   void printOperand(Value) override {}
   void printOperand(Value, raw_ostream &os) override {
     // Users expect the output string to have at least the prefixed % to signal
@@ -793,9 +501,6 @@ private:
     // guaranteed to go unused.
     os << "%";
   }
-  void printKeywordOrString(StringRef) override {}
-  void printString(StringRef) override {}
-  void printResourceHandle(const AsmDialectResourceHandle &) override {}
   void printSymbolName(StringRef) override {}
   void printSuccessor(Block *) override {}
   void printSuccessorAndUseList(Block *, ValueRange) override {}
@@ -810,161 +515,7 @@ private:
   /// A dummy output stream.
   mutable llvm::raw_null_ostream os;
 };
-
-class DummyAliasDialectAsmPrinter : public DialectAsmPrinter {
-public:
-  explicit DummyAliasDialectAsmPrinter(AliasInitializer &initializer,
-                                       bool canBeDeferred,
-                                       SmallVectorImpl<size_t> &childIndices)
-      : initializer(initializer), canBeDeferred(canBeDeferred),
-        childIndices(childIndices) {}
-
-  /// Print the given attribute/type, visiting any nested aliases that would be
-  /// generated as part of printing. Returns the maximum alias depth found while
-  /// printing the given value.
-  template <typename T, typename... PrintArgs>
-  size_t printAndVisitNestedAliases(T value, PrintArgs &&...printArgs) {
-    printAndVisitNestedAliasesImpl(value, printArgs...);
-    return maxAliasDepth;
-  }
-
-private:
-  /// Print the given attribute/type, visiting any nested aliases that would be
-  /// generated as part of printing.
-  void printAndVisitNestedAliasesImpl(Attribute attr, bool elideType) {
-    if (!isa<BuiltinDialect>(attr.getDialect())) {
-      attr.getDialect().printAttribute(attr, *this);
-
-      // Process the builtin attributes.
-    } else if (llvm::isa<AffineMapAttr, DenseArrayAttr, FloatAttr, IntegerAttr,
-                         IntegerSetAttr, UnitAttr>(attr)) {
-      return;
-    } else if (auto distinctAttr = dyn_cast<DistinctAttr>(attr)) {
-      printAttribute(distinctAttr.getReferencedAttr());
-    } else if (auto dictAttr = dyn_cast<DictionaryAttr>(attr)) {
-      for (const NamedAttribute &nestedAttr : dictAttr.getValue()) {
-        printAttribute(nestedAttr.getName());
-        printAttribute(nestedAttr.getValue());
-      }
-    } else if (auto arrayAttr = dyn_cast<ArrayAttr>(attr)) {
-      for (Attribute nestedAttr : arrayAttr.getValue())
-        printAttribute(nestedAttr);
-    } else if (auto typeAttr = dyn_cast<TypeAttr>(attr)) {
-      printType(typeAttr.getValue());
-    } else if (auto locAttr = dyn_cast<OpaqueLoc>(attr)) {
-      printAttribute(locAttr.getFallbackLocation());
-    } else if (auto locAttr = dyn_cast<NameLoc>(attr)) {
-      if (!isa<UnknownLoc>(locAttr.getChildLoc()))
-        printAttribute(locAttr.getChildLoc());
-    } else if (auto locAttr = dyn_cast<CallSiteLoc>(attr)) {
-      printAttribute(locAttr.getCallee());
-      printAttribute(locAttr.getCaller());
-    } else if (auto locAttr = dyn_cast<FusedLoc>(attr)) {
-      if (Attribute metadata = locAttr.getMetadata())
-        printAttribute(metadata);
-      for (Location nestedLoc : locAttr.getLocations())
-        printAttribute(nestedLoc);
-    }
-
-    // Don't print the type if we must elide it, or if it is a None type.
-    if (!elideType) {
-      if (auto typedAttr = llvm::dyn_cast<TypedAttr>(attr)) {
-        Type attrType = typedAttr.getType();
-        if (!llvm::isa<NoneType>(attrType))
-          printType(attrType);
-      }
-    }
-  }
-  void printAndVisitNestedAliasesImpl(Type type) {
-    if (!isa<BuiltinDialect>(type.getDialect()))
-      return type.getDialect().printType(type, *this);
-
-    // Only visit the layout of memref if it isn't the identity.
-    if (auto memrefTy = llvm::dyn_cast<MemRefType>(type)) {
-      printType(memrefTy.getElementType());
-      MemRefLayoutAttrInterface layout = memrefTy.getLayout();
-      if (!llvm::isa<AffineMapAttr>(layout) || !layout.isIdentity())
-        printAttribute(memrefTy.getLayout());
-      if (memrefTy.getMemorySpace())
-        printAttribute(memrefTy.getMemorySpace());
-      return;
-    }
-
-    // For most builtin types, we can simply walk the sub elements.
-    auto visitFn = [&](auto element) {
-      if (element)
-        (void)printAlias(element);
-    };
-    type.walkImmediateSubElements(visitFn, visitFn);
-  }
-
-  /// Consider the given type to be printed for an alias.
-  void printType(Type type) override {
-    recordAliasResult(initializer.visit(type, canBeDeferred));
-  }
-
-  /// Consider the given attribute to be printed for an alias.
-  void printAttribute(Attribute attr) override {
-    recordAliasResult(initializer.visit(attr, canBeDeferred));
-  }
-  void printAttributeWithoutType(Attribute attr) override {
-    recordAliasResult(
-        initializer.visit(attr, canBeDeferred, /*elideType=*/true));
-  }
-  LogicalResult printAlias(Attribute attr) override {
-    printAttribute(attr);
-    return success();
-  }
-  LogicalResult printAlias(Type type) override {
-    printType(type);
-    return success();
-  }
-
-  /// Record the alias result of a child element.
-  void recordAliasResult(std::pair<size_t, size_t> aliasDepthAndIndex) {
-    childIndices.push_back(aliasDepthAndIndex.second);
-    if (aliasDepthAndIndex.first > maxAliasDepth)
-      maxAliasDepth = aliasDepthAndIndex.first;
-  }
-
-  /// Return a null stream as the output stream, this will ignore any data fed
-  /// to it.
-  raw_ostream &getStream() const override { return os; }
-
-  /// The following are hooks of `DialectAsmPrinter` that are not necessary for
-  /// determining potential aliases.
-  void printFloat(const APFloat &) override {}
-  void printKeywordOrString(StringRef) override {}
-  void printString(StringRef) override {}
-  void printSymbolName(StringRef) override {}
-  void printResourceHandle(const AsmDialectResourceHandle &) override {}
-
-  LogicalResult pushCyclicPrinting(const void *opaquePointer) override {
-    return success(cyclicPrintingStack.insert(opaquePointer));
-  }
-
-  void popCyclicPrinting() override { cyclicPrintingStack.pop_back(); }
-
-  /// Stack of potentially cyclic mutable attributes or type currently being
-  /// printed.
-  SetVector<const void *> cyclicPrintingStack;
-
-  /// The initializer to use when identifying aliases.
-  AliasInitializer &initializer;
-
-  /// If the aliases visited by this printer can be deferred.
-  bool canBeDeferred;
-
-  /// The indices of child aliases.
-  SmallVectorImpl<size_t> &childIndices;
-
-  /// The maximum alias depth found by the printer.
-  size_t maxAliasDepth = 0;
-
-  /// A dummy output stream.
-  mutable llvm::raw_null_ostream os;
-};
-} // namespace
+} // end anonymous namespace
 
 /// Sanitize the given name such that it can be used as a valid identifier. If
 /// the string needs to be modified in any way, the provided buffer is used to
@@ -1016,93 +567,91 @@ static StringRef sanitizeIdentifier(StringRef name, SmallString<16> &buffer,
 
 /// Given a collection of aliases and symbols, initialize a mapping from a
 /// symbol to a given alias.
-void AliasInitializer::initializeAliases(
-    llvm::MapVector<const void *, InProgressAliasInfo> &visitedSymbols,
-    llvm::MapVector<const void *, SymbolAlias> &symbolToAlias) {
-  SmallVector<std::pair<const void *, InProgressAliasInfo>, 0>
-      unprocessedAliases = visitedSymbols.takeVector();
-  llvm::stable_sort(unprocessedAliases, [](const auto &lhs, const auto &rhs) {
-    return lhs.second < rhs.second;
-  });
+template <typename T>
+static void
+initializeAliases(llvm::MapVector<StringRef, std::vector<T>> &aliasToSymbol,
+                  llvm::MapVector<T, SymbolAlias> &symbolToAlias,
+                  DenseSet<T> *deferrableAliases = nullptr) {
+  std::vector<std::pair<StringRef, std::vector<T>>> aliases =
+      aliasToSymbol.takeVector();
+  llvm::array_pod_sort(aliases.begin(), aliases.end(),
+                       [](const auto *lhs, const auto *rhs) {
+                         return lhs->first.compare(rhs->first);
+                       });
 
-  llvm::StringMap<unsigned> nameCounts;
-  for (auto &[symbol, aliasInfo] : unprocessedAliases) {
-    if (!aliasInfo.alias)
+  for (auto &it : aliases) {
+    // If there is only one instance for this alias, use the name directly.
+    if (it.second.size() == 1) {
+      T symbol = it.second.front();
+      bool isDeferrable = deferrableAliases && deferrableAliases->count(symbol);
+      symbolToAlias.insert({symbol, SymbolAlias(it.first, isDeferrable)});
       continue;
-    StringRef alias = *aliasInfo.alias;
-    unsigned nameIndex = nameCounts[alias]++;
-    symbolToAlias.insert(
-        {symbol, SymbolAlias(alias, nameIndex, aliasInfo.isType,
-                             aliasInfo.canBeDeferred)});
+    }
+    // Otherwise, add the index to the name.
+    for (int i = 0, e = it.second.size(); i < e; ++i) {
+      T symbol = it.second[i];
+      bool isDeferrable = deferrableAliases && deferrableAliases->count(symbol);
+      symbolToAlias.insert({symbol, SymbolAlias(it.first, i, isDeferrable)});
+    }
   }
 }
 
 void AliasInitializer::initialize(
     Operation *op, const OpPrintingFlags &printerFlags,
-    llvm::MapVector<const void *, SymbolAlias> &attrTypeToAlias) {
+    llvm::MapVector<Attribute, SymbolAlias> &attrToAlias,
+    llvm::MapVector<Type, SymbolAlias> &typeToAlias) {
   // Use a dummy printer when walking the IR so that we can collect the
   // attributes/types that will actually be used during printing when
   // considering aliases.
   DummyAliasOperationPrinter aliasPrinter(printerFlags, *this);
-  aliasPrinter.printCustomOrGenericOp(op);
+  aliasPrinter.print(op);
 
-  // Initialize the aliases.
-  initializeAliases(aliases, attrTypeToAlias);
+  // Initialize the aliases sorted by name.
+  initializeAliases(aliasToAttr, attrToAlias, &deferrableAttributes);
+  initializeAliases(aliasToType, typeToAlias);
 }
 
-template <typename T, typename... PrintArgs>
-std::pair<size_t, size_t> AliasInitializer::visitImpl(
-    T value, llvm::MapVector<const void *, InProgressAliasInfo> &aliases,
-    bool canBeDeferred, PrintArgs &&...printArgs) {
-  auto [it, inserted] =
-      aliases.insert({value.getAsOpaquePointer(), InProgressAliasInfo()});
-  size_t aliasIndex = std::distance(aliases.begin(), it);
-  if (!inserted) {
-    // Make sure that the alias isn't deferred if we don't permit it.
+void AliasInitializer::visit(Attribute attr, bool canBeDeferred) {
+  if (!visitedAttributes.insert(attr).second) {
+    // If this attribute already has an alias and this instance can't be
+    // deferred, make sure that the alias isn't deferred.
     if (!canBeDeferred)
-      markAliasNonDeferrable(aliasIndex);
-    return {static_cast<size_t>(it->second.aliasDepth), aliasIndex};
+      deferrableAttributes.erase(attr);
+    return;
   }
 
-  // Try to generate an alias for this value.
-  generateAlias(value, it->second, canBeDeferred);
+  // Try to generate an alias for this attribute.
+  if (succeeded(generateAlias(attr, aliasToAttr))) {
+    if (canBeDeferred)
+      deferrableAttributes.insert(attr);
+    return;
+  }
 
-  // Print the value, capturing any nested elements that require aliases.
-  SmallVector<size_t> childAliases;
-  DummyAliasDialectAsmPrinter printer(*this, canBeDeferred, childAliases);
-  size_t maxAliasDepth =
-      printer.printAndVisitNestedAliases(value, printArgs...);
-
-  // Make sure to recompute `it` in case the map was reallocated.
-  it = std::next(aliases.begin(), aliasIndex);
-
-  // If we had sub elements, update to account for the depth.
-  it->second.childIndices = std::move(childAliases);
-  if (maxAliasDepth)
-    it->second.aliasDepth = maxAliasDepth + 1;
-
-  // Propagate the alias depth of the value.
-  return {(size_t)it->second.aliasDepth, aliasIndex};
+  // Check for any sub elements.
+  if (auto subElementInterface = attr.dyn_cast<SubElementAttrInterface>()) {
+    subElementInterface.walkSubElements([&](Attribute attr) { visit(attr); },
+                                        [&](Type type) { visit(type); });
+  }
 }
 
-void AliasInitializer::markAliasNonDeferrable(size_t aliasIndex) {
-  auto it = std::next(aliases.begin(), aliasIndex);
-
-  // If already marked non-deferrable stop the recursion.
-  // All children should already be marked non-deferrable as well.
-  if (!it->second.canBeDeferred)
+void AliasInitializer::visit(Type type) {
+  if (!visitedTypes.insert(type).second)
     return;
 
-  it->second.canBeDeferred = false;
+  // Try to generate an alias for this type.
+  if (succeeded(generateAlias(type, aliasToType)))
+    return;
 
-  // Propagate the non-deferrable flag to any child aliases.
-  for (size_t childIndex : it->second.childIndices)
-    markAliasNonDeferrable(childIndex);
+  // Check for any sub elements.
+  if (auto subElementInterface = type.dyn_cast<SubElementTypeInterface>()) {
+    subElementInterface.walkSubElements([&](Attribute attr) { visit(attr); },
+                                        [&](Type type) { visit(type); });
+  }
 }
 
 template <typename T>
-void AliasInitializer::generateAlias(T symbol, InProgressAliasInfo &alias,
-                                     bool canBeDeferred) {
+LogicalResult AliasInitializer::generateAlias(
+    T symbol, llvm::MapVector<StringRef, std::vector<T>> &aliasToSymbol) {
   SmallString<32> nameBuffer;
   for (const auto &interface : interfaces) {
     OpAsmDialectInterface::AliasResult result =
@@ -1116,15 +665,15 @@ void AliasInitializer::generateAlias(T symbol, InProgressAliasInfo &alias,
   }
 
   if (nameBuffer.empty())
-    return;
+    return failure();
 
   SmallString<16> tempBuffer;
   StringRef name =
       sanitizeIdentifier(nameBuffer, tempBuffer, /*allowedPunctChars=*/"$_-",
                          /*allowTrailingDigit=*/false);
   name = name.copy(aliasAllocator);
-  alias = InProgressAliasInfo(name, /*isType=*/std::is_base_of_v<Type, T>,
-                              canBeDeferred);
+  aliasToSymbol[name].push_back(symbol);
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1150,80 +699,67 @@ public:
 
   /// Print all of the referenced aliases that can not be resolved in a deferred
   /// manner.
-  void printNonDeferredAliases(AsmPrinter::Impl &p, NewLineCounter &newLine) {
-    printAliases(p, newLine, /*isDeferred=*/false);
+  void printNonDeferredAliases(raw_ostream &os, NewLineCounter &newLine) const {
+    printAliases(os, newLine, /*isDeferred=*/false);
   }
 
   /// Print all of the referenced aliases that support deferred resolution.
-  void printDeferredAliases(AsmPrinter::Impl &p, NewLineCounter &newLine) {
-    printAliases(p, newLine, /*isDeferred=*/true);
+  void printDeferredAliases(raw_ostream &os, NewLineCounter &newLine) const {
+    printAliases(os, newLine, /*isDeferred=*/true);
   }
 
 private:
   /// Print all of the referenced aliases that support the provided resolution
   /// behavior.
-  void printAliases(AsmPrinter::Impl &p, NewLineCounter &newLine,
-                    bool isDeferred);
+  void printAliases(raw_ostream &os, NewLineCounter &newLine,
+                    bool isDeferred) const;
 
-  /// Mapping between attribute/type and alias.
-  llvm::MapVector<const void *, SymbolAlias> attrTypeToAlias;
+  /// Mapping between attribute and alias.
+  llvm::MapVector<Attribute, SymbolAlias> attrToAlias;
+  /// Mapping between type and alias.
+  llvm::MapVector<Type, SymbolAlias> typeToAlias;
 
   /// An allocator used for alias names.
   llvm::BumpPtrAllocator aliasAllocator;
 };
-} // namespace
+} // end anonymous namespace
 
 void AliasState::initialize(
     Operation *op, const OpPrintingFlags &printerFlags,
     DialectInterfaceCollection<OpAsmDialectInterface> &interfaces) {
   AliasInitializer initializer(interfaces, aliasAllocator);
-  initializer.initialize(op, printerFlags, attrTypeToAlias);
+  initializer.initialize(op, printerFlags, attrToAlias, typeToAlias);
 }
 
 LogicalResult AliasState::getAlias(Attribute attr, raw_ostream &os) const {
-  auto it = attrTypeToAlias.find(attr.getAsOpaquePointer());
-  if (it == attrTypeToAlias.end())
+  auto it = attrToAlias.find(attr);
+  if (it == attrToAlias.end())
     return failure();
-  it->second.print(os);
+  it->second.print(os << '#');
   return success();
 }
 
 LogicalResult AliasState::getAlias(Type ty, raw_ostream &os) const {
-  auto it = attrTypeToAlias.find(ty.getAsOpaquePointer());
-  if (it == attrTypeToAlias.end())
+  auto it = typeToAlias.find(ty);
+  if (it == typeToAlias.end())
     return failure();
 
-  it->second.print(os);
+  it->second.print(os << '!');
   return success();
 }
 
-void AliasState::printAliases(AsmPrinter::Impl &p, NewLineCounter &newLine,
-                              bool isDeferred) {
+void AliasState::printAliases(raw_ostream &os, NewLineCounter &newLine,
+                              bool isDeferred) const {
   auto filterFn = [=](const auto &aliasIt) {
     return aliasIt.second.canBeDeferred() == isDeferred;
   };
-  for (auto &[opaqueSymbol, alias] :
-       llvm::make_filter_range(attrTypeToAlias, filterFn)) {
-    alias.print(p.getStream());
-    p.getStream() << " = ";
-
-    if (alias.isTypeAlias()) {
-      // TODO: Support nested aliases in mutable types.
-      Type type = Type::getFromOpaquePointer(opaqueSymbol);
-      if (type.hasTrait<TypeTrait::IsMutable>())
-        p.getStream() << type;
-      else
-        p.printTypeImpl(type);
-    } else {
-      // TODO: Support nested aliases in mutable attributes.
-      Attribute attr = Attribute::getFromOpaquePointer(opaqueSymbol);
-      if (attr.hasTrait<AttributeTrait::IsMutable>())
-        p.getStream() << attr;
-      else
-        p.printAttributeImpl(attr);
-    }
-
-    p.getStream() << newLine;
+  for (const auto &it : llvm::make_filter_range(attrToAlias, filterFn)) {
+    it.second.print(os << '#');
+    os << " = " << it.first << newLine;
+  }
+  for (const auto &it : llvm::make_filter_range(typeToAlias, filterFn)) {
+    it.second.print(os << '!');
+    os << " = type " << it.first << newLine;
   }
 }
 
@@ -1232,36 +768,26 @@ void AliasState::printAliases(AsmPrinter::Impl &p, NewLineCounter &newLine,
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// Info about block printing: a number which is its position in the visitation
-/// order, and a name that is used to print reference to it, e.g. ^bb42.
-struct BlockInfo {
-  int ordering;
-  StringRef name;
-};
-
 /// This class manages the state of SSA value names.
 class SSANameState {
 public:
   /// A sentinel value used for values with names set.
   enum : unsigned { NameSentinel = ~0U };
 
-  SSANameState(Operation *op, const OpPrintingFlags &printerFlags);
-  SSANameState() = default;
+  SSANameState(Operation *op, const OpPrintingFlags &printerFlags,
+               DialectInterfaceCollection<OpAsmDialectInterface> &interfaces);
 
   /// Print the SSA identifier for the given value to 'stream'. If
   /// 'printResultNo' is true, it also presents the result number ('#' number)
   /// of this value.
   void printValueID(Value value, bool printResultNo, raw_ostream &stream) const;
 
-  /// Print the operation identifier.
-  void printOperationID(Operation *op, raw_ostream &stream) const;
-
   /// Return the result indices for each of the result groups registered by this
   /// operation, or empty if none exist.
   ArrayRef<int> getOpResultGroups(Operation *op);
 
-  /// Get the info for the given block.
-  BlockInfo getBlockInfo(Block *block);
+  /// Get the ID for the given block.
+  unsigned getBlockID(Block *block);
 
   /// Renumber the arguments for the specified region to the same names as the
   /// SSA values in namesToUse. See OperationPrinter::shadowRegionArgs for
@@ -1279,7 +805,7 @@ private:
   /// 'lookupResultNo'. 'lookupResultNo' is only filled in if the result group
   /// has more than 1 result.
   void getResultIDAndNumber(OpResult result, Value &lookupValue,
-                            std::optional<int> &lookupResultNo) const;
+                            Optional<int> &lookupResultNo) const;
 
   /// Set a special value name for the given value.
   void setValueName(Value value, StringRef name);
@@ -1293,18 +819,13 @@ private:
   DenseMap<Value, unsigned> valueIDs;
   DenseMap<Value, StringRef> valueNames;
 
-  /// When printing users of values, an operation without a result might
-  /// be the user. This map holds ids for such operations.
-  DenseMap<Operation *, unsigned> operationIDs;
-
   /// This is a map of operations that contain multiple named result groups,
   /// i.e. there may be multiple names for the results of the operation. The
   /// value of this map are the result numbers that start a result group.
   DenseMap<Operation *, SmallVector<int, 1>> opResultGroups;
 
-  /// This maps blocks to there visitation number in the current region as well
-  /// as the string representing their name.
-  DenseMap<Block *, BlockInfo> blockNames;
+  /// This is the block ID for each block in the current.
+  DenseMap<Block *, unsigned> blockIDs;
 
   /// This keeps track of all of the non-numeric names that are in flight,
   /// allowing us to check for duplicates.
@@ -1322,14 +843,18 @@ private:
   /// These are the printing flags.  They control, eg., whether to print in
   /// generic form.
   OpPrintingFlags printerFlags;
-};
-} // namespace
 
-SSANameState::SSANameState(Operation *op, const OpPrintingFlags &printerFlags)
-    : printerFlags(printerFlags) {
-  llvm::SaveAndRestore valueIDSaver(nextValueID);
-  llvm::SaveAndRestore argumentIDSaver(nextArgumentID);
-  llvm::SaveAndRestore conflictIDSaver(nextConflictID);
+  DialectInterfaceCollection<OpAsmDialectInterface> &interfaces;
+};
+} // end anonymous namespace
+
+SSANameState::SSANameState(
+    Operation *op, const OpPrintingFlags &printerFlags,
+    DialectInterfaceCollection<OpAsmDialectInterface> &interfaces)
+    : printerFlags(printerFlags), interfaces(interfaces) {
+  llvm::SaveAndRestore<unsigned> valueIDSaver(nextValueID);
+  llvm::SaveAndRestore<unsigned> argumentIDSaver(nextArgumentID);
+  llvm::SaveAndRestore<unsigned> conflictIDSaver(nextConflictID);
 
   // The naming context includes `nextValueID`, `nextArgumentID`,
   // `nextConflictID` and `usedNames` scoped HashTable. This information is
@@ -1387,16 +912,16 @@ SSANameState::SSANameState(Operation *op, const OpPrintingFlags &printerFlags)
 void SSANameState::printValueID(Value value, bool printResultNo,
                                 raw_ostream &stream) const {
   if (!value) {
-    stream << "<<NULL VALUE>>";
+    stream << "<<NULL>>";
     return;
   }
 
-  std::optional<int> resultNo;
+  Optional<int> resultNo;
   auto lookupValue = value;
 
   // If this is an operation result, collect the head lookup value of the result
   // group and the result number of 'result' within that group.
-  if (OpResult result = dyn_cast<OpResult>(value))
+  if (OpResult result = value.dyn_cast<OpResult>())
     getResultIDAndNumber(result, lookupValue, resultNo);
 
   auto it = valueIDs.find(lookupValue);
@@ -1414,17 +939,8 @@ void SSANameState::printValueID(Value value, bool printResultNo,
     stream << nameIt->second;
   }
 
-  if (resultNo && printResultNo)
-    stream << '#' << *resultNo;
-}
-
-void SSANameState::printOperationID(Operation *op, raw_ostream &stream) const {
-  auto it = operationIDs.find(op);
-  if (it == operationIDs.end()) {
-    stream << "<<UNKNOWN OPERATION>>";
-  } else {
-    stream << '%' << it->second;
-  }
+  if (resultNo.hasValue() && printResultNo)
+    stream << '#' << resultNo;
 }
 
 ArrayRef<int> SSANameState::getOpResultGroups(Operation *op) {
@@ -1432,10 +948,9 @@ ArrayRef<int> SSANameState::getOpResultGroups(Operation *op) {
   return it == opResultGroups.end() ? ArrayRef<int>() : it->second;
 }
 
-BlockInfo SSANameState::getBlockInfo(Block *block) {
-  auto it = blockNames.find(block);
-  BlockInfo invalidBlock{-1, "INVALIDBLOCK"};
-  return it != blockNames.end() ? it->second : invalidBlock;
+unsigned SSANameState::getBlockID(Block *block) {
+  auto it = blockIDs.find(block);
+  return it != blockIDs.end() ? it->second : NameSentinel;
 }
 
 void SSANameState::shadowRegionArgs(Region &region, ValueRange namesToUse) {
@@ -1468,43 +983,34 @@ void SSANameState::shadowRegionArgs(Region &region, ValueRange namesToUse) {
 }
 
 void SSANameState::numberValuesInRegion(Region &region) {
-  auto setBlockArgNameFn = [&](Value arg, StringRef name) {
-    assert(!valueIDs.count(arg) && "arg numbered multiple times");
-    assert(llvm::cast<BlockArgument>(arg).getOwner()->getParent() == &region &&
-           "arg not defined in current region");
-    setValueName(arg, name);
-  };
-
-  if (!printerFlags.shouldPrintGenericOpForm()) {
-    if (Operation *op = region.getParentOp()) {
-      if (auto asmInterface = dyn_cast<OpAsmOpInterface>(op))
-        asmInterface.getAsmBlockArgumentNames(region, setBlockArgNameFn);
-    }
-  }
-
   // Number the values within this region in a breadth-first order.
   unsigned nextBlockID = 0;
   for (auto &block : region) {
     // Each block gets a unique ID, and all of the operations within it get
     // numbered as well.
-    auto blockInfoIt = blockNames.insert({&block, {-1, ""}});
-    if (blockInfoIt.second) {
-      // This block hasn't been named through `getAsmBlockArgumentNames`, use
-      // default `^bbNNN` format.
-      std::string name;
-      llvm::raw_string_ostream(name) << "^bb" << nextBlockID;
-      blockInfoIt.first->second.name = StringRef(name).copy(usedNameAllocator);
-    }
-    blockInfoIt.first->second.ordering = nextBlockID++;
-
+    blockIDs[&block] = nextBlockID++;
     numberValuesInBlock(block);
   }
 }
 
 void SSANameState::numberValuesInBlock(Block &block) {
+  auto setArgNameFn = [&](Value arg, StringRef name) {
+    assert(!valueIDs.count(arg) && "arg numbered multiple times");
+    assert(arg.cast<BlockArgument>().getOwner() == &block &&
+           "arg not defined in 'block'");
+    setValueName(arg, name);
+  };
+
+  bool isEntryBlock = block.isEntryBlock();
+  if (isEntryBlock && !printerFlags.shouldPrintGenericOpForm()) {
+    if (auto *op = block.getParentOp()) {
+      if (auto asmInterface = interfaces.getInterfaceFor(op->getDialect()))
+        asmInterface->getAsmBlockArgumentNames(&block, setArgNameFn);
+    }
+  }
+
   // Number the block arguments. We give entry block arguments a special name
   // 'arg'.
-  bool isEntryBlock = block.isEntryBlock();
   SmallString<32> specialNameBuffer(isEntryBlock ? "arg" : "");
   llvm::raw_svector_ostream specialName(specialNameBuffer);
   for (auto arg : block.getArguments()) {
@@ -1523,6 +1029,11 @@ void SSANameState::numberValuesInBlock(Block &block) {
 }
 
 void SSANameState::numberValuesInOp(Operation &op) {
+  unsigned numResults = op.getNumResults();
+  if (numResults == 0)
+    return;
+  Value resultBegin = op.getResult(0);
+
   // Function used to set the special result names for the operation.
   SmallVector<int, 2> resultGroups(/*Size=*/1, /*Value=*/0);
   auto setResultNameFn = [&](Value result, StringRef name) {
@@ -1531,42 +1042,15 @@ void SSANameState::numberValuesInOp(Operation &op) {
     setValueName(result, name);
 
     // Record the result number for groups not anchored at 0.
-    if (int resultNo = llvm::cast<OpResult>(result).getResultNumber())
+    if (int resultNo = result.cast<OpResult>().getResultNumber())
       resultGroups.push_back(resultNo);
   };
-  // Operations can customize the printing of block names in OpAsmOpInterface.
-  auto setBlockNameFn = [&](Block *block, StringRef name) {
-    assert(block->getParentOp() == &op &&
-           "getAsmBlockArgumentNames callback invoked on a block not directly "
-           "nested under the current operation");
-    assert(!blockNames.count(block) && "block numbered multiple times");
-    SmallString<16> tmpBuffer{"^"};
-    name = sanitizeIdentifier(name, tmpBuffer);
-    if (name.data() != tmpBuffer.data()) {
-      tmpBuffer.append(name);
-      name = tmpBuffer.str();
-    }
-    name = name.copy(usedNameAllocator);
-    blockNames[block] = {-1, name};
-  };
-
   if (!printerFlags.shouldPrintGenericOpForm()) {
-    if (OpAsmOpInterface asmInterface = dyn_cast<OpAsmOpInterface>(&op)) {
-      asmInterface.getAsmBlockNames(setBlockNameFn);
+    if (OpAsmOpInterface asmInterface = dyn_cast<OpAsmOpInterface>(&op))
       asmInterface.getAsmResultNames(setResultNameFn);
-    }
+    else if (auto *asmInterface = interfaces.getInterfaceFor(op.getDialect()))
+      asmInterface->getAsmResultNames(&op, setResultNameFn);
   }
-
-  unsigned numResults = op.getNumResults();
-  if (numResults == 0) {
-    // If value users should be printed, operations with no result need an id.
-    if (printerFlags.shouldPrintValueUsers()) {
-      if (operationIDs.try_emplace(&op, nextValueID).second)
-        ++nextValueID;
-    }
-    return;
-  }
-  Value resultBegin = op.getResult(0);
 
   // If the first result wasn't numbered, give it a default number.
   if (valueIDs.try_emplace(resultBegin, nextValueID).second)
@@ -1579,9 +1063,8 @@ void SSANameState::numberValuesInOp(Operation &op) {
   }
 }
 
-void SSANameState::getResultIDAndNumber(
-    OpResult result, Value &lookupValue,
-    std::optional<int> &lookupResultNo) const {
+void SSANameState::getResultIDAndNumber(OpResult result, Value &lookupValue,
+                                        Optional<int> &lookupResultNo) const {
   Operation *owner = result.getOwner();
   if (owner->getNumResults() == 1)
     return;
@@ -1599,7 +1082,7 @@ void SSANameState::getResultIDAndNumber(
 
   // Find the correct index using a binary search, as the groups are ordered.
   ArrayRef<int> resultGroups = resultGroupIt->second;
-  const auto *it = llvm::upper_bound(resultGroups, resultNo);
+  auto it = llvm::upper_bound(resultGroups, resultNo);
   int groupResultNo = 0, groupSize = 0;
 
   // If there are no smaller elements, the last result group is the lookup.
@@ -1657,115 +1140,6 @@ StringRef SSANameState::uniqueValueName(StringRef name) {
 }
 
 //===----------------------------------------------------------------------===//
-// DistinctState
-//===----------------------------------------------------------------------===//
-
-namespace {
-/// This class manages the state for distinct attributes.
-class DistinctState {
-public:
-  /// Returns a unique identifier for the given distinct attribute.
-  uint64_t getId(DistinctAttr distinctAttr);
-
-private:
-  uint64_t distinctCounter = 0;
-  DenseMap<DistinctAttr, uint64_t> distinctAttrMap;
-};
-} // namespace
-
-uint64_t DistinctState::getId(DistinctAttr distinctAttr) {
-  auto [it, inserted] =
-      distinctAttrMap.try_emplace(distinctAttr, distinctCounter);
-  if (inserted)
-    distinctCounter++;
-  return it->getSecond();
-}
-
-//===----------------------------------------------------------------------===//
-// Resources
-//===----------------------------------------------------------------------===//
-
-AsmParsedResourceEntry::~AsmParsedResourceEntry() = default;
-AsmResourceBuilder::~AsmResourceBuilder() = default;
-AsmResourceParser::~AsmResourceParser() = default;
-AsmResourcePrinter::~AsmResourcePrinter() = default;
-
-StringRef mlir::toString(AsmResourceEntryKind kind) {
-  switch (kind) {
-  case AsmResourceEntryKind::Blob:
-    return "blob";
-  case AsmResourceEntryKind::Bool:
-    return "bool";
-  case AsmResourceEntryKind::String:
-    return "string";
-  }
-  llvm_unreachable("unknown AsmResourceEntryKind");
-}
-
-AsmResourceParser &FallbackAsmResourceMap::getParserFor(StringRef key) {
-  std::unique_ptr<ResourceCollection> &collection = keyToResources[key.str()];
-  if (!collection)
-    collection = std::make_unique<ResourceCollection>(key);
-  return *collection;
-}
-
-std::vector<std::unique_ptr<AsmResourcePrinter>>
-FallbackAsmResourceMap::getPrinters() {
-  std::vector<std::unique_ptr<AsmResourcePrinter>> printers;
-  for (auto &it : keyToResources) {
-    ResourceCollection *collection = it.second.get();
-    auto buildValues = [=](Operation *op, AsmResourceBuilder &builder) {
-      return collection->buildResources(op, builder);
-    };
-    printers.emplace_back(
-        AsmResourcePrinter::fromCallable(collection->getName(), buildValues));
-  }
-  return printers;
-}
-
-LogicalResult FallbackAsmResourceMap::ResourceCollection::parseResource(
-    AsmParsedResourceEntry &entry) {
-  switch (entry.getKind()) {
-  case AsmResourceEntryKind::Blob: {
-    FailureOr<AsmResourceBlob> blob = entry.parseAsBlob();
-    if (failed(blob))
-      return failure();
-    resources.emplace_back(entry.getKey(), std::move(*blob));
-    return success();
-  }
-  case AsmResourceEntryKind::Bool: {
-    FailureOr<bool> value = entry.parseAsBool();
-    if (failed(value))
-      return failure();
-    resources.emplace_back(entry.getKey(), *value);
-    break;
-  }
-  case AsmResourceEntryKind::String: {
-    FailureOr<std::string> str = entry.parseAsString();
-    if (failed(str))
-      return failure();
-    resources.emplace_back(entry.getKey(), std::move(*str));
-    break;
-  }
-  }
-  return success();
-}
-
-void FallbackAsmResourceMap::ResourceCollection::buildResources(
-    Operation *op, AsmResourceBuilder &builder) const {
-  for (const auto &entry : resources) {
-    if (const auto *value = std::get_if<AsmResourceBlob>(&entry.value))
-      builder.buildBlob(entry.key, *value);
-    else if (const auto *value = std::get_if<bool>(&entry.value))
-      builder.buildBool(entry.key, *value);
-    else if (const auto *value = std::get_if<std::string>(&entry.value))
-      builder.buildString(entry.key, *value);
-    else
-      llvm_unreachable("unknown AsmResourceEntryKind");
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // AsmState
 //===----------------------------------------------------------------------===//
 
@@ -1775,15 +1149,18 @@ class AsmStateImpl {
 public:
   explicit AsmStateImpl(Operation *op, const OpPrintingFlags &printerFlags,
                         AsmState::LocationMap *locationMap)
-      : interfaces(op->getContext()), nameState(op, printerFlags),
+      : interfaces(op->getContext()), nameState(op, printerFlags, interfaces),
         printerFlags(printerFlags), locationMap(locationMap) {}
-  explicit AsmStateImpl(MLIRContext *ctx, const OpPrintingFlags &printerFlags,
-                        AsmState::LocationMap *locationMap)
-      : interfaces(ctx), printerFlags(printerFlags), locationMap(locationMap) {}
 
   /// Initialize the alias state to enable the printing of aliases.
   void initializeAliases(Operation *op) {
     aliasState.initialize(op, printerFlags, interfaces);
+  }
+
+  /// Get an instance of the OpAsmDialectInterface for the given dialect, or
+  /// null if one wasn't registered.
+  const OpAsmDialectInterface *getOpAsmInterface(Dialect *dialect) {
+    return interfaces.getInterfaceFor(dialect);
   }
 
   /// Get the state used for aliases.
@@ -1792,23 +1169,6 @@ public:
   /// Get the state used for SSA names.
   SSANameState &getSSANameState() { return nameState; }
 
-  /// Get the state used for distinct attribute identifiers.
-  DistinctState &getDistinctState() { return distinctState; }
-
-  /// Return the dialects within the context that implement
-  /// OpAsmDialectInterface.
-  DialectInterfaceCollection<OpAsmDialectInterface> &getDialectInterfaces() {
-    return interfaces;
-  }
-
-  /// Return the non-dialect resource printers.
-  auto getResourcePrinters() {
-    return llvm::make_pointee_range(externalResourcePrinters);
-  }
-
-  /// Get the printer flags.
-  const OpPrintingFlags &getPrinterFlags() const { return printerFlags; }
-
   /// Register the location, line and column, within the buffer that the given
   /// operation was printed at.
   void registerOperationLocation(Operation *op, unsigned line, unsigned col) {
@@ -1816,27 +1176,9 @@ public:
       (*locationMap)[op] = std::make_pair(line, col);
   }
 
-  /// Return the referenced dialect resources within the printer.
-  DenseMap<Dialect *, SetVector<AsmDialectResourceHandle>> &
-  getDialectResources() {
-    return dialectResources;
-  }
-
-  LogicalResult pushCyclicPrinting(const void *opaquePointer) {
-    return success(cyclicPrintingStack.insert(opaquePointer));
-  }
-
-  void popCyclicPrinting() { cyclicPrintingStack.pop_back(); }
-
 private:
   /// Collection of OpAsm interfaces implemented in the context.
   DialectInterfaceCollection<OpAsmDialectInterface> interfaces;
-
-  /// A collection of non-dialect resource printers.
-  SmallVector<std::unique_ptr<AsmResourcePrinter>> externalResourcePrinters;
-
-  /// A set of dialect resources that were referenced during printing.
-  DenseMap<Dialect *, SetVector<AsmDialectResourceHandle>> dialectResources;
 
   /// The state used for attribute and type aliases.
   AliasState aliasState;
@@ -1844,97 +1186,120 @@ private:
   /// The state used for SSA value names.
   SSANameState nameState;
 
-  /// The state used for distinct attribute identifiers.
-  DistinctState distinctState;
-
   /// Flags that control op output.
   OpPrintingFlags printerFlags;
 
   /// An optional location map to be populated.
   AsmState::LocationMap *locationMap;
-
-  /// Stack of potentially cyclic mutable attributes or type currently being
-  /// printed.
-  SetVector<const void *> cyclicPrintingStack;
-
-  // Allow direct access to the impl fields.
-  friend AsmState;
 };
-} // namespace detail
-} // namespace mlir
-
-/// Verifies the operation and switches to generic op printing if verification
-/// fails. We need to do this because custom print functions may fail for
-/// invalid ops.
-static OpPrintingFlags verifyOpAndAdjustFlags(Operation *op,
-                                              OpPrintingFlags printerFlags) {
-  if (printerFlags.shouldPrintGenericOpForm() ||
-      printerFlags.shouldAssumeVerified())
-    return printerFlags;
-
-  LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << ": Verifying operation: "
-                          << op->getName() << "\n");
-
-  // Ignore errors emitted by the verifier. We check the thread id to avoid
-  // consuming other threads' errors.
-  auto parentThreadId = llvm::get_threadid();
-  ScopedDiagnosticHandler diagHandler(op->getContext(), [&](Diagnostic &diag) {
-    if (parentThreadId == llvm::get_threadid()) {
-      LLVM_DEBUG({
-        diag.print(llvm::dbgs());
-        llvm::dbgs() << "\n";
-      });
-      return success();
-    }
-    return failure();
-  });
-  if (failed(verify(op))) {
-    LLVM_DEBUG(llvm::dbgs()
-               << DEBUG_TYPE << ": '" << op->getName()
-               << "' failed to verify and will be printed in generic form\n");
-    printerFlags.printGenericOpForm();
-  }
-
-  return printerFlags;
-}
+} // end namespace detail
+} // end namespace mlir
 
 AsmState::AsmState(Operation *op, const OpPrintingFlags &printerFlags,
-                   LocationMap *locationMap, FallbackAsmResourceMap *map)
-    : impl(std::make_unique<AsmStateImpl>(
-          op, verifyOpAndAdjustFlags(op, printerFlags), locationMap)) {
-  if (map)
-    attachFallbackResourcePrinter(*map);
-}
-AsmState::AsmState(MLIRContext *ctx, const OpPrintingFlags &printerFlags,
-                   LocationMap *locationMap, FallbackAsmResourceMap *map)
-    : impl(std::make_unique<AsmStateImpl>(ctx, printerFlags, locationMap)) {
-  if (map)
-    attachFallbackResourcePrinter(*map);
-}
-AsmState::~AsmState() = default;
-
-const OpPrintingFlags &AsmState::getPrinterFlags() const {
-  return impl->getPrinterFlags();
-}
-
-void AsmState::attachResourcePrinter(
-    std::unique_ptr<AsmResourcePrinter> printer) {
-  impl->externalResourcePrinters.emplace_back(std::move(printer));
-}
-
-DenseMap<Dialect *, SetVector<AsmDialectResourceHandle>> &
-AsmState::getDialectResources() const {
-  return impl->getDialectResources();
-}
+                   LocationMap *locationMap)
+    : impl(std::make_unique<AsmStateImpl>(op, printerFlags, locationMap)) {}
+AsmState::~AsmState() {}
 
 //===----------------------------------------------------------------------===//
-// AsmPrinter::Impl
+// ModulePrinter
 //===----------------------------------------------------------------------===//
 
-AsmPrinter::Impl::Impl(raw_ostream &os, AsmStateImpl &state)
-    : os(os), state(state), printerFlags(state.getPrinterFlags()) {}
+namespace {
+class ModulePrinter {
+public:
+  ModulePrinter(raw_ostream &os, OpPrintingFlags flags = llvm::None,
+                AsmStateImpl *state = nullptr)
+      : os(os), printerFlags(flags), state(state) {}
+  explicit ModulePrinter(ModulePrinter &printer)
+      : os(printer.os), printerFlags(printer.printerFlags),
+        state(printer.state) {}
 
-void AsmPrinter::Impl::printTrailingLocation(Location loc, bool allowAlias) {
+  /// Returns the output stream of the printer.
+  raw_ostream &getStream() { return os; }
+
+  template <typename Container, typename UnaryFunctor>
+  inline void interleaveComma(const Container &c, UnaryFunctor each_fn) const {
+    llvm::interleaveComma(c, os, each_fn);
+  }
+
+  /// This enum describes the different kinds of elision for the type of an
+  /// attribute when printing it.
+  enum class AttrTypeElision {
+    /// The type must not be elided,
+    Never,
+    /// The type may be elided when it matches the default used in the parser
+    /// (for example i64 is the default for integer attributes).
+    May,
+    /// The type must be elided.
+    Must
+  };
+
+  /// Print the given attribute.
+  void printAttribute(Attribute attr,
+                      AttrTypeElision typeElision = AttrTypeElision::Never);
+
+  void printType(Type type);
+
+  /// Print the given location to the stream. If `allowAlias` is true, this
+  /// allows for the internal location to use an attribute alias.
+  void printLocation(LocationAttr loc, bool allowAlias = false);
+
+  void printAffineMap(AffineMap map);
+  void
+  printAffineExpr(AffineExpr expr,
+                  function_ref<void(unsigned, bool)> printValueName = nullptr);
+  void printAffineConstraint(AffineExpr expr, bool isEq);
+  void printIntegerSet(IntegerSet set);
+
+protected:
+  void printOptionalAttrDict(ArrayRef<NamedAttribute> attrs,
+                             ArrayRef<StringRef> elidedAttrs = {},
+                             bool withKeyword = false);
+  void printNamedAttribute(NamedAttribute attr);
+  void printTrailingLocation(Location loc, bool allowAlias = true);
+  void printLocationInternal(LocationAttr loc, bool pretty = false);
+
+  /// Print a dense elements attribute. If 'allowHex' is true, a hex string is
+  /// used instead of individual elements when the elements attr is large.
+  void printDenseElementsAttr(DenseElementsAttr attr, bool allowHex);
+
+  /// Print a dense string elements attribute.
+  void printDenseStringElementsAttr(DenseStringElementsAttr attr);
+
+  /// Print a dense elements attribute. If 'allowHex' is true, a hex string is
+  /// used instead of individual elements when the elements attr is large.
+  void printDenseIntOrFPElementsAttr(DenseIntOrFPElementsAttr attr,
+                                     bool allowHex);
+
+  void printDialectAttribute(Attribute attr);
+  void printDialectType(Type type);
+
+  /// This enum is used to represent the binding strength of the enclosing
+  /// context that an AffineExprStorage is being printed in, so we can
+  /// intelligently produce parens.
+  enum class BindingStrength {
+    Weak,   // + and -
+    Strong, // All other binary operators.
+  };
+  void printAffineExprInternal(
+      AffineExpr expr, BindingStrength enclosingTightness,
+      function_ref<void(unsigned, bool)> printValueName = nullptr);
+
+  /// The output stream for the printer.
+  raw_ostream &os;
+
+  /// A set of flags to control the printer's behavior.
+  OpPrintingFlags printerFlags;
+
+  /// An optional printer state for the module.
+  AsmStateImpl *state;
+
+  /// A tracker for the number of new lines emitted during printing.
+  NewLineCounter newLine;
+};
+} // end anonymous namespace
+
+void ModulePrinter::printTrailingLocation(Location loc, bool allowAlias) {
   // Check to see if we are printing debug information.
   if (!printerFlags.shouldPrintDebugInfo())
     return;
@@ -1943,12 +1308,7 @@ void AsmPrinter::Impl::printTrailingLocation(Location loc, bool allowAlias) {
   printLocation(loc, /*allowAlias=*/allowAlias);
 }
 
-void AsmPrinter::Impl::printLocationInternal(LocationAttr loc, bool pretty,
-                                             bool isTopLevel) {
-  // If this isn't a top-level location, check for an alias.
-  if (!isTopLevel && succeeded(state.getAliasState().getAlias(loc, os)))
-    return;
-
+void ModulePrinter::printLocationInternal(LocationAttr loc, bool pretty) {
   TypeSwitch<LocationAttr>(loc)
       .Case<OpaqueLoc>([&](OpaqueLoc loc) {
         printLocationInternal(loc.getFallbackLocation(), pretty);
@@ -1960,18 +1320,23 @@ void AsmPrinter::Impl::printLocationInternal(LocationAttr loc, bool pretty,
           os << "unknown";
       })
       .Case<FileLineColLoc>([&](FileLineColLoc loc) {
-        if (pretty)
-          os << loc.getFilename().getValue();
-        else
-          printEscapedString(loc.getFilename());
+        if (pretty) {
+          os << loc.getFilename();
+        } else {
+          os << "\"";
+          printEscapedString(loc.getFilename(), os);
+          os << "\"";
+        }
         os << ':' << loc.getLine() << ':' << loc.getColumn();
       })
       .Case<NameLoc>([&](NameLoc loc) {
-        printEscapedString(loc.getName());
+        os << '\"';
+        printEscapedString(loc.getName(), os);
+        os << '\"';
 
         // Print the child if it isn't unknown.
         auto childLoc = loc.getChildLoc();
-        if (!llvm::isa<UnknownLoc>(childLoc)) {
+        if (!childLoc.isa<UnknownLoc>()) {
           os << '(';
           printLocationInternal(childLoc, pretty);
           os << ')';
@@ -1984,8 +1349,8 @@ void AsmPrinter::Impl::printLocationInternal(LocationAttr loc, bool pretty,
           os << "callsite(";
         printLocationInternal(callee, pretty);
         if (pretty) {
-          if (llvm::isa<NameLoc>(callee)) {
-            if (llvm::isa<FileLineColLoc>(caller)) {
+          if (callee.isa<NameLoc>()) {
+            if (caller.isa<FileLineColLoc>()) {
               os << " at ";
             } else {
               os << newLine << " at ";
@@ -2003,11 +1368,8 @@ void AsmPrinter::Impl::printLocationInternal(LocationAttr loc, bool pretty,
       .Case<FusedLoc>([&](FusedLoc loc) {
         if (!pretty)
           os << "fused";
-        if (Attribute metadata = loc.getMetadata()) {
-          os << '<';
-          printAttribute(metadata);
-          os << '>';
-        }
+        if (Attribute metadata = loc.getMetadata())
+          os << '<' << metadata << '>';
         os << '[';
         interleave(
             loc.getLocations(),
@@ -2067,26 +1429,18 @@ static void printFloatValue(const APFloat &apValue, raw_ostream &os) {
   os << str;
 }
 
-void AsmPrinter::Impl::printLocation(LocationAttr loc, bool allowAlias) {
+void ModulePrinter::printLocation(LocationAttr loc, bool allowAlias) {
   if (printerFlags.shouldPrintDebugInfoPrettyForm())
-    return printLocationInternal(loc, /*pretty=*/true, /*isTopLevel=*/true);
+    return printLocationInternal(loc, /*pretty=*/true);
 
   os << "loc(";
-  if (!allowAlias || failed(printAlias(loc)))
-    printLocationInternal(loc, /*pretty=*/false, /*isTopLevel=*/true);
+  if (!allowAlias || !state || failed(state->getAliasState().getAlias(loc, os)))
+    printLocationInternal(loc);
   os << ')';
 }
 
-void AsmPrinter::Impl::printResourceHandle(
-    const AsmDialectResourceHandle &resource) {
-  auto *interface = cast<OpAsmDialectInterface>(resource.getDialect());
-  os << interface->getResourceKey(resource);
-  state.getDialectResources()[resource.getDialect()].insert(resource);
-}
-
 /// Returns true if the given dialect symbol data is simple enough to print in
-/// the pretty form. This is essentially when the symbol takes the form:
-///   identifier (`<` body `>`)?
+/// the pretty form, i.e. without the enclosing "".
 static bool isDialectSymbolSimpleEnoughForPrettyForm(StringRef symName) {
   // The name must start with an identifier.
   if (symName.empty() || !isalpha(symName.front()))
@@ -2099,9 +1453,64 @@ static bool isDialectSymbolSimpleEnoughForPrettyForm(StringRef symName) {
   if (symName.empty())
     return true;
 
-  // If we got to an unexpected character, then it must be a <>. Check that the
-  // rest of the symbol is wrapped within <>.
-  return symName.front() == '<' && symName.back() == '>';
+  // If we got to an unexpected character, then it must be a <>.  Check those
+  // recursively.
+  if (symName.front() != '<' || symName.back() != '>')
+    return false;
+
+  SmallVector<char, 8> nestedPunctuation;
+  do {
+    // If we ran out of characters, then we had a punctuation mismatch.
+    if (symName.empty())
+      return false;
+
+    auto c = symName.front();
+    symName = symName.drop_front();
+
+    switch (c) {
+    // We never allow null characters. This is an EOF indicator for the lexer
+    // which we could handle, but isn't important for any known dialect.
+    case '\0':
+      return false;
+    case '<':
+    case '[':
+    case '(':
+    case '{':
+      nestedPunctuation.push_back(c);
+      continue;
+    case '-':
+      // Treat `->` as a special token.
+      if (!symName.empty() && symName.front() == '>') {
+        symName = symName.drop_front();
+        continue;
+      }
+      break;
+    // Reject types with mismatched brackets.
+    case '>':
+      if (nestedPunctuation.pop_back_val() != '<')
+        return false;
+      break;
+    case ']':
+      if (nestedPunctuation.pop_back_val() != '[')
+        return false;
+      break;
+    case ')':
+      if (nestedPunctuation.pop_back_val() != '(')
+        return false;
+      break;
+    case '}':
+      if (nestedPunctuation.pop_back_val() != '{')
+        return false;
+      break;
+    default:
+      continue;
+    }
+
+    // We're done when the punctuation is fully matched.
+  } while (!nestedPunctuation.empty());
+
+  // If there were extra characters, then we failed.
+  return symName.empty();
 }
 
 /// Print the given dialect symbol to the stream.
@@ -2116,105 +1525,84 @@ static void printDialectSymbol(raw_ostream &os, StringRef symPrefix,
     return;
   }
 
-  os << '<' << symString << '>';
+  os << "<\"";
+  llvm::printEscapedString(symString, os);
+  os << "\">";
 }
 
 /// Returns true if the given string can be represented as a bare identifier.
 static bool isBareIdentifier(StringRef name) {
+  assert(!name.empty() && "invalid name");
+
   // By making this unsigned, the value passed in to isalnum will always be
   // in the range 0-255. This is important when building with MSVC because
   // its implementation will assert. This situation can arise when dealing
   // with UTF-8 multibyte characters.
-  if (name.empty() || (!isalpha(name[0]) && name[0] != '_'))
+  unsigned char firstChar = static_cast<unsigned char>(name[0]);
+  if (!isalpha(firstChar) && firstChar != '_')
     return false;
   return llvm::all_of(name.drop_front(), [](unsigned char c) {
     return isalnum(c) || c == '_' || c == '$' || c == '.';
   });
 }
 
-/// Print the given string as a keyword, or a quoted and escaped string if it
-/// has any special or non-printable characters in it.
-static void printKeywordOrString(StringRef keyword, raw_ostream &os) {
-  // If it can be represented as a bare identifier, write it directly.
-  if (isBareIdentifier(keyword)) {
-    os << keyword;
-    return;
-  }
-
-  // Otherwise, output the keyword wrapped in quotes with proper escaping.
-  os << "\"";
-  printEscapedString(keyword, os);
-  os << '"';
-}
-
 /// Print the given string as a symbol reference. A symbol reference is
 /// represented as a string prefixed with '@'. The reference is surrounded with
 /// ""'s and escaped if it has any special or non-printable characters in it.
 static void printSymbolReference(StringRef symbolRef, raw_ostream &os) {
-  if (symbolRef.empty()) {
-    os << "@<<INVALID EMPTY SYMBOL>>";
+  assert(!symbolRef.empty() && "expected valid symbol reference");
+
+  // If the symbol can be represented as a bare identifier, write it directly.
+  if (isBareIdentifier(symbolRef)) {
+    os << '@' << symbolRef;
     return;
   }
-  os << '@';
-  printKeywordOrString(symbolRef, os);
+
+  // Otherwise, output the reference wrapped in quotes with proper escaping.
+  os << "@\"";
+  printEscapedString(symbolRef, os);
+  os << '"';
 }
 
 // Print out a valid ElementsAttr that is succinct and can represent any
 // potential shape/type, for use when eliding a large ElementsAttr.
 //
-// We choose to use a dense resource ElementsAttr literal with conspicuous
-// content to hopefully alert readers to the fact that this has been elided.
+// We choose to use an opaque ElementsAttr literal with conspicuous content to
+// hopefully alert readers to the fact that this has been elided.
+//
+// Unfortunately, neither of the strings of an opaque ElementsAttr literal will
+// accept the string "elided". The first string must be a registered dialect
+// name and the latter must be a hex constant.
 static void printElidedElementsAttr(raw_ostream &os) {
-  os << R"(dense_resource<__elided__>)";
+  os << R"(opaque<"_", "0xDEADBEEF">)";
 }
 
-LogicalResult AsmPrinter::Impl::printAlias(Attribute attr) {
-  return state.getAliasState().getAlias(attr, os);
-}
-
-LogicalResult AsmPrinter::Impl::printAlias(Type type) {
-  return state.getAliasState().getAlias(type, os);
-}
-
-void AsmPrinter::Impl::printAttribute(Attribute attr,
-                                      AttrTypeElision typeElision) {
+void ModulePrinter::printAttribute(Attribute attr,
+                                   AttrTypeElision typeElision) {
   if (!attr) {
     os << "<<NULL ATTRIBUTE>>";
     return;
   }
 
   // Try to print an alias for this attribute.
-  if (succeeded(printAlias(attr)))
+  if (state && succeeded(state->getAliasState().getAlias(attr, os)))
     return;
-  return printAttributeImpl(attr, typeElision);
-}
 
-void AsmPrinter::Impl::printAttributeImpl(Attribute attr,
-                                          AttrTypeElision typeElision) {
-  if (!isa<BuiltinDialect>(attr.getDialect())) {
-    printDialectAttribute(attr);
-  } else if (auto opaqueAttr = llvm::dyn_cast<OpaqueAttr>(attr)) {
+  auto attrType = attr.getType();
+  if (auto opaqueAttr = attr.dyn_cast<OpaqueAttr>()) {
     printDialectSymbol(os, "#", opaqueAttr.getDialectNamespace(),
                        opaqueAttr.getAttrData());
-  } else if (llvm::isa<UnitAttr>(attr)) {
+  } else if (attr.isa<UnitAttr>()) {
     os << "unit";
     return;
-  } else if (auto distinctAttr = llvm::dyn_cast<DistinctAttr>(attr)) {
-    os << "distinct[" << state.getDistinctState().getId(distinctAttr) << "]<";
-    if (!llvm::isa<UnitAttr>(distinctAttr.getReferencedAttr())) {
-      printAttribute(distinctAttr.getReferencedAttr());
-    }
-    os << '>';
-    return;
-  } else if (auto dictAttr = llvm::dyn_cast<DictionaryAttr>(attr)) {
+  } else if (auto dictAttr = attr.dyn_cast<DictionaryAttr>()) {
     os << '{';
     interleaveComma(dictAttr.getValue(),
                     [&](NamedAttribute attr) { printNamedAttribute(attr); });
     os << '}';
 
-  } else if (auto intAttr = llvm::dyn_cast<IntegerAttr>(attr)) {
-    Type intType = intAttr.getType();
-    if (intType.isSignlessInteger(1)) {
+  } else if (auto intAttr = attr.dyn_cast<IntegerAttr>()) {
+    if (attrType.isSignlessInteger(1)) {
       os << (intAttr.getValue().getBoolValue() ? "true" : "false");
 
       // Boolean integer attributes always elides the type.
@@ -2225,31 +1613,33 @@ void AsmPrinter::Impl::printAttributeImpl(Attribute attr,
     // signless 1-bit values.  Indexes, signed values, and multi-bit signless
     // values print as signed.
     bool isUnsigned =
-        intType.isUnsignedInteger() || intType.isSignlessInteger(1);
+        attrType.isUnsignedInteger() || attrType.isSignlessInteger(1);
     intAttr.getValue().print(os, !isUnsigned);
 
     // IntegerAttr elides the type if I64.
-    if (typeElision == AttrTypeElision::May && intType.isSignlessInteger(64))
+    if (typeElision == AttrTypeElision::May && attrType.isSignlessInteger(64))
       return;
 
-  } else if (auto floatAttr = llvm::dyn_cast<FloatAttr>(attr)) {
+  } else if (auto floatAttr = attr.dyn_cast<FloatAttr>()) {
     printFloatValue(floatAttr.getValue(), os);
 
     // FloatAttr elides the type if F64.
-    if (typeElision == AttrTypeElision::May && floatAttr.getType().isF64())
+    if (typeElision == AttrTypeElision::May && attrType.isF64())
       return;
 
-  } else if (auto strAttr = llvm::dyn_cast<StringAttr>(attr)) {
-    printEscapedString(strAttr.getValue());
+  } else if (auto strAttr = attr.dyn_cast<StringAttr>()) {
+    os << '"';
+    printEscapedString(strAttr.getValue(), os);
+    os << '"';
 
-  } else if (auto arrayAttr = llvm::dyn_cast<ArrayAttr>(attr)) {
+  } else if (auto arrayAttr = attr.dyn_cast<ArrayAttr>()) {
     os << '[';
     interleaveComma(arrayAttr.getValue(), [&](Attribute attr) {
       printAttribute(attr, AttrTypeElision::May);
     });
     os << ']';
 
-  } else if (auto affineMapAttr = llvm::dyn_cast<AffineMapAttr>(attr)) {
+  } else if (auto affineMapAttr = attr.dyn_cast<AffineMapAttr>()) {
     os << "affine_map<";
     affineMapAttr.getValue().print(os);
     os << '>';
@@ -2257,7 +1647,7 @@ void AsmPrinter::Impl::printAttributeImpl(Attribute attr,
     // AffineMap always elides the type.
     return;
 
-  } else if (auto integerSetAttr = llvm::dyn_cast<IntegerSetAttr>(attr)) {
+  } else if (auto integerSetAttr = attr.dyn_cast<IntegerSetAttr>()) {
     os << "affine_set<";
     integerSetAttr.getValue().print(os);
     os << '>';
@@ -2265,18 +1655,25 @@ void AsmPrinter::Impl::printAttributeImpl(Attribute attr,
     // IntegerSet always elides the type.
     return;
 
-  } else if (auto typeAttr = llvm::dyn_cast<TypeAttr>(attr)) {
+  } else if (auto typeAttr = attr.dyn_cast<TypeAttr>()) {
     printType(typeAttr.getValue());
 
-  } else if (auto refAttr = llvm::dyn_cast<SymbolRefAttr>(attr)) {
-    printSymbolReference(refAttr.getRootReference().getValue(), os);
+  } else if (auto refAttr = attr.dyn_cast<SymbolRefAttr>()) {
+    printSymbolReference(refAttr.getRootReference(), os);
     for (FlatSymbolRefAttr nestedRef : refAttr.getNestedReferences()) {
       os << "::";
       printSymbolReference(nestedRef.getValue(), os);
     }
 
-  } else if (auto intOrFpEltAttr =
-                 llvm::dyn_cast<DenseIntOrFPElementsAttr>(attr)) {
+  } else if (auto opaqueAttr = attr.dyn_cast<OpaqueElementsAttr>()) {
+    if (printerFlags.shouldElideElementsAttr(opaqueAttr)) {
+      printElidedElementsAttr(os);
+    } else {
+      os << "opaque<\"" << opaqueAttr.getDialect() << "\", \"0x"
+         << llvm::toHex(opaqueAttr.getValue()) << "\">";
+    }
+
+  } else if (auto intOrFpEltAttr = attr.dyn_cast<DenseIntOrFPElementsAttr>()) {
     if (printerFlags.shouldElideElementsAttr(intOrFpEltAttr)) {
       printElidedElementsAttr(os);
     } else {
@@ -2285,7 +1682,7 @@ void AsmPrinter::Impl::printAttributeImpl(Attribute attr,
       os << '>';
     }
 
-  } else if (auto strEltAttr = llvm::dyn_cast<DenseStringElementsAttr>(attr)) {
+  } else if (auto strEltAttr = attr.dyn_cast<DenseStringElementsAttr>()) {
     if (printerFlags.shouldElideElementsAttr(strEltAttr)) {
       printElidedElementsAttr(os);
     } else {
@@ -2294,7 +1691,7 @@ void AsmPrinter::Impl::printAttributeImpl(Attribute attr,
       os << '>';
     }
 
-  } else if (auto sparseEltAttr = llvm::dyn_cast<SparseElementsAttr>(attr)) {
+  } else if (auto sparseEltAttr = attr.dyn_cast<SparseElementsAttr>()) {
     if (printerFlags.shouldElideElementsAttr(sparseEltAttr.getIndices()) ||
         printerFlags.shouldElideElementsAttr(sparseEltAttr.getValues())) {
       printElidedElementsAttr(os);
@@ -2308,46 +1705,28 @@ void AsmPrinter::Impl::printAttributeImpl(Attribute attr,
       }
       os << '>';
     }
-  } else if (auto stridedLayoutAttr = llvm::dyn_cast<StridedLayoutAttr>(attr)) {
-    stridedLayoutAttr.print(os);
-  } else if (auto denseArrayAttr = llvm::dyn_cast<DenseArrayAttr>(attr)) {
-    os << "array<";
-    printType(denseArrayAttr.getElementType());
-    if (!denseArrayAttr.empty()) {
-      os << ": ";
-      printDenseArrayAttr(denseArrayAttr);
-    }
-    os << ">";
-    return;
-  } else if (auto resourceAttr =
-                 llvm::dyn_cast<DenseResourceElementsAttr>(attr)) {
-    os << "dense_resource<";
-    printResourceHandle(resourceAttr.getRawHandle());
-    os << ">";
-  } else if (auto locAttr = llvm::dyn_cast<LocationAttr>(attr)) {
+
+  } else if (auto locAttr = attr.dyn_cast<LocationAttr>()) {
     printLocation(locAttr);
+
   } else {
-    llvm::report_fatal_error("Unknown builtin attribute");
+    return printDialectAttribute(attr);
   }
+
   // Don't print the type if we must elide it, or if it is a None type.
-  if (typeElision != AttrTypeElision::Must) {
-    if (auto typedAttr = llvm::dyn_cast<TypedAttr>(attr)) {
-      Type attrType = typedAttr.getType();
-      if (!llvm::isa<NoneType>(attrType)) {
-        os << " : ";
-        printType(attrType);
-      }
-    }
+  if (typeElision != AttrTypeElision::Must && !attrType.isa<NoneType>()) {
+    os << " : ";
+    printType(attrType);
   }
 }
 
 /// Print the integer element of a DenseElementsAttr.
 static void printDenseIntElement(const APInt &value, raw_ostream &os,
-                                 Type type) {
-  if (type.isInteger(1))
+                                 bool isSigned) {
+  if (value.getBitWidth() == 1)
     os << (value.getBoolValue() ? "true" : "false");
   else
-    value.print(os, !type.isUnsignedInteger());
+    value.print(os, isSigned);
 }
 
 static void
@@ -2400,17 +1779,17 @@ printDenseElementsAttrImpl(bool isSplat, ShapedType type, raw_ostream &os,
     os << ']';
 }
 
-void AsmPrinter::Impl::printDenseElementsAttr(DenseElementsAttr attr,
-                                              bool allowHex) {
-  if (auto stringAttr = llvm::dyn_cast<DenseStringElementsAttr>(attr))
+void ModulePrinter::printDenseElementsAttr(DenseElementsAttr attr,
+                                           bool allowHex) {
+  if (auto stringAttr = attr.dyn_cast<DenseStringElementsAttr>())
     return printDenseStringElementsAttr(stringAttr);
 
-  printDenseIntOrFPElementsAttr(llvm::cast<DenseIntOrFPElementsAttr>(attr),
+  printDenseIntOrFPElementsAttr(attr.cast<DenseIntOrFPElementsAttr>(),
                                 allowHex);
 }
 
-void AsmPrinter::Impl::printDenseIntOrFPElementsAttr(
-    DenseIntOrFPElementsAttr attr, bool allowHex) {
+void ModulePrinter::printDenseIntOrFPElementsAttr(DenseIntOrFPElementsAttr attr,
+                                                  bool allowHex) {
   auto type = attr.getType();
   auto elementType = type.getElementType();
 
@@ -2419,40 +1798,43 @@ void AsmPrinter::Impl::printDenseIntOrFPElementsAttr(
   if (!attr.isSplat() && allowHex &&
       shouldPrintElementsAttrWithHex(numElements)) {
     ArrayRef<char> rawData = attr.getRawData();
-    if (llvm::endianness::native == llvm::endianness::big) {
+    if (llvm::support::endian::system_endianness() ==
+        llvm::support::endianness::big) {
       // Convert endianess in big-endian(BE) machines. `rawData` is BE in BE
       // machines. It is converted here to print in LE format.
       SmallVector<char, 64> outDataVec(rawData.size());
       MutableArrayRef<char> convRawData(outDataVec);
       DenseIntOrFPElementsAttr::convertEndianOfArrayRefForBEmachine(
           rawData, convRawData, type);
-      printHexString(convRawData);
+      os << '"' << "0x"
+         << llvm::toHex(StringRef(convRawData.data(), convRawData.size()))
+         << "\"";
     } else {
-      printHexString(rawData);
+      os << '"' << "0x"
+         << llvm::toHex(StringRef(rawData.data(), rawData.size())) << "\"";
     }
 
     return;
   }
 
-  if (ComplexType complexTy = llvm::dyn_cast<ComplexType>(elementType)) {
+  if (ComplexType complexTy = elementType.dyn_cast<ComplexType>()) {
     Type complexElementType = complexTy.getElementType();
     // Note: The if and else below had a common lambda function which invoked
     // printDenseElementsAttrImpl. This lambda was hitting a bug in gcc 9.1,9.2
     // and hence was replaced.
-    if (llvm::isa<IntegerType>(complexElementType)) {
-      auto valueIt = attr.value_begin<std::complex<APInt>>();
+    if (complexElementType.isa<IntegerType>()) {
+      bool isSigned = !complexElementType.isUnsignedInteger();
       printDenseElementsAttrImpl(attr.isSplat(), type, os, [&](unsigned index) {
-        auto complexValue = *(valueIt + index);
+        auto complexValue = *(attr.getComplexIntValues().begin() + index);
         os << "(";
-        printDenseIntElement(complexValue.real(), os, complexElementType);
+        printDenseIntElement(complexValue.real(), os, isSigned);
         os << ",";
-        printDenseIntElement(complexValue.imag(), os, complexElementType);
+        printDenseIntElement(complexValue.imag(), os, isSigned);
         os << ")";
       });
     } else {
-      auto valueIt = attr.value_begin<std::complex<APFloat>>();
       printDenseElementsAttrImpl(attr.isSplat(), type, os, [&](unsigned index) {
-        auto complexValue = *(valueIt + index);
+        auto complexValue = *(attr.getComplexFloatValues().begin() + index);
         os << "(";
         printFloatValue(complexValue.real(), os);
         os << ",";
@@ -2461,78 +1843,48 @@ void AsmPrinter::Impl::printDenseIntOrFPElementsAttr(
       });
     }
   } else if (elementType.isIntOrIndex()) {
-    auto valueIt = attr.value_begin<APInt>();
+    bool isSigned = !elementType.isUnsignedInteger();
+    auto intValues = attr.getIntValues();
     printDenseElementsAttrImpl(attr.isSplat(), type, os, [&](unsigned index) {
-      printDenseIntElement(*(valueIt + index), os, elementType);
+      printDenseIntElement(*(intValues.begin() + index), os, isSigned);
     });
   } else {
-    assert(llvm::isa<FloatType>(elementType) && "unexpected element type");
-    auto valueIt = attr.value_begin<APFloat>();
+    assert(elementType.isa<FloatType>() && "unexpected element type");
+    auto floatValues = attr.getFloatValues();
     printDenseElementsAttrImpl(attr.isSplat(), type, os, [&](unsigned index) {
-      printFloatValue(*(valueIt + index), os);
+      printFloatValue(*(floatValues.begin() + index), os);
     });
   }
 }
 
-void AsmPrinter::Impl::printDenseStringElementsAttr(
-    DenseStringElementsAttr attr) {
+void ModulePrinter::printDenseStringElementsAttr(DenseStringElementsAttr attr) {
   ArrayRef<StringRef> data = attr.getRawStringData();
-  auto printFn = [&](unsigned index) { printEscapedString(data[index]); };
+  auto printFn = [&](unsigned index) {
+    os << "\"";
+    printEscapedString(data[index], os);
+    os << "\"";
+  };
   printDenseElementsAttrImpl(attr.isSplat(), attr.getType(), os, printFn);
 }
 
-void AsmPrinter::Impl::printDenseArrayAttr(DenseArrayAttr attr) {
-  Type type = attr.getElementType();
-  unsigned bitwidth = type.isInteger(1) ? 8 : type.getIntOrFloatBitWidth();
-  unsigned byteSize = bitwidth / 8;
-  ArrayRef<char> data = attr.getRawData();
-
-  auto printElementAt = [&](unsigned i) {
-    APInt value(bitwidth, 0);
-    if (bitwidth) {
-      llvm::LoadIntFromMemory(
-          value, reinterpret_cast<const uint8_t *>(data.begin() + byteSize * i),
-          byteSize);
-    }
-    // Print the data as-is or as a float.
-    if (type.isIntOrIndex()) {
-      printDenseIntElement(value, getStream(), type);
-    } else {
-      APFloat fltVal(llvm::cast<FloatType>(type).getFloatSemantics(), value);
-      printFloatValue(fltVal, getStream());
-    }
-  };
-  llvm::interleaveComma(llvm::seq<unsigned>(0, attr.size()), getStream(),
-                        printElementAt);
-}
-
-void AsmPrinter::Impl::printType(Type type) {
+void ModulePrinter::printType(Type type) {
   if (!type) {
     os << "<<NULL TYPE>>";
     return;
   }
 
   // Try to print an alias for this type.
-  if (succeeded(printAlias(type)))
+  if (state && succeeded(state->getAliasState().getAlias(type, os)))
     return;
-  return printTypeImpl(type);
-}
 
-void AsmPrinter::Impl::printTypeImpl(Type type) {
   TypeSwitch<Type>(type)
       .Case<OpaqueType>([&](OpaqueType opaqueTy) {
         printDialectSymbol(os, "!", opaqueTy.getDialectNamespace(),
                            opaqueTy.getTypeData());
       })
       .Case<IndexType>([&](Type) { os << "index"; })
-      .Case<Float8E5M2Type>([&](Type) { os << "f8E5M2"; })
-      .Case<Float8E4M3FNType>([&](Type) { os << "f8E4M3FN"; })
-      .Case<Float8E5M2FNUZType>([&](Type) { os << "f8E5M2FNUZ"; })
-      .Case<Float8E4M3FNUZType>([&](Type) { os << "f8E4M3FNUZ"; })
-      .Case<Float8E4M3B11FNUZType>([&](Type) { os << "f8E4M3B11FNUZ"; })
       .Case<BFloat16Type>([&](Type) { os << "bf16"; })
       .Case<Float16Type>([&](Type) { os << "f16"; })
-      .Case<FloatTF32Type>([&](Type) { os << "tf32"; })
       .Case<Float32Type>([&](Type) { os << "f32"; })
       .Case<Float64Type>([&](Type) { os << "f64"; })
       .Case<Float80Type>([&](Type) { os << "f80"; })
@@ -2549,8 +1901,8 @@ void AsmPrinter::Impl::printTypeImpl(Type type) {
         interleaveComma(funcTy.getInputs(), [&](Type ty) { printType(ty); });
         os << ") -> ";
         ArrayRef<Type> results = funcTy.getResults();
-        if (results.size() == 1 && !llvm::isa<FunctionType>(results[0])) {
-          printType(results[0]);
+        if (results.size() == 1 && !results[0].isa<FunctionType>()) {
+          os << results[0];
         } else {
           os << '(';
           interleaveComma(results, [&](Type ty) { printType(ty); });
@@ -2558,21 +1910,10 @@ void AsmPrinter::Impl::printTypeImpl(Type type) {
         }
       })
       .Case<VectorType>([&](VectorType vectorTy) {
-        auto scalableDims = vectorTy.getScalableDims();
         os << "vector<";
-        auto vShape = vectorTy.getShape();
-        unsigned lastDim = vShape.size();
-        unsigned dimIdx = 0;
-        for (dimIdx = 0; dimIdx < lastDim; dimIdx++) {
-          if (!scalableDims.empty() && scalableDims[dimIdx])
-            os << '[';
-          os << vShape[dimIdx];
-          if (!scalableDims.empty() && scalableDims[dimIdx])
-            os << ']';
-          os << 'x';
-        }
-        printType(vectorTy.getElementType());
-        os << '>';
+        for (int64_t dim : vectorTy.getShape())
+          os << dim << 'x';
+        os << vectorTy.getElementType() << '>';
       })
       .Case<RankedTensorType>([&](RankedTensorType tensorTy) {
         os << "tensor<";
@@ -2583,7 +1924,7 @@ void AsmPrinter::Impl::printTypeImpl(Type type) {
             os << dim;
           os << 'x';
         }
-        printType(tensorTy.getElementType());
+        os << tensorTy.getElementType();
         // Only print the encoding attribute value if set.
         if (tensorTy.getEncoding()) {
           os << ", ";
@@ -2606,10 +1947,9 @@ void AsmPrinter::Impl::printTypeImpl(Type type) {
           os << 'x';
         }
         printType(memrefTy.getElementType());
-        MemRefLayoutAttrInterface layout = memrefTy.getLayout();
-        if (!llvm::isa<AffineMapAttr>(layout) || !layout.isIdentity()) {
+        for (auto map : memrefTy.getAffineMaps()) {
           os << ", ";
-          printAttribute(memrefTy.getLayout(), AttrTypeElision::May);
+          printAttribute(AffineMapAttr::get(map));
         }
         // Only print the memory space if it is the non-default one.
         if (memrefTy.getMemorySpace()) {
@@ -2643,9 +1983,9 @@ void AsmPrinter::Impl::printTypeImpl(Type type) {
       .Default([&](Type type) { return printDialectType(type); });
 }
 
-void AsmPrinter::Impl::printOptionalAttrDict(ArrayRef<NamedAttribute> attrs,
-                                             ArrayRef<StringRef> elidedAttrs,
-                                             bool withKeyword) {
+void ModulePrinter::printOptionalAttrDict(ArrayRef<NamedAttribute> attrs,
+                                          ArrayRef<StringRef> elidedAttrs,
+                                          bool withKeyword) {
   // If there are no attributes, then there is nothing to be done.
   if (attrs.empty())
     return;
@@ -2671,157 +2011,104 @@ void AsmPrinter::Impl::printOptionalAttrDict(ArrayRef<NamedAttribute> attrs,
   llvm::SmallDenseSet<StringRef> elidedAttrsSet(elidedAttrs.begin(),
                                                 elidedAttrs.end());
   auto filteredAttrs = llvm::make_filter_range(attrs, [&](NamedAttribute attr) {
-    return !elidedAttrsSet.contains(attr.getName().strref());
+    return !elidedAttrsSet.contains(attr.first.strref());
   });
   if (!filteredAttrs.empty())
     printFilteredAttributesFn(filteredAttrs);
 }
-void AsmPrinter::Impl::printNamedAttribute(NamedAttribute attr) {
-  // Print the name without quotes if possible.
-  ::printKeywordOrString(attr.getName().strref(), os);
+
+void ModulePrinter::printNamedAttribute(NamedAttribute attr) {
+  if (isBareIdentifier(attr.first)) {
+    os << attr.first;
+  } else {
+    os << '"';
+    printEscapedString(attr.first.strref(), os);
+    os << '"';
+  }
 
   // Pretty printing elides the attribute value for unit attributes.
-  if (llvm::isa<UnitAttr>(attr.getValue()))
+  if (attr.second.isa<UnitAttr>())
     return;
 
   os << " = ";
-  printAttribute(attr.getValue());
+  printAttribute(attr.second);
 }
 
-void AsmPrinter::Impl::printDialectAttribute(Attribute attr) {
+//===----------------------------------------------------------------------===//
+// CustomDialectAsmPrinter
+//===----------------------------------------------------------------------===//
+
+namespace {
+/// This class provides the main specialization of the DialectAsmPrinter that is
+/// used to provide support for print attributes and types. This hooks allows
+/// for dialects to hook into the main ModulePrinter.
+struct CustomDialectAsmPrinter : public DialectAsmPrinter {
+public:
+  CustomDialectAsmPrinter(ModulePrinter &printer) : printer(printer) {}
+  ~CustomDialectAsmPrinter() override {}
+
+  raw_ostream &getStream() const override { return printer.getStream(); }
+
+  /// Print the given attribute to the stream.
+  void printAttribute(Attribute attr) override { printer.printAttribute(attr); }
+
+  /// Print the given floating point value in a stablized form.
+  void printFloat(const APFloat &value) override {
+    printFloatValue(value, getStream());
+  }
+
+  /// Print the given type to the stream.
+  void printType(Type type) override { printer.printType(type); }
+
+  /// The main module printer.
+  ModulePrinter &printer;
+};
+} // end anonymous namespace
+
+void ModulePrinter::printDialectAttribute(Attribute attr) {
   auto &dialect = attr.getDialect();
 
   // Ask the dialect to serialize the attribute to a string.
   std::string attrName;
   {
     llvm::raw_string_ostream attrNameStr(attrName);
-    Impl subPrinter(attrNameStr, state);
-    DialectAsmPrinter printer(subPrinter);
+    ModulePrinter subPrinter(attrNameStr, printerFlags, state);
+    CustomDialectAsmPrinter printer(subPrinter);
     dialect.printAttribute(attr, printer);
   }
   printDialectSymbol(os, "#", dialect.getNamespace(), attrName);
 }
 
-void AsmPrinter::Impl::printDialectType(Type type) {
+void ModulePrinter::printDialectType(Type type) {
   auto &dialect = type.getDialect();
 
   // Ask the dialect to serialize the type to a string.
   std::string typeName;
   {
     llvm::raw_string_ostream typeNameStr(typeName);
-    Impl subPrinter(typeNameStr, state);
-    DialectAsmPrinter printer(subPrinter);
+    ModulePrinter subPrinter(typeNameStr, printerFlags, state);
+    CustomDialectAsmPrinter printer(subPrinter);
     dialect.printType(type, printer);
   }
   printDialectSymbol(os, "!", dialect.getNamespace(), typeName);
 }
 
-void AsmPrinter::Impl::printEscapedString(StringRef str) {
-  os << "\"";
-  llvm::printEscapedString(str, os);
-  os << "\"";
-}
-
-void AsmPrinter::Impl::printHexString(StringRef str) {
-  os << "\"0x" << llvm::toHex(str) << "\"";
-}
-void AsmPrinter::Impl::printHexString(ArrayRef<char> data) {
-  printHexString(StringRef(data.data(), data.size()));
-}
-
-LogicalResult AsmPrinter::Impl::pushCyclicPrinting(const void *opaquePointer) {
-  return state.pushCyclicPrinting(opaquePointer);
-}
-
-void AsmPrinter::Impl::popCyclicPrinting() { state.popCyclicPrinting(); }
-
-//===--------------------------------------------------------------------===//
-// AsmPrinter
-//===--------------------------------------------------------------------===//
-
-AsmPrinter::~AsmPrinter() = default;
-
-raw_ostream &AsmPrinter::getStream() const {
-  assert(impl && "expected AsmPrinter::getStream to be overriden");
-  return impl->getStream();
-}
-
-/// Print the given floating point value in a stablized form.
-void AsmPrinter::printFloat(const APFloat &value) {
-  assert(impl && "expected AsmPrinter::printFloat to be overriden");
-  printFloatValue(value, impl->getStream());
-}
-
-void AsmPrinter::printType(Type type) {
-  assert(impl && "expected AsmPrinter::printType to be overriden");
-  impl->printType(type);
-}
-
-void AsmPrinter::printAttribute(Attribute attr) {
-  assert(impl && "expected AsmPrinter::printAttribute to be overriden");
-  impl->printAttribute(attr);
-}
-
-LogicalResult AsmPrinter::printAlias(Attribute attr) {
-  assert(impl && "expected AsmPrinter::printAlias to be overriden");
-  return impl->printAlias(attr);
-}
-
-LogicalResult AsmPrinter::printAlias(Type type) {
-  assert(impl && "expected AsmPrinter::printAlias to be overriden");
-  return impl->printAlias(type);
-}
-
-void AsmPrinter::printAttributeWithoutType(Attribute attr) {
-  assert(impl &&
-         "expected AsmPrinter::printAttributeWithoutType to be overriden");
-  impl->printAttribute(attr, Impl::AttrTypeElision::Must);
-}
-
-void AsmPrinter::printKeywordOrString(StringRef keyword) {
-  assert(impl && "expected AsmPrinter::printKeywordOrString to be overriden");
-  ::printKeywordOrString(keyword, impl->getStream());
-}
-
-void AsmPrinter::printString(StringRef keyword) {
-  assert(impl && "expected AsmPrinter::printString to be overriden");
-  *this << '"';
-  printEscapedString(keyword, getStream());
-  *this << '"';
-}
-
-void AsmPrinter::printSymbolName(StringRef symbolRef) {
-  assert(impl && "expected AsmPrinter::printSymbolName to be overriden");
-  ::printSymbolReference(symbolRef, impl->getStream());
-}
-
-void AsmPrinter::printResourceHandle(const AsmDialectResourceHandle &resource) {
-  assert(impl && "expected AsmPrinter::printResourceHandle to be overriden");
-  impl->printResourceHandle(resource);
-}
-
-LogicalResult AsmPrinter::pushCyclicPrinting(const void *opaquePointer) {
-  return impl->pushCyclicPrinting(opaquePointer);
-}
-
-void AsmPrinter::popCyclicPrinting() { impl->popCyclicPrinting(); }
-
 //===----------------------------------------------------------------------===//
 // Affine expressions and maps
 //===----------------------------------------------------------------------===//
 
-void AsmPrinter::Impl::printAffineExpr(
+void ModulePrinter::printAffineExpr(
     AffineExpr expr, function_ref<void(unsigned, bool)> printValueName) {
   printAffineExprInternal(expr, BindingStrength::Weak, printValueName);
 }
 
-void AsmPrinter::Impl::printAffineExprInternal(
+void ModulePrinter::printAffineExprInternal(
     AffineExpr expr, BindingStrength enclosingTightness,
     function_ref<void(unsigned, bool)> printValueName) {
   const char *binopSpelling = nullptr;
   switch (expr.getKind()) {
   case AffineExprKind::SymbolId: {
-    unsigned pos = cast<AffineSymbolExpr>(expr).getPosition();
+    unsigned pos = expr.cast<AffineSymbolExpr>().getPosition();
     if (printValueName)
       printValueName(pos, /*isSymbol=*/true);
     else
@@ -2829,7 +2116,7 @@ void AsmPrinter::Impl::printAffineExprInternal(
     return;
   }
   case AffineExprKind::DimId: {
-    unsigned pos = cast<AffineDimExpr>(expr).getPosition();
+    unsigned pos = expr.cast<AffineDimExpr>().getPosition();
     if (printValueName)
       printValueName(pos, /*isSymbol=*/false);
     else
@@ -2837,7 +2124,7 @@ void AsmPrinter::Impl::printAffineExprInternal(
     return;
   }
   case AffineExprKind::Constant:
-    os << cast<AffineConstantExpr>(expr).getValue();
+    os << expr.cast<AffineConstantExpr>().getValue();
     return;
   case AffineExprKind::Add:
     binopSpelling = " + ";
@@ -2856,7 +2143,7 @@ void AsmPrinter::Impl::printAffineExprInternal(
     break;
   }
 
-  auto binOp = cast<AffineBinaryOpExpr>(expr);
+  auto binOp = expr.cast<AffineBinaryOpExpr>();
   AffineExpr lhsExpr = binOp.getLHS();
   AffineExpr rhsExpr = binOp.getRHS();
 
@@ -2866,7 +2153,7 @@ void AsmPrinter::Impl::printAffineExprInternal(
       os << '(';
 
     // Pretty print multiplication with -1.
-    auto rhsConst = dyn_cast<AffineConstantExpr>(rhsExpr);
+    auto rhsConst = rhsExpr.dyn_cast<AffineConstantExpr>();
     if (rhsConst && binOp.getKind() == AffineExprKind::Mul &&
         rhsConst.getValue() == -1) {
       os << "-";
@@ -2892,10 +2179,10 @@ void AsmPrinter::Impl::printAffineExprInternal(
 
   // Pretty print addition to a product that has a negative operand as a
   // subtraction.
-  if (auto rhs = dyn_cast<AffineBinaryOpExpr>(rhsExpr)) {
+  if (auto rhs = rhsExpr.dyn_cast<AffineBinaryOpExpr>()) {
     if (rhs.getKind() == AffineExprKind::Mul) {
       AffineExpr rrhsExpr = rhs.getRHS();
-      if (auto rrhs = dyn_cast<AffineConstantExpr>(rrhsExpr)) {
+      if (auto rrhs = rrhsExpr.dyn_cast<AffineConstantExpr>()) {
         if (rrhs.getValue() == -1) {
           printAffineExprInternal(lhsExpr, BindingStrength::Weak,
                                   printValueName);
@@ -2929,7 +2216,7 @@ void AsmPrinter::Impl::printAffineExprInternal(
   }
 
   // Pretty print addition to a negative number as a subtraction.
-  if (auto rhsConst = dyn_cast<AffineConstantExpr>(rhsExpr)) {
+  if (auto rhsConst = rhsExpr.dyn_cast<AffineConstantExpr>()) {
     if (rhsConst.getValue() < 0) {
       printAffineExprInternal(lhsExpr, BindingStrength::Weak, printValueName);
       os << " - " << -rhsConst.getValue();
@@ -2948,12 +2235,12 @@ void AsmPrinter::Impl::printAffineExprInternal(
     os << ')';
 }
 
-void AsmPrinter::Impl::printAffineConstraint(AffineExpr expr, bool isEq) {
+void ModulePrinter::printAffineConstraint(AffineExpr expr, bool isEq) {
   printAffineExprInternal(expr, BindingStrength::Weak);
   isEq ? os << " == 0" : os << " >= 0";
 }
 
-void AsmPrinter::Impl::printAffineMap(AffineMap map) {
+void ModulePrinter::printAffineMap(AffineMap map) {
   // Dimension identifiers.
   os << '(';
   for (int i = 0; i < (int)map.getNumDims() - 1; ++i)
@@ -2979,7 +2266,7 @@ void AsmPrinter::Impl::printAffineMap(AffineMap map) {
   os << ')';
 }
 
-void AsmPrinter::Impl::printIntegerSet(IntegerSet set) {
+void ModulePrinter::printIntegerSet(IntegerSet set) {
   // Dimension identifiers.
   os << '(';
   for (unsigned i = 1; i < set.getNumDims(); ++i)
@@ -3017,28 +2304,21 @@ void AsmPrinter::Impl::printIntegerSet(IntegerSet set) {
 
 namespace {
 /// This class contains the logic for printing operations, regions, and blocks.
-class OperationPrinter : public AsmPrinter::Impl, private OpAsmPrinter {
+class OperationPrinter : public ModulePrinter, private OpAsmPrinter {
 public:
-  using Impl = AsmPrinter::Impl;
-  using Impl::printType;
-
-  explicit OperationPrinter(raw_ostream &os, AsmStateImpl &state)
-      : Impl(os, state), OpAsmPrinter(static_cast<Impl &>(*this)) {}
+  explicit OperationPrinter(raw_ostream &os, OpPrintingFlags flags,
+                            AsmStateImpl &state)
+      : ModulePrinter(os, flags, &state) {}
 
   /// Print the given top-level operation.
   void printTopLevelOperation(Operation *op);
 
-  /// Print the given operation, including its left-hand side and its right-hand
-  /// side, with its indent and location.
-  void printFullOpWithIndentAndLoc(Operation *op);
-  /// Print the given operation, including its left-hand side and its right-hand
-  /// side, but not including indentation and location.
-  void printFullOp(Operation *op);
-  /// Print the right-hand size of the given operation in the custom or generic
-  /// form.
-  void printCustomOrGenericOp(Operation *op) override;
-  /// Print the right-hand side of the given operation in the generic form.
-  void printGenericOp(Operation *op, bool printOpName) override;
+  /// Print the given operation with its indent and location.
+  void print(Operation *op);
+  /// Print the bare location, not including indentation/location/etc.
+  void printOperation(Operation *op);
+  /// Print the given operation in the generic form.
+  void printGenericOp(Operation *op) override;
 
   /// Print the name of the given block.
   void printBlockName(Block *block);
@@ -3053,19 +2333,12 @@ public:
   void printValueID(Value value, bool printResultNo = true,
                     raw_ostream *streamOverride = nullptr) const;
 
-  /// Print the ID of the given operation.
-  void printOperationID(Operation *op,
-                        raw_ostream *streamOverride = nullptr) const;
-
   //===--------------------------------------------------------------------===//
   // OpAsmPrinter methods
   //===--------------------------------------------------------------------===//
 
-  /// Print a loc(...) specifier if printing debug info is enabled. Locations
-  /// may be deferred with an alias.
-  void printOptionalLocationSpecifier(Location loc) override {
-    printTrailingLocation(loc);
-  }
+  /// Return the current stream of the printer.
+  raw_ostream &getStream() const override { return os; }
 
   /// Print a newline and indent the printer to the start of the current
   /// operation.
@@ -3074,11 +2347,19 @@ public:
     os.indent(currentIndent);
   }
 
-  /// Increase indentation.
-  void increaseIndent() override { currentIndent += indentWidth; }
+  /// Print the given type.
+  void printType(Type type) override { ModulePrinter::printType(type); }
 
-  /// Decrease indentation.
-  void decreaseIndent() override { currentIndent -= indentWidth; }
+  /// Print the given attribute.
+  void printAttribute(Attribute attr) override {
+    ModulePrinter::printAttribute(attr);
+  }
+
+  /// Print the given attribute without its type. The corresponding parser must
+  /// provide a valid type for the attribute.
+  void printAttributeWithoutType(Attribute attr) override {
+    ModulePrinter::printAttribute(attr, AttrTypeElision::Must);
+  }
 
   /// Print a block argument in the usual format of:
   ///   %ssaName : type {attr1=42} loc("here")
@@ -3098,13 +2379,13 @@ public:
   /// Print an optional attribute dictionary with a given set of elided values.
   void printOptionalAttrDict(ArrayRef<NamedAttribute> attrs,
                              ArrayRef<StringRef> elidedAttrs = {}) override {
-    Impl::printOptionalAttrDict(attrs, elidedAttrs);
+    ModulePrinter::printOptionalAttrDict(attrs, elidedAttrs);
   }
   void printOptionalAttrDictWithKeyword(
       ArrayRef<NamedAttribute> attrs,
       ArrayRef<StringRef> elidedAttrs = {}) override {
-    Impl::printOptionalAttrDict(attrs, elidedAttrs,
-                                /*withKeyword=*/true);
+    ModulePrinter::printOptionalAttrDict(attrs, elidedAttrs,
+                                         /*withKeyword=*/true);
   }
 
   /// Print the given successor.
@@ -3124,7 +2405,7 @@ public:
   /// operations. If any entry in namesToUse is null, the corresponding
   /// argument name is left alone.
   void shadowRegionArgs(Region &region, ValueRange namesToUse) override {
-    state.getSSANameState().shadowRegionArgs(region, namesToUse);
+    state->getSSANameState().shadowRegionArgs(region, namesToUse);
   }
 
   /// Print the given affine map with the symbol and dimension operands printed
@@ -3137,193 +2418,30 @@ public:
   void printAffineExprOfSSAIds(AffineExpr expr, ValueRange dimOperands,
                                ValueRange symOperands) override;
 
-  /// Print users of this operation or id of this operation if it has no result.
-  void printUsersComment(Operation *op);
-
-  /// Print users of this block arg.
-  void printUsersComment(BlockArgument arg);
-
-  /// Print the users of a value.
-  void printValueUsers(Value value);
-
-  /// Print either the ids of the result values or the id of the operation if
-  /// the operation has no results.
-  void printUserIDs(Operation *user, bool prefixComma = false);
+  /// Print the given string as a symbol reference.
+  void printSymbolName(StringRef symbolRef) override {
+    ::printSymbolReference(symbolRef, os);
+  }
 
 private:
-  /// This class represents a resource builder implementation for the MLIR
-  /// textual assembly format.
-  class ResourceBuilder : public AsmResourceBuilder {
-  public:
-    using ValueFn = function_ref<void(raw_ostream &)>;
-    using PrintFn = function_ref<void(StringRef, ValueFn)>;
-
-    ResourceBuilder(PrintFn printFn) : printFn(printFn) {}
-    ~ResourceBuilder() override = default;
-
-    void buildBool(StringRef key, bool data) final {
-      printFn(key, [&](raw_ostream &os) { os << (data ? "true" : "false"); });
-    }
-
-    void buildString(StringRef key, StringRef data) final {
-      printFn(key, [&](raw_ostream &os) {
-        os << "\"";
-        llvm::printEscapedString(data, os);
-        os << "\"";
-      });
-    }
-
-    void buildBlob(StringRef key, ArrayRef<char> data,
-                   uint32_t dataAlignment) final {
-      printFn(key, [&](raw_ostream &os) {
-        // Store the blob in a hex string containing the alignment and the data.
-        llvm::support::ulittle32_t dataAlignmentLE(dataAlignment);
-        os << "\"0x"
-           << llvm::toHex(StringRef(reinterpret_cast<char *>(&dataAlignmentLE),
-                                    sizeof(dataAlignment)))
-           << llvm::toHex(StringRef(data.data(), data.size())) << "\"";
-      });
-    }
-
-  private:
-    PrintFn printFn;
-  };
-
-  /// Print the metadata dictionary for the file, eliding it if it is empty.
-  void printFileMetadataDictionary(Operation *op);
-
-  /// Print the resource sections for the file metadata dictionary.
-  /// `checkAddMetadataDict` is used to indicate that metadata is going to be
-  /// added, and the file metadata dictionary should be started if it hasn't
-  /// yet.
-  void printResourceFileMetadata(function_ref<void()> checkAddMetadataDict,
-                                 Operation *op);
-
-  // Contains the stack of default dialects to use when printing regions.
-  // A new dialect is pushed to the stack before parsing regions nested under an
-  // operation implementing `OpAsmOpInterface`, and popped when done. At the
-  // top-level we start with "builtin" as the default, so that the top-level
-  // `module` operation prints as-is.
-  SmallVector<StringRef> defaultDialectStack{"builtin"};
-
   /// The number of spaces used for indenting nested operations.
   const static unsigned indentWidth = 2;
 
   // This is the current indentation level for nested structures.
   unsigned currentIndent = 0;
 };
-} // namespace
+} // end anonymous namespace
 
 void OperationPrinter::printTopLevelOperation(Operation *op) {
   // Output the aliases at the top level that can't be deferred.
-  state.getAliasState().printNonDeferredAliases(*this, newLine);
+  state->getAliasState().printNonDeferredAliases(os, newLine);
 
   // Print the module.
-  printFullOpWithIndentAndLoc(op);
+  print(op);
   os << newLine;
 
   // Output the aliases at the top level that can be deferred.
-  state.getAliasState().printDeferredAliases(*this, newLine);
-
-  // Output any file level metadata.
-  printFileMetadataDictionary(op);
-}
-
-void OperationPrinter::printFileMetadataDictionary(Operation *op) {
-  bool sawMetadataEntry = false;
-  auto checkAddMetadataDict = [&] {
-    if (!std::exchange(sawMetadataEntry, true))
-      os << newLine << "{-#" << newLine;
-  };
-
-  // Add the various types of metadata.
-  printResourceFileMetadata(checkAddMetadataDict, op);
-
-  // If the file dictionary exists, close it.
-  if (sawMetadataEntry)
-    os << newLine << "#-}" << newLine;
-}
-
-void OperationPrinter::printResourceFileMetadata(
-    function_ref<void()> checkAddMetadataDict, Operation *op) {
-  // Functor used to add data entries to the file metadata dictionary.
-  bool hadResource = false;
-  bool needResourceComma = false;
-  bool needEntryComma = false;
-  auto processProvider = [&](StringRef dictName, StringRef name, auto &provider,
-                             auto &&...providerArgs) {
-    bool hadEntry = false;
-    auto printFn = [&](StringRef key, ResourceBuilder::ValueFn valueFn) {
-      checkAddMetadataDict();
-
-      auto printFormatting = [&]() {
-        // Emit the top-level resource entry if we haven't yet.
-        if (!std::exchange(hadResource, true)) {
-          if (needResourceComma)
-            os << "," << newLine;
-          os << "  " << dictName << "_resources: {" << newLine;
-        }
-        // Emit the parent resource entry if we haven't yet.
-        if (!std::exchange(hadEntry, true)) {
-          if (needEntryComma)
-            os << "," << newLine;
-          os << "    " << name << ": {" << newLine;
-        } else {
-          os << "," << newLine;
-        }
-      };
-
-      std::optional<uint64_t> charLimit =
-          printerFlags.getLargeResourceStringLimit();
-      if (charLimit.has_value()) {
-        std::string resourceStr;
-        llvm::raw_string_ostream ss(resourceStr);
-        valueFn(ss);
-
-        // Only print entry if it's string is small enough
-        if (resourceStr.size() > charLimit.value())
-          return;
-
-        printFormatting();
-        os << "      " << key << ": " << resourceStr;
-      } else {
-        printFormatting();
-        os << "      " << key << ": ";
-        valueFn(os);
-      }
-    };
-    ResourceBuilder entryBuilder(printFn);
-    provider.buildResources(op, providerArgs..., entryBuilder);
-
-    needEntryComma |= hadEntry;
-    if (hadEntry)
-      os << newLine << "    }";
-  };
-
-  // Print the `dialect_resources` section if we have any dialects with
-  // resources.
-  for (const OpAsmDialectInterface &interface : state.getDialectInterfaces()) {
-    auto &dialectResources = state.getDialectResources();
-    StringRef name = interface.getDialect()->getNamespace();
-    auto it = dialectResources.find(interface.getDialect());
-    if (it != dialectResources.end())
-      processProvider("dialect", name, interface, it->second);
-    else
-      processProvider("dialect", name, interface,
-                      SetVector<AsmDialectResourceHandle>());
-  }
-  if (hadResource)
-    os << newLine << "  }";
-
-  // Print the `external_resources` section if we have any external clients with
-  // resources.
-  needEntryComma = false;
-  needResourceComma = hadResource;
-  hadResource = false;
-  for (const auto &printer : state.getResourcePrinters())
-    processProvider("external", printer.getName(), printer);
-  if (hadResource)
-    os << newLine << "  }";
+  state->getAliasState().printDeferredAliases(os, newLine);
 }
 
 /// Print a block argument in the usual format of:
@@ -3344,18 +2462,16 @@ void OperationPrinter::printRegionArgument(BlockArgument arg,
   printTrailingLocation(arg.getLoc(), /*allowAlias*/ false);
 }
 
-void OperationPrinter::printFullOpWithIndentAndLoc(Operation *op) {
+void OperationPrinter::print(Operation *op) {
   // Track the location of this operation.
-  state.registerOperationLocation(op, newLine.curLine, currentIndent);
+  state->registerOperationLocation(op, newLine.curLine, currentIndent);
 
   os.indent(currentIndent);
-  printFullOp(op);
+  printOperation(op);
   printTrailingLocation(op->getLoc());
-  if (printerFlags.shouldPrintValueUsers())
-    printUsersComment(op);
 }
 
-void OperationPrinter::printFullOp(Operation *op) {
+void OperationPrinter::printOperation(Operation *op) {
   if (size_t numResults = op->getNumResults()) {
     auto printResultGroup = [&](size_t resultNo, size_t resultCount) {
       printValueID(op->getResult(resultNo), /*printResultNo=*/false);
@@ -3364,7 +2480,7 @@ void OperationPrinter::printFullOp(Operation *op) {
     };
 
     // Check to see if this operation has multiple result groups.
-    ArrayRef<int> resultGroups = state.getSSANameState().getOpResultGroups(op);
+    ArrayRef<int> resultGroups = state->getSSANameState().getOpResultGroups(op);
     if (!resultGroups.empty()) {
       // Interleave the groups excluding the last one, this one will be handled
       // separately.
@@ -3382,118 +2498,29 @@ void OperationPrinter::printFullOp(Operation *op) {
     os << " = ";
   }
 
-  printCustomOrGenericOp(op);
-}
-
-void OperationPrinter::printUsersComment(Operation *op) {
-  unsigned numResults = op->getNumResults();
-  if (!numResults && op->getNumOperands()) {
-    os << " // id: ";
-    printOperationID(op);
-  } else if (numResults && op->use_empty()) {
-    os << " // unused";
-  } else if (numResults && !op->use_empty()) {
-    // Print "user" if the operation has one result used to compute one other
-    // result, or is used in one operation with no result.
-    unsigned usedInNResults = 0;
-    unsigned usedInNOperations = 0;
-    SmallPtrSet<Operation *, 1> userSet;
-    for (Operation *user : op->getUsers()) {
-      if (userSet.insert(user).second) {
-        ++usedInNOperations;
-        usedInNResults += user->getNumResults();
-      }
-    }
-
-    // We already know that users is not empty.
-    bool exactlyOneUniqueUse =
-        usedInNResults <= 1 && usedInNOperations <= 1 && numResults == 1;
-    os << " // " << (exactlyOneUniqueUse ? "user" : "users") << ": ";
-    bool shouldPrintBrackets = numResults > 1;
-    auto printOpResult = [&](OpResult opResult) {
-      if (shouldPrintBrackets)
-        os << "(";
-      printValueUsers(opResult);
-      if (shouldPrintBrackets)
-        os << ")";
-    };
-
-    interleaveComma(op->getResults(), printOpResult);
-  }
-}
-
-void OperationPrinter::printUsersComment(BlockArgument arg) {
-  os << "// ";
-  printValueID(arg);
-  if (arg.use_empty()) {
-    os << " is unused";
-  } else {
-    os << " is used by ";
-    printValueUsers(arg);
-  }
-  os << newLine;
-}
-
-void OperationPrinter::printValueUsers(Value value) {
-  if (value.use_empty())
-    os << "unused";
-
-  // One value might be used as the operand of an operation more than once.
-  // Only print the operations results once in that case.
-  SmallPtrSet<Operation *, 1> userSet;
-  for (auto [index, user] : enumerate(value.getUsers())) {
-    if (userSet.insert(user).second)
-      printUserIDs(user, index);
-  }
-}
-
-void OperationPrinter::printUserIDs(Operation *user, bool prefixComma) {
-  if (prefixComma)
-    os << ", ";
-
-  if (!user->getNumResults()) {
-    printOperationID(user);
-  } else {
-    interleaveComma(user->getResults(),
-                    [this](Value result) { printValueID(result); });
-  }
-}
-
-void OperationPrinter::printCustomOrGenericOp(Operation *op) {
   // If requested, always print the generic form.
   if (!printerFlags.shouldPrintGenericOpForm()) {
-    // Check to see if this is a known operation. If so, use the registered
+    // Check to see if this is a known operation.  If so, use the registered
     // custom printer hook.
-    if (auto opInfo = op->getRegisteredInfo()) {
-      opInfo->printAssembly(op, *this, defaultDialectStack.back());
+    if (auto *opInfo = op->getAbstractOperation()) {
+      opInfo->printAssembly(op, *this);
       return;
     }
     // Otherwise try to dispatch to the dialect, if available.
     if (Dialect *dialect = op->getDialect()) {
-      if (auto opPrinter = dialect->getOperationPrinter(op)) {
-        // Print the op name first.
-        StringRef name = op->getName().getStringRef();
-        // Only drop the default dialect prefix when it cannot lead to
-        // ambiguities.
-        if (name.count('.') == 1)
-          name.consume_front((defaultDialectStack.back() + ".").str());
-        os << name;
-
-        // Print the rest of the op now.
-        opPrinter(op, *this);
+      if (succeeded(dialect->printOperation(op, *this)))
         return;
-      }
     }
   }
 
   // Otherwise print with the generic assembly form.
-  printGenericOp(op, /*printOpName=*/true);
+  printGenericOp(op);
 }
 
-void OperationPrinter::printGenericOp(Operation *op, bool printOpName) {
-  if (printOpName)
-    printEscapedString(op->getName().getStringRef());
-  os << '(';
+void OperationPrinter::printGenericOp(Operation *op) {
+  os << '"';
+  printEscapedString(op->getName().getStringRef(), os);
+  os << "\"(";
   interleaveComma(op->getOperands(), [&](Value value) { printValueID(value); });
   os << ')';
 
@@ -3503,13 +2530,6 @@ void OperationPrinter::printGenericOp(Operation *op, bool printOpName) {
     interleaveComma(op->getSuccessors(),
                     [&](Block *successor) { printBlockName(successor); });
     os << ']';
-  }
-
-  // Print the properties.
-  if (Attribute prop = op->getPropertiesAsAttribute()) {
-    os << " <";
-    Impl::printAttribute(prop);
-    os << '>';
   }
 
   // Print regions.
@@ -3522,7 +2542,7 @@ void OperationPrinter::printGenericOp(Operation *op, bool printOpName) {
     os << ')';
   }
 
-  auto attrs = op->getDiscardableAttrs();
+  auto attrs = op->getAttrs();
   printOptionalAttrDict(attrs);
 
   // Print the type signature of the operation.
@@ -3531,7 +2551,11 @@ void OperationPrinter::printGenericOp(Operation *op, bool printOpName) {
 }
 
 void OperationPrinter::printBlockName(Block *block) {
-  os << state.getSSANameState().getBlockInfo(block).name;
+  auto id = state->getSSANameState().getBlockID(block);
+  if (id != SSANameState::NameSentinel)
+    os << "^bb" << id;
+  else
+    os << "^INVALIDBLOCK";
 }
 
 void OperationPrinter::print(Block *block, bool printBlockArgs,
@@ -3559,37 +2583,28 @@ void OperationPrinter::print(Block *block, bool printBlockArgs,
     if (!block->getParent()) {
       os << "  // block is not in a region!";
     } else if (block->hasNoPredecessors()) {
-      if (!block->isEntryBlock())
-        os << "  // no predecessors";
+      os << "  // no predecessors";
     } else if (auto *pred = block->getSinglePredecessor()) {
       os << "  // pred: ";
       printBlockName(pred);
     } else {
-      // We want to print the predecessors in a stable order, not in
+      // We want to print the predecessors in increasing numeric order, not in
       // whatever order the use-list is in, so gather and sort them.
-      SmallVector<BlockInfo, 4> predIDs;
+      SmallVector<std::pair<unsigned, Block *>, 4> predIDs;
       for (auto *pred : block->getPredecessors())
-        predIDs.push_back(state.getSSANameState().getBlockInfo(pred));
-      llvm::sort(predIDs, [](BlockInfo lhs, BlockInfo rhs) {
-        return lhs.ordering < rhs.ordering;
-      });
+        predIDs.push_back({state->getSSANameState().getBlockID(pred), pred});
+      llvm::array_pod_sort(predIDs.begin(), predIDs.end());
 
       os << "  // " << predIDs.size() << " preds: ";
 
-      interleaveComma(predIDs, [&](BlockInfo pred) { os << pred.name; });
+      interleaveComma(predIDs, [&](std::pair<unsigned, Block *> pred) {
+        printBlockName(pred.second);
+      });
     }
     os << newLine;
   }
 
   currentIndent += indentWidth;
-
-  if (printerFlags.shouldPrintValueUsers()) {
-    for (BlockArgument arg : block->getArguments()) {
-      os.indent(currentIndent);
-      printUsersComment(arg);
-    }
-  }
-
   bool hasTerminator =
       !block->empty() && block->back().hasTrait<OpTrait::IsTerminator>();
   auto range = llvm::make_range(
@@ -3597,7 +2612,7 @@ void OperationPrinter::print(Block *block, bool printBlockArgs,
       std::prev(block->end(),
                 (!hasTerminator || printBlockTerminator) ? 0 : 1));
   for (auto &op : range) {
-    printFullOpWithIndentAndLoc(&op);
+    print(&op);
     os << newLine;
   }
   currentIndent -= indentWidth;
@@ -3605,14 +2620,8 @@ void OperationPrinter::print(Block *block, bool printBlockArgs,
 
 void OperationPrinter::printValueID(Value value, bool printResultNo,
                                     raw_ostream *streamOverride) const {
-  state.getSSANameState().printValueID(value, printResultNo,
-                                       streamOverride ? *streamOverride : os);
-}
-
-void OperationPrinter::printOperationID(Operation *op,
-                                        raw_ostream *streamOverride) const {
-  state.getSSANameState().printOperationID(op, streamOverride ? *streamOverride
-                                                              : os);
+  state->getSSANameState().printValueID(value, printResultNo,
+                                        streamOverride ? *streamOverride : os);
 }
 
 void OperationPrinter::printSuccessor(Block *successor) {
@@ -3637,19 +2646,8 @@ void OperationPrinter::printSuccessorAndUseList(Block *successor,
 void OperationPrinter::printRegion(Region &region, bool printEntryBlockArgs,
                                    bool printBlockTerminators,
                                    bool printEmptyBlock) {
-  if (printerFlags.shouldSkipRegions()) {
-    os << "{...}";
-    return;
-  }
-  os << "{" << newLine;
+  os << " {" << newLine;
   if (!region.empty()) {
-    auto restoreDefaultDialect =
-        llvm::make_scope_exit([&]() { defaultDialectStack.pop_back(); });
-    if (auto iface = dyn_cast<OpAsmOpInterface>(region.getParentOp()))
-      defaultDialectStack.push_back(iface.getDefaultDialect());
-    else
-      defaultDialectStack.push_back("");
-
     auto *entryBlock = &region.front();
     // Force printing the block header if printEmptyBlock is set and the block
     // is empty or if printEntryBlockArgs is set and there are arguments to
@@ -3666,10 +2664,6 @@ void OperationPrinter::printRegion(Region &region, bool printEntryBlockArgs,
 
 void OperationPrinter::printAffineMapOfSSAIds(AffineMapAttr mapAttr,
                                               ValueRange operands) {
-  if (!mapAttr) {
-    os << "<<NULL AFFINE MAP>>";
-    return;
-  }
   AffineMap map = mapAttr.getValue();
   unsigned numDims = map.getNumDims();
   auto printValueName = [&](unsigned pos, bool isSymbol) {
@@ -3704,20 +2698,8 @@ void OperationPrinter::printAffineExprOfSSAIds(AffineExpr expr,
 // print and dump methods
 //===----------------------------------------------------------------------===//
 
-void Attribute::print(raw_ostream &os, bool elideType) const {
-  if (!*this) {
-    os << "<<NULL ATTRIBUTE>>";
-    return;
-  }
-
-  AsmState state(getContext());
-  print(os, state, elideType);
-}
-void Attribute::print(raw_ostream &os, AsmState &state, bool elideType) const {
-  using AttrTypeElision = AsmPrinter::Impl::AttrTypeElision;
-  AsmPrinter::Impl(os, state.getImpl())
-      .printAttribute(*this, elideType ? AttrTypeElision::Must
-                                       : AttrTypeElision::Never);
+void Attribute::print(raw_ostream &os) const {
+  ModulePrinter(os).printAttribute(*this);
 }
 
 void Attribute::dump() const {
@@ -3725,23 +2707,9 @@ void Attribute::dump() const {
   llvm::errs() << "\n";
 }
 
-void Type::print(raw_ostream &os) const {
-  if (!*this) {
-    os << "<<NULL TYPE>>";
-    return;
-  }
+void Type::print(raw_ostream &os) const { ModulePrinter(os).printType(*this); }
 
-  AsmState state(getContext());
-  print(os, state);
-}
-void Type::print(raw_ostream &os, AsmState &state) const {
-  AsmPrinter::Impl(os, state.getImpl()).printType(*this);
-}
-
-void Type::dump() const {
-  print(llvm::errs());
-  llvm::errs() << "\n";
-}
+void Type::dump() const { print(llvm::errs()); }
 
 void AffineMap::dump() const {
   print(llvm::errs());
@@ -3758,8 +2726,7 @@ void AffineExpr::print(raw_ostream &os) const {
     os << "<<NULL AFFINE EXPR>>";
     return;
   }
-  AsmState state(getContext());
-  AsmPrinter::Impl(os, state.getImpl()).printAffineExpr(*this);
+  ModulePrinter(os).printAffineExpr(*this);
 }
 
 void AffineExpr::dump() const {
@@ -3772,50 +2739,37 @@ void AffineMap::print(raw_ostream &os) const {
     os << "<<NULL AFFINE MAP>>";
     return;
   }
-  AsmState state(getContext());
-  AsmPrinter::Impl(os, state.getImpl()).printAffineMap(*this);
+  ModulePrinter(os).printAffineMap(*this);
 }
 
 void IntegerSet::print(raw_ostream &os) const {
-  AsmState state(getContext());
-  AsmPrinter::Impl(os, state.getImpl()).printIntegerSet(*this);
+  ModulePrinter(os).printIntegerSet(*this);
 }
 
-void Value::print(raw_ostream &os) const { print(os, OpPrintingFlags()); }
-void Value::print(raw_ostream &os, const OpPrintingFlags &flags) const {
-  if (!impl) {
-    os << "<<NULL VALUE>>";
-    return;
-  }
-
+void Value::print(raw_ostream &os) {
   if (auto *op = getDefiningOp())
-    return op->print(os, flags);
+    return op->print(os);
   // TODO: Improve BlockArgument print'ing.
-  BlockArgument arg = llvm::cast<BlockArgument>(*this);
+  BlockArgument arg = this->cast<BlockArgument>();
   os << "<block argument> of type '" << arg.getType()
      << "' at index: " << arg.getArgNumber();
 }
-void Value::print(raw_ostream &os, AsmState &state) const {
-  if (!impl) {
-    os << "<<NULL VALUE>>";
-    return;
-  }
-
+void Value::print(raw_ostream &os, AsmState &state) {
   if (auto *op = getDefiningOp())
     return op->print(os, state);
 
   // TODO: Improve BlockArgument print'ing.
-  BlockArgument arg = llvm::cast<BlockArgument>(*this);
+  BlockArgument arg = this->cast<BlockArgument>();
   os << "<block argument> of type '" << arg.getType()
      << "' at index: " << arg.getArgNumber();
 }
 
-void Value::dump() const {
+void Value::dump() {
   print(llvm::errs());
   llvm::errs() << "\n";
 }
 
-void Value::printAsOperand(raw_ostream &os, AsmState &state) const {
+void Value::printAsOperand(raw_ostream &os, AsmState &state) {
   // TODO: This doesn't necessarily capture all potential cases.
   // Currently, region arguments can be shadowed when printing the main
   // operation. If the IR hasn't been printed, this will produce the old SSA
@@ -3824,7 +2778,18 @@ void Value::printAsOperand(raw_ostream &os, AsmState &state) const {
                                                  os);
 }
 
-static Operation *findParent(Operation *op, bool shouldUseLocalScope) {
+void Operation::print(raw_ostream &os, const OpPrintingFlags &printerFlags) {
+  // If this is a top level operation, we also print aliases.
+  if (!getParent() && !printerFlags.shouldUseLocalScope()) {
+    AsmState state(this, printerFlags);
+    state.getImpl().initializeAliases(this);
+    print(os, state, printerFlags);
+    return;
+  }
+
+  // Find the operation to number from based upon the provided flags.
+  Operation *op = this;
+  bool shouldUseLocalScope = printerFlags.shouldUseLocalScope();
   do {
     // If we are printing local scope, stop at the first operation that is
     // isolated from above.
@@ -3837,40 +2802,17 @@ static Operation *findParent(Operation *op, bool shouldUseLocalScope) {
       break;
     op = parentOp;
   } while (true);
-  return op;
-}
 
-void Value::printAsOperand(raw_ostream &os,
-                           const OpPrintingFlags &flags) const {
-  Operation *op;
-  if (auto result = llvm::dyn_cast<OpResult>(*this)) {
-    op = result.getOwner();
-  } else {
-    op = llvm::cast<BlockArgument>(*this).getOwner()->getParentOp();
-    if (!op) {
-      os << "<<UNKNOWN SSA VALUE>>";
-      return;
-    }
-  }
-  op = findParent(op, flags.shouldUseLocalScope());
-  AsmState state(op, flags);
-  printAsOperand(os, state);
-}
-
-void Operation::print(raw_ostream &os, const OpPrintingFlags &printerFlags) {
-  // Find the operation to number from based upon the provided flags.
-  Operation *op = findParent(this, printerFlags.shouldUseLocalScope());
   AsmState state(op, printerFlags);
-  print(os, state);
+  print(os, state, printerFlags);
 }
-void Operation::print(raw_ostream &os, AsmState &state) {
-  OperationPrinter printer(os, state.getImpl());
-  if (!getParent() && !state.getPrinterFlags().shouldUseLocalScope()) {
-    state.getImpl().initializeAliases(this);
+void Operation::print(raw_ostream &os, AsmState &state,
+                      const OpPrintingFlags &flags) {
+  OperationPrinter printer(os, flags, state.getImpl());
+  if (!getParent() && !flags.shouldUseLocalScope())
     printer.printTopLevelOperation(this);
-  } else {
-    printer.printFullOpWithIndentAndLoc(this);
-  }
+  else
+    printer.print(this);
 }
 
 void Operation::dump() {
@@ -3892,7 +2834,7 @@ void Block::print(raw_ostream &os) {
   print(os, state);
 }
 void Block::print(raw_ostream &os, AsmState &state) {
-  OperationPrinter(os, state.getImpl()).print(this);
+  OperationPrinter(os, /*flags=*/llvm::None, state.getImpl()).print(this);
 }
 
 void Block::dump() { print(llvm::errs()); }
@@ -3908,6 +2850,6 @@ void Block::printAsOperand(raw_ostream &os, bool printType) {
   printAsOperand(os, state);
 }
 void Block::printAsOperand(raw_ostream &os, AsmState &state) {
-  OperationPrinter printer(os, state.getImpl());
+  OperationPrinter printer(os, /*flags=*/llvm::None, state.getImpl());
   printer.printBlockName(this);
 }

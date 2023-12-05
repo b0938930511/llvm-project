@@ -9,11 +9,8 @@
 #include "CommandObjectLog.h"
 #include "lldb/Core/Debugger.h"
 #include "lldb/Host/OptionParser.h"
-#include "lldb/Interpreter/CommandOptionArgumentTable.h"
 #include "lldb/Interpreter/CommandReturnObject.h"
 #include "lldb/Interpreter/OptionArgParser.h"
-#include "lldb/Interpreter/OptionValueEnumeration.h"
-#include "lldb/Interpreter/OptionValueUInt64.h"
 #include "lldb/Interpreter/Options.h"
 #include "lldb/Utility/Args.h"
 #include "lldb/Utility/FileSpec.h"
@@ -24,10 +21,7 @@
 using namespace lldb;
 using namespace lldb_private;
 
-#define LLDB_OPTIONS_log_enable
-#include "CommandOptions.inc"
-
-#define LLDB_OPTIONS_log_dump
+#define LLDB_OPTIONS_log
 #include "CommandOptions.inc"
 
 /// Common completion logic for log enable/disable.
@@ -51,7 +45,8 @@ public:
   CommandObjectLogEnable(CommandInterpreter &interpreter)
       : CommandObjectParsed(interpreter, "log enable",
                             "Enable logging for a single log channel.",
-                            nullptr) {
+                            nullptr),
+        m_options() {
     CommandArgumentEntry arg1;
     CommandArgumentEntry arg2;
     CommandArgumentData channel_arg;
@@ -81,7 +76,7 @@ public:
 
   class CommandOptions : public Options {
   public:
-    CommandOptions() = default;
+    CommandOptions() : Options(), log_file() {}
 
     ~CommandOptions() override = default;
 
@@ -95,17 +90,8 @@ public:
         log_file.SetFile(option_arg, FileSpec::Style::native);
         FileSystem::Instance().Resolve(log_file);
         break;
-      case 'h':
-        handler = (LogHandlerKind)OptionArgParser::ToOptionEnum(
-            option_arg, GetDefinitions()[option_idx].enum_values, 0, error);
-        if (!error.Success())
-          error.SetErrorStringWithFormat(
-              "unrecognized value for log handler '%s'",
-              option_arg.str().c_str());
-        break;
-      case 'b':
-        error =
-            buffer_size.SetValueFromString(option_arg, eVarSetOperationAssign);
+      case 't':
+        log_options |= LLDB_LOG_OPTION_THREADSAFE;
         break;
       case 'v':
         log_options |= LLDB_LOG_OPTION_VERBOSE;
@@ -140,18 +126,16 @@ public:
 
     void OptionParsingStarting(ExecutionContext *execution_context) override {
       log_file.Clear();
-      buffer_size.Clear();
-      handler = eLogHandlerStream;
       log_options = 0;
     }
 
     llvm::ArrayRef<OptionDefinition> GetDefinitions() override {
-      return llvm::ArrayRef(g_log_enable_options);
+      return llvm::makeArrayRef(g_log_options);
     }
 
+    // Instance variables to hold the values for command options.
+
     FileSpec log_file;
-    OptionValueUInt64 buffer_size;
-    LogHandlerKind handler = eLogHandlerStream;
     uint32_t log_options = 0;
   };
 
@@ -162,33 +146,12 @@ public:
   }
 
 protected:
-  void DoExecute(Args &args, CommandReturnObject &result) override {
+  bool DoExecute(Args &args, CommandReturnObject &result) override {
     if (args.GetArgumentCount() < 2) {
       result.AppendErrorWithFormat(
           "%s takes a log channel and one or more log types.\n",
           m_cmd_name.c_str());
-      return;
-    }
-
-    if (m_options.handler == eLogHandlerCircular &&
-        m_options.buffer_size.GetCurrentValue() == 0) {
-      result.AppendError(
-          "the circular buffer handler requires a non-zero buffer size.\n");
-      return;
-    }
-
-    if ((m_options.handler != eLogHandlerCircular &&
-         m_options.handler != eLogHandlerStream) &&
-        m_options.buffer_size.GetCurrentValue() != 0) {
-      result.AppendError("a buffer size can only be specified for the circular "
-                         "and stream buffer handler.\n");
-      return;
-    }
-
-    if (m_options.handler != eLogHandlerStream && m_options.log_file) {
-      result.AppendError(
-          "a file name can only be specified for the stream handler.\n");
-      return;
+      return false;
     }
 
     // Store into a std::string since we're about to shift the channel off.
@@ -202,16 +165,16 @@ protected:
 
     std::string error;
     llvm::raw_string_ostream error_stream(error);
-    bool success = GetDebugger().EnableLog(
-        channel, args.GetArgumentArrayRef(), log_file, m_options.log_options,
-        m_options.buffer_size.GetCurrentValue(), m_options.handler,
-        error_stream);
+    bool success =
+        GetDebugger().EnableLog(channel, args.GetArgumentArrayRef(), log_file,
+                                m_options.log_options, error_stream);
     result.GetErrorStream() << error_stream.str();
 
     if (success)
       result.SetStatus(eReturnStatusSuccessFinishNoResult);
     else
       result.SetStatus(eReturnStatusFailed);
+    return result.Succeeded();
   }
 
   CommandOptions m_options;
@@ -256,12 +219,12 @@ public:
   }
 
 protected:
-  void DoExecute(Args &args, CommandReturnObject &result) override {
+  bool DoExecute(Args &args, CommandReturnObject &result) override {
     if (args.empty()) {
       result.AppendErrorWithFormat(
           "%s takes a log channel and one or more log types.\n",
           m_cmd_name.c_str());
-      return;
+      return false;
     }
 
     const std::string channel = std::string(args[0].ref());
@@ -277,6 +240,7 @@ protected:
         result.SetStatus(eReturnStatusSuccessFinishNoResult);
       result.GetErrorStream() << error_stream.str();
     }
+    return result.Succeeded();
   }
 };
 
@@ -313,7 +277,7 @@ public:
   }
 
 protected:
-  void DoExecute(Args &args, CommandReturnObject &result) override {
+  bool DoExecute(Args &args, CommandReturnObject &result) override {
     std::string output;
     llvm::raw_string_ostream output_stream(output);
     if (args.empty()) {
@@ -328,113 +292,8 @@ protected:
         result.SetStatus(eReturnStatusSuccessFinishResult);
     }
     result.GetOutputStream() << output_stream.str();
+    return result.Succeeded();
   }
-};
-class CommandObjectLogDump : public CommandObjectParsed {
-public:
-  CommandObjectLogDump(CommandInterpreter &interpreter)
-      : CommandObjectParsed(interpreter, "log dump",
-                            "dump circular buffer logs", nullptr) {
-    CommandArgumentEntry arg1;
-    CommandArgumentData channel_arg;
-
-    // Define the first (and only) variant of this arg.
-    channel_arg.arg_type = eArgTypeLogChannel;
-    channel_arg.arg_repetition = eArgRepeatPlain;
-
-    // There is only one variant this argument could be; put it into the
-    // argument entry.
-    arg1.push_back(channel_arg);
-
-    // Push the data for the first argument into the m_arguments vector.
-    m_arguments.push_back(arg1);
-  }
-
-  ~CommandObjectLogDump() override = default;
-
-  Options *GetOptions() override { return &m_options; }
-
-  class CommandOptions : public Options {
-  public:
-    CommandOptions() = default;
-
-    ~CommandOptions() override = default;
-
-    Status SetOptionValue(uint32_t option_idx, llvm::StringRef option_arg,
-                          ExecutionContext *execution_context) override {
-      Status error;
-      const int short_option = m_getopt_table[option_idx].val;
-
-      switch (short_option) {
-      case 'f':
-        log_file.SetFile(option_arg, FileSpec::Style::native);
-        FileSystem::Instance().Resolve(log_file);
-        break;
-      default:
-        llvm_unreachable("Unimplemented option");
-      }
-
-      return error;
-    }
-
-    void OptionParsingStarting(ExecutionContext *execution_context) override {
-      log_file.Clear();
-    }
-
-    llvm::ArrayRef<OptionDefinition> GetDefinitions() override {
-      return llvm::ArrayRef(g_log_dump_options);
-    }
-
-    FileSpec log_file;
-  };
-
-  void
-  HandleArgumentCompletion(CompletionRequest &request,
-                           OptionElementVector &opt_element_vector) override {
-    CompleteEnableDisable(request);
-  }
-
-protected:
-  void DoExecute(Args &args, CommandReturnObject &result) override {
-    if (args.empty()) {
-      result.AppendErrorWithFormat(
-          "%s takes a log channel and one or more log types.\n",
-          m_cmd_name.c_str());
-      return;
-    }
-
-    std::unique_ptr<llvm::raw_ostream> stream_up;
-    if (m_options.log_file) {
-      const File::OpenOptions flags = File::eOpenOptionWriteOnly |
-                                      File::eOpenOptionCanCreate |
-                                      File::eOpenOptionTruncate;
-      llvm::Expected<FileUP> file = FileSystem::Instance().Open(
-          m_options.log_file, flags, lldb::eFilePermissionsFileDefault, false);
-      if (!file) {
-        result.AppendErrorWithFormat("Unable to open log file '%s': %s",
-                                     m_options.log_file.GetPath().c_str(),
-                                     llvm::toString(file.takeError()).c_str());
-        return;
-      }
-      stream_up = std::make_unique<llvm::raw_fd_ostream>(
-          (*file)->GetDescriptor(), /*shouldClose=*/true);
-    } else {
-      stream_up = std::make_unique<llvm::raw_fd_ostream>(
-          GetDebugger().GetOutputFile().GetDescriptor(), /*shouldClose=*/false);
-    }
-
-    const std::string channel = std::string(args[0].ref());
-    std::string error;
-    llvm::raw_string_ostream error_stream(error);
-    if (Log::DumpLogChannel(channel, *stream_up, error_stream)) {
-      result.SetStatus(eReturnStatusSuccessFinishNoResult);
-    } else {
-      result.SetStatus(eReturnStatusFailed);
-      result.GetErrorStream() << error_stream.str();
-    }
-  }
-
-  CommandOptions m_options;
 };
 
 class CommandObjectLogTimerEnable : public CommandObjectParsed {
@@ -462,7 +321,7 @@ public:
   ~CommandObjectLogTimerEnable() override = default;
 
 protected:
-  void DoExecute(Args &args, CommandReturnObject &result) override {
+  bool DoExecute(Args &args, CommandReturnObject &result) override {
     result.SetStatus(eReturnStatusFailed);
 
     if (args.GetArgumentCount() == 0) {
@@ -483,6 +342,7 @@ protected:
       result.AppendError("Missing subcommand");
       result.AppendErrorWithFormat("Usage: %s\n", m_cmd_syntax.c_str());
     }
+    return result.Succeeded();
   }
 };
 
@@ -497,8 +357,8 @@ public:
   ~CommandObjectLogTimerDisable() override = default;
 
 protected:
-  void DoExecute(Args &args, CommandReturnObject &result) override {
-    Timer::DumpCategoryTimes(result.GetOutputStream());
+  bool DoExecute(Args &args, CommandReturnObject &result) override {
+    Timer::DumpCategoryTimes(&result.GetOutputStream());
     Timer::SetDisplayDepth(0);
     result.SetStatus(eReturnStatusSuccessFinishResult);
 
@@ -506,6 +366,7 @@ protected:
       result.AppendError("Missing subcommand");
       result.AppendErrorWithFormat("Usage: %s\n", m_cmd_syntax.c_str());
     }
+    return result.Succeeded();
   }
 };
 
@@ -519,14 +380,15 @@ public:
   ~CommandObjectLogTimerDump() override = default;
 
 protected:
-  void DoExecute(Args &args, CommandReturnObject &result) override {
-    Timer::DumpCategoryTimes(result.GetOutputStream());
+  bool DoExecute(Args &args, CommandReturnObject &result) override {
+    Timer::DumpCategoryTimes(&result.GetOutputStream());
     result.SetStatus(eReturnStatusSuccessFinishResult);
 
     if (!result.Succeeded()) {
       result.AppendError("Missing subcommand");
       result.AppendErrorWithFormat("Usage: %s\n", m_cmd_syntax.c_str());
     }
+    return result.Succeeded();
   }
 };
 
@@ -541,7 +403,7 @@ public:
   ~CommandObjectLogTimerReset() override = default;
 
 protected:
-  void DoExecute(Args &args, CommandReturnObject &result) override {
+  bool DoExecute(Args &args, CommandReturnObject &result) override {
     Timer::ResetCategoryTimes();
     result.SetStatus(eReturnStatusSuccessFinishResult);
 
@@ -549,6 +411,7 @@ protected:
       result.AppendError("Missing subcommand");
       result.AppendErrorWithFormat("Usage: %s\n", m_cmd_syntax.c_str());
     }
+    return result.Succeeded();
   }
 };
 
@@ -584,7 +447,7 @@ public:
   }
 
 protected:
-  void DoExecute(Args &args, CommandReturnObject &result) override {
+  bool DoExecute(Args &args, CommandReturnObject &result) override {
     result.SetStatus(eReturnStatusFailed);
 
     if (args.GetArgumentCount() == 1) {
@@ -603,6 +466,7 @@ protected:
       result.AppendError("Missing subcommand");
       result.AppendErrorWithFormat("Usage: %s\n", m_cmd_syntax.c_str());
     }
+    return result.Succeeded();
   }
 };
 
@@ -640,8 +504,6 @@ CommandObjectLog::CommandObjectLog(CommandInterpreter &interpreter)
                  CommandObjectSP(new CommandObjectLogDisable(interpreter)));
   LoadSubCommand("list",
                  CommandObjectSP(new CommandObjectLogList(interpreter)));
-  LoadSubCommand("dump",
-                 CommandObjectSP(new CommandObjectLogDump(interpreter)));
   LoadSubCommand("timers",
                  CommandObjectSP(new CommandObjectLogTimer(interpreter)));
 }

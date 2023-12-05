@@ -27,6 +27,7 @@
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCObjectWriter.h"
 #include "llvm/MC/MCSection.h"
+#include "llvm/MC/MCSectionELF.h"
 #include "llvm/MC/MCSymbol.h"
 #include "llvm/MC/MCValue.h"
 #include "llvm/Support/Alignment.h"
@@ -35,17 +36,15 @@
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/LEB128.h"
+#include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cassert>
 #include <cstdint>
+#include <cstring>
 #include <tuple>
 #include <utility>
 
 using namespace llvm;
-
-namespace llvm {
-class MCSubtargetInfo;
-}
 
 #define DEBUG_TYPE "assembler"
 
@@ -90,7 +89,6 @@ MCAssembler::MCAssembler(MCContext &Context,
       BundleAlignSize(0), RelaxAll(false), SubsectionsViaSymbols(false),
       IncrementalLinkerCompatible(false), ELFHeaderEFlags(0) {
   VersionInfo.Major = 0; // Major version == 0 for "none specified"
-  DarwinTargetVariantVersionInfo.Major = 0;
 }
 
 MCAssembler::~MCAssembler() = default;
@@ -111,8 +109,6 @@ void MCAssembler::reset() {
   LOHContainer.reset();
   VersionInfo.Major = 0;
   VersionInfo.SDKVersion = VersionTuple();
-  DarwinTargetVariantVersionInfo.Major = 0;
-  DarwinTargetVariantVersionInfo.SDKVersion = VersionTuple();
 
   // reset objects owned by us
   if (getBackendPtr())
@@ -273,7 +269,7 @@ bool MCAssembler::evaluateFixup(const MCAsmLayout &Layout,
     "FKF_IsAlignedDownTo32Bits is only allowed on PC-relative fixups!");
 
   if (IsPCRel) {
-    uint64_t Offset = Layout.getFragmentOffset(DF) + Fixup.getOffset();
+    uint32_t Offset = Layout.getFragmentOffset(DF) + Fixup.getOffset();
 
     // A number of ARM fixups in Thumb mode require that the effective PC
     // address be determined as the 32-bit aligned version of the actual offset.
@@ -286,13 +282,6 @@ bool MCAssembler::evaluateFixup(const MCAsmLayout &Layout,
     IsResolved = false;
     WasForced = true;
   }
-
-  // A linker relaxation target may emit ADD/SUB relocations for A-B+C. Let
-  // recordRelocation handle non-VK_None cases like A@plt-B+C.
-  if (!IsResolved && Target.getSymA() && Target.getSymB() &&
-      Target.getSymA()->getKind() == MCSymbolRefExpr::VK_None &&
-      getBackend().handleAddSubRelocations(Layout, *DF, Fixup, Target, Value))
-    return true;
 
   return IsResolved;
 }
@@ -310,7 +299,7 @@ uint64_t MCAssembler::computeFragmentSize(const MCAsmLayout &Layout,
   case MCFragment::FT_Fill: {
     auto &FF = cast<MCFillFragment>(F);
     int64_t NumValues = 0;
-    if (!FF.getNumValues().evaluateKnownAbsolute(NumValues, Layout)) {
+    if (!FF.getNumValues().evaluateAsAbsolute(NumValues, Layout)) {
       getContext().reportError(FF.getLoc(),
                                "expected assembly-time absolute expression");
       return 0;
@@ -338,11 +327,11 @@ uint64_t MCAssembler::computeFragmentSize(const MCAsmLayout &Layout,
   case MCFragment::FT_Align: {
     const MCAlignFragment &AF = cast<MCAlignFragment>(F);
     unsigned Offset = Layout.getFragmentOffset(&AF);
-    unsigned Size = offsetToAlignment(Offset, AF.getAlignment());
+    unsigned Size = offsetToAlignment(Offset, Align(AF.getAlignment()));
 
     // Insert extra Nops for code alignment if the target define
     // shouldInsertExtraNopBytesForCodeAlign target hook.
-    if (AF.getParent()->useCodeAlign() && AF.hasEmitNops() &&
+    if (AF.getParent()->UseCodeAlign() && AF.hasEmitNops() &&
         getBackend().shouldInsertExtraNopBytesForCodeAlign(AF, Size))
       return Size;
 
@@ -350,7 +339,7 @@ uint64_t MCAssembler::computeFragmentSize(const MCAsmLayout &Layout,
     // minimum nop size.
     if (Size > 0 && AF.hasEmitNops()) {
       while (Size % getBackend().getMinimumNopSize())
-        Size += AF.getAlignment().value();
+        Size += AF.getAlignment();
     }
     if (Size > AF.getMaxBytesToEmit())
       return 0;
@@ -471,13 +460,14 @@ void MCAsmLayout::layoutFragment(MCFragment *F) {
   }
 }
 
-bool MCAssembler::registerSymbol(const MCSymbol &Symbol) {
-  bool Changed = !Symbol.isRegistered();
-  if (Changed) {
+void MCAssembler::registerSymbol(const MCSymbol &Symbol, bool *Created) {
+  bool New = !Symbol.isRegistered();
+  if (Created)
+    *Created = New;
+  if (New) {
     Symbol.setIsRegistered(true);
     Symbols.push_back(&Symbol);
   }
-  return Changed;
 }
 
 void MCAssembler::writeFragmentPadding(raw_ostream &OS,
@@ -493,7 +483,6 @@ void MCAssembler::writeFragmentPadding(raw_ostream &OS,
            "Writing bundle padding for a fragment without instructions");
 
     unsigned TotalLength = BundlePadding + static_cast<unsigned>(FSize);
-    const MCSubtargetInfo *STI = EF.getSubtargetInfo();
     if (EF.alignToBundleEnd() && TotalLength > getBundleAlignSize()) {
       // If the padding itself crosses a bundle boundary, it must be emitted
       // in 2 pieces, since even nop instructions must not cross boundaries.
@@ -504,12 +493,12 @@ void MCAssembler::writeFragmentPadding(raw_ostream &OS,
       // ----------------------------
       //        ^-------------------^   <- TotalLength
       unsigned DistanceToBoundary = TotalLength - getBundleAlignSize();
-      if (!getBackend().writeNopData(OS, DistanceToBoundary, STI))
+      if (!getBackend().writeNopData(OS, DistanceToBoundary))
         report_fatal_error("unable to write NOP sequence of " +
                            Twine(DistanceToBoundary) + " bytes");
       BundlePadding -= DistanceToBoundary;
     }
-    if (!getBackend().writeNopData(OS, BundlePadding, STI))
+    if (!getBackend().writeNopData(OS, BundlePadding))
       report_fatal_error("unable to write NOP sequence of " +
                          Twine(BundlePadding) + " bytes");
   }
@@ -521,7 +510,7 @@ static void writeFragment(raw_ostream &OS, const MCAssembler &Asm,
   // FIXME: Embed in fragments instead?
   uint64_t FragmentSize = Asm.computeFragmentSize(Layout, F);
 
-  llvm::endianness Endian = Asm.getBackend().Endian;
+  support::endianness Endian = Asm.getBackend().Endian;
 
   if (const MCEncodedFragment *EF = dyn_cast<MCEncodedFragment>(&F))
     Asm.writeFragmentPadding(OS, *EF, FragmentSize);
@@ -555,7 +544,7 @@ static void writeFragment(raw_ostream &OS, const MCAssembler &Asm,
     // bytes left to fill use the Value and ValueSize to fill the rest.
     // If we are aligning with nops, ask that target to emit the right data.
     if (AF.hasEmitNops()) {
-      if (!Asm.getBackend().writeNopData(OS, Count, AF.getSubtargetInfo()))
+      if (!Asm.getBackend().writeNopData(OS, Count))
         report_fatal_error("unable to write nop sequence of " +
                           Twine(Count) + " bytes");
       break;
@@ -606,7 +595,7 @@ static void writeFragment(raw_ostream &OS, const MCAssembler &Asm,
     // Duplicate V into Data as byte vector to reduce number of
     // writes done. As such, do endian conversion here.
     for (unsigned I = 0; I != VSize; ++I) {
-      unsigned index = Endian == llvm::endianness::little ? I : (VSize - I - 1);
+      unsigned index = Endian == support::little ? I : (VSize - I - 1);
       Data[I] = uint8_t(V >> (index * 8));
     }
     for (unsigned I = VSize; I < MaxChunkSize; ++I)
@@ -632,11 +621,9 @@ static void writeFragment(raw_ostream &OS, const MCAssembler &Asm,
   case MCFragment::FT_Nops: {
     ++stats::EmittedNopsFragments;
     const MCNopsFragment &NF = cast<MCNopsFragment>(F);
-
     int64_t NumBytes = NF.getNumBytes();
     int64_t ControlledNopLength = NF.getControlledNopLength();
-    int64_t MaximumNopLength =
-        Asm.getBackend().getMaximumNopSize(*NF.getSubtargetInfo());
+    int64_t MaximumNopLength = Asm.getBackend().getMaximumNopSize();
 
     assert(NumBytes > 0 && "Expected positive NOPs fragment size");
     assert(ControlledNopLength >= 0 && "Expected non-negative NOP size");
@@ -660,8 +647,7 @@ static void writeFragment(raw_ostream &OS, const MCAssembler &Asm,
       uint64_t NumBytesToEmit =
           (uint64_t)std::min(NumBytes, ControlledNopLength);
       assert(NumBytesToEmit && "try to emit empty NOP instruction");
-      if (!Asm.getBackend().writeNopData(OS, NumBytesToEmit,
-                                         NF.getSubtargetInfo())) {
+      if (!Asm.getBackend().writeNopData(OS, NumBytesToEmit)) {
         report_fatal_error("unable to write nop sequence of the remaining " +
                            Twine(NumBytesToEmit) + " bytes");
         break;
@@ -678,8 +664,7 @@ static void writeFragment(raw_ostream &OS, const MCAssembler &Asm,
   }
 
   case MCFragment::FT_BoundaryAlign: {
-    const MCBoundaryAlignFragment &BF = cast<MCBoundaryAlignFragment>(F);
-    if (!Asm.getBackend().writeNopData(OS, FragmentSize, BF.getSubtargetInfo()))
+    if (!Asm.getBackend().writeNopData(OS, FragmentSize))
       report_fatal_error("unable to write nop sequence of " +
                          Twine(FragmentSize) + " bytes");
     break;
@@ -880,7 +865,7 @@ void MCAssembler::layout(MCAsmLayout &Layout) {
         MCAlignFragment &AF = cast<MCAlignFragment>(Frag);
         // Insert fixup type for code alignment if the target define
         // shouldInsertFixupForCodeAlign target hook.
-        if (Sec.useCodeAlign() && AF.hasEmitNops())
+        if (Sec.UseCodeAlign() && AF.hasEmitNops())
           getBackend().shouldInsertFixupForCodeAlign(*this, Layout, AF);
         continue;
       }
@@ -916,12 +901,6 @@ void MCAssembler::layout(MCAsmLayout &Layout) {
         MCDwarfCallFrameFragment &DF = cast<MCDwarfCallFrameFragment>(Frag);
         Fixups = DF.getFixups();
         Contents = DF.getContents();
-        break;
-      }
-      case MCFragment::FT_LEB: {
-        auto &LF = cast<MCLEBFragment>(Frag);
-        Fixups = LF.getFixups();
-        Contents = LF.getContents();
         break;
       }
       case MCFragment::FT_PseudoProbe: {
@@ -1003,36 +982,29 @@ bool MCAssembler::relaxInstruction(MCAsmLayout &Layout,
   getBackend().relaxInstruction(Relaxed, *F.getSubtargetInfo());
 
   // Encode the new instruction.
+  //
+  // FIXME-PERF: If it matters, we could let the target do this. It can
+  // probably do so more efficiently in many cases.
+  SmallVector<MCFixup, 4> Fixups;
+  SmallString<256> Code;
+  raw_svector_ostream VecOS(Code);
+  getEmitter().encodeInstruction(Relaxed, VecOS, Fixups, *F.getSubtargetInfo());
+
+  // Update the fragment.
   F.setInst(Relaxed);
-  F.getFixups().clear();
-  F.getContents().clear();
-  getEmitter().encodeInstruction(Relaxed, F.getContents(), F.getFixups(),
-                                 *F.getSubtargetInfo());
+  F.getContents() = Code;
+  F.getFixups() = Fixups;
+
   return true;
 }
 
 bool MCAssembler::relaxLEB(MCAsmLayout &Layout, MCLEBFragment &LF) {
-  const unsigned OldSize = static_cast<unsigned>(LF.getContents().size());
-  unsigned PadTo = OldSize;
+  uint64_t OldSize = LF.getContents().size();
   int64_t Value;
-  SmallVectorImpl<char> &Data = LF.getContents();
-  LF.getFixups().clear();
-  // Use evaluateKnownAbsolute for Mach-O as a hack: .subsections_via_symbols
-  // requires that .uleb128 A-B is foldable where A and B reside in different
-  // fragments. This is used by __gcc_except_table.
-  bool Abs = getSubsectionsViaSymbols()
-                 ? LF.getValue().evaluateKnownAbsolute(Value, Layout)
-                 : LF.getValue().evaluateAsAbsolute(Value, Layout);
-  if (!Abs) {
-    if (!getBackend().relaxLEB128(LF, Layout, Value)) {
-      getContext().reportError(LF.getValue().getLoc(),
-                               Twine(LF.isSigned() ? ".s" : ".u") +
-                                   "leb128 expression is not absolute");
-      LF.setValue(MCConstantExpr::create(0, Context));
-    }
-    uint8_t Tmp[10]; // maximum size: ceil(64/7)
-    PadTo = std::max(PadTo, encodeULEB128(uint64_t(Value), Tmp));
-  }
+  bool Abs = LF.getValue().evaluateKnownAbsolute(Value, Layout);
+  if (!Abs)
+    report_fatal_error("sleb128 and uleb128 expressions must be absolute");
+  SmallString<8> &Data = LF.getContents();
   Data.clear();
   raw_svector_ostream OSE(Data);
   // The compiler can generate EH table assembly that is impossible to assemble
@@ -1040,9 +1012,9 @@ bool MCAssembler::relaxLEB(MCAsmLayout &Layout, MCLEBFragment &LF) {
   // to a later alignment fragment. To accommodate such tables, relaxation can
   // only increase an LEB fragment size here, not decrease it. See PR35809.
   if (LF.isSigned())
-    encodeSLEB128(Value, OSE, PadTo);
+    encodeSLEB128(Value, OSE, OldSize);
   else
-    encodeULEB128(Value, OSE, PadTo);
+    encodeULEB128(Value, OSE, OldSize);
   return OldSize != LF.getContents().size();
 }
 
@@ -1124,10 +1096,11 @@ bool MCAssembler::relaxDwarfLineAddr(MCAsmLayout &Layout,
   LineDelta = DF.getLineDelta();
   SmallVectorImpl<char> &Data = DF.getContents();
   Data.clear();
+  raw_svector_ostream OSE(Data);
   DF.getFixups().clear();
 
-  MCDwarfLineAddr::encode(Context, getDWARFLinetableParams(), LineDelta,
-                          AddrDelta, Data);
+  MCDwarfLineAddr::Encode(Context, getDWARFLinetableParams(), LineDelta,
+                          AddrDelta, OSE);
   return OldSize != Data.size();
 }
 
@@ -1138,21 +1111,17 @@ bool MCAssembler::relaxDwarfCallFrameFragment(MCAsmLayout &Layout,
     return WasRelaxed;
 
   MCContext &Context = Layout.getAssembler().getContext();
-  int64_t Value;
-  bool Abs = DF.getAddrDelta().evaluateAsAbsolute(Value, Layout);
-  if (!Abs) {
-    getContext().reportError(DF.getAddrDelta().getLoc(),
-                             "invalid CFI advance_loc expression");
-    DF.setAddrDelta(MCConstantExpr::create(0, Context));
-    return false;
-  }
-
+  uint64_t OldSize = DF.getContents().size();
+  int64_t AddrDelta;
+  bool Abs = DF.getAddrDelta().evaluateKnownAbsolute(AddrDelta, Layout);
+  assert(Abs && "We created call frame with an invalid expression");
+  (void) Abs;
   SmallVectorImpl<char> &Data = DF.getContents();
-  uint64_t OldSize = Data.size();
   Data.clear();
+  raw_svector_ostream OSE(Data);
   DF.getFixups().clear();
 
-  MCDwarfFrameEmitter::encodeAdvanceLoc(Context, Value, Data);
+  MCDwarfFrameEmitter::EncodeAdvanceLoc(Context, AddrDelta, OSE);
   return OldSize != Data.size();
 }
 

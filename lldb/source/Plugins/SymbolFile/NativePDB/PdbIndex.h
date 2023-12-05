@@ -11,6 +11,7 @@
 
 #include "lldb/lldb-types.h"
 #include "llvm/ADT/IntervalMap.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/DebugInfo/PDB/Native/PDBFile.h"
 #include "llvm/DebugInfo/PDB/PDBTypes.h"
 
@@ -19,11 +20,11 @@
 
 #include <map>
 #include <memory>
-#include <optional>
 
 namespace llvm {
 namespace pdb {
 class DbiStream;
+class TpiStream;
 class TpiStream;
 class InfoStream;
 class PublicsStream;
@@ -143,15 +144,16 @@ public:
   const CompileUnitIndex &compilands() const { return m_cus; }
 
   lldb::addr_t MakeVirtualAddress(uint16_t segment, uint32_t offset) const;
+  lldb::addr_t MakeVirtualAddress(const SegmentOffset &so) const;
 
   std::vector<SymbolAndUid> FindSymbolsByVa(lldb::addr_t va);
 
   llvm::codeview::CVSymbol ReadSymbolRecord(PdbCompilandSymId cu_sym) const;
   llvm::codeview::CVSymbol ReadSymbolRecord(PdbGlobalSymId global) const;
 
-  std::optional<uint16_t> GetModuleIndexForAddr(uint16_t segment,
-                                                uint32_t offset) const;
-  std::optional<uint16_t> GetModuleIndexForVa(lldb::addr_t va) const;
+  llvm::Optional<uint16_t> GetModuleIndexForAddr(uint16_t segment,
+                                                 uint32_t offset) const;
+  llvm::Optional<uint16_t> GetModuleIndexForVa(lldb::addr_t va) const;
 };
 } // namespace npdb
 } // namespace lldb_private

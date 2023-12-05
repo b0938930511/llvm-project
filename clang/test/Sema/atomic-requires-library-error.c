@@ -1,4 +1,5 @@
 // RUN: %clang_cc1 %s -triple=i686-apple-darwin9 -verify
+// rdar://13973577
 
 struct foo {
   int big[128];
@@ -11,7 +12,7 @@ struct bar smallThing;
 struct foo bigThing;
 _Atomic(struct foo) bigAtomic;
 
-void structAtomicStore(void) {
+void structAtomicStore() {
   struct foo f = {0};
   __c11_atomic_store(&bigAtomic, f, 5); // expected-error {{atomic store requires runtime support that is not available for this target}}
 
@@ -21,7 +22,7 @@ void structAtomicStore(void) {
   __atomic_store(&bigThing, &f, 5);
 }
 
-void structAtomicLoad(void) {
+void structAtomicLoad() {
   struct foo f = __c11_atomic_load(&bigAtomic, 5); // expected-error {{atomic load requires runtime support that is not available for this target}}
   struct bar b;
   __atomic_load(&smallThing, &b, 5);

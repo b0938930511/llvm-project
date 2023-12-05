@@ -22,6 +22,7 @@
 #include "clang/Basic/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Casting.h"
@@ -80,8 +81,7 @@ bool CXXRecordDecl::isDerivedFrom(const CXXRecordDecl *Base,
   const CXXRecordDecl *BaseDecl = Base->getCanonicalDecl();
   return lookupInBases(
       [BaseDecl](const CXXBaseSpecifier *Specifier, CXXBasePath &Path) {
-        return Specifier->getType()->getAsRecordDecl() &&
-               FindBaseClass(Specifier, Path, BaseDecl);
+        return FindBaseClass(Specifier, Path, BaseDecl);
       },
       Paths);
 }
@@ -465,7 +465,7 @@ void OverridingMethods::add(unsigned OverriddenSubobject,
                             UniqueVirtualMethod Overriding) {
   SmallVectorImpl<UniqueVirtualMethod> &SubobjectOverrides
     = Overrides[OverriddenSubobject];
-  if (!llvm::is_contained(SubobjectOverrides, Overriding))
+  if (llvm::find(SubobjectOverrides, Overriding) == SubobjectOverrides.end())
     SubobjectOverrides.push_back(Overriding);
 }
 
@@ -671,7 +671,9 @@ CXXRecordDecl::getFinalOverriders(CXXFinalOverriderMap &FinalOverriders) const {
 
       // FIXME: IsHidden reads from Overriding from the middle of a remove_if
       // over the same sequence! Is this guaranteed to work?
-      llvm::erase_if(Overriding, IsHidden);
+      Overriding.erase(
+          std::remove_if(Overriding.begin(), Overriding.end(), IsHidden),
+          Overriding.end());
     }
   }
 }

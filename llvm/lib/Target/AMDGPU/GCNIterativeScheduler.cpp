@@ -80,11 +80,13 @@ static void printLivenessInfo(raw_ostream &OS,
   const auto &MRI = BB->getParent()->getRegInfo();
 
   const auto LiveIns = getLiveRegsBefore(*Begin, *LIS);
-  OS << "LIn RP: " << print(getRegPressure(MRI, LiveIns));
+  OS << "LIn RP: ";
+  getRegPressure(MRI, LiveIns).print(OS);
 
   const auto BottomMI = End == BB->end() ? std::prev(End) : End;
   const auto LiveOuts = getLiveRegsAfter(*BottomMI, *LIS);
-  OS << "LOt RP: " << print(getRegPressure(MRI, LiveOuts));
+  OS << "LOt RP: ";
+  getRegPressure(MRI, LiveOuts).print(OS);
 }
 
 LLVM_DUMP_METHOD
@@ -94,7 +96,8 @@ void GCNIterativeScheduler::printRegions(raw_ostream &OS) const {
     OS << "Region to schedule ";
     printRegion(OS, R->Begin, R->End, LIS, 1);
     printLivenessInfo(OS, R->Begin, R->End, LIS);
-    OS << "Max RP: " << print(R->MaxPressure, &ST);
+    OS << "Max RP: ";
+    R->MaxPressure.print(OS, &ST);
   }
 }
 
@@ -113,8 +116,10 @@ void GCNIterativeScheduler::printSchedRP(raw_ostream &OS,
                                          const GCNRegPressure &Before,
                                          const GCNRegPressure &After) const {
   const auto &ST = MF.getSubtarget<GCNSubtarget>();
-  OS << "RP before: " << print(Before, &ST)
-     << "RP after:  " << print(After, &ST);
+  OS << "RP before: ";
+  Before.print(OS, &ST);
+  OS << "RP after:  ";
+  After.print(OS, &ST);
 }
 #endif
 
@@ -183,7 +188,7 @@ public:
                printRegion(dbgs(), Rgn.Begin, Rgn.End, Sch.LIS, 2));
     Sch.BaseClass::schedule();
 
-    // Unfortunately placeDebugValues incorrectly modifies RegionEnd, restore
+    // Unfortunatelly placeDebugValues incorrectly modifies RegionEnd, restore
     Sch.RegionEnd = Rgn.End;
     //assert(Rgn.End == Sch.RegionEnd);
     Rgn.Begin = Sch.RegionBegin;
@@ -251,7 +256,7 @@ GCNIterativeScheduler::getRegionPressure(MachineBasicBlock::iterator Begin,
   assert(UPTracker.isValid() ||
          (dbgs() << "Tracked region ",
           printRegion(dbgs(), Begin, End, LIS), false));
-  return UPTracker.getMaxPressureAndReset();
+  return UPTracker.moveMaxPressure();
 }
 
 // returns max pressure for a tentative schedule
@@ -272,10 +277,10 @@ GCNIterativeScheduler::getSchedulePressure(const Region &R,
   for (auto I = Schedule.end(), B = Schedule.begin(); I != B;) {
     RPTracker.recede(*getMachineInstr(*--I));
   }
-  return RPTracker.getMaxPressureAndReset();
+  return RPTracker.moveMaxPressure();
 }
 
-void GCNIterativeScheduler::enterRegion(MachineBasicBlock *BB, // overridden
+void GCNIterativeScheduler::enterRegion(MachineBasicBlock *BB, // overriden
                                         MachineBasicBlock::iterator Begin,
                                         MachineBasicBlock::iterator End,
                                         unsigned NumRegionInstrs) {
@@ -288,18 +293,18 @@ void GCNIterativeScheduler::enterRegion(MachineBasicBlock *BB, // overridden
   }
 }
 
-void GCNIterativeScheduler::schedule() { // overridden
+void GCNIterativeScheduler::schedule() { // overriden
   // do nothing
   LLVM_DEBUG(printLivenessInfo(dbgs(), RegionBegin, RegionEnd, LIS);
              if (!Regions.empty() && Regions.back()->Begin == RegionBegin) {
-               dbgs() << "Max RP: "
-                      << print(Regions.back()->MaxPressure,
-                               &MF.getSubtarget<GCNSubtarget>());
+               dbgs() << "Max RP: ";
+               Regions.back()->MaxPressure.print(
+                   dbgs(), &MF.getSubtarget<GCNSubtarget>());
              } dbgs()
              << '\n';);
 }
 
-void GCNIterativeScheduler::finalizeSchedule() { // overridden
+void GCNIterativeScheduler::finalizeSchedule() { // overriden
   if (Regions.empty())
     return;
   switch (Strategy) {
@@ -321,7 +326,7 @@ GCNIterativeScheduler::detachSchedule(ScheduleRef Schedule) const {
     Res.push_back(FirstDbgValue);
 
   const auto DbgB = DbgValues.begin(), DbgE = DbgValues.end();
-  for (const auto *SU : Schedule) {
+  for (auto SU : Schedule) {
     Res.push_back(SU->getInstr());
     const auto &D = std::find_if(DbgB, DbgE, [SU](decltype(*DbgB) &P) {
       return P.second == SU->getInstr();
@@ -367,8 +372,9 @@ void GCNIterativeScheduler::scheduleRegion(Region &R, Range &&Schedule,
     }
     if (!MI->isDebugInstr()) {
       // Reset read - undef flags and update them later.
-      for (auto &Op : MI->all_defs())
-        Op.setIsUndef(false);
+      for (auto &Op : MI->operands())
+        if (Op.isReg() && Op.isDef())
+          Op.setIsUndef(false);
 
       RegisterOperands RegOpers;
       RegOpers.collect(*MI, *TRI, MRI, /*ShouldTrackLaneMasks*/true,
@@ -385,8 +391,8 @@ void GCNIterativeScheduler::scheduleRegion(Region &R, Range &&Schedule,
   // and already interleaved with debug values
   if (!std::is_same<decltype(*Schedule.begin()), MachineInstr*>::value) {
     placeDebugValues();
-    // Unfortunately placeDebugValues incorrectly modifies RegionEnd, restore
-    // assert(R.End == RegionEnd);
+    // Unfortunatelly placeDebugValues incorrectly modifies RegionEnd, restore
+    //assert(R.End == RegionEnd);
     RegionEnd = R.End;
   }
 
@@ -397,14 +403,15 @@ void GCNIterativeScheduler::scheduleRegion(Region &R, Range &&Schedule,
   const auto RegionMaxRP = getRegionPressure(R);
   const auto &ST = MF.getSubtarget<GCNSubtarget>();
 #endif
-  assert(
-      (SchedMaxRP == RegionMaxRP && (MaxRP.empty() || SchedMaxRP == MaxRP)) ||
-      (dbgs() << "Max RP mismatch!!!\n"
-                 "RP for schedule (calculated): "
-              << print(SchedMaxRP, &ST)
-              << "RP for schedule (reported): " << print(MaxRP, &ST)
-              << "RP after scheduling: " << print(RegionMaxRP, &ST),
-       false));
+  assert((SchedMaxRP == RegionMaxRP && (MaxRP.empty() || SchedMaxRP == MaxRP))
+  || (dbgs() << "Max RP mismatch!!!\n"
+                "RP for schedule (calculated): ",
+      SchedMaxRP.print(dbgs(), &ST),
+      dbgs() << "RP for schedule (reported): ",
+      MaxRP.print(dbgs(), &ST),
+      dbgs() << "RP after scheduling: ",
+      RegionMaxRP.print(dbgs(), &ST),
+      false));
 }
 
 // Sort recorded regions by pressure - highest at the front
@@ -432,7 +439,7 @@ unsigned GCNIterativeScheduler::tryMaximizeOccupancy(unsigned TargetOcc) {
                     << ", current = " << Occ << '\n');
 
   auto NewOcc = TargetOcc;
-  for (auto *R : Regions) {
+  for (auto R : Regions) {
     if (R->MaxPressure.getOccupancy(ST) >= NewOcc)
       break;
 
@@ -488,7 +495,7 @@ void GCNIterativeScheduler::scheduleLegacyMaxOccupancy(
     // running first pass with TargetOccupancy = 0 mimics previous scheduling
     // approach and is a performance magic
     LStrgy.setTargetOccupancy(I == 0 ? 0 : TgtOcc);
-    for (auto *R : Regions) {
+    for (auto R : Regions) {
       OverrideLegacyStrategy Ovr(*R, LStrgy, *this);
 
       Ovr.schedule();
@@ -523,7 +530,7 @@ void GCNIterativeScheduler::scheduleMinReg(bool force) {
   sortRegionsByPressure(TgtOcc);
 
   auto MaxPressure = Regions.front()->MaxPressure;
-  for (auto *R : Regions) {
+  for (auto R : Regions) {
     if (!force && R->MaxPressure.less(ST, MaxPressure, TgtOcc))
       break;
 
@@ -567,7 +574,7 @@ void GCNIterativeScheduler::scheduleILP(
                     << TgtOcc << '\n');
 
   unsigned FinalOccupancy = std::min(Occ, MFI->getOccupancy());
-  for (auto *R : Regions) {
+  for (auto R : Regions) {
     BuildDAG DAG(*R, *this);
     const auto ILPSchedule = makeGCNILPScheduler(DAG.getBottomRoots(), *this);
 

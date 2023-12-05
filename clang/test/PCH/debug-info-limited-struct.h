@@ -2,7 +2,7 @@ struct foo {
   int i;
 };
 
-void func(void) {
+void func() {
   struct foo *f;
   f->i = 3;
 }

@@ -26,7 +26,14 @@
 #include "clang/Basic/TargetInfo.h"
 
 namespace llvm {
+class Constant;
+class Function;
+class GlobalValue;
+class DataLayout;
+class FunctionType;
+class PointerType;
 class Value;
+class LLVMContext;
 }
 
 namespace clang {
@@ -141,17 +148,6 @@ public:
   CharUnits FieldOffset;
 };
 
-/// Represents a type of copy/destroy operation that should be performed for an
-/// entity that's captured by a block.
-enum class BlockCaptureEntityKind {
-  None,
-  CXXRecord, // Copy or destroy
-  ARCWeak,
-  ARCStrong,
-  NonTrivialCStruct,
-  BlockObject, // Assign or release
-};
-
 /// CGBlockInfo - Information to generate a block literal.
 class CGBlockInfo {
 public:
@@ -201,40 +197,20 @@ public:
       return FieldType;
     }
 
-    static Capture
-    makeIndex(unsigned index, CharUnits offset, QualType FieldType,
-              BlockCaptureEntityKind CopyKind, BlockFieldFlags CopyFlags,
-              BlockCaptureEntityKind DisposeKind, BlockFieldFlags DisposeFlags,
-              const BlockDecl::Capture *Cap) {
+    static Capture makeIndex(unsigned index, CharUnits offset,
+                             QualType FieldType) {
       Capture v;
       v.Data = (index << 1) | 1;
       v.Offset = offset.getQuantity();
       v.FieldType = FieldType;
-      v.CopyKind = CopyKind;
-      v.CopyFlags = CopyFlags;
-      v.DisposeKind = DisposeKind;
-      v.DisposeFlags = DisposeFlags;
-      v.Cap = Cap;
       return v;
     }
 
-    static Capture makeConstant(llvm::Value *value,
-                                const BlockDecl::Capture *Cap) {
+    static Capture makeConstant(llvm::Value *value) {
       Capture v;
       v.Data = reinterpret_cast<uintptr_t>(value);
-      v.Cap = Cap;
       return v;
     }
-
-    bool isConstantOrTrivial() const {
-      return CopyKind == BlockCaptureEntityKind::None &&
-             DisposeKind == BlockCaptureEntityKind::None;
-    }
-
-    BlockCaptureEntityKind CopyKind = BlockCaptureEntityKind::None,
-                           DisposeKind = BlockCaptureEntityKind::None;
-    BlockFieldFlags CopyFlags, DisposeFlags;
-    const BlockDecl::Capture *Cap;
   };
 
   /// CanBeGlobal - True if the block can be global, i.e. it has
@@ -244,9 +220,6 @@ public:
   /// True if the block has captures that would necessitate custom copy or
   /// dispose helper functions if the block were escaping.
   bool NeedsCopyDispose : 1;
-
-  /// Indicates whether the block is non-escaping.
-  bool NoEscape : 1;
 
   /// HasCXXObject - True if the block's custom copy/dispose functions
   /// need to be run even in GC mode.
@@ -265,11 +238,8 @@ public:
   /// functions.
   bool CapturesNonExternalType : 1;
 
-  /// Mapping from variables to pointers to captures in SortedCaptures.
-  llvm::DenseMap<const VarDecl *, Capture *> Captures;
-
-  /// The block's captures. Non-constant captures are sorted by their offsets.
-  llvm::SmallVector<Capture, 4> SortedCaptures;
+  /// The mapping of allocated indexes within the block.
+  llvm::DenseMap<const VarDecl*, Capture> Captures;
 
   Address LocalAddress;
   llvm::StructType *StructureType;
@@ -287,18 +257,20 @@ public:
   // This could be zero if no forced alignment is required.
   CharUnits BlockHeaderForcedGapSize;
 
-  void buildCaptureMap() {
-    for (auto &C : SortedCaptures)
-      Captures[C.Cap->getVariable()] = &C;
-  }
+  /// The next block in the block-info chain.  Invalid if this block
+  /// info is not part of the CGF's block-info chain, which is true
+  /// if it corresponds to a global block or a block whose expression
+  /// has been encountered.
+  CGBlockInfo *NextBlockInfo;
 
   const Capture &getCapture(const VarDecl *var) const {
     return const_cast<CGBlockInfo*>(this)->getCapture(var);
   }
   Capture &getCapture(const VarDecl *var) {
-    auto it = Captures.find(var);
+    llvm::DenseMap<const VarDecl*, Capture>::iterator
+      it = Captures.find(var);
     assert(it != Captures.end() && "no entry for variable!");
-    return *it->second;
+    return it->second;
   }
 
   const BlockDecl *getBlockDecl() const { return Block; }
@@ -309,6 +281,11 @@ public:
   }
 
   CGBlockInfo(const BlockDecl *blockDecl, StringRef Name);
+
+  // Indicates whether the block needs a custom copy or dispose function.
+  bool needsCopyDisposeHelpers() const {
+    return NeedsCopyDispose && !Block->doesNotEscape();
+  }
 };
 
 }  // end namespace CodeGen

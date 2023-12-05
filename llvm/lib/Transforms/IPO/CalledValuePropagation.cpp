@@ -19,11 +19,10 @@
 #include "llvm/Transforms/IPO/CalledValuePropagation.h"
 #include "llvm/Analysis/SparsePropagation.h"
 #include "llvm/Analysis/ValueLatticeUtils.h"
-#include "llvm/IR/Constants.h"
 #include "llvm/IR/MDBuilder.h"
+#include "llvm/InitializePasses.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Transforms/IPO.h"
-
 using namespace llvm;
 
 #define DEBUG_TYPE "called-value-propagation"
@@ -68,7 +67,7 @@ public:
     }
   };
 
-  CVPLatticeVal() = default;
+  CVPLatticeVal() : LatticeState(Undefined) {}
   CVPLatticeVal(CVPLatticeStateTy LatticeState) : LatticeState(LatticeState) {}
   CVPLatticeVal(std::vector<Function *> &&Functions)
       : LatticeState(FunctionSet), Functions(std::move(Functions)) {
@@ -94,7 +93,7 @@ public:
 
 private:
   /// Holds the state this lattice value is in.
-  CVPLatticeStateTy LatticeState = Undefined;
+  CVPLatticeStateTy LatticeState;
 
   /// Holds functions indicating the possible targets of call sites. This set
   /// is empty for lattice values in the undefined, overdefined, and untracked
@@ -402,4 +401,34 @@ PreservedAnalyses CalledValuePropagationPass::run(Module &M,
                                                   ModuleAnalysisManager &) {
   runCVP(M);
   return PreservedAnalyses::all();
+}
+
+namespace {
+class CalledValuePropagationLegacyPass : public ModulePass {
+public:
+  static char ID;
+
+  void getAnalysisUsage(AnalysisUsage &AU) const override {
+    AU.setPreservesAll();
+  }
+
+  CalledValuePropagationLegacyPass() : ModulePass(ID) {
+    initializeCalledValuePropagationLegacyPassPass(
+        *PassRegistry::getPassRegistry());
+  }
+
+  bool runOnModule(Module &M) override {
+    if (skipModule(M))
+      return false;
+    return runCVP(M);
+  }
+};
+} // namespace
+
+char CalledValuePropagationLegacyPass::ID = 0;
+INITIALIZE_PASS(CalledValuePropagationLegacyPass, "called-value-propagation",
+                "Called Value Propagation", false, false)
+
+ModulePass *llvm::createCalledValuePropagationPass() {
+  return new CalledValuePropagationLegacyPass();
 }

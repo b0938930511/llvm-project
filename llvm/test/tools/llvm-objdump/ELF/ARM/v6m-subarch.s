@@ -6,4 +6,4 @@ dmb:
 dmb
 
 @ CHECK-LABEL: dmb
-@ CHECK: f3bf 8f5f   dmb sy
+@ CHECK: bf f3 5f 8f dmb sy

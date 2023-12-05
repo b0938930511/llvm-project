@@ -7,16 +7,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/MC/MCSectionMachO.h"
-#include "llvm/MC/SectionKind.h"
+#include "llvm/MC/MCContext.h"
 #include "llvm/Support/raw_ostream.h"
-
-namespace llvm {
-class MCAsmInfo;
-class MCExpr;
-class MCSymbol;
-class Triple;
-} // namespace llvm
-
+#include <cctype>
 using namespace llvm;
 
 /// SectionTypeDescriptors - These are strings that describe the various section
@@ -26,7 +19,7 @@ static constexpr struct {
   StringLiteral AssemblerName, EnumName;
 } SectionTypeDescriptors[MachO::LAST_KNOWN_SECTION_TYPE + 1] = {
     {StringLiteral("regular"), StringLiteral("S_REGULAR")}, // 0x00
-    {StringLiteral("zerofill"), StringLiteral("S_ZEROFILL")}, // 0x01
+    {StringLiteral(""), StringLiteral("S_ZEROFILL")},       // 0x01
     {StringLiteral("cstring_literals"),
      StringLiteral("S_CSTRING_LITERALS")}, // 0x02
     {StringLiteral("4byte_literals"),
@@ -62,8 +55,6 @@ static constexpr struct {
      StringLiteral("S_THREAD_LOCAL_VARIABLE_POINTERS")}, // 0x14
     {StringLiteral("thread_local_init_function_pointers"),
      StringLiteral("S_THREAD_LOCAL_INIT_FUNCTION_POINTERS")}, // 0x15
-    {StringLiteral("") /* linker-synthesized */,
-     StringLiteral("S_INIT_FUNC_OFFSETS")}, // 0x16
 };
 
 /// SectionAttrDescriptors - This is an array of descriptors for section
@@ -104,7 +95,7 @@ MCSectionMachO::MCSectionMachO(StringRef Segment, StringRef Section,
   }
 }
 
-void MCSectionMachO::printSwitchToSection(const MCAsmInfo &MAI, const Triple &T,
+void MCSectionMachO::PrintSwitchToSection(const MCAsmInfo &MAI, const Triple &T,
                                           raw_ostream &OS,
                                           const MCExpr *Subsection) const {
   OS << "\t.section\t" << getSegmentName() << ',' << getName();
@@ -168,7 +159,7 @@ void MCSectionMachO::printSwitchToSection(const MCAsmInfo &MAI, const Triple &T,
   OS << '\n';
 }
 
-bool MCSectionMachO::useCodeAlign() const {
+bool MCSectionMachO::UseCodeAlign() const {
   return hasAttribute(MachO::S_ATTR_PURE_INSTRUCTIONS);
 }
 

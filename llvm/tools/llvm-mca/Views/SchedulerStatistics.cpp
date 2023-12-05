@@ -48,23 +48,23 @@ void SchedulerStatistics::onEvent(const HWInstructionEvent &Event) {
   } else if (Event.Type == HWInstructionEvent::Dispatched) {
     const Instruction &Inst = *Event.IR.getInstruction();
     const unsigned Index = Event.IR.getSourceIndex();
-    if (LQResourceID && Inst.getMayLoad() &&
+    if (LQResourceID && Inst.getDesc().MayLoad &&
         MostRecentLoadDispatched != Index) {
       Usage[LQResourceID].SlotsInUse++;
       MostRecentLoadDispatched = Index;
     }
-    if (SQResourceID && Inst.getMayStore() &&
+    if (SQResourceID && Inst.getDesc().MayStore &&
         MostRecentStoreDispatched != Index) {
       Usage[SQResourceID].SlotsInUse++;
       MostRecentStoreDispatched = Index;
     }
   } else if (Event.Type == HWInstructionEvent::Executed) {
     const Instruction &Inst = *Event.IR.getInstruction();
-    if (LQResourceID && Inst.getMayLoad()) {
+    if (LQResourceID && Inst.getDesc().MayLoad) {
       assert(Usage[LQResourceID].SlotsInUse);
       Usage[LQResourceID].SlotsInUse--;
     }
-    if (SQResourceID && Inst.getMayStore()) {
+    if (SQResourceID && Inst.getDesc().MayStore) {
       assert(Usage[SQResourceID].SlotsInUse);
       Usage[SQResourceID].SlotsInUse--;
     }

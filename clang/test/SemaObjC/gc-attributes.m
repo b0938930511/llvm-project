@@ -5,7 +5,7 @@
 
 void f0(__strong A**); // expected-note{{passing argument to parameter here}}
 
-void test_f0(void) {
+void test_f0() {
   A *a;
   static __weak A *a2;
   f0(&a);
@@ -14,7 +14,7 @@ void test_f0(void) {
 
 void f1(__weak A**); // expected-note{{passing argument to parameter here}}
 
-void test_f1(void) {
+void test_f1() {
   A *a;
   __strong A *a2;
   f1(&a);

@@ -6,8 +6,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-// UNSUPPORTED: c++03
-
 // Class bad_function_call
 
 // class bad_function_call
@@ -18,7 +16,6 @@
 //   bad_function_call();
 // };
 
-#include <exception>
 #include <functional>
 #include <type_traits>
 

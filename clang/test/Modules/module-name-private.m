@@ -9,4 +9,4 @@
 #import <A/a.h>
 #import <A/aprivate.h>
 
-int foo(void) { return APRIVATE; }
+int foo() { return APRIVATE; }

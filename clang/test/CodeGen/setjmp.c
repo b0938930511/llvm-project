@@ -18,7 +18,7 @@ typedef struct __jmp_buf_tag sigjmp_buf[1];
 }
 #endif
 
-void f(void) {
+void f() {
   jmp_buf jb;
   // CHECK: call {{.*}}@setjmp(
   setjmp(jb);

@@ -15,14 +15,15 @@ namespace clang {
 
 class CallGraphNode;
 
-namespace tidy::misc {
+namespace tidy {
+namespace misc {
 
 /// Finds strongly connected functions (by analyzing call graph for SCC's
 /// that are loops), diagnoses each function in the cycle,
 /// and displays one example of possible call graph loop (recursion).
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/misc/no-recursion.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/misc-no-recursion.html
 class NoRecursionCheck : public ClangTidyCheck {
 public:
   NoRecursionCheck(StringRef Name, ClangTidyContext *Context)
@@ -34,7 +35,8 @@ private:
   void handleSCC(ArrayRef<CallGraphNode *> SCC);
 };
 
-} // namespace tidy::misc
+} // namespace misc
+} // namespace tidy
 } // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_MISC_NORECURSIONCHECK_H

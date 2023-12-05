@@ -6,6 +6,6 @@
 
 #include "include_not_real.h"
 
-void foo(void) {
+void foo() {
   bar();
 }

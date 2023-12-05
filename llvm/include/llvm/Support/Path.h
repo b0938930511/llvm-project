@@ -19,34 +19,13 @@
 #include "llvm/ADT/iterator.h"
 #include "llvm/Support/DataTypes.h"
 #include <iterator>
+#include <system_error>
 
 namespace llvm {
 namespace sys {
 namespace path {
 
-enum class Style {
-  native,
-  posix,
-  windows_slash,
-  windows_backslash,
-  windows = windows_backslash, // deprecated
-};
-
-/// Check if \p S uses POSIX path rules.
-constexpr bool is_style_posix(Style S) {
-  if (S == Style::posix)
-    return true;
-  if (S != Style::native)
-    return false;
-#if defined(_WIN32)
-  return false;
-#else
-  return true;
-#endif
-}
-
-/// Check if \p S uses Windows path rules.
-constexpr bool is_style_windows(Style S) { return !is_style_posix(S); }
+enum class Style { windows, posix, native };
 
 /// @name Lexical Component Iterator
 /// @{
@@ -195,21 +174,6 @@ bool replace_path_prefix(SmallVectorImpl<char> &Path, StringRef OldPrefix,
                          StringRef NewPrefix,
                          Style style = Style::native);
 
-/// Remove redundant leading "./" pieces and consecutive separators.
-///
-/// @param path Input path.
-/// @result The cleaned-up \a path.
-StringRef remove_leading_dotslash(StringRef path, Style style = Style::native);
-
-/// In-place remove any './' and optionally '../' components from a path.
-///
-/// @param path processed path
-/// @param remove_dot_dot specify if '../' (except for leading "../") should be
-/// removed
-/// @result True if path was changed
-bool remove_dots(SmallVectorImpl<char> &path, bool remove_dot_dot = false,
-                 Style style = Style::native);
-
 /// Append to path.
 ///
 /// @code
@@ -248,7 +212,7 @@ void append(SmallVectorImpl<char> &path, const_iterator begin,
 
 /// Convert path to the native form. This is used to give paths to users and
 /// operating system calls in the platform's normal way. For example, on Windows
-/// all '/' are converted to '\'. On Unix, it converts all '\' to '/'.
+/// all '/' are converted to '\'.
 ///
 /// @param path A path that is transformed to native format.
 /// @param result Holds the result of the transformation.
@@ -261,17 +225,6 @@ void native(const Twine &path, SmallVectorImpl<char> &result,
 ///
 /// @param path A path that is transformed to native format.
 void native(SmallVectorImpl<char> &path, Style style = Style::native);
-
-/// For Windows path styles, convert path to use the preferred path separators.
-/// For other styles, do nothing.
-///
-/// @param path A path that is transformed to preferred format.
-inline void make_preferred(SmallVectorImpl<char> &path,
-                           Style style = Style::native) {
-  if (!is_style_windows(style))
-    return;
-  native(path, style);
-}
 
 /// Replaces backslashes with slashes if Windows.
 ///
@@ -545,6 +498,21 @@ bool is_absolute_gnu(const Twine &path, Style style = Style::native);
 /// @param path Input path.
 /// @result True if the path is relative, false if it is not.
 bool is_relative(const Twine &path, Style style = Style::native);
+
+/// Remove redundant leading "./" pieces and consecutive separators.
+///
+/// @param path Input path.
+/// @result The cleaned-up \a path.
+StringRef remove_leading_dotslash(StringRef path, Style style = Style::native);
+
+/// In-place remove any './' and optionally '../' components from a path.
+///
+/// @param path processed path
+/// @param remove_dot_dot specify if '../' (except for leading "../") should be
+/// removed
+/// @result True if path was changed
+bool remove_dots(SmallVectorImpl<char> &path, bool remove_dot_dot = false,
+                 Style style = Style::native);
 
 } // end namespace path
 } // end namespace sys

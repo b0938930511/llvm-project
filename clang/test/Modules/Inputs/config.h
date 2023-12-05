@@ -1,7 +1,7 @@
 #ifdef WANT_FOO
-int* foo(void);
+int* foo();
 #endif
 
 #ifdef WANT_BAR
-char *bar(void);
+char *bar();
 #endif

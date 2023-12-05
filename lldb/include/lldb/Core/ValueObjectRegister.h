@@ -20,7 +20,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <optional>
 
 namespace lldb_private {
 class DataExtractor;
@@ -37,7 +36,7 @@ public:
                                     lldb::RegisterContextSP &reg_ctx_sp,
                                     uint32_t set_idx);
 
-  std::optional<uint64_t> GetByteSize() override;
+  llvm::Optional<uint64_t> GetByteSize() override;
 
   lldb::ValueType GetValueType() const override {
     return lldb::eValueTypeRegisterSet;
@@ -52,10 +51,10 @@ public:
   ValueObject *CreateChildAtIndex(size_t idx, bool synthetic_array_member,
                                   int32_t synthetic_index) override;
 
-  lldb::ValueObjectSP GetChildMemberWithName(llvm::StringRef name,
-                                             bool can_create = true) override;
+  lldb::ValueObjectSP GetChildMemberWithName(ConstString name,
+                                             bool can_create) override;
 
-  size_t GetIndexOfChildWithName(llvm::StringRef name) override;
+  size_t GetIndexOfChildWithName(ConstString name) override;
 
 protected:
   bool UpdateValue() override;
@@ -85,9 +84,9 @@ public:
 
   static lldb::ValueObjectSP Create(ExecutionContextScope *exe_scope,
                                     lldb::RegisterContextSP &reg_ctx_sp,
-                                    const RegisterInfo *reg_info);
+                                    uint32_t reg_num);
 
-  std::optional<uint64_t> GetByteSize() override;
+  llvm::Optional<uint64_t> GetByteSize() override;
 
   lldb::ValueType GetValueType() const override {
     return lldb::eValueTypeRegister;
@@ -120,16 +119,15 @@ protected:
   CompilerType m_compiler_type;
 
 private:
-  void ConstructObject(const RegisterInfo *reg_info);
+  void ConstructObject(uint32_t reg_num);
 
   friend class ValueObjectRegisterSet;
 
   ValueObjectRegister(ValueObject &parent, lldb::RegisterContextSP &reg_ctx_sp,
-                      const RegisterInfo *reg_info);
+                      uint32_t reg_num);
   ValueObjectRegister(ExecutionContextScope *exe_scope,
                       ValueObjectManager &manager,
-                      lldb::RegisterContextSP &reg_ctx_sp,
-                      const RegisterInfo *reg_info);
+                      lldb::RegisterContextSP &reg_ctx_sp, uint32_t reg_num);
 
   // For ValueObject only
   ValueObjectRegister(const ValueObjectRegister &) = delete;

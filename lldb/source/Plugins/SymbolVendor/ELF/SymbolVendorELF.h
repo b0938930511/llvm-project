@@ -22,16 +22,18 @@ public:
 
   static void Terminate();
 
-  static llvm::StringRef GetPluginNameStatic() { return "ELF"; }
+  static lldb_private::ConstString GetPluginNameStatic();
 
-  static llvm::StringRef GetPluginDescriptionStatic();
+  static const char *GetPluginDescriptionStatic();
 
   static lldb_private::SymbolVendor *
   CreateInstance(const lldb::ModuleSP &module_sp,
                  lldb_private::Stream *feedback_strm);
 
   // PluginInterface protocol
-  llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
+  lldb_private::ConstString GetPluginName() override;
+
+  uint32_t GetPluginVersion() override;
 };
 
 #endif // LLDB_SOURCE_PLUGINS_SYMBOLVENDOR_ELF_SYMBOLVENDORELF_H

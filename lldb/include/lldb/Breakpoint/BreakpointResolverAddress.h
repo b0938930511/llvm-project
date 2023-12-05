@@ -30,7 +30,7 @@ public:
 
   ~BreakpointResolverAddress() override = default;
 
-  static lldb::BreakpointResolverSP
+  static BreakpointResolver *
   CreateFromStructuredData(const lldb::BreakpointSP &bkpt,
                            const StructuredData::Dictionary &options_dict,
                            Status &error);

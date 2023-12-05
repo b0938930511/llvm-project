@@ -1,4 +1,4 @@
-; RUN: opt -passes=instcombine < %s
+; RUN: opt -instcombine < %s
 
 ; Function Attrs: nounwind readnone ssp
 define void @mulByZero(<4 x i16> %x) #0 {

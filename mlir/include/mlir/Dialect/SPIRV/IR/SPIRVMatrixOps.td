@@ -16,7 +16,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 
 // -----
 
-def SPIRV_MatrixTimesMatrixOp : SPIRV_Op<"MatrixTimesMatrix", [Pure]> {
+def SPV_MatrixTimesMatrixOp : SPV_Op<"MatrixTimesMatrix", [NoSideEffect]> {
   let summary = "Linear-algebraic multiply of LeftMatrix X RightMatrix.";
 
   let description = [{
@@ -31,90 +31,112 @@ def SPIRV_MatrixTimesMatrixOp : SPIRV_Op<"MatrixTimesMatrix", [Pure]> {
     number of columns in Result Type. Its columns must have the same number
     of components as the number of columns in LeftMatrix.
 
+    <!-- End of AutoGen section -->
+
+    ```
+    matrix-times-matrix-op ::= ssa-id `=` `spv.MatrixTimesMatrix` ssa-use,
+    ssa-use `:` matrix-type `,` matrix-type `->` matrix-type
+    ```mlir
+
     #### Example:
 
-    ```mlir
-    %0 = spirv.MatrixTimesMatrix %matrix_1, %matrix_2 :
-        !spirv.matrix<4 x vector<3xf32>>, !spirv.matrix<3 x vector<4xf32>> ->
-        !spirv.matrix<4 x vector<4xf32>>
+    ```
+    %0 = spv.MatrixTimesMatrix %matrix_1, %matrix_2 :
+        !spv.matrix<4 x vector<3xf32>>, !spv.matrix<3 x vector<4xf32>> ->
+        !spv.matrix<4 x vector<4xf32>>
     ```
   }];
 
   let availability = [
-    MinVersion<SPIRV_V_1_0>,
-    MaxVersion<SPIRV_V_1_6>,
+    MinVersion<SPV_V_1_0>,
+    MaxVersion<SPV_V_1_5>,
     Extension<[]>,
-    Capability<[SPIRV_C_Matrix]>
+    Capability<[SPV_C_Matrix]>
   ];
 
   let arguments = (ins
-    SPIRV_AnyMatrix:$leftmatrix,
-    SPIRV_AnyMatrix:$rightmatrix
+    SPV_AnyMatrix:$leftmatrix,
+    SPV_AnyMatrix:$rightmatrix
   );
 
   let results = (outs
-    SPIRV_AnyMatrix:$result
+    SPV_AnyMatrix:$result
   );
 
   let assemblyFormat = [{
     operands attr-dict `:` type($leftmatrix) `,` type($rightmatrix) `->` type($result)
   }];
+
+  let verifier = [{ return verifyMatrixTimesMatrix(*this); }];
 }
 
 // -----
 
-def SPIRV_MatrixTimesScalarOp : SPIRV_Op<
-    "MatrixTimesScalar", [Pure, AllTypesMatch<["matrix", "result"]>]> {
+def SPV_MatrixTimesScalarOp : SPV_Op<"MatrixTimesScalar", [NoSideEffect]> {
   let summary = "Scale a floating-point matrix.";
 
   let description = [{
-    Result Type must be a matrix type with a float component type.
+    Result Type must be an OpTypeMatrix whose Column Type is a vector of
+    floating-point type.
 
-    The type of Matrix must be the same as Result Type. Each component in
+     The type of Matrix must be the same as Result Type. Each component in
     each column in Matrix is multiplied by Scalar.
 
     Scalar must have the same type as the Component Type in Result Type.
 
+    <!-- End of AutoGen section -->
+
+    ```
+    matrix-times-scalar-op ::= ssa-id `=` `spv.MatrixTimesScalar` ssa-use,
+    ssa-use `:` matrix-type `,` float-type `->` matrix-type
+
+    ```
+
     #### Example:
 
     ```mlir
-    %0 = spirv.MatrixTimesScalar %matrix, %scalar :
-    !spirv.matrix<3 x vector<3xf32>>, f32 -> !spirv.matrix<3 x vector<3xf32>>
+
+    %0 = spv.MatrixTimesScalar %matrix, %scalar :
+    !spv.matrix<3 x vector<3xf32>>, f32 -> !spv.matrix<3 x vector<3xf32>>
 
     ```
   }];
 
   let availability = [
-    MinVersion<SPIRV_V_1_0>,
-    MaxVersion<SPIRV_V_1_6>,
+    MinVersion<SPV_V_1_0>,
+    MaxVersion<SPV_V_1_5>,
     Extension<[]>,
-    Capability<[SPIRV_C_Matrix]>
+    Capability<[SPV_C_Matrix]>
   ];
 
   let arguments = (ins
-    SPIRV_MatrixOrCoopMatrixOf<SPIRV_Float>:$matrix,
-    SPIRV_Float:$scalar
+    SPV_AnyMatrix:$matrix,
+    SPV_Float:$scalar
   );
 
   let results = (outs
-    SPIRV_MatrixOrCoopMatrixOf<SPIRV_Float>:$result
+    SPV_AnyMatrix:$result
   );
 
+  // TODO: we need just one matrix type given that the input and result are the
+  // same and the scalar's type can be deduced from it.
   let assemblyFormat = [{
-    operands attr-dict `:` type($matrix) `,` type($scalar)
+    operands attr-dict `:` type($matrix) `,` type($scalar) `->` type($result)
   }];
 
   let availability = [
-    MinVersion<SPIRV_V_1_0>,
-    MaxVersion<SPIRV_V_1_6>,
+    MinVersion<SPV_V_1_0>,
+    MaxVersion<SPV_V_1_5>,
     Extension<[]>,
-    Capability<[SPIRV_C_Matrix]>
+    Capability<[SPV_C_Matrix]>
   ];
+
+  let verifier = [{ return verifyMatrixTimesScalar(*this); }];
 }
 
 // -----
 
-def SPIRV_TransposeOp : SPIRV_Op<"Transpose", [Pure]> {
+def SPV_TransposeOp : SPV_Op<"Transpose", [NoSideEffect]> {
   let summary = "Transpose a matrix.";
 
   let description = [{
@@ -127,32 +149,43 @@ def SPIRV_TransposeOp : SPIRV_Op<"Transpose", [Pure]> {
 
     Matrix must have of type of OpTypeMatrix.
 
-    #### Example:
+    <!-- End of AutoGen section -->
+
+    ```
+    transpose-op ::= ssa-id `=` `spv.Transpose` ssa-use `:` matrix-type `->`
+    matrix-type
 
     ```mlir
-    %0 = spirv.Transpose %matrix: !spirv.matrix<2 x vector<3xf32>> ->
-    !spirv.matrix<3 x vector<2xf32>>
+
+    #### Example:
+
+    ```
+    %0 = spv.Transpose %matrix: !spv.matrix<2 x vector<3xf32>> ->
+    !spv.matrix<3 x vector<2xf32>>
+
     ```
   }];
 
   let availability = [
-    MinVersion<SPIRV_V_1_0>,
-    MaxVersion<SPIRV_V_1_6>,
+    MinVersion<SPV_V_1_0>,
+    MaxVersion<SPV_V_1_5>,
     Extension<[]>,
-    Capability<[SPIRV_C_Matrix]>
+    Capability<[SPV_C_Matrix]>
   ];
 
   let arguments = (ins
-    SPIRV_AnyMatrix:$matrix
+    SPV_AnyMatrix:$matrix
   );
 
   let results = (outs
-    SPIRV_AnyMatrix:$result
+    SPV_AnyMatrix:$result
   );
 
   let assemblyFormat = [{
     operands attr-dict `:` type($matrix) `->` type($result)
   }];
+
+  let verifier = [{ return verifyTranspose(*this); }];
 }
 
 // -----

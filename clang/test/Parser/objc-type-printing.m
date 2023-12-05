@@ -8,7 +8,7 @@
 - (INTF<P1>*) METH;
 @end
 
-void foo(void)
+void foo()
 {
         INTF *pintf;
 	INTF<P1>* p1;

@@ -11,9 +11,10 @@
 
 #include "Protocol.h"
 #include "SourceCode.h"
+#include "support/Path.h"
 #include "clang/Basic/LangOptions.h"
+#include "clang/Tooling/Core/Replacement.h"
 #include "llvm/Support/Error.h"
-#include <optional>
 
 namespace clang {
 namespace clangd {
@@ -27,10 +28,6 @@ struct RenameOptions {
   size_t LimitFiles = 50;
   /// If true, format the rename edits, only meaningful in ClangdServer layer.
   bool WantFormat = false;
-  /// Allow rename of virtual method hierarchies.
-  /// Disable to support broken index implementations with missing relations.
-  /// FIXME: fix those implementations and remove this option.
-  bool RenameVirtual = true;
 };
 
 struct RenameInputs {
@@ -84,18 +81,18 @@ llvm::Expected<Edit> buildRenameEdit(llvm::StringRef AbsFilePath,
 /// The API assumes that Indexed contains only named occurrences (each
 /// occurrence has the same length).
 /// REQUIRED: Indexed is sorted.
-std::optional<std::vector<Range>>
+llvm::Optional<std::vector<Range>>
 adjustRenameRanges(llvm::StringRef DraftCode, llvm::StringRef Identifier,
                    std::vector<Range> Indexed, const LangOptions &LangOpts);
 
 /// Calculates the lexed occurrences that the given indexed occurrences map to.
-/// Returns std::nullopt if we don't find a mapping.
+/// Returns None if we don't find a mapping.
 ///
 /// Exposed for testing only.
 ///
 /// REQUIRED: Indexed and Lexed are sorted.
-std::optional<std::vector<Range>> getMappedRanges(ArrayRef<Range> Indexed,
-                                                  ArrayRef<Range> Lexed);
+llvm::Optional<std::vector<Range>> getMappedRanges(ArrayRef<Range> Indexed,
+                                                   ArrayRef<Range> Lexed);
 /// Evaluates how good the mapped result is. 0 indicates a perfect match.
 ///
 /// Exposed for testing only.

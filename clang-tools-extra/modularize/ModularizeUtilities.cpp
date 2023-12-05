@@ -258,33 +258,34 @@ std::error_code ModularizeUtilities::loadProblemHeaderList(
 std::error_code ModularizeUtilities::loadModuleMap(
     llvm::StringRef InputPath) {
   // Get file entry for module.modulemap file.
-  auto ModuleMapEntryOrErr = SourceMgr->getFileManager().getFileRef(InputPath);
+  auto ModuleMapEntryOrErr =
+    SourceMgr->getFileManager().getFile(InputPath);
 
   // return error if not found.
   if (!ModuleMapEntryOrErr) {
     llvm::errs() << "error: File \"" << InputPath << "\" not found.\n";
-    return errorToErrorCode(ModuleMapEntryOrErr.takeError());
+    return ModuleMapEntryOrErr.getError();
   }
-  FileEntryRef ModuleMapEntry = *ModuleMapEntryOrErr;
+  const FileEntry *ModuleMapEntry = *ModuleMapEntryOrErr;
 
   // Because the module map parser uses a ForwardingDiagnosticConsumer,
   // which doesn't forward the BeginSourceFile call, we do it explicitly here.
   DC.BeginSourceFile(*LangOpts, nullptr);
 
   // Figure out the home directory for the module map file.
-  DirectoryEntryRef Dir = ModuleMapEntry.getDir();
-  StringRef DirName(Dir.getName());
+  const DirectoryEntry *Dir = ModuleMapEntry->getDir();
+  StringRef DirName(Dir->getName());
   if (llvm::sys::path::filename(DirName) == "Modules") {
     DirName = llvm::sys::path::parent_path(DirName);
     if (DirName.endswith(".framework")) {
-      auto FrameworkDirOrErr = FileMgr->getDirectoryRef(DirName);
-      if (!FrameworkDirOrErr) {
-        // This can happen if there's a race between the above check and the
-        // removal of the directory.
-        return errorToErrorCode(FrameworkDirOrErr.takeError());
-      }
-      Dir = *FrameworkDirOrErr;
+      if (auto DirEntry = FileMgr->getDirectory(DirName))
+        Dir = *DirEntry;
+      else
+        Dir = nullptr;
     }
+    // FIXME: This assert can fail if there's a race between the above check
+    // and the removal of the directory.
+    assert(Dir && "parent must exist");
   }
 
   std::unique_ptr<ModuleMap> ModMap;
@@ -322,13 +323,12 @@ std::error_code ModularizeUtilities::loadModuleMap(
 // Walks the modules and collects referenced headers into
 // HeaderFileNames.
 bool ModularizeUtilities::collectModuleMapHeaders(clang::ModuleMap *ModMap) {
-  SmallVector<std::pair<StringRef, const clang::Module *>, 0> Vec;
-  for (auto &M : ModMap->modules())
-    Vec.emplace_back(M.first(), M.second);
-  llvm::sort(Vec, llvm::less_first());
-  for (auto &I : Vec)
-    if (!collectModuleHeaders(*I.second))
+  for (ModuleMap::module_iterator I = ModMap->module_begin(),
+    E = ModMap->module_end();
+    I != E; ++I) {
+    if (!collectModuleHeaders(*I->second))
       return false;
+  }
   return true;
 }
 
@@ -346,23 +346,22 @@ bool ModularizeUtilities::collectModuleHeaders(const clang::Module &Mod) {
   DependentsVector UmbrellaDependents;
 
   // Recursively do submodules.
-  for (auto *Submodule : Mod.submodules())
-    collectModuleHeaders(*Submodule);
+  for (auto MI = Mod.submodule_begin(), MIEnd = Mod.submodule_end();
+       MI != MIEnd; ++MI)
+    collectModuleHeaders(**MI);
 
-  if (std::optional<clang::Module::Header> UmbrellaHeader =
-          Mod.getUmbrellaHeaderAsWritten()) {
-    std::string HeaderPath = getCanonicalPath(UmbrellaHeader->Entry.getName());
+  if (const FileEntry *UmbrellaHeader = Mod.getUmbrellaHeader().Entry) {
+    std::string HeaderPath = getCanonicalPath(UmbrellaHeader->getName());
     // Collect umbrella header.
     HeaderFileNames.push_back(HeaderPath);
 
     // FUTURE: When needed, umbrella header header collection goes here.
-  } else if (std::optional<clang::Module::DirectoryName> UmbrellaDir =
-                 Mod.getUmbrellaDirAsWritten()) {
+  }
+  else if (const DirectoryEntry *UmbrellaDir = Mod.getUmbrellaDir().Entry) {
     // If there normal headers, assume these are umbrellas and skip collection.
     if (Mod.Headers->size() == 0) {
       // Collect headers in umbrella directory.
-      if (!collectUmbrellaHeaders(UmbrellaDir->Entry.getName(),
-                                  UmbrellaDependents))
+      if (!collectUmbrellaHeaders(UmbrellaDir->getName(), UmbrellaDependents))
         return false;
     }
   }
@@ -379,7 +378,7 @@ bool ModularizeUtilities::collectModuleHeaders(const clang::Module &Mod) {
     // Collect normal header.
     const clang::Module::Header &Header(
       Mod.Headers[clang::Module::HK_Normal][Index]);
-    std::string HeaderPath = getCanonicalPath(Header.Entry.getName());
+    std::string HeaderPath = getCanonicalPath(Header.Entry->getName());
     HeaderFileNames.push_back(HeaderPath);
   }
 

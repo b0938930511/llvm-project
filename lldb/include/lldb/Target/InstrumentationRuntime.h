@@ -42,7 +42,8 @@ class InstrumentationRuntime
 
 protected:
   InstrumentationRuntime(const lldb::ProcessSP &process_sp)
-      : m_breakpoint_id(0), m_is_active(false) {
+      : m_process_wp(), m_runtime_module(), m_breakpoint_id(0),
+        m_is_active(false) {
     if (process_sp)
       m_process_wp = process_sp;
   }

@@ -20,7 +20,7 @@ void t3(unsigned char *src, unsigned long long temp) {
   __asm__ volatile("" : "+m"(temp), "+r"(src));
 }
 
-void t4(void) {
+void t4() {
   unsigned long long a;
   struct reg { unsigned long long a, b; } b;
 
@@ -43,7 +43,7 @@ void t7(int a) {
   // CHECK: T7 NAMED: $1
 }
 
-void t8(void) {
+void t8() {
   __asm__ volatile("T8 NAMED MODIFIER: %c[input]" :: [input] "i" (4));
   // CHECK: @t8()
   // CHECK: T8 NAMED MODIFIER: ${0:c}
@@ -110,7 +110,7 @@ void t14(struct S *P) {
 }
 
 // PR4938
-int t16(void) {
+int t16() {
   int a,b;
   asm ( "nop;"
        :"=%c" (a)
@@ -120,7 +120,7 @@ int t16(void) {
 }
 
 // PR6475
-void t17(void) {
+void t17() {
   int i;
   __asm__ ( "nop": "=m"(i));
 
@@ -128,6 +128,7 @@ void t17(void) {
 // CHECK: call void asm "nop", "=*m,
 }
 
+// <rdar://problem/6841383>
 int t18(unsigned data) {
   int a, b;
 
@@ -170,7 +171,7 @@ float t21(long double x) {
   // CHECK-NEXT: fptrunc x86_fp80 {{.*}} to float
 }
 
-// accept 'l' constraint
+// <rdar://problem/8348447> - accept 'l' constraint
 unsigned char t22(unsigned char a, unsigned char b) {
   unsigned int la = a;
   unsigned int lb = b;
@@ -182,7 +183,7 @@ unsigned char t22(unsigned char a, unsigned char b) {
   return res;
 }
 
-// accept 'l' constraint
+// <rdar://problem/8348447> - accept 'l' constraint
 unsigned char t23(unsigned char a, unsigned char b) {
   unsigned int la = a;
   unsigned int lb = b;
@@ -196,7 +197,7 @@ void *t24(char c) {
   void *addr;
   // CHECK: @t24
   // CHECK: zext i8 {{.*}} to i32
-  // CHECK-NEXT: call ptr asm "foobar"
+  // CHECK-NEXT: call i8* asm "foobar"
   __asm__ ("foobar" : "=a" (addr) : "0" (c));
   return addr;
 }
@@ -214,7 +215,7 @@ void t25(void)
 							   );
 }
 
-// AVX registers
+// rdar://10510405 - AVX registers
 typedef long long __m256i __attribute__((__vector_size__(32)));
 void t26 (__m256i *p) {
   __asm__ volatile("vmovaps  %0, %%ymm0" :: "m" (*(__m256i*)p) : "ymm0");
@@ -245,7 +246,7 @@ void t29(void) {
                :
                : "m"(t29_var));
   // CHECK: @t29
-  // CHECK: call void asm sideeffect "movl %eax, $0", "*m,~{dirflag},~{fpsr},~{flags}"(ptr elementtype([1 x i32]) @t29_var)
+  // CHECK: call void asm sideeffect "movl %eax, $0", "*m,~{dirflag},~{fpsr},~{flags}"([1 x i32]* @t29_var)
 }
 
 void t30(int len) {
@@ -266,21 +267,10 @@ void t31(int len) {
 int t32(int cond)
 {
   asm goto("testl %0, %0; jne %l1;" :: "r"(cond)::label_true, loop);
-  // CHECK: callbr void asm sideeffect "testl $0, $0; jne ${1:l};", "r,!i,!i,~{dirflag},~{fpsr},~{flags}"(i32 %0) #1
-  // CHECK-NEXT: to label %asm.fallthrough [label %label_true, label %loop]
+  // CHECK: callbr void asm sideeffect "testl $0, $0; jne ${1:l};", "r,X,X,~{dirflag},~{fpsr},~{flags}"(i32 %0, i8* blockaddress(@t32, %label_true), i8* blockaddress(@t32, %loop)) #1
   return 0;
 loop:
   return 0;
 label_true:
   return 1;
-}
-
-void *t33(void *ptr)
-{
-  void *ret;
-  asm ("lea %1, %0" : "=r" (ret) : "p" (ptr));
-  return ret;
-
-  // CHECK: @t33
-  // CHECK: %1 = call ptr asm "lea $1, $0", "=r,p,~{dirflag},~{fpsr},~{flags}"(ptr %0)
 }

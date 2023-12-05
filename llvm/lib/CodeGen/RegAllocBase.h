@@ -96,19 +96,19 @@ protected:
   virtual Spiller &spiller() = 0;
 
   /// enqueue - Add VirtReg to the priority queue of unassigned registers.
-  virtual void enqueueImpl(const LiveInterval *LI) = 0;
+  virtual void enqueueImpl(LiveInterval *LI) = 0;
 
   /// enqueue - Add VirtReg to the priority queue of unassigned registers.
-  void enqueue(const LiveInterval *LI);
+  void enqueue(LiveInterval *LI);
 
   /// dequeue - Return the next unassigned register, or NULL.
-  virtual const LiveInterval *dequeue() = 0;
+  virtual LiveInterval *dequeue() = 0;
 
   // A RegAlloc pass should override this to provide the allocation heuristics.
   // Each call must guarantee forward progess by returning an available PhysReg
   // or new set of split live virtual registers. It is up to the splitter to
   // converge quickly toward fully spilled live ranges.
-  virtual MCRegister selectOrSplit(const LiveInterval &VirtReg,
+  virtual MCRegister selectOrSplit(LiveInterval &VirtReg,
                                    SmallVectorImpl<Register> &splitLVRs) = 0;
 
   // Use this group name for NamedRegionTimer.
@@ -116,7 +116,7 @@ protected:
   static const char TimerGroupDescription[];
 
   /// Method called when the allocator is about to remove a LiveInterval.
-  virtual void aboutToRemoveInterval(const LiveInterval &LI) {}
+  virtual void aboutToRemoveInterval(LiveInterval &LI) {}
 
 public:
   /// VerifyEnabled - True when -verify-regalloc is given.

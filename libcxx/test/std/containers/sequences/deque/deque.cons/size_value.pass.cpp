@@ -10,7 +10,6 @@
 
 // deque(size_type n, const value_type& v);
 
-#include "asan_testing.h"
 #include <deque>
 #include <cassert>
 #include <cstddef>
@@ -27,8 +26,7 @@ test(unsigned n, const T& x)
     typedef typename C::const_iterator const_iterator;
     C d(n, x);
     assert(d.size() == n);
-    assert(static_cast<std::size_t>(std::distance(d.begin(), d.end())) == d.size());
-    LIBCPP_ASSERT(is_double_ended_contiguous_container_asan_correct(d));
+    assert(static_cast<std::size_t>(distance(d.begin(), d.end())) == d.size());
     for (const_iterator i = d.begin(), e = d.end(); i != e; ++i)
         assert(*i == x);
 }

@@ -16,7 +16,9 @@
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::readability {
+namespace clang {
+namespace tidy {
+namespace readability {
 
 namespace {
 
@@ -261,7 +263,7 @@ void ElseAfterReturnCheck::check(const MatchFinder::MatchResult &Result) {
     if (!WarnOnConditionVariables)
       return;
     if (IsLastInScope) {
-      // If the if statement is the last statement of its enclosing statements
+      // If the if statement is the last statement its enclosing statements
       // scope, we can pull the decl out of the if statement.
       DiagnosticBuilder Diag = diag(ElseLoc, WarningMessage)
                                << ControlFlowInterruptor
@@ -297,7 +299,7 @@ void ElseAfterReturnCheck::check(const MatchFinder::MatchResult &Result) {
     if (!WarnOnConditionVariables)
       return;
     if (IsLastInScope) {
-      // If the if statement is the last statement of its enclosing statements
+      // If the if statement is the last statement its enclosing statements
       // scope, we can pull the decl out of the if statement.
       DiagnosticBuilder Diag = diag(ElseLoc, WarningMessage)
                                << ControlFlowInterruptor
@@ -322,4 +324,6 @@ void ElseAfterReturnCheck::check(const MatchFinder::MatchResult &Result) {
   removeElseAndBrackets(Diag, *Result.Context, Else, ElseLoc);
 }
 
-} // namespace clang::tidy::readability
+} // namespace readability
+} // namespace tidy
+} // namespace clang

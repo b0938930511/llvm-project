@@ -19,6 +19,7 @@
 #ifndef LLVM_CODEGEN_TILESHAPEINFO_H
 #define LLVM_CODEGEN_TILESHAPEINFO_H
 
+#include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/MachineOperand.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
@@ -37,7 +38,7 @@ public:
   ShapeT()
       : Row(nullptr), Col(nullptr), RowImm(InvalidImmShape),
         ColImm(InvalidImmShape) {}
-  bool operator==(const ShapeT &Shape) const {
+  bool operator==(const ShapeT &Shape) {
     MachineOperand *R = Shape.Row;
     MachineOperand *C = Shape.Col;
     if (!R || !C)
@@ -51,7 +52,7 @@ public:
     return false;
   }
 
-  bool operator!=(const ShapeT &Shape) const { return !(*this == Shape); }
+  bool operator!=(const ShapeT &Shape) { return !(*this == Shape); }
 
   MachineOperand *getRow() const { return Row; }
 
@@ -86,8 +87,8 @@ private:
   static constexpr int64_t InvalidImmShape = -1;
   MachineOperand *Row;
   MachineOperand *Col;
-  int64_t RowImm = -1;
-  int64_t ColImm = -1;
+  int64_t RowImm;
+  int64_t ColImm;
 };
 
 } // namespace llvm

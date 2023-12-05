@@ -63,7 +63,8 @@ namespace clang {
                            ParsedTemplateTy Template,
                            SourceLocation TemplateLoc)
       : Kind(ParsedTemplateArgument::Template),
-        Arg(Template.getAsOpaquePtr()), SS(SS), Loc(TemplateLoc) {}
+        Arg(Template.getAsOpaquePtr()),
+        SS(SS), Loc(TemplateLoc), EllipsisLoc() { }
 
     /// Determine whether the given template argument is invalid.
     bool isInvalid() const { return Arg == nullptr; }
@@ -212,9 +213,9 @@ namespace clang {
     }
 
     void Destroy() {
-      for (ParsedTemplateArgument &A :
-           llvm::make_range(getTemplateArgs(), getTemplateArgs() + NumArgs))
-        A.~ParsedTemplateArgument();
+      std::for_each(
+          getTemplateArgs(), getTemplateArgs() + NumArgs,
+          [](ParsedTemplateArgument &A) { A.~ParsedTemplateArgument(); });
       this->~TemplateIdAnnotation();
       free(this);
     }

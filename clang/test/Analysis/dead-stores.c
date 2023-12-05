@@ -12,9 +12,7 @@
 // RUN:   -analyzer-config deadcode.DeadStores:ShowFixIts=true \
 // RUN:   -verify=non-nested,nested
 
-extern int printf(const char *, ...);
-
-void f1(void) {
+void f1() {
   int k, y; // non-nested-warning {{unused variable 'k'}}
             // non-nested-warning@-1 {{unused variable 'y'}}
   int abc = 1;
@@ -32,10 +30,12 @@ void f2(void *b) {
   // CHECK-FIXES-NEXT: char *d;
 
   printf("%s", c);
+  // non-nested-warning@-1 {{implicitly declaring library function 'printf' with type 'int (const char *, ...)'}}
+  // non-nested-note@-2 {{include the header <stdio.h> or explicitly provide a declaration for 'printf'}}
 }
 
-int f(void);
-void f3(void) {
+int f();
+void f3() {
   int r;
   if ((r = f()) != 0) { // no-warning
     int y = r;          // no-warning
@@ -50,7 +50,7 @@ void f4(int k) {
   k = 2; // non-nested-warning {{never read}}
 }
 
-void f5(void) {
+void f5() {
   int x = 4;   // no-warning
   int *p = &x; // non-nested-warning {{never read}}
                // non-nested-warning@-1 {{unused variable 'p'}}
@@ -58,7 +58,7 @@ void f5(void) {
   // CHECK-FIXES-NEXT: int *p;
 }
 
-int f6(void) {
+int f6() {
   int x = 4;
   ++x; // no-warning
   return 1;
@@ -90,30 +90,30 @@ int f7d(int *p) {
 
 // Warn for dead stores in nested expressions.
 int f8(int *p) {
-  extern int *baz(void);
+  extern int *baz();
   if ((p = baz())) // nested-warning {{Although the value stored}}
     return 1;
   return 0;
 }
 
-int f9(void) {
+int f9() {
   int x = 4;
   x = x + 10; // non-nested-warning {{never read}}
   return 1;
 }
 
-int f10(void) {
+int f10() {
   int x = 4;
   x = 10 + x; // non-nested-warning {{never read}}
   return 1;
 }
 
-int f11(void) {
+int f11() {
   int x = 4;
   return x++; // non-nested-warning {{never read}}
 }
 
-int f11b(void) {
+int f11b() {
   int x = 4;
   return ((((++x)))); // no-warning
 }
@@ -156,6 +156,7 @@ int f14(int count) {
   return index;
 }
 
+// Test case for <rdar://problem/6248086>
 void f15(unsigned x, unsigned y) {
   int count = x * y; // no-warning
   int z[count];      // non-nested-warning {{unused variable 'z'}}
@@ -170,15 +171,16 @@ int f16(int x) {
 }
 
 // Self-assignments should not be flagged as dead stores.
-void f17(void) {
+void f17() {
   int x = 1;
   x = x;
 }
 
+// <rdar://problem/6506065>
 // The values of dead stores are only "consumed" in an enclosing expression
 // what that value is actually used.  In other words, don't say "Although the
 // value stored to 'x' is used...".
-int f18(void) {
+int f18() {
   int x = 0; // no-warning
   if (1)
     x = 10; // non-nested-warning {{Value stored to 'x' is never read}}
@@ -191,24 +193,24 @@ int f18(void) {
   return (x = 10); // no-warning
 }
 
-int f18_a(void) {
+int f18_a() {
   int x = 0;       // no-warning
   return (x = 10); // nested-warning {{Although the value stored}}
 }
 
-void f18_b(void) {
+void f18_b() {
   int x = 0; // no-warning
   if (1)
     x = 10; // non-nested-warning {{Value stored to 'x' is never read}}
 }
 
-void f18_c(void) {
+void f18_c() {
   int x = 0;
   while (1)
     x = 10; // non-nested-warning {{Value stored to 'x' is never read}}
 }
 
-void f18_d(void) {
+void f18_d() {
   int x = 0; // no-warning
   do
     x = 10; // non-nested-warning {{Value stored to 'x' is never read}}
@@ -236,8 +238,8 @@ void f20(void) {
 #pragma unused(x)
 }
 
-void halt(void) __attribute__((noreturn));
-int f21(void) {
+void halt() __attribute__((noreturn));
+int f21() {
   int x = 4;
   x = x + 1; // non-nested-warning {{never read}}
   if (1) {
@@ -248,7 +250,7 @@ int f21(void) {
 }
 
 int j;
-void f22(void) {
+void f22() {
   int x = 4;
   int y1 = 4;
   int y2 = 4;
@@ -337,12 +339,12 @@ void f22(void) {
     (void)(0 && x);
     (void)y7;
     (void)(0 || (y8, ({ return; }), 1));
-    // non-nested-warning@-1 {{left operand of comma operator has no effect}}
+    // non-nested-warning@-1 {{expression result unused}}
     (void)x;
     break;
   case 8:
     (void)(1 && (y9, ({ return; }), 1));
-    // non-nested-warning@-1 {{left operand of comma operator has no effect}}
+    // non-nested-warning@-1 {{expression result unused}}
     (void)x;
     break;
   case 9:
@@ -471,7 +473,7 @@ int f24_D(int y) {
 int f25(int y) {
   __block int x = (y > 2);
   __block int z = 0;
-  void (^foo)(void) = ^{
+  void (^foo)() = ^{
     z = x + y;
   };
   x = 4; // no-warning
@@ -490,7 +492,7 @@ int f25_b(int y) {
   return z;
 }
 
-int f26_nestedblocks(void) {
+int f26_nestedblocks() {
   int z;
   z = 1;
   __block int y = 0;
@@ -506,7 +508,7 @@ int f26_nestedblocks(void) {
 
 // The FOREACH macro in QT uses 'break' statements within statement expressions
 // placed within the increment code of for loops.
-void rdar8014335(void) {
+void rdar8014335() {
   for (int i = 0 ; i != 10 ; ({ break; })) {
     for (;; ({ ++i; break; }))
       ;
@@ -518,7 +520,7 @@ void rdar8014335(void) {
   }
 }
 
-// NullStmts followed by do...while() can lead to disconnected CFG
+// <rdar://problem/8320674> NullStmts followed by do...while() can lead to disconnected CFG
 //
 // This previously caused bogus dead-stores warnings because the body of the first do...while was
 // disconnected from the entry of the function.
@@ -544,7 +546,7 @@ void rdar8320674(s_rdar8320674 *z, unsigned y, s2_rdar8320674 *st, int m)
 
 // Avoid dead stores resulting from an assignment (and use) being unreachable.
 void rdar8405222_aux(int i);
-void rdar8405222(void) {
+void rdar8405222() {
   const int show = 0;
   int i = 0;
   if (show)
@@ -555,13 +557,13 @@ void rdar8405222(void) {
 
 // Look through chains of assignments, e.g.: int x = y = 0, when employing
 // silencing heuristics.
-int radar11185138_foo(void) {
+int radar11185138_foo() {
   int x, y;
   x = y = 0; // non-nested-warning {{never read}}
   return y;
 }
 
-int rdar11185138_bar(void) {
+int rdar11185138_bar() {
   int y;
   int x = y = 0; // nested-warning {{Although the value stored}}
   x = 2;
@@ -569,15 +571,15 @@ int rdar11185138_bar(void) {
   return x + y;
 }
 
-int *radar11185138_baz(void) {
+int *radar11185138_baz() {
   int *x, *y;
   x = y = 0; // no-warning
   return y;
 }
 
-int getInt(void);
-int *getPtr(void);
-void testBOComma(void) {
+int getInt();
+int *getPtr();
+void testBOComma() {
   int x0 = (getInt(), 0); // non-nested-warning {{unused variable 'x0'}}
   int x1 = (getInt(), getInt());
   // non-nested-warning@-1 {{Value stored to 'x1' during its initialization is never read}}
@@ -629,7 +631,7 @@ void testBOComma(void) {
   p = (getPtr(), (int *)0); // no warning
 }
 
-void testVolatile(void) {
+void testVolatile() {
   volatile int v;
   v = 0; // no warning
 }
@@ -652,7 +654,7 @@ int rdar34122265_test(int input) {
   return foo.x + foo.y;
 }
 
-void rdar34122265_test_cast(void) {
+void rdar34122265_test_cast() {
   // This is allowed for defensive programming.
   struct Foo foo = {0, 0};
   (void)foo;

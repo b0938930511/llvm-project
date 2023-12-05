@@ -13,8 +13,6 @@
 
 #include "sanitizer_thread_registry.h"
 
-#include "sanitizer_placement_new.h"
-
 namespace __sanitizer {
 
 ThreadContextBase::ThreadContextBase(u32 tid)
@@ -110,7 +108,7 @@ ThreadRegistry::ThreadRegistry(ThreadContextFactory factory, u32 max_threads,
       max_threads_(max_threads),
       thread_quarantine_size_(thread_quarantine_size),
       max_reuse_(max_reuse),
-      mtx_(MutexThreadRegistry),
+      mtx_(),
       total_threads_(0),
       alive_threads_(0),
       max_alive_threads_(0),
@@ -163,12 +161,6 @@ u32 ThreadRegistry::CreateThread(uptr user_id, bool detached, u32 parent_tid,
   if (max_alive_threads_ < alive_threads_) {
     max_alive_threads_++;
     CHECK_EQ(alive_threads_, max_alive_threads_);
-  }
-  if (user_id) {
-    // Ensure that user_id is unique. If it's not the case we are screwed.
-    // Ignoring this situation may lead to very hard to debug false
-    // positives later (e.g. if we join a wrong thread).
-    CHECK(live_.try_emplace(user_id, tid).second);
   }
   tctx->SetCreated(user_id, total_threads_++, detached,
                    parent_tid, arg);
@@ -229,8 +221,14 @@ void ThreadRegistry::SetThreadName(u32 tid, const char *name) {
 
 void ThreadRegistry::SetThreadNameByUserId(uptr user_id, const char *name) {
   ThreadRegistryLock l(this);
-  if (const auto *tid = live_.find(user_id))
-    threads_[tid->second]->SetName(name);
+  for (u32 tid = 0; tid < threads_.size(); tid++) {
+    ThreadContextBase *tctx = threads_[tid];
+    if (tctx != 0 && tctx->user_id == user_id &&
+        tctx->status != ThreadStatusInvalid) {
+      tctx->SetName(name);
+      return;
+    }
+  }
 }
 
 void ThreadRegistry::DetachThread(u32 tid, void *arg) {
@@ -243,8 +241,6 @@ void ThreadRegistry::DetachThread(u32 tid, void *arg) {
   }
   tctx->OnDetached(arg);
   if (tctx->status == ThreadStatusFinished) {
-    if (tctx->user_id)
-      live_.erase(tctx->user_id);
     tctx->SetDead();
     QuarantinePush(tctx);
   } else {
@@ -264,8 +260,6 @@ void ThreadRegistry::JoinThread(u32 tid, void *arg) {
         return;
       }
       if ((destroyed = tctx->GetDestroyed())) {
-        if (tctx->user_id)
-          live_.erase(tctx->user_id);
         tctx->SetJoined(arg);
         QuarantinePush(tctx);
       }
@@ -298,8 +292,6 @@ ThreadStatus ThreadRegistry::FinishThread(u32 tid) {
   }
   tctx->SetFinished();
   if (dead) {
-    if (tctx->user_id)
-      live_.erase(tctx->user_id);
     tctx->SetDead();
     QuarantinePush(tctx);
   }
@@ -335,23 +327,10 @@ void ThreadRegistry::QuarantinePush(ThreadContextBase *tctx) {
 
 ThreadContextBase *ThreadRegistry::QuarantinePop() {
   if (invalid_threads_.size() == 0)
-    return nullptr;
+    return 0;
   ThreadContextBase *tctx = invalid_threads_.front();
   invalid_threads_.pop_front();
   return tctx;
-}
-
-u32 ThreadRegistry::ConsumeThreadUserId(uptr user_id) {
-  ThreadRegistryLock l(this);
-  u32 tid;
-  auto *t = live_.find(user_id);
-  CHECK(t);
-  tid = t->second;
-  live_.erase(t);
-  auto *tctx = threads_[tid];
-  CHECK_EQ(tctx->user_id, user_id);
-  tctx->user_id = 0;
-  return tid;
 }
 
 void ThreadRegistry::SetThreadUserId(u32 tid, uptr user_id) {
@@ -362,23 +341,6 @@ void ThreadRegistry::SetThreadUserId(u32 tid, uptr user_id) {
   CHECK_NE(tctx->status, ThreadStatusDead);
   CHECK_EQ(tctx->user_id, 0);
   tctx->user_id = user_id;
-  CHECK(live_.try_emplace(user_id, tctx->tid).second);
-}
-
-u32 ThreadRegistry::OnFork(u32 tid) {
-  ThreadRegistryLock l(this);
-  // We only purge user_id (pthread_t) of live threads because
-  // they cause CHECK failures if new threads with matching pthread_t
-  // created after fork.
-  // Potentially we could purge more info (ThreadContextBase themselves),
-  // but it's hard to test and easy to introduce new issues by doing this.
-  for (auto *tctx : threads_) {
-    if (tctx->tid == tid || !tctx->user_id)
-      continue;
-    CHECK(live_.erase(tctx->user_id));
-    tctx->user_id = 0;
-  }
-  return alive_threads_;
 }
 
 }  // namespace __sanitizer

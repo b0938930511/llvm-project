@@ -1,14 +1,14 @@
 // RUN: %clang_cc1 -fblocks -debug-info-kind=limited -emit-llvm -o - %s | FileCheck %s
 // RUN: %clang_cc1 -DDEAD_CODE -fblocks -debug-info-kind=limited -emit-llvm -o - %s | FileCheck %s
 
-typedef void (^BlockTy)(void);
+typedef void (^BlockTy)();
 void escapeFunc(BlockTy);
-typedef void (^BlockTy)(void);
+typedef void (^BlockTy)();
 void noEscapeFunc(__attribute__((noescape)) BlockTy);
 
 // Verify that the desired DIExpression are generated for escaping (i.e, not
 // 'noescape') blocks.
-void test_escape_func(void) {
+void test_escape_func() {
 // CHECK-LABEL: void @test_escape_func
 // CHECK: call void @llvm.dbg.declare({{.*}}metadata ![[ESCAPE_VAR:[0-9]+]], metadata !DIExpression(DW_OP_plus_uconst, {{[0-9]+}}, DW_OP_deref, DW_OP_plus_uconst, {{[0-9]+}}){{.*}})
   __block int escape_var;
@@ -20,7 +20,7 @@ void test_escape_func(void) {
 }
 
 // Verify that the desired DIExpression are generated for noescape blocks.
-void test_noescape_func(void) {
+void test_noescape_func() {
 // CHECK-LABEL: void @test_noescape_func
 // CHECK: call void @llvm.dbg.declare({{.*}}metadata ![[NOESCAPE_VAR:[0-9]+]], metadata !DIExpression())
   __block int noescape_var;
@@ -28,7 +28,7 @@ void test_noescape_func(void) {
 }
 
 // Verify that the desired DIExpression are generated for blocks.
-void test_local_block(void) {
+void test_local_block() {
 // CHECK-LABEL: void @test_local_block
 // CHECK: call void @llvm.dbg.declare({{.*}}metadata ![[BLOCK_VAR:[0-9]+]], metadata !DIExpression(DW_OP_plus_uconst, {{[0-9]+}}, DW_OP_deref, DW_OP_plus_uconst, {{[0-9]+}}){{.*}})
   __block int block_var;
@@ -40,7 +40,7 @@ void test_local_block(void) {
 
 // Verify that the desired DIExpression are generated for __block vars not used
 // in any block.
-void test_unused(void) {
+void test_unused() {
 // CHECK-LABEL: void @test_unused
 // CHECK: call void @llvm.dbg.declare({{.*}}metadata ![[UNUSED_VAR:[0-9]+]], metadata !DIExpression())
   __block int unused_var;

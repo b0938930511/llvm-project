@@ -21,10 +21,10 @@
 #ifndef FORTRAN_RUNTIME_REDUCTION_TEMPLATES_H_
 #define FORTRAN_RUNTIME_REDUCTION_TEMPLATES_H_
 
+#include "cpp-type.h"
+#include "descriptor.h"
 #include "terminator.h"
 #include "tools.h"
-#include "flang/Runtime/cpp-type.h"
-#include "flang/Runtime/descriptor.h"
 
 namespace Fortran::runtime {
 
@@ -44,8 +44,8 @@ inline void DoTotalReduction(const Descriptor &x, int dim,
     const Descriptor *mask, ACCUMULATOR &accumulator, const char *intrinsic,
     Terminator &terminator) {
   if (dim < 0 || dim > 1) {
-    terminator.Crash("%s: bad DIM=%d for ARRAY argument with rank %d",
-        intrinsic, dim, x.rank());
+    terminator.Crash(
+        "%s: bad DIM=%d for argument with rank %d", intrinsic, dim, x.rank());
   }
   SubscriptValue xAt[maxRank];
   x.GetLowerBounds(xAt);
@@ -57,8 +57,7 @@ inline void DoTotalReduction(const Descriptor &x, int dim,
       for (auto elements{x.Elements()}; elements--;
            x.IncrementSubscripts(xAt), mask->IncrementSubscripts(maskAt)) {
         if (IsLogicalElementTrue(*mask, maskAt)) {
-          if (!accumulator.template AccumulateAt<TYPE>(xAt))
-            break;
+          accumulator.template AccumulateAt<TYPE>(xAt);
         }
       }
       return;
@@ -97,7 +96,7 @@ inline CppTypeFor<CAT, KIND> GetTotalReduction(const Descriptor &x,
 // result(j,k) = SUM(array(j,:,k)), possibly modified if the array has
 // lower bounds other than one.  This utility subroutine creates an
 // array of subscripts [j,_,k] for result subscripts [j,k] so that the
-// elements of array(j,:,k) can be reduced.
+// elemets of array(j,:,k) can be reduced.
 inline void GetExpandedSubscripts(SubscriptValue at[],
     const Descriptor &descriptor, int zeroBasedDim,
     const SubscriptValue from[]) {
@@ -163,12 +162,11 @@ inline void ReduceDimMaskToScalar(const Descriptor &x, int zeroBasedDim,
 // Utility: establishes & allocates the result array for a partial
 // reduction (i.e., one with DIM=).
 static void CreatePartialReductionResult(Descriptor &result,
-    const Descriptor &x, std::size_t resultElementSize, int dim,
-    Terminator &terminator, const char *intrinsic, TypeCode typeCode) {
+    const Descriptor &x, int dim, Terminator &terminator, const char *intrinsic,
+    TypeCode typeCode) {
   int xRank{x.rank()};
   if (dim < 1 || dim > xRank) {
-    terminator.Crash(
-        "%s: bad DIM=%d for ARRAY with rank %d", intrinsic, dim, xRank);
+    terminator.Crash("%s: bad DIM=%d for rank %d", intrinsic, dim, xRank);
   }
   int zeroBasedDim{dim - 1};
   SubscriptValue resultExtent[maxRank];
@@ -178,8 +176,8 @@ static void CreatePartialReductionResult(Descriptor &result,
   for (int j{zeroBasedDim + 1}; j < xRank; ++j) {
     resultExtent[j - 1] = x.GetDimension(j).Extent();
   }
-  result.Establish(typeCode, resultElementSize, nullptr, xRank - 1,
-      resultExtent, CFI_attribute_allocatable);
+  result.Establish(typeCode, x.ElementBytes(), nullptr, xRank - 1, resultExtent,
+      CFI_attribute_allocatable);
   for (int j{0}; j + 1 < xRank; ++j) {
     result.GetDimension(j).SetBounds(1, resultExtent[j]);
   }
@@ -192,11 +190,11 @@ static void CreatePartialReductionResult(Descriptor &result,
 // Partial reductions with DIM=
 
 template <typename ACCUMULATOR, TypeCategory CAT, int KIND>
-inline void PartialReduction(Descriptor &result, const Descriptor &x,
-    std::size_t resultElementSize, int dim, const Descriptor *mask,
-    Terminator &terminator, const char *intrinsic, ACCUMULATOR &accumulator) {
-  CreatePartialReductionResult(result, x, resultElementSize, dim, terminator,
-      intrinsic, TypeCode{CAT, KIND});
+inline void PartialReduction(Descriptor &result, const Descriptor &x, int dim,
+    const Descriptor *mask, Terminator &terminator, const char *intrinsic,
+    ACCUMULATOR &accumulator) {
+  CreatePartialReductionResult(
+      result, x, dim, terminator, intrinsic, TypeCode{CAT, KIND});
   SubscriptValue at[maxRank];
   result.GetLowerBounds(at);
   INTERNAL_CHECK(result.rank() == 0 || at[0] == 1);
@@ -239,10 +237,8 @@ struct PartialIntegerReductionHelper {
       using Accumulator =
           ACCUM<CppTypeFor<TypeCategory::Integer, Intermediate>>;
       Accumulator accumulator{x};
-      // Element size of the destination descriptor is the same
-      // as the element size of the source.
-      PartialReduction<Accumulator, TypeCategory::Integer, KIND>(result, x,
-          x.ElementBytes(), dim, mask, terminator, intrinsic, accumulator);
+      PartialReduction<Accumulator, TypeCategory::Integer, KIND>(
+          result, x, dim, mask, terminator, intrinsic, accumulator);
     }
   };
 };
@@ -266,10 +262,8 @@ struct PartialFloatingReductionHelper {
         const char *intrinsic) const {
       using Accumulator = ACCUM<CppTypeFor<TypeCategory::Real, Intermediate>>;
       Accumulator accumulator{x};
-      // Element size of the destination descriptor is the same
-      // as the element size of the source.
-      PartialReduction<Accumulator, CAT, KIND>(result, x, x.ElementBytes(), dim,
-          mask, terminator, intrinsic, accumulator);
+      PartialReduction<Accumulator, CAT, KIND>(
+          result, x, dim, mask, terminator, intrinsic, accumulator);
     }
   };
 };
@@ -301,7 +295,7 @@ inline void TypedPartialNumericReduction(Descriptor &result,
         intrinsic);
     break;
   default:
-    terminator.Crash("%s: bad type code %d", intrinsic, x.type().raw());
+    terminator.Crash("%s: invalid type code %d", intrinsic, x.type().raw());
   }
 }
 
@@ -319,11 +313,8 @@ template <typename ACCUMULATOR> struct PartialLocationHelper {
     void operator()(Descriptor &result, const Descriptor &x, int dim,
         const Descriptor *mask, Terminator &terminator, const char *intrinsic,
         ACCUMULATOR &accumulator) const {
-      // Element size of the destination descriptor is the size
-      // of {TypeCategory::Integer, KIND}.
-      PartialReduction<ACCUMULATOR, TypeCategory::Integer, KIND>(result, x,
-          Descriptor::BytesFor(TypeCategory::Integer, KIND), dim, mask,
-          terminator, intrinsic, accumulator);
+      PartialReduction<ACCUMULATOR, TypeCategory::Integer, KIND>(
+          result, x, dim, mask, terminator, intrinsic, accumulator);
     }
   };
 };

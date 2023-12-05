@@ -14,8 +14,9 @@
 #ifndef LLVM_PROFILEDATA_GCOV_H
 #define LLVM_PROFILEDATA_GCOV_H
 
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -25,8 +26,10 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <map>
 #include <memory>
 #include <string>
@@ -215,9 +218,6 @@ public:
       SmallVectorImpl<std::unique_ptr<GCOVFunction>>::const_iterator>;
   iterator begin() const { return iterator(functions.begin()); }
   iterator end() const { return iterator(functions.end()); }
-
-private:
-  unsigned addNormalizedPathToMap(StringRef filename);
 };
 
 struct GCOVArc {
@@ -249,7 +249,7 @@ public:
     return make_range(blocks.begin(), blocks.end());
   }
 
-  void propagateCounts(const GCOVBlock &v, GCOVArc *pred);
+  uint64_t propagateCounts(const GCOVBlock &v, GCOVArc *pred);
   void print(raw_ostream &OS) const;
   void dump() const;
 

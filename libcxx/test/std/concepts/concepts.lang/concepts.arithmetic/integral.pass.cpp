@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
+// UNSUPPORTED: libcpp-no-concepts
 
 // template<class T>
 // concept integral = // see below
@@ -15,7 +16,6 @@
 #include <type_traits>
 
 #include "arithmetic.h"
-#include "test_macros.h"
 
 template <typename T>
 constexpr bool CheckIntegralQualifiers() {
@@ -59,7 +59,7 @@ static_assert(CheckIntegralQualifiers<long long>());
 static_assert(CheckIntegralQualifiers<unsigned long long>());
 
 // extended integers
-#ifndef TEST_HAS_NO_INT128
+#ifndef _LIBCPP_HAS_NO_INT128
 static_assert(CheckIntegralQualifiers<__int128_t>());
 static_assert(CheckIntegralQualifiers<__uint128_t>());
 #endif

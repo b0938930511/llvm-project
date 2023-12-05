@@ -9,36 +9,28 @@
 #ifndef LLVM_DWARFLINKER_DWARFLINKERCOMPILEUNIT_H
 #define LLVM_DWARFLINKER_DWARFLINKERCOMPILEUNIT_H
 
-#include "llvm/ADT/AddressRanges.h"
-#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/IntervalMap.h"
 #include "llvm/CodeGen/DIE.h"
 #include "llvm/DebugInfo/DWARF/DWARFUnit.h"
-#include <optional>
+#include "llvm/Support/DataExtractor.h"
 
 namespace llvm {
 
 class DeclContext;
 
-/// Mapped value in the address map is the offset to apply to the
-/// linked address.
-using RangesTy = AddressRangesMap;
+template <typename KeyT, typename ValT>
+using HalfOpenIntervalMap =
+    IntervalMap<KeyT, ValT, IntervalMapImpl::NodeSizer<KeyT, ValT>::LeafSize,
+                IntervalMapHalfOpenInfo<KeyT>>;
 
-// This structure keeps patch for the attribute and, optionally,
-// the value of relocation which should be applied. Currently,
-// only location attribute needs to have relocation: either to the
-// function ranges if location attribute is of type 'loclist',
-// either to the operand of DW_OP_addr/DW_OP_addrx if location attribute
-// is of type 'exprloc'.
-// ASSUMPTION: Location attributes of 'loclist' type containing 'exprloc'
-//             with address expression operands are not supported yet.
+using FunctionIntervals = HalfOpenIntervalMap<uint64_t, int64_t>;
+
+// FIXME: Delete this structure.
 struct PatchLocation {
   DIE::value_iterator I;
-  int64_t RelocAdjustment = 0;
 
   PatchLocation() = default;
   PatchLocation(DIE::value_iterator I) : I(I) {}
-  PatchLocation(DIE::value_iterator I, int64_t Reloc)
-      : I(I), RelocAdjustment(Reloc) {}
 
   void set(uint64_t New) const {
     assert(I);
@@ -52,9 +44,6 @@ struct PatchLocation {
     return I->getDIEInteger().getValue();
   }
 };
-
-using RngListAttributesTy = SmallVector<PatchLocation>;
-using LocListAttributesTy = SmallVector<PatchLocation>;
 
 /// Stores all information relating to a compile unit, be it in its original
 /// instance in the object file to its brand new cloned and generated DIE tree.
@@ -85,27 +74,12 @@ public:
 
     /// Does DIE transitively refer an incomplete decl?
     bool Incomplete : 1;
-
-    /// Is DIE in the clang module scope?
-    bool InModuleScope : 1;
-
-    /// Is ODR marking done?
-    bool ODRMarkingDone : 1;
-
-    /// Is this a reference to a DIE that hasn't been cloned yet?
-    bool UnclonedReference : 1;
-
-    /// Is this a variable with a location attribute referencing address?
-    bool HasLocationExpressionAddr : 1;
-
-#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
-    LLVM_DUMP_METHOD void dump();
-#endif // if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   };
 
   CompileUnit(DWARFUnit &OrigUnit, unsigned ID, bool CanUseODR,
               StringRef ClangModuleName)
-      : OrigUnit(OrigUnit), ID(ID), ClangModuleName(ClangModuleName) {
+      : OrigUnit(OrigUnit), ID(ID), Ranges(RangeAlloc),
+        ClangModuleName(ClangModuleName) {
     Info.resize(OrigUnit.getNumDIEs());
 
     auto CUDie = OrigUnit.getUnitDIE(false);
@@ -155,21 +129,27 @@ public:
   uint64_t getNextUnitOffset() const { return NextUnitOffset; }
   void setStartOffset(uint64_t DebugInfoSize) { StartOffset = DebugInfoSize; }
 
-  std::optional<uint64_t> getLowPc() const { return LowPc; }
+  uint64_t getLowPc() const { return LowPc; }
   uint64_t getHighPc() const { return HighPc; }
   bool hasLabelAt(uint64_t Addr) const { return Labels.count(Addr); }
 
-  const RangesTy &getFunctionRanges() const { return Ranges; }
-
-  const RngListAttributesTy &getRangesAttributes() { return RangeAttributes; }
-
-  std::optional<PatchLocation> getUnitRangesAttribute() const {
+  Optional<PatchLocation> getUnitRangesAttribute() const {
     return UnitRangeAttribute;
   }
 
-  const LocListAttributesTy &getLocationAttributes() const {
+  const FunctionIntervals &getFunctionRanges() const { return Ranges; }
+
+  const std::vector<PatchLocation> &getRangesAttributes() const {
+    return RangeAttributes;
+  }
+
+  const std::vector<std::pair<PatchLocation, int64_t>> &
+  getLocationAttributes() const {
     return LocationAttributes;
   }
+
+  void setHasInterestingContent() { HasInterestingContent = true; }
+  bool hasInterestingContent() { return HasInterestingContent; }
 
   /// Mark every DIE in this unit as kept. This function also
   /// marks variables as InDebugMap so that they appear in the
@@ -204,7 +184,7 @@ public:
 
   /// Keep track of a location attribute pointing to a location list in the
   /// debug_loc section.
-  void noteLocationAttribute(PatchLocation Attr);
+  void noteLocationAttribute(PatchLocation Attr, int64_t PcOffset);
 
   /// Add a name accelerator entry for \a Die with \a Name.
   void addNamespaceAccelerator(const DIE *Die, DwarfStringPoolEntryRef Name);
@@ -264,13 +244,13 @@ private:
   DWARFUnit &OrigUnit;
   unsigned ID;
   std::vector<DIEInfo> Info; ///< DIE info indexed by DIE index.
-  std::optional<BasicDIEUnit> NewUnit;
+  Optional<BasicDIEUnit> NewUnit;
   MCSymbol *LabelBegin = nullptr;
 
   uint64_t StartOffset;
   uint64_t NextUnitOffset;
 
-  std::optional<uint64_t> LowPc;
+  uint64_t LowPc = std::numeric_limits<uint64_t>::max();
   uint64_t HighPc = 0;
 
   /// A list of attributes to fixup with the absolute offset of
@@ -283,27 +263,28 @@ private:
       std::tuple<DIE *, const CompileUnit *, DeclContext *, PatchLocation>>
       ForwardDIEReferences;
 
-  /// The ranges in that map are the PC ranges for functions in this unit,
-  /// associated with the PC offset to apply to the addresses to get
-  /// the linked address.
-  RangesTy Ranges;
+  FunctionIntervals::Allocator RangeAlloc;
+
+  /// The ranges in that interval map are the PC ranges for
+  /// functions in this unit, associated with the PC offset to apply
+  /// to the addresses to get the linked address.
+  FunctionIntervals Ranges;
 
   /// The DW_AT_low_pc of each DW_TAG_label.
   SmallDenseMap<uint64_t, uint64_t, 1> Labels;
 
-  /// 'rnglist'(DW_AT_ranges, DW_AT_start_scope) attributes to patch after
-  /// we have gathered all the unit's function addresses.
+  /// DW_AT_ranges attributes to patch after we have gathered
+  /// all the unit's function addresses.
   /// @{
-  RngListAttributesTy RangeAttributes;
-  std::optional<PatchLocation> UnitRangeAttribute;
+  std::vector<PatchLocation> RangeAttributes;
+  Optional<PatchLocation> UnitRangeAttribute;
   /// @}
 
   /// Location attributes that need to be transferred from the
-  /// original debug_loc section to the linked one. They are stored
+  /// original debug_loc section to the liked one. They are stored
   /// along with the PC offset that is to be applied to their
-  /// function's address or to be applied to address operands of
-  /// location expression.
-  LocListAttributesTy LocationAttributes;
+  /// function's address.
+  std::vector<std::pair<PatchLocation, int64_t>> LocationAttributes;
 
   /// Accelerator entries for the unit, both for the pub*
   /// sections and the apple* ones.
@@ -316,6 +297,9 @@ private:
 
   /// Is this unit subject to the ODR rule?
   bool HasODR;
+
+  /// Did a DIE actually contain a valid reloc?
+  bool HasInterestingContent;
 
   /// The DW_AT_language of this unit.
   uint16_t Language = 0;

@@ -20,6 +20,7 @@
 #include "clang/Lex/MacroInfo.h"
 #include "clang/Lex/Token.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Capacity.h"
@@ -30,7 +31,6 @@
 #include <cstddef>
 #include <cstring>
 #include <iterator>
-#include <optional>
 #include <utility>
 #include <vector>
 
@@ -42,8 +42,7 @@ ExternalPreprocessingRecordSource::~ExternalPreprocessingRecordSource() =
 InclusionDirective::InclusionDirective(PreprocessingRecord &PPRec,
                                        InclusionKind Kind, StringRef FileName,
                                        bool InQuotes, bool ImportedModule,
-                                       OptionalFileEntryRef File,
-                                       SourceRange Range)
+                                       const FileEntry *File, SourceRange Range)
     : PreprocessingDirective(InclusionDirectiveKind, Range), InQuotes(InQuotes),
       Kind(Kind), ImportedModule(ImportedModule), File(File) {
   char *Memory = (char *)PPRec.Allocate(FileName.size() + 1, alignof(char));
@@ -112,9 +111,10 @@ bool PreprocessingRecord::isEntityInFileID(iterator PPEI, FileID FID) {
 
     // See if the external source can see if the entity is in the file without
     // deserializing it.
-    if (std::optional<bool> IsInFile =
-            ExternalSource->isPreprocessedEntityInFileID(LoadedIndex, FID))
-      return *IsInFile;
+    Optional<bool> IsInFile =
+        ExternalSource->isPreprocessedEntityInFileID(LoadedIndex, FID);
+    if (IsInFile.hasValue())
+      return IsInFile.getValue();
 
     // The external source did not provide a definite answer, go and deserialize
     // the entity to check it.
@@ -381,7 +381,12 @@ PreprocessingRecord::getLoadedPreprocessedEntity(unsigned Index) {
 
 MacroDefinitionRecord *
 PreprocessingRecord::findMacroDefinition(const MacroInfo *MI) {
-  return MacroDefinitions.lookup(MI);
+  llvm::DenseMap<const MacroInfo *, MacroDefinitionRecord *>::iterator Pos =
+      MacroDefinitions.find(MI);
+  if (Pos == MacroDefinitions.end())
+    return nullptr;
+
+  return Pos->second;
 }
 
 void PreprocessingRecord::addMacroExpansion(const Token &Id,
@@ -470,9 +475,15 @@ void PreprocessingRecord::MacroUndefined(const Token &Id,
 }
 
 void PreprocessingRecord::InclusionDirective(
-    SourceLocation HashLoc, const Token &IncludeTok, StringRef FileName,
-    bool IsAngled, CharSourceRange FilenameRange, OptionalFileEntryRef File,
-    StringRef SearchPath, StringRef RelativePath, const Module *Imported,
+    SourceLocation HashLoc,
+    const Token &IncludeTok,
+    StringRef FileName,
+    bool IsAngled,
+    CharSourceRange FilenameRange,
+    const FileEntry *File,
+    StringRef SearchPath,
+    StringRef RelativePath,
+    const Module *Imported,
     SrcMgr::CharacteristicKind FileType) {
   InclusionDirective::InclusionKind Kind = InclusionDirective::Include;
 

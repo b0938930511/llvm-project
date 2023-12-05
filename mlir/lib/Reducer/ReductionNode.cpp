@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "mlir/Reducer/ReductionNode.h"
-#include "mlir/IR/IRMapping.h"
+#include "mlir/IR/BlockAndValueMapping.h"
 #include "llvm/ADT/STLExtras.h"
 
 #include <algorithm>
@@ -24,11 +24,12 @@
 using namespace mlir;
 
 ReductionNode::ReductionNode(
-    ReductionNode *parentNode, const std::vector<Range> &ranges,
+    ReductionNode *parentNode, std::vector<Range> ranges,
     llvm::SpecificBumpPtrAllocator<ReductionNode> &allocator)
     /// Root node will have the parent pointer point to themselves.
     : parent(parentNode == nullptr ? this : parentNode),
-      size(std::numeric_limits<size_t>::max()), ranges(ranges),
+      size(std::numeric_limits<size_t>::max()),
+      interesting(Tester::Interestingness::Untested), ranges(ranges),
       startRanges(ranges), allocator(allocator) {
   if (parent != this)
     if (failed(initialize(parent->getModule(), parent->getRegion())))
@@ -38,7 +39,7 @@ ReductionNode::ReductionNode(
 LogicalResult ReductionNode::initialize(ModuleOp parentModule,
                                         Region &targetRegion) {
   // Use the mapper help us find the corresponding region after module clone.
-  IRMapping mapper;
+  BlockAndValueMapping mapper;
   module = cast<ModuleOp>(parentModule->clone(mapper));
   // Use the first block of targetRegion to locate the cloned region.
   Block *block = mapper.lookup(&*targetRegion.begin());
@@ -52,18 +53,19 @@ LogicalResult ReductionNode::initialize(ModuleOp parentModule,
 ArrayRef<ReductionNode *> ReductionNode::generateNewVariants() {
   int oldNumVariant = getVariants().size();
 
-  auto createNewNode = [this](const std::vector<Range> &ranges) {
-    return new (allocator.Allocate()) ReductionNode(this, ranges, allocator);
+  auto createNewNode = [this](std::vector<Range> ranges) {
+    return new (allocator.Allocate())
+        ReductionNode(this, std::move(ranges), allocator);
   };
 
   // If we haven't created new variant, then we can create varients by removing
   // each of them respectively. For example, given {{1, 3}, {4, 9}}, we can
   // produce variants with range {{1, 3}} and {{4, 9}}.
-  if (variants.empty() && getRanges().size() > 1) {
+  if (variants.size() == 0 && getRanges().size() > 1) {
     for (const Range &range : getRanges()) {
       std::vector<Range> subRanges = getRanges();
-      llvm::erase(subRanges, range);
-      variants.push_back(createNewNode(subRanges));
+      llvm::erase_value(subRanges, range);
+      variants.push_back(createNewNode(std::move(subRanges)));
     }
 
     return getVariants().drop_front(oldNumVariant);
@@ -91,7 +93,7 @@ ArrayRef<ReductionNode *> ReductionNode::generateNewVariants() {
   *subRangesIter = std::make_pair(maxRange.first, half);
   variants.push_back(createNewNode(subRanges));
   *subRangesIter = std::make_pair(half, maxRange.second);
-  variants.push_back(createNewNode(subRanges));
+  variants.push_back(createNewNode(std::move(subRanges)));
 
   auto it = ranges.insert(maxElement, std::make_pair(half, maxRange.second));
   it = ranges.insert(it, std::make_pair(maxRange.first, half));
@@ -109,7 +111,7 @@ void ReductionNode::update(std::pair<Tester::Interestingness, size_t> result) {
   if (interesting == Tester::Interestingness::True) {
     // This module may has been updated. Reset the range.
     ranges.clear();
-    ranges.emplace_back(0, std::distance(region->op_begin(), region->op_end()));
+    ranges.push_back({0, std::distance(region->op_begin(), region->op_end())});
   } else {
     // Release the uninteresting module to save some memory.
     module.release()->erase();

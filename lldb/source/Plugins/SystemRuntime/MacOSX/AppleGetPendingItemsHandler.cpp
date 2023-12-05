@@ -20,7 +20,6 @@
 #include "lldb/Target/Target.h"
 #include "lldb/Target/Thread.h"
 #include "lldb/Utility/ConstString.h"
-#include "lldb/Utility/LLDBLog.h"
 #include "lldb/Utility/Log.h"
 #include "lldb/Utility/StreamString.h"
 
@@ -134,7 +133,7 @@ lldb::addr_t AppleGetPendingItemsHandler::SetupGetPendingItemsFunction(
   ThreadSP thread_sp(thread.shared_from_this());
   ExecutionContext exe_ctx(thread_sp);
   DiagnosticManager diagnostics;
-  Log *log = GetLog(LLDBLog::SystemRuntime);
+  Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_SYSTEM_RUNTIME));
 
   lldb::addr_t args_addr = LLDB_INVALID_ADDRESS;
   FunctionCaller *get_pending_items_caller = nullptr;
@@ -164,10 +163,10 @@ lldb::addr_t AppleGetPendingItemsHandler::SetupGetPendingItemsFunction(
 
       // Next make the runner function for our implementation utility function.
       Status error;
-      TypeSystemClangSP scratch_ts_sp = ScratchTypeSystemClang::GetForTarget(
+      TypeSystemClang *clang_ast_context = ScratchTypeSystemClang::GetForTarget(
           thread.GetProcess()->GetTarget());
       CompilerType get_pending_items_return_type =
-          scratch_ts_sp->GetBasicType(eBasicTypeVoid).GetPointerType();
+          clang_ast_context->GetBasicType(eBasicTypeVoid).GetPointerType();
       get_pending_items_caller =
           m_get_pending_items_impl_code->MakeFunctionCaller(
               get_pending_items_return_type, get_pending_items_arglist,
@@ -216,9 +215,9 @@ AppleGetPendingItemsHandler::GetPendingItems(Thread &thread, addr_t queue,
   lldb::StackFrameSP thread_cur_frame = thread.GetStackFrameAtIndex(0);
   ProcessSP process_sp(thread.CalculateProcess());
   TargetSP target_sp(thread.CalculateTarget());
-  TypeSystemClangSP scratch_ts_sp =
+  TypeSystemClang *clang_ast_context =
       ScratchTypeSystemClang::GetForTarget(*target_sp);
-  Log *log = GetLog(LLDBLog::SystemRuntime);
+  Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_SYSTEM_RUNTIME));
 
   GetPendingItemsReturnInfo return_value;
   return_value.items_buffer_ptr = LLDB_INVALID_ADDRESS;
@@ -260,18 +259,18 @@ AppleGetPendingItemsHandler::GetPendingItems(Thread &thread, addr_t queue,
   // already allocated by lldb in the inferior process.
 
   CompilerType clang_void_ptr_type =
-      scratch_ts_sp->GetBasicType(eBasicTypeVoid).GetPointerType();
+      clang_ast_context->GetBasicType(eBasicTypeVoid).GetPointerType();
   Value return_buffer_ptr_value;
   return_buffer_ptr_value.SetValueType(Value::ValueType::Scalar);
   return_buffer_ptr_value.SetCompilerType(clang_void_ptr_type);
 
-  CompilerType clang_int_type = scratch_ts_sp->GetBasicType(eBasicTypeInt);
+  CompilerType clang_int_type = clang_ast_context->GetBasicType(eBasicTypeInt);
   Value debug_value;
   debug_value.SetValueType(Value::ValueType::Scalar);
   debug_value.SetCompilerType(clang_int_type);
 
   CompilerType clang_uint64_type =
-      scratch_ts_sp->GetBasicType(eBasicTypeUnsignedLongLong);
+      clang_ast_context->GetBasicType(eBasicTypeUnsignedLongLong);
   Value queue_value;
   queue_value.SetValueType(Value::ValueType::Scalar);
   queue_value.SetCompilerType(clang_uint64_type);

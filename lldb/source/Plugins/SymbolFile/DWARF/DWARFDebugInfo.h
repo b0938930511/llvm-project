@@ -19,18 +19,20 @@
 #include "lldb/lldb-private.h"
 #include "llvm/Support/Error.h"
 
-namespace lldb_private::plugin {
-namespace dwarf {
+namespace lldb_private {
 class DWARFContext;
+}
 
 class DWARFDebugInfo {
 public:
-  typedef dw_offset_t (*Callback)(SymbolFileDWARF *dwarf2Data, DWARFUnit *cu,
+  typedef dw_offset_t (*Callback)(SymbolFileDWARF *dwarf2Data,
+                                  DWARFUnit *cu,
                                   DWARFDebugInfoEntry *die,
                                   const dw_offset_t next_offset,
                                   const uint32_t depth, void *userData);
 
-  explicit DWARFDebugInfo(SymbolFileDWARF &dwarf, DWARFContext &context);
+  explicit DWARFDebugInfo(SymbolFileDWARF &dwarf,
+                          lldb_private::DWARFContext &context);
 
   size_t GetNumUnits();
   DWARFUnit *GetUnitAtIndex(size_t idx);
@@ -56,7 +58,7 @@ protected:
   typedef std::vector<DWARFUnitSP> UnitColl;
 
   SymbolFileDWARF &m_dwarf;
-  DWARFContext &m_context;
+  lldb_private::DWARFContext &m_context;
 
   llvm::once_flag m_units_once_flag;
   UnitColl m_units;
@@ -78,7 +80,5 @@ private:
   DWARFDebugInfo(const DWARFDebugInfo &) = delete;
   const DWARFDebugInfo &operator=(const DWARFDebugInfo &) = delete;
 };
-} // namespace dwarf
-} // namespace lldb_private::plugin
 
 #endif // LLDB_SOURCE_PLUGINS_SYMBOLFILE_DWARF_DWARFDEBUGINFO_H

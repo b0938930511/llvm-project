@@ -3,9 +3,13 @@
 // REQUIRES: x86-registered-target
 //
 // RUN: %clang_cc1 -triple i686-pc-win32 -emit-llvm %s -o - | FileCheck -check-prefix=NOINLINE %s
+// RUN: %clang_cc1 -triple i686-pc-win32 -fexperimental-new-pass-manager -emit-llvm %s -o - | FileCheck -check-prefix=NOINLINE %s
 // RUN: %clang_cc1 -triple i686-pc-win32 -O3 -fno-inline-functions -emit-llvm %s -o - | FileCheck -check-prefix=NOINLINE %s
+// RUN: %clang_cc1 -triple i686-pc-win32 -fexperimental-new-pass-manager -O3 -fno-inline-functions -emit-llvm %s -o - | FileCheck -check-prefix=NOINLINE %s
 // RUN: %clang_cc1 -triple i686-pc-win32 -O3 -finline-hint-functions -emit-llvm %s -o - | FileCheck -check-prefix=HINT %s
+// RUN: %clang_cc1 -triple i686-pc-win32 -fexperimental-new-pass-manager -O3 -finline-hint-functions -emit-llvm %s -o - | FileCheck -check-prefix=HINT %s
 // RUN: %clang_cc1 -triple i686-pc-win32 -O3 -finline-functions -emit-llvm %s -o - | FileCheck -check-prefix=INLINE %s
+// RUN: %clang_cc1 -triple i686-pc-win32 -fexperimental-new-pass-manager -O3 -finline-functions -emit-llvm %s -o - | FileCheck -check-prefix=INLINE %s
 
 inline int inline_hint(int a, int b) { return(a+b); }
 
@@ -14,7 +18,7 @@ int inline_no_hint(int a, int b) { return (a/b); }
 inline __attribute__ ((__always_inline__)) int inline_always(int a, int b) { return(a*b); }
 
 volatile int *pa = (int*) 0x1000;
-void foo(void) {
+void foo() {
 // NOINLINE-LABEL: @foo
 // HINT-LABEL: @foo
 // INLINE-LABEL: @foo

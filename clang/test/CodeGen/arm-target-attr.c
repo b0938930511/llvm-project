@@ -3,12 +3,12 @@
 // RUN: %clang_cc1 -triple arm-apple-darwin -emit-llvm -o - %s | FileCheck --check-prefix CHECKPOS %s
 // RUN: %clang_cc1 -triple arm-apple-darwin -emit-llvm -o - %s | FileCheck --check-prefix CHECKNEG %s
 
-__attribute__((target("arm"))) void test_target_arm(void) {
+__attribute__((target("arm"))) void test_target_arm() {
   // CHECKPOS: define{{.*}} void @test_target_arm() [[ARM_ATTRS:#[0-9]+]]
   // CHECKNEG: define{{.*}} void @test_target_arm() [[ARM_ATTRS:#[0-9]+]]
 }
 
-__attribute__((target("thumb"))) void test_target_thumb(void) {
+__attribute__((target("thumb"))) void test_target_thumb() {
   // CHECKPOS: define{{.*}} void @test_target_thumb() [[THUMB_ATTRS:#[0-9]+]]
   // CHECKNEG: define{{.*}} void @test_target_thumb() [[THUMB_ATTRS:#[0-9]+]]
 }

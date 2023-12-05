@@ -4,8 +4,8 @@
 // RUN: %clang_cc1 -target-feature +altivec -fsyntax-only %s -triple powerpc-ibm-aix-xcoff
 // RUN: %clang_cc1 -target-feature +altivec -fsyntax-only %s -triple powerpc-linux-gnu
 
-int vector(void);
+int vector();
 
-void test(void) {
+void test() {
   vector unsigned int v = {0};
 }

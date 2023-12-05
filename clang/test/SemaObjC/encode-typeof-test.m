@@ -1,4 +1,5 @@
 // RUN: %clang_cc1  -fsyntax-only -verify -Wno-objc-root-class %s
+// rdar://16655340
 @protocol X, Y, Z;
 @class Foo;
 
@@ -18,12 +19,13 @@ Class <X> IVAR_Classx;
 @implementation Intf 
 @end
 
-int main(void)
+int main()
 {
     int i;
     typeof(@encode(typeof(i))) e = @encode(typeof(Intf)); // expected-warning {{initializer-string for char array is too long}}
 }
 
+// rdar://9255564
 typedef short short8 __attribute__((ext_vector_type(8)));
 
 struct foo {
@@ -37,7 +39,7 @@ struct foo {
  char *string;
 };
 
-const char *RetEncode (void) {
+const char *RetEncode () {
  return @encode(struct foo); // expected-warning {{encoding of 'struct foo' type is incomplete because 'short8' (vector of 8 'short' values) component has unknown encoding}}
 }
 

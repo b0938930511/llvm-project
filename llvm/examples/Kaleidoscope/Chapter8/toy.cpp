@@ -1,23 +1,24 @@
 #include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
-#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
-#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/Host.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/TargetRegistry.h"
+#include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
-#include "llvm/TargetParser/Host.h"
 #include <algorithm>
 #include <cassert>
 #include <cctype>
@@ -867,7 +868,7 @@ Value *IfExprAST::codegen() {
   ThenBB = Builder->GetInsertBlock();
 
   // Emit else block.
-  TheFunction->insert(TheFunction->end(), ElseBB);
+  TheFunction->getBasicBlockList().push_back(ElseBB);
   Builder->SetInsertPoint(ElseBB);
 
   Value *ElseV = Else->codegen();
@@ -879,7 +880,7 @@ Value *IfExprAST::codegen() {
   ElseBB = Builder->GetInsertBlock();
 
   // Emit merge block.
-  TheFunction->insert(TheFunction->end(), MergeBB);
+  TheFunction->getBasicBlockList().push_back(MergeBB);
   Builder->SetInsertPoint(MergeBB);
   PHINode *PN = Builder->CreatePHI(Type::getDoubleTy(*TheContext), 2, "iftmp");
 
@@ -1242,7 +1243,7 @@ int main() {
   auto Features = "";
 
   TargetOptions opt;
-  auto RM = std::optional<Reloc::Model>();
+  auto RM = Optional<Reloc::Model>();
   auto TheTargetMachine =
       Target->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
 
@@ -1258,7 +1259,7 @@ int main() {
   }
 
   legacy::PassManager pass;
-  auto FileType = CodeGenFileType::ObjectFile;
+  auto FileType = CGFT_ObjectFile;
 
   if (TheTargetMachine->addPassesToEmitFile(pass, dest, nullptr, FileType)) {
     errs() << "TheTargetMachine can't emit a file of this type";

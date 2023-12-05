@@ -14,6 +14,9 @@
 #define LLVM_SUPPORT_ERROR_H
 
 #include "llvm-c/Error.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Config/abi-breaking.h"
 #include "llvm/Support/AlignOf.h"
@@ -23,13 +26,13 @@
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <cstdlib>
 #include <functional>
 #include <memory>
 #include <new>
-#include <optional>
 #include <string>
 #include <system_error>
 #include <type_traits>
@@ -127,7 +130,7 @@ private:
 ///
 ///   auto E = foo(<...>); // <- foo returns failure with MyErrorInfo.
 ///   auto NewE =
-///     handleErrors(std::move(E),
+///     handleErrors(E,
 ///       [](const MyErrorInfo &M) {
 ///         // Deal with the error.
 ///       },
@@ -138,15 +141,9 @@ private:
 ///         }
 ///         // Couldn't handle this error instance. Pass it up the stack.
 ///         return Error(std::move(M));
-///     });
-///   // Note - The error passed to handleErrors will be marked as checked. If
-///   // there is no matched handler, a new error with the same payload is
-///   // created and returned.
-///   // The handlers take the error checked by handleErrors as an argument,
-///   // which can be used to retrieve more information. If a new error is
-///   // created by a handler, it will be passed back to the caller of
-///   // handleErrors and needs to be checked or return up to the stack.
-///   // Otherwise, the passed-in error is considered consumed.
+///       );
+///   // Note - we must check or return NewE in case any of the handlers
+///   // returned a new error.
 ///   @endcode
 ///
 /// The handleAllErrors function is identical to handleErrors, except
@@ -157,7 +154,7 @@ private:
 /// *All* Error instances must be checked before destruction, even if
 /// they're moved-assigned or constructed from Success values that have already
 /// been checked. This enforces checking through all levels of the call stack.
-class [[nodiscard]] Error {
+class LLVM_NODISCARD Error {
   // ErrorList needs to be able to yank ErrorInfoBase pointers out of Errors
   // to add to the error list. It can't rely on handleErrors for this, since
   // handleErrors does not support ErrorList handlers.
@@ -316,7 +313,7 @@ private:
   }
 
   friend raw_ostream &operator<<(raw_ostream &OS, const Error &E) {
-    if (auto *P = E.getPtr())
+    if (auto P = E.getPtr())
       P->log(OS);
     else
       OS << "success";
@@ -376,7 +373,7 @@ class ErrorList final : public ErrorInfo<ErrorList> {
 public:
   void log(raw_ostream &OS) const override {
     OS << "Multiple errors:\n";
-    for (const auto &ErrPayload : Payloads) {
+    for (auto &ErrPayload : Payloads) {
       ErrPayload->log(OS);
       OS << "\n";
     }
@@ -468,14 +465,14 @@ inline Error joinErrors(Error E1, Error E2) {
 ///     outs() << "The answer is " << *Result << "\n";
 ///   @endcode
 ///
-///  For unit-testing a function returning an 'Expected<T>', see the
+///  For unit-testing a function returning an 'Expceted<T>', see the
 ///  'EXPECT_THAT_EXPECTED' macros in llvm/Testing/Support/Error.h
 
-template <class T> class [[nodiscard]] Expected {
+template <class T> class LLVM_NODISCARD Expected {
   template <class T1> friend class ExpectedAsOutParameter;
   template <class OtherT> friend class Expected;
 
-  static constexpr bool isRef = std::is_reference_v<T>;
+  static constexpr bool isRef = std::is_reference<T>::value;
 
   using wrap = std::reference_wrapper<std::remove_reference_t<T>>;
 
@@ -513,7 +510,7 @@ public:
   /// must be convertible to T.
   template <typename OtherT>
   Expected(OtherT &&Val,
-           std::enable_if_t<std::is_convertible_v<OtherT, T>> * = nullptr)
+           std::enable_if_t<std::is_convertible<OtherT, T>::value> * = nullptr)
       : HasError(false)
 #if LLVM_ENABLE_ABI_BREAKING_CHECKS
         // Expected is unchecked upon construction in Debug builds.
@@ -530,8 +527,9 @@ public:
   /// Move construct an Expected<T> value from an Expected<OtherT>, where OtherT
   /// must be convertible to T.
   template <class OtherT>
-  Expected(Expected<OtherT> &&Other,
-           std::enable_if_t<std::is_convertible_v<OtherT, T>> * = nullptr) {
+  Expected(
+      Expected<OtherT> &&Other,
+      std::enable_if_t<std::is_convertible<OtherT, T>::value> * = nullptr) {
     moveConstruct(std::move(Other));
   }
 
@@ -540,7 +538,7 @@ public:
   template <class OtherT>
   explicit Expected(
       Expected<OtherT> &&Other,
-      std::enable_if_t<!std::is_convertible_v<OtherT, T>> * = nullptr) {
+      std::enable_if_t<!std::is_convertible<OtherT, T>::value> * = nullptr) {
     moveConstruct(std::move(Other));
   }
 
@@ -577,16 +575,6 @@ public:
   const_reference get() const {
     assertIsChecked();
     return const_cast<Expected<T> *>(this)->get();
-  }
-
-  /// Returns \a takeError() after moving the held T (if any) into \p V.
-  template <class OtherT>
-  Error moveInto(
-      OtherT &Value,
-      std::enable_if_t<std::is_assignable_v<OtherT &, T &&>> * = nullptr) && {
-    if (*this)
-      Value = std::move(get());
-    return takeError();
   }
 
   /// Check that this Expected<T> is an error of type ErrT.
@@ -826,8 +814,8 @@ T& cantFail(Expected<T&> ValOrErr, const char *Msg = nullptr) {
 /// ErrorInfo types.
 template <typename HandlerT>
 class ErrorHandlerTraits
-    : public ErrorHandlerTraits<
-          decltype(&std::remove_reference_t<HandlerT>::operator())> {};
+    : public ErrorHandlerTraits<decltype(
+          &std::remove_reference<HandlerT>::type::operator())> {};
 
 // Specialization functions of the form 'Error (const ErrT&)'.
 template <typename ErrT> class ErrorHandlerTraits<Error (&)(ErrT &)> {
@@ -1029,7 +1017,13 @@ void logAllUnhandledErrors(Error E, raw_ostream &OS, Twine ErrorBanner = {});
 
 /// Write all error messages (if any) in E to a string. The newline character
 /// is used to separate error messages.
-std::string toString(Error E);
+inline std::string toString(Error E) {
+  SmallVector<std::string, 2> Errors;
+  handleAllErrors(std::move(E), [&Errors](const ErrorInfoBase &EI) {
+    Errors.push_back(EI.message());
+  });
+  return join(Errors.begin(), Errors.end(), "\n");
+}
 
 /// Consume a Error without doing anything. This method should be used
 /// only where an error can be considered a reasonable and expected return
@@ -1037,7 +1031,7 @@ std::string toString(Error E);
 ///
 /// Uses of this method are potentially indicative of design problems: If it's
 /// legitimate to do nothing while processing an "error", the error-producer
-/// might be more clearly refactored to return an std::optional<T>.
+/// might be more clearly refactored to return an Optional<T>.
 inline void consumeError(Error Err) {
   handleAllErrors(std::move(Err), [](const ErrorInfoBase &) {});
 }
@@ -1049,18 +1043,11 @@ inline void consumeError(Error Err) {
 /// Uses of this method are potentially indicative of problems: perhaps the
 /// error should be propagated further, or the error-producer should just
 /// return an Optional in the first place.
-template <typename T> std::optional<T> expectedToOptional(Expected<T> &&E) {
+template <typename T> Optional<T> expectedToOptional(Expected<T> &&E) {
   if (E)
     return std::move(*E);
   consumeError(E.takeError());
-  return std::nullopt;
-}
-
-template <typename T> std::optional<T> expectedToStdOptional(Expected<T> &&E) {
-  if (E)
-    return std::move(*E);
-  consumeError(E.takeError());
-  return std::nullopt;
+  return None;
 }
 
 /// Helper for converting an Error to a bool.
@@ -1146,7 +1133,7 @@ private:
 class ECError : public ErrorInfo<ECError> {
   friend Error errorCodeToError(std::error_code);
 
-  void anchor() override;
+  virtual void anchor() override;
 
 public:
   void setErrorCode(std::error_code EC) { this->EC = EC; }
@@ -1168,7 +1155,7 @@ protected:
 /// It should only be used in this situation, and should never be used where a
 /// sensible conversion to std::error_code is available, as attempts to convert
 /// to/from this error will result in a fatal error. (i.e. it is a programmatic
-/// error to try to convert such a value).
+///error to try to convert such a value).
 std::error_code inconvertibleErrorCode();
 
 /// Helper for converting an std::error_code to a Error.
@@ -1272,21 +1259,14 @@ class FileError final : public ErrorInfo<FileError> {
 
 public:
   void log(raw_ostream &OS) const override {
-    assert(Err && "Trying to log after takeError().");
+    assert(Err && !FileName.empty() && "Trying to log after takeError().");
     OS << "'" << FileName << "': ";
-    if (Line)
-      OS << "line " << *Line << ": ";
+    if (Line.hasValue())
+      OS << "line " << Line.getValue() << ": ";
     Err->log(OS);
   }
 
-  std::string messageWithoutFileInfo() const {
-    std::string Msg;
-    raw_string_ostream OS(Msg);
-    Err->log(OS);
-    return OS.str();
-  }
-
-  StringRef getFileName() const { return FileName; }
+  StringRef getFileName() { return FileName; }
 
   Error takeError() { return Error(std::move(Err)); }
 
@@ -1296,15 +1276,17 @@ public:
   static char ID;
 
 private:
-  FileError(const Twine &F, std::optional<size_t> LineNum,
+  FileError(const Twine &F, Optional<size_t> LineNum,
             std::unique_ptr<ErrorInfoBase> E) {
     assert(E && "Cannot create FileError from Error success value.");
+    assert(!F.isTriviallyEmpty() &&
+           "The file name provided to FileError must not be empty.");
     FileName = F.str();
     Err = std::move(E);
     Line = std::move(LineNum);
   }
 
-  static Error build(const Twine &F, std::optional<size_t> Line, Error E) {
+  static Error build(const Twine &F, Optional<size_t> Line, Error E) {
     std::unique_ptr<ErrorInfoBase> Payload;
     handleAllErrors(std::move(E),
                     [&](std::unique_ptr<ErrorInfoBase> EIB) -> Error {
@@ -1316,20 +1298,20 @@ private:
   }
 
   std::string FileName;
-  std::optional<size_t> Line;
+  Optional<size_t> Line;
   std::unique_ptr<ErrorInfoBase> Err;
 };
 
 /// Concatenate a source file path and/or name with an Error. The resulting
 /// Error is unchecked.
 inline Error createFileError(const Twine &F, Error E) {
-  return FileError::build(F, std::optional<size_t>(), std::move(E));
+  return FileError::build(F, Optional<size_t>(), std::move(E));
 }
 
 /// Concatenate a source file path and/or name with line number and an Error.
 /// The resulting Error is unchecked.
 inline Error createFileError(const Twine &F, size_t Line, Error E) {
-  return FileError::build(F, std::optional<size_t>(Line), std::move(E));
+  return FileError::build(F, Optional<size_t>(Line), std::move(E));
 }
 
 /// Concatenate a source file path and/or name with a std::error_code 

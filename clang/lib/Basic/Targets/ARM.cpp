@@ -212,20 +212,6 @@ StringRef ARMTargetInfo::getCPUAttr() const {
     return "8_6A";
   case llvm::ARM::ArchKind::ARMV8_7A:
     return "8_7A";
-  case llvm::ARM::ArchKind::ARMV8_8A:
-    return "8_8A";
-  case llvm::ARM::ArchKind::ARMV8_9A:
-    return "8_9A";
-  case llvm::ARM::ArchKind::ARMV9A:
-    return "9A";
-  case llvm::ARM::ArchKind::ARMV9_1A:
-    return "9_1A";
-  case llvm::ARM::ArchKind::ARMV9_2A:
-    return "9_2A";
-  case llvm::ARM::ArchKind::ARMV9_3A:
-    return "9_3A";
-  case llvm::ARM::ArchKind::ARMV9_4A:
-    return "9_4A";
   case llvm::ARM::ArchKind::ARMV8MBaseline:
     return "8M_BASE";
   case llvm::ARM::ArchKind::ARMV8MMainline:
@@ -254,11 +240,8 @@ ARMTargetInfo::ARMTargetInfo(const llvm::Triple &Triple,
                              const TargetOptions &Opts)
     : TargetInfo(Triple), FPMath(FP_Default), IsAAPCS(true), LDREX(0),
       HW_FP(0) {
-  bool IsFreeBSD = Triple.isOSFreeBSD();
   bool IsOpenBSD = Triple.isOSOpenBSD();
   bool IsNetBSD = Triple.isOSNetBSD();
-  bool IsHaiku = Triple.isOSHaiku();
-  bool IsOHOS = Triple.isOHOSFamily();
 
   // FIXME: the isOSBinFormatMachO is a workaround for identifying a Darwin-like
   // environment where size_t is `unsigned long` rather than `unsigned int`
@@ -312,7 +295,6 @@ ARMTargetInfo::ARMTargetInfo(const llvm::Triple &Triple,
     case llvm::Triple::GNUEABIHF:
     case llvm::Triple::MuslEABI:
     case llvm::Triple::MuslEABIHF:
-    case llvm::Triple::OpenHOS:
       setABI("aapcs-linux");
       break;
     case llvm::Triple::EABIHF:
@@ -325,7 +307,7 @@ ARMTargetInfo::ARMTargetInfo(const llvm::Triple &Triple,
     default:
       if (IsNetBSD)
         setABI("apcs-gnu");
-      else if (IsFreeBSD || IsOpenBSD || IsHaiku || IsOHOS)
+      else if (IsOpenBSD)
         setABI("aapcs-linux");
       else
         setABI("aapcs");
@@ -379,49 +361,6 @@ bool ARMTargetInfo::setABI(const std::string &Name) {
   return false;
 }
 
-bool ARMTargetInfo::isBranchProtectionSupportedArch(StringRef Arch) const {
-  llvm::ARM::ArchKind CPUArch = llvm::ARM::parseCPUArch(Arch);
-  if (CPUArch == llvm::ARM::ArchKind::INVALID)
-    CPUArch = llvm::ARM::parseArch(getTriple().getArchName());
-
-  if (CPUArch == llvm::ARM::ArchKind::INVALID)
-    return false;
-
-  StringRef ArchFeature = llvm::ARM::getArchName(CPUArch);
-  auto a =
-      llvm::Triple(ArchFeature, getTriple().getVendorName(),
-                   getTriple().getOSName(), getTriple().getEnvironmentName());
-
-  StringRef SubArch = llvm::ARM::getSubArch(CPUArch);
-  llvm::ARM::ProfileKind Profile = llvm::ARM::parseArchProfile(SubArch);
-  return a.isArmT32() && (Profile == llvm::ARM::ProfileKind::M);
-}
-
-bool ARMTargetInfo::validateBranchProtection(StringRef Spec, StringRef Arch,
-                                             BranchProtectionInfo &BPI,
-                                             StringRef &Err) const {
-  llvm::ARM::ParsedBranchProtection PBP;
-  if (!llvm::ARM::parseBranchProtection(Spec, PBP, Err))
-    return false;
-
-  if (!isBranchProtectionSupportedArch(Arch))
-    return false;
-
-  BPI.SignReturnAddr =
-      llvm::StringSwitch<LangOptions::SignReturnAddressScopeKind>(PBP.Scope)
-          .Case("non-leaf", LangOptions::SignReturnAddressScopeKind::NonLeaf)
-          .Case("all", LangOptions::SignReturnAddressScopeKind::All)
-          .Default(LangOptions::SignReturnAddressScopeKind::None);
-
-  // Don't care for the sign key, beyond issuing a warning.
-  if (PBP.Key == "b_key")
-    Err = "b-key";
-  BPI.SignKey = LangOptions::SignReturnAddressKeyKind::AKey;
-
-  BPI.BranchTargetEnforcement = PBP.BranchTargetEnforcement;
-  return true;
-}
-
 // FIXME: This should be based on Arch attributes, not CPU names.
 bool ARMTargetInfo::initFeatureMap(
     llvm::StringMap<bool> &Features, DiagnosticsEngine &Diags, StringRef CPU,
@@ -439,23 +378,10 @@ bool ARMTargetInfo::initFeatureMap(
   if (CPUArch != llvm::ARM::ArchKind::INVALID) {
     ArchFeature = ("+" + llvm::ARM::getArchName(CPUArch)).str();
     TargetFeatures.push_back(ArchFeature);
-
-    // These features are added to allow arm_neon.h target(..) attributes to
-    // match with both arm and aarch64. We need to add all previous architecture
-    // versions, so that "8.6" also allows "8.1" functions. In case of v9.x the
-    // v8.x counterparts are added too. We only need these for anything > 8.0-A.
-    for (llvm::ARM::ArchKind I = llvm::ARM::convertV9toV8(CPUArch);
-         I != llvm::ARM::ArchKind::INVALID; --I)
-      Features[llvm::ARM::getSubArch(I)] = true;
-    if (CPUArch > llvm::ARM::ArchKind::ARMV8A &&
-        CPUArch <= llvm::ARM::ArchKind::ARMV9_3A)
-      for (llvm::ARM::ArchKind I = CPUArch; I != llvm::ARM::ArchKind::INVALID;
-           --I)
-        Features[llvm::ARM::getSubArch(I)] = true;
   }
 
   // get default FPU features
-  llvm::ARM::FPUKind FPUKind = llvm::ARM::getDefaultFPU(CPU, Arch);
+  unsigned FPUKind = llvm::ARM::getDefaultFPU(CPU, Arch);
   llvm::ARM::getFPUFeatures(FPUKind, TargetFeatures);
 
   // get default Extension features
@@ -511,13 +437,9 @@ bool ARMTargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
   HWDiv = 0;
   DotProd = 0;
   HasMatMul = 0;
-  HasPAC = 0;
-  HasBTI = 0;
   HasFloat16 = true;
   ARMCDECoprocMask = 0;
   HasBFloat16 = false;
-  HasFullBFloat16 = false;
-  FPRegsDisabled = false;
 
   // This does not diagnose illegal cases like having both
   // "+vfpv2" and "+vfpv3" or having "+neon" and "-fp64".
@@ -594,17 +516,8 @@ bool ARMTargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
       ARMCDECoprocMask |= (1U << Coproc);
     } else if (Feature == "+bf16") {
       HasBFloat16 = true;
-    } else if (Feature == "-fpregs") {
-      FPRegsDisabled = true;
-    } else if (Feature == "+pacbti") {
-      HasPAC = 1;
-      HasBTI = 1;
-    } else if (Feature == "+fullbf16") {
-      HasFullBFloat16 = true;
     }
   }
-
-  HalfArgsAndReturns = true;
 
   switch (ArchVersion) {
   case 6:
@@ -622,7 +535,6 @@ bool ARMTargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
       LDREX = LDREX_D | LDREX_W | LDREX_H | LDREX_B;
     break;
   case 8:
-  case 9:
     LDREX = LDREX_D | LDREX_W | LDREX_H | LDREX_B;
   }
 
@@ -654,8 +566,7 @@ bool ARMTargetInfo::hasFeature(StringRef Feature) const {
 }
 
 bool ARMTargetInfo::hasBFloat16Type() const {
-  // The __bf16 type is generally available so long as we have any fp registers.
-  return HasBFloat16 || (FPU && !SoftFloat);
+  return HasBFloat16 && !SoftFloat;
 }
 
 bool ARMTargetInfo::isValidCPUName(StringRef Name) const {
@@ -716,10 +627,8 @@ void ARMTargetInfo::getTargetDefines(const LangOptions &Opts,
   // For bare-metal none-eabi.
   if (getTriple().getOS() == llvm::Triple::UnknownOS &&
       (getTriple().getEnvironment() == llvm::Triple::EABI ||
-       getTriple().getEnvironment() == llvm::Triple::EABIHF) &&
-      Opts.CPlusPlus) {
-    Builder.defineMacro("_GNU_SOURCE");
-  }
+       getTriple().getEnvironment() == llvm::Triple::EABIHF))
+    Builder.defineMacro("__ELF__");
 
   // Target properties.
   Builder.defineMacro("__REGISTER_PREFIX__", "");
@@ -827,7 +736,7 @@ void ARMTargetInfo::getTargetDefines(const LangOptions &Opts,
   if ((!SoftFloat && !SoftFloatABI) || ABI == "aapcs-vfp" || ABI == "aapcs16")
     Builder.defineMacro("__ARM_PCS_VFP", "1");
 
-  if (SoftFloat || (SoftFloatABI && !FPU))
+  if (SoftFloat)
     Builder.defineMacro("__SOFTFP__");
 
   // ACLE position independent code macros.
@@ -949,26 +858,10 @@ void ARMTargetInfo::getTargetDefines(const LangOptions &Opts,
   if (HasMatMul)
     Builder.defineMacro("__ARM_FEATURE_MATMUL_INT8", "1");
 
-  if (HasPAC)
-    Builder.defineMacro("__ARM_FEATURE_PAUTH", "1");
-
-  if (HasBTI)
-    Builder.defineMacro("__ARM_FEATURE_BTI", "1");
-
   if (HasBFloat16) {
     Builder.defineMacro("__ARM_FEATURE_BF16", "1");
     Builder.defineMacro("__ARM_FEATURE_BF16_VECTOR_ARITHMETIC", "1");
     Builder.defineMacro("__ARM_BF16_FORMAT_ALTERNATIVE", "1");
-  }
-
-  if (Opts.BranchTargetEnforcement)
-    Builder.defineMacro("__ARM_FEATURE_BTI_DEFAULT", "1");
-
-  if (Opts.hasSignReturnAddress()) {
-    unsigned Value = 1;
-    if (Opts.isSignReturnAddressScopeAll())
-      Value |= 1 << 2;
-    Builder.defineMacro("__ARM_FEATURE_PAC_DEFAULT", Twine(Value));
   }
 
   switch (ArchKind) {
@@ -984,44 +877,32 @@ void ARMTargetInfo::getTargetDefines(const LangOptions &Opts,
   case llvm::ARM::ArchKind::ARMV8_4A:
   case llvm::ARM::ArchKind::ARMV8_5A:
   case llvm::ARM::ArchKind::ARMV8_6A:
-  case llvm::ARM::ArchKind::ARMV8_7A:
-  case llvm::ARM::ArchKind::ARMV8_8A:
-  case llvm::ARM::ArchKind::ARMV8_9A:
-  case llvm::ARM::ArchKind::ARMV9A:
-  case llvm::ARM::ArchKind::ARMV9_1A:
-  case llvm::ARM::ArchKind::ARMV9_2A:
-  case llvm::ARM::ArchKind::ARMV9_3A:
-  case llvm::ARM::ArchKind::ARMV9_4A:
     getTargetDefinesARMV83A(Opts, Builder);
     break;
   }
 }
 
-static constexpr Builtin::Info BuiltinInfo[] = {
+const Builtin::Info ARMTargetInfo::BuiltinInfo[] = {
 #define BUILTIN(ID, TYPE, ATTRS)                                               \
-  {#ID, TYPE, ATTRS, nullptr, HeaderDesc::NO_HEADER, ALL_LANGUAGES},
+  {#ID, TYPE, ATTRS, nullptr, ALL_LANGUAGES, nullptr},
 #define LIBBUILTIN(ID, TYPE, ATTRS, HEADER)                                    \
-  {#ID, TYPE, ATTRS, nullptr, HeaderDesc::HEADER, ALL_LANGUAGES},
-#define TARGET_BUILTIN(ID, TYPE, ATTRS, FEATURE)                               \
-  {#ID, TYPE, ATTRS, FEATURE, HeaderDesc::NO_HEADER, ALL_LANGUAGES},
+  {#ID, TYPE, ATTRS, HEADER, ALL_LANGUAGES, nullptr},
 #include "clang/Basic/BuiltinsNEON.def"
 
 #define BUILTIN(ID, TYPE, ATTRS)                                               \
-  {#ID, TYPE, ATTRS, nullptr, HeaderDesc::NO_HEADER, ALL_LANGUAGES},
+  {#ID, TYPE, ATTRS, nullptr, ALL_LANGUAGES, nullptr},
 #define LANGBUILTIN(ID, TYPE, ATTRS, LANG)                                     \
-  {#ID, TYPE, ATTRS, nullptr, HeaderDesc::NO_HEADER, LANG},
+  {#ID, TYPE, ATTRS, nullptr, LANG, nullptr},
 #define LIBBUILTIN(ID, TYPE, ATTRS, HEADER)                                    \
-  {#ID, TYPE, ATTRS, nullptr, HeaderDesc::HEADER, ALL_LANGUAGES},
-#define TARGET_BUILTIN(ID, TYPE, ATTRS, FEATURE)                               \
-  {#ID, TYPE, ATTRS, FEATURE, HeaderDesc::NO_HEADER, ALL_LANGUAGES},
+  {#ID, TYPE, ATTRS, HEADER, ALL_LANGUAGES, nullptr},
 #define TARGET_HEADER_BUILTIN(ID, TYPE, ATTRS, HEADER, LANGS, FEATURE)         \
-  {#ID, TYPE, ATTRS, FEATURE, HeaderDesc::HEADER, LANGS},
+  {#ID, TYPE, ATTRS, HEADER, LANGS, FEATURE},
 #include "clang/Basic/BuiltinsARM.def"
 };
 
 ArrayRef<Builtin::Info> ARMTargetInfo::getTargetBuiltins() const {
-  return llvm::ArrayRef(BuiltinInfo,
-                        clang::ARM::LastTSBuiltin - Builtin::FirstTSBuiltin);
+  return llvm::makeArrayRef(BuiltinInfo, clang::ARM::LastTSBuiltin -
+                                             Builtin::FirstTSBuiltin);
 }
 
 bool ARMTargetInfo::isCLZForZeroUndef() const { return false; }
@@ -1052,7 +933,7 @@ const char *const ARMTargetInfo::GCCRegNames[] = {
     "q12", "q13", "q14", "q15"};
 
 ArrayRef<const char *> ARMTargetInfo::getGCCRegNames() const {
-  return llvm::ArrayRef(GCCRegNames);
+  return llvm::makeArrayRef(GCCRegNames);
 }
 
 const TargetInfo::GCCRegAlias ARMTargetInfo::GCCRegAliases[] = {
@@ -1065,7 +946,7 @@ const TargetInfo::GCCRegAlias ARMTargetInfo::GCCRegAliases[] = {
 };
 
 ArrayRef<TargetInfo::GCCRegAlias> ARMTargetInfo::getGCCRegAliases() const {
-  return llvm::ArrayRef(GCCRegAliases);
+  return llvm::makeArrayRef(GCCRegAliases);
 }
 
 bool ARMTargetInfo::validateAsmConstraint(
@@ -1087,8 +968,6 @@ bool ARMTargetInfo::validateAsmConstraint(
   case 't': // s0-s31, d0-d31, or q0-q15
   case 'w': // s0-s15, d0-d7, or q0-q3
   case 'x': // s0-s31, d0-d15, or q0-q7
-    if (FPRegsDisabled)
-      return false;
     Info.setAllowsRegister();
     return true;
   case 'j': // An immediate integer between 0 and 65535 (valid for MOVW)
@@ -1248,7 +1127,7 @@ bool ARMTargetInfo::validateConstraintModifier(
 
   return true;
 }
-std::string_view ARMTargetInfo::getClobbers() const {
+const char *ARMTargetInfo::getClobbers() const {
   // FIXME: Is this really right?
   return "";
 }
@@ -1410,6 +1289,11 @@ DarwinARMTargetInfo::DarwinARMTargetInfo(const llvm::Triple &Triple,
                                          const TargetOptions &Opts)
     : DarwinTargetInfo<ARMleTargetInfo>(Triple, Opts) {
   HasAlignMac68kSupport = true;
+  // iOS always has 64-bit atomic instructions.
+  // FIXME: This should be based off of the target features in
+  // ARMleTargetInfo.
+  MaxAtomicInlineWidth = 64;
+
   if (Triple.isWatchABI()) {
     // Darwin on iOS uses a variant of the ARM C++ ABI.
     TheCXXABI.set(TargetCXXABI::WatchOS);

@@ -8,7 +8,7 @@
 // expected-error@+1 {{unexpected OpenMP directive '#pragma omp parallel for'}}
 #pragma omp parallel for foo
 
-void test_no_clause(void) {
+void test_no_clause() {
   int i;
 #pragma omp parallel for
   for (i = 0; i < 16; ++i)
@@ -19,7 +19,7 @@ void test_no_clause(void) {
   ++i;
 }
 
-void test_branch_protected_scope(void) {
+void test_branch_protected_scope() {
   int i = 0;
 L1:
   ++i;
@@ -46,7 +46,7 @@ L1:
     goto L1;
 }
 
-void test_invalid_clause(void) {
+void test_invalid_clause() {
   int i;
 // expected-warning@+1 {{extra tokens at the end of '#pragma omp parallel for' are ignored}}
 #pragma omp parallel for foo bar
@@ -54,7 +54,7 @@ void test_invalid_clause(void) {
     ;
 }
 
-void test_non_identifiers(void) {
+void test_non_identifiers() {
   int i, x;
 
 // expected-warning@+1 {{extra tokens at the end of '#pragma omp parallel for' are ignored}}
@@ -73,9 +73,9 @@ void test_non_identifiers(void) {
     ;
 }
 
-extern int foo(void);
+extern int foo();
 
-void test_collapse(void) {
+void test_collapse() {
   int i;
 // expected-error@+1 {{expected '('}}
 #pragma omp parallel for collapse
@@ -174,7 +174,7 @@ void test_collapse(void) {
         i += j;
 }
 
-void test_private(void) {
+void test_private() {
   int i;
 // expected-error@+2 {{expected expression}}
 // expected-error@+1 {{expected ')'}} expected-note@+1 {{to match this '('}}
@@ -216,7 +216,7 @@ void test_private(void) {
   }
 }
 
-void test_lastprivate(void) {
+void test_lastprivate() {
   int i;
 // expected-error@+2 {{expected ')'}} expected-note@+2 {{to match this '('}}
 // expected-error@+1 {{expected expression}}
@@ -258,7 +258,7 @@ void test_lastprivate(void) {
     ;
 }
 
-void test_firstprivate(void) {
+void test_firstprivate() {
   int i;
 // expected-error@+2 {{expected ')'}} expected-note@+2 {{to match this '('}}
 // expected-error@+1 {{expected expression}}
@@ -300,7 +300,7 @@ void test_firstprivate(void) {
     ;
 }
 
-void test_loop_messages(void) {
+void test_loop_messages() {
   float a[100], b[100], c[100];
 // expected-error@+2 {{variable must be of integer or pointer type}}
 #pragma omp parallel for

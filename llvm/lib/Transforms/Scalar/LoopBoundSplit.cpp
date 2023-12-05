@@ -7,16 +7,20 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Transforms/Scalar/LoopBoundSplit.h"
-#include "llvm/ADT/Sequence.h"
+#include "llvm/Analysis/LoopAccessAnalysis.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/Analysis/LoopIterator.h"
+#include "llvm/Analysis/LoopPass.h"
+#include "llvm/Analysis/MemorySSA.h"
+#include "llvm/Analysis/MemorySSAUpdater.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/IR/PatternMatch.h"
-#include "llvm/Transforms/Scalar/LoopPassManager.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/LoopSimplify.h"
+#include "llvm/Transforms/Utils/LoopUtils.h"
 #include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
 
 #define DEBUG_TYPE "loop-bound-split"
@@ -28,51 +32,40 @@ using namespace PatternMatch;
 namespace {
 struct ConditionInfo {
   /// Branch instruction with this condition
-  BranchInst *BI = nullptr;
+  BranchInst *BI;
   /// ICmp instruction with this condition
-  ICmpInst *ICmp = nullptr;
+  ICmpInst *ICmp;
   /// Preciate info
-  ICmpInst::Predicate Pred = ICmpInst::BAD_ICMP_PREDICATE;
+  ICmpInst::Predicate Pred;
   /// AddRec llvm value
-  Value *AddRecValue = nullptr;
-  /// Non PHI AddRec llvm value
-  Value *NonPHIAddRecValue;
+  Value *AddRecValue;
   /// Bound llvm value
-  Value *BoundValue = nullptr;
+  Value *BoundValue;
   /// AddRec SCEV
-  const SCEVAddRecExpr *AddRecSCEV = nullptr;
+  const SCEV *AddRecSCEV;
   /// Bound SCEV
-  const SCEV *BoundSCEV = nullptr;
+  const SCEV *BoundSCEV;
 
-  ConditionInfo() = default;
+  ConditionInfo()
+      : BI(nullptr), ICmp(nullptr), Pred(ICmpInst::BAD_ICMP_PREDICATE),
+        AddRecValue(nullptr), BoundValue(nullptr), AddRecSCEV(nullptr),
+        BoundSCEV(nullptr) {}
 };
 } // namespace
 
 static void analyzeICmp(ScalarEvolution &SE, ICmpInst *ICmp,
-                        ConditionInfo &Cond, const Loop &L) {
+                        ConditionInfo &Cond) {
   Cond.ICmp = ICmp;
   if (match(ICmp, m_ICmp(Cond.Pred, m_Value(Cond.AddRecValue),
                          m_Value(Cond.BoundValue)))) {
-    const SCEV *AddRecSCEV = SE.getSCEV(Cond.AddRecValue);
-    const SCEV *BoundSCEV = SE.getSCEV(Cond.BoundValue);
-    const SCEVAddRecExpr *LHSAddRecSCEV = dyn_cast<SCEVAddRecExpr>(AddRecSCEV);
-    const SCEVAddRecExpr *RHSAddRecSCEV = dyn_cast<SCEVAddRecExpr>(BoundSCEV);
+    Cond.AddRecSCEV = SE.getSCEV(Cond.AddRecValue);
+    Cond.BoundSCEV = SE.getSCEV(Cond.BoundValue);
     // Locate AddRec in LHSSCEV and Bound in RHSSCEV.
-    if (!LHSAddRecSCEV && RHSAddRecSCEV) {
+    if (isa<SCEVAddRecExpr>(Cond.BoundSCEV) &&
+        !isa<SCEVAddRecExpr>(Cond.AddRecSCEV)) {
       std::swap(Cond.AddRecValue, Cond.BoundValue);
-      std::swap(AddRecSCEV, BoundSCEV);
+      std::swap(Cond.AddRecSCEV, Cond.BoundSCEV);
       Cond.Pred = ICmpInst::getSwappedPredicate(Cond.Pred);
-    }
-
-    Cond.AddRecSCEV = dyn_cast<SCEVAddRecExpr>(AddRecSCEV);
-    Cond.BoundSCEV = BoundSCEV;
-    Cond.NonPHIAddRecValue = Cond.AddRecValue;
-
-    // If the Cond.AddRecValue is PHI node, update Cond.NonPHIAddRecValue with
-    // value from backedge.
-    if (Cond.AddRecSCEV && isa<PHINode>(Cond.AddRecValue)) {
-      PHINode *PN = cast<PHINode>(Cond.AddRecValue);
-      Cond.NonPHIAddRecValue = PN->getIncomingValueForBlock(L.getLoopLatch());
     }
   }
 }
@@ -125,20 +118,21 @@ static bool calculateUpperBound(const Loop &L, ScalarEvolution &SE,
 static bool hasProcessableCondition(const Loop &L, ScalarEvolution &SE,
                                     ICmpInst *ICmp, ConditionInfo &Cond,
                                     bool IsExitCond) {
-  analyzeICmp(SE, ICmp, Cond, L);
+  analyzeICmp(SE, ICmp, Cond);
 
   // The BoundSCEV should be evaluated at loop entry.
   if (!SE.isAvailableAtLoopEntry(Cond.BoundSCEV, &L))
     return false;
 
+  const SCEVAddRecExpr *AddRecSCEV = dyn_cast<SCEVAddRecExpr>(Cond.AddRecSCEV);
   // Allowed AddRec as induction variable.
-  if (!Cond.AddRecSCEV)
+  if (!AddRecSCEV)
     return false;
 
-  if (!Cond.AddRecSCEV->isAffine())
+  if (!AddRecSCEV->isAffine())
     return false;
 
-  const SCEV *StepRecSCEV = Cond.AddRecSCEV->getStepRecurrence(SE);
+  const SCEV *StepRecSCEV = AddRecSCEV->getStepRecurrence(SE);
   // Allowed constant step.
   if (!isa<SCEVConstant>(StepRecSCEV))
     return false;
@@ -270,14 +264,6 @@ static BranchInst *findSplitCandidate(const Loop &L, ScalarEvolution &SE,
         SplitCandidateCond.BoundSCEV->getType())
       continue;
 
-    // After transformation, we assume the split condition of the pre-loop is
-    // always true. In order to guarantee it, we need to check the start value
-    // of the split cond AddRec satisfies the split condition.
-    if (!SE.isLoopEntryGuardedByCond(&L, SplitCandidateCond.Pred,
-                                     SplitCandidateCond.AddRecSCEV->getStart(),
-                                     SplitCandidateCond.BoundSCEV))
-      continue;
-
     SplitCandidateCond.BI = BI;
     return BI;
   }
@@ -355,45 +341,13 @@ static bool splitLoopBound(Loop &L, DominatorTree &DT, LoopInfo &LI,
                                     ".split", &LI, &DT, PostLoopBlocks);
   remapInstructionsInBlocks(PostLoopBlocks, VMap);
 
-  BasicBlock *PostLoopPreHeader = PostLoop->getLoopPreheader();
-  IRBuilder<> Builder(&PostLoopPreHeader->front());
-
-  // Update phi nodes in header of post-loop.
-  bool isExitingLatch =
-      (L.getExitingBlock() == L.getLoopLatch()) ? true : false;
-  Value *ExitingCondLCSSAPhi = nullptr;
-  for (PHINode &PN : L.getHeader()->phis()) {
-    // Create LCSSA phi node in preheader of post-loop.
-    PHINode *LCSSAPhi =
-        Builder.CreatePHI(PN.getType(), 1, PN.getName() + ".lcssa");
-    LCSSAPhi->setDebugLoc(PN.getDebugLoc());
-    // If the exiting block is loop latch, the phi does not have the update at
-    // last iteration. In this case, update lcssa phi with value from backedge.
-    LCSSAPhi->addIncoming(
-        isExitingLatch ? PN.getIncomingValueForBlock(L.getLoopLatch()) : &PN,
-        L.getExitingBlock());
-
-    // Update the start value of phi node in post-loop with the LCSSA phi node.
-    PHINode *PostLoopPN = cast<PHINode>(VMap[&PN]);
-    PostLoopPN->setIncomingValueForBlock(PostLoopPreHeader, LCSSAPhi);
-
-    // Find PHI with exiting condition from pre-loop. The PHI should be
-    // SCEVAddRecExpr and have same incoming value from backedge with
-    // ExitingCond.
-    if (!SE.isSCEVable(PN.getType()))
-      continue;
-
-    const SCEVAddRecExpr *PhiSCEV = dyn_cast<SCEVAddRecExpr>(SE.getSCEV(&PN));
-    if (PhiSCEV && ExitingCond.NonPHIAddRecValue ==
-                       PN.getIncomingValueForBlock(L.getLoopLatch()))
-      ExitingCondLCSSAPhi = LCSSAPhi;
-  }
-
   // Add conditional branch to check we can skip post-loop in its preheader.
+  BasicBlock *PostLoopPreHeader = PostLoop->getLoopPreheader();
+  IRBuilder<> Builder(PostLoopPreHeader);
   Instruction *OrigBI = PostLoopPreHeader->getTerminator();
   ICmpInst::Predicate Pred = ICmpInst::ICMP_NE;
   Value *Cond =
-      Builder.CreateICmp(Pred, ExitingCondLCSSAPhi, ExitingCond.BoundValue);
+      Builder.CreateICmp(Pred, ExitingCond.AddRecValue, ExitingCond.BoundValue);
   Builder.CreateCondBr(Cond, PostLoop->getHeader(), PostLoop->getExitBlock());
   OrigBI->eraseFromParent();
 
@@ -414,6 +368,21 @@ static bool splitLoopBound(Loop &L, DominatorTree &DT, LoopInfo &LI,
   // Replace exiting bound value of pre-loop NewBound.
   ExitingCond.ICmp->setOperand(1, NewBoundValue);
 
+  // Replace IV's start value of post-loop by NewBound.
+  for (PHINode &PN : L.getHeader()->phis()) {
+    // Find PHI with exiting condition from pre-loop.
+    if (SE.isSCEVable(PN.getType()) && isa<SCEVAddRecExpr>(SE.getSCEV(&PN))) {
+      for (Value *Op : PN.incoming_values()) {
+        if (Op == ExitingCond.AddRecValue) {
+          // Find cloned PHI for post-loop.
+          PHINode *PostLoopPN = cast<PHINode>(VMap[&PN]);
+          PostLoopPN->setIncomingValueForBlock(PostLoopPreHeader,
+                                               NewBoundValue);
+        }
+      }
+    }
+  }
+
   // Replace SplitCandidateCond.BI's condition of pre-loop by True.
   LLVMContext &Context = PreHeader->getContext();
   SplitCandidateCond.BI->setCondition(ConstantInt::getTrue(Context));
@@ -429,30 +398,6 @@ static bool splitLoopBound(Loop &L, DominatorTree &DT, LoopInfo &LI,
   else
     ExitingCond.BI->setSuccessor(1, PostLoopPreHeader);
 
-  // Update phi node in exit block of post-loop.
-  Builder.SetInsertPoint(PostLoopPreHeader, PostLoopPreHeader->begin());
-  for (PHINode &PN : PostLoop->getExitBlock()->phis()) {
-    for (auto i : seq<int>(0, PN.getNumOperands())) {
-      // Check incoming block is pre-loop's exiting block.
-      if (PN.getIncomingBlock(i) == L.getExitingBlock()) {
-        Value *IncomingValue = PN.getIncomingValue(i);
-
-        // Create LCSSA phi node for incoming value.
-        PHINode *LCSSAPhi =
-            Builder.CreatePHI(PN.getType(), 1, PN.getName() + ".lcssa");
-        LCSSAPhi->setDebugLoc(PN.getDebugLoc());
-        LCSSAPhi->addIncoming(IncomingValue, PN.getIncomingBlock(i));
-
-        // Replace pre-loop's exiting block by post-loop's preheader.
-        PN.setIncomingBlock(i, PostLoopPreHeader);
-        // Replace incoming value by LCSSAPhi.
-        PN.setIncomingValue(i, LCSSAPhi);
-        // Add a new incoming value with post-loop's exiting block.
-        PN.addIncoming(VMap[IncomingValue], PostLoop->getExitingBlock());
-      }
-    }
-  }
-
   // Update dominator tree.
   DT.changeImmediateDominator(PostLoopPreHeader, L.getExitingBlock());
   DT.changeImmediateDominator(PostLoop->getExitBlock(), PostLoopPreHeader);
@@ -461,7 +406,10 @@ static bool splitLoopBound(Loop &L, DominatorTree &DT, LoopInfo &LI,
   SE.forgetLoop(&L);
 
   // Canonicalize loops.
+  // TODO: Try to update LCSSA information according to above change.
+  formLCSSA(L, DT, &LI, &SE);
   simplifyLoop(&L, &DT, &LI, &SE, nullptr, nullptr, true);
+  formLCSSA(*PostLoop, DT, &LI, &SE);
   simplifyLoop(PostLoop, &DT, &LI, &SE, nullptr, nullptr, true);
 
   // Add new post-loop to loop pass manager.

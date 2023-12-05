@@ -124,9 +124,9 @@ static void PrintAccumulatedStats() {
   // Use lock to keep reports from mixing up.
   Lock lock(&print_lock);
   stats.Print();
-  StackDepotStats stack_depot_stats = StackDepotGetStats();
+  StackDepotStats *stack_depot_stats = StackDepotGetStats();
   Printf("Stats: StackDepot: %zd ids; %zdM allocated\n",
-         stack_depot_stats.n_uniq_ids, stack_depot_stats.allocated >> 20);
+         stack_depot_stats->n_uniq_ids, stack_depot_stats->allocated >> 20);
   PrintInternalAllocatorStats();
 }
 
@@ -142,7 +142,7 @@ uptr __sanitizer_get_current_allocated_bytes() {
   uptr freed = stats.freed;
   // Return sane value if malloced < freed due to racy
   // way we update accumulated stats.
-  return (malloced > freed) ? malloced - freed : 0;
+  return (malloced > freed) ? malloced - freed : 1;
 }
 
 uptr __sanitizer_get_heap_size() {
@@ -161,7 +161,7 @@ uptr __sanitizer_get_free_bytes() {
                   + stats.malloced_redzones;
   // Return sane value if total_free < total_used due to racy
   // way we update accumulated stats.
-  return (total_free > total_used) ? total_free - total_used : 0;
+  return (total_free > total_used) ? total_free - total_used : 1;
 }
 
 uptr __sanitizer_get_unmapped_bytes() {

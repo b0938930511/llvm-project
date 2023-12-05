@@ -1,4 +1,5 @@
-! RUN: %python %S/test_errors.py %s %flang_fc1
+! RUN: %S/test_errors.sh %s %t %flang_fc1
+! REQUIRES: shell
 subroutine forall1
   real :: a(9)
   !ERROR: 'i' is already declared in this scoping unit
@@ -42,7 +43,6 @@ subroutine forall3
   forall(i=1:10)
     forall(j=1:10)
       !ERROR: Cannot redefine FORALL variable 'i'
-      !WARNING: FORALL index variable 'j' not used on left-hand side of assignment
       i = 1
     end forall
   end forall
@@ -82,18 +82,14 @@ subroutine forall5
     x(i) = y(i)
   end forall
   forall(i=1:10)
-    !WARNING: FORALL index variable 'i' not used on left-hand side of assignment
-    x = y
+    x = y  ! warning: i not used on LHS
     forall(j=1:10)
-      !WARNING: FORALL index variable 'j' not used on left-hand side of assignment
-      x(i) = y(i)
-      !WARNING: FORALL index variable 'i' not used on left-hand side of assignment
-      x(j) = y(j)
+      x(i) = y(i)  ! warning: j not used on LHS
+      x(j) = y(j)  ! warning: i not used on LHS
     endforall
   endforall
   do concurrent(i=1:10)
     x = y
-    !WARNING: FORALL index variable 'i' not used on left-hand side of assignment
     forall(i=1:10) x = y
   end do
 end
@@ -106,29 +102,6 @@ subroutine forall6
   real, target :: b(10)
   forall(i=1:10)
     a(i)%p => b(i)
-    !WARNING: FORALL index variable 'i' not used on left-hand side of assignment
-    a(1)%p => b(i)
+    a(1)%p => b(i)  ! warning: i not used on LHS
   end forall
 end
-
-subroutine forall7(x)
-  integer :: iarr(1)
-  real :: a(10)
-  class(*) :: x
-  associate (j => iarr(1))
-    forall (j=1:size(a))
-      a(j) = a(j) + 1
-    end forall
-  end associate
-  associate (j => iarr(1) + 1)
-    forall (j=1:size(a))
-      a(j) = a(j) + 1
-    end forall
-  end associate
-  select type (j => x)
-  type is (integer)
-    forall (j=1:size(a))
-      a(j) = a(j) + 1
-    end forall
-  end select
-end subroutine

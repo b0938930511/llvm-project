@@ -7,12 +7,14 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
+// UNSUPPORTED: libcpp-no-concepts
+// UNSUPPORTED: gcc-10
 
 // iter_common_reference_t
 
-#include <concepts>
 #include <iterator>
-#include <type_traits>
+
+#include <concepts>
 
 struct X { };
 

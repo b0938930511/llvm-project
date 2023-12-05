@@ -3,20 +3,19 @@ set(exegesis_includes
   )
 
 set(LLVM_LINK_COMPONENTS
-  CodeGenTypes
   MC
   MCParser
   Object
   Support
   Symbolize
-  TargetParser
   )
 
 set(exegesis_sources
   BenchmarkRunnerTest.cpp
   ClusteringTest.cpp
-  ProgressMeterTest.cpp
+  PerfHelperTest.cpp
   RegisterValueTest.cpp
+  SnippetGeneratorTest.cpp
   )
 
 set(exegesis_link_libraries LLVMExegesis)
@@ -43,6 +42,9 @@ endfunction()
 if(LLVM_TARGETS_TO_BUILD MATCHES "X86")
   include(X86/CMakeLists.txt)
 endif()
+if(LLVM_TARGETS_TO_BUILD MATCHES "ARM")
+  include(ARM/CMakeLists.txt)
+endif()
 if(LLVM_TARGETS_TO_BUILD MATCHES "AArch64")
   include(AArch64/CMakeLists.txt)
 endif()
@@ -61,5 +63,3 @@ add_llvm_target_unittest(LLVMExegesisTests
   ${exegesis_sources}
   )
 target_link_libraries(LLVMExegesisTests PRIVATE ${exegesis_link_libraries})
-
-set_property(TARGET LLVMExegesisTests PROPERTY FOLDER "Tests/UnitTests/ToolTests")

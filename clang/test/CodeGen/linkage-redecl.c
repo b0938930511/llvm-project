@@ -2,7 +2,7 @@
 
 // CHECK: @test2_i = internal global i32 99
 static int test2_i = 99;
-int test2_f(void) {
+int test2_f() {
   extern int test2_i;
   return test2_i;
 }
@@ -11,7 +11,7 @@ int test2_f(void) {
 // PR3425
 static void f(int x);
 
-void g0(void) {
+void g0() {
   f(5);
 }
 

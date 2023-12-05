@@ -4,8 +4,9 @@
 // RUN: %clang -target xcore %s -g0 -### -o %t.o 2>&1 | FileCheck -check-prefix CHECK-G0 %s
 
 // CHECK: "-mframe-pointer=none"
-// CHECK: "-nostdsysteminc" "-fno-use-cxa-atexit"
+// CHECK: "-nostdsysteminc"
 // CHECK: "-fno-signed-char"
+// CHECK: "-fno-use-cxa-atexit"
 // CHECK-NOT: "-fcxx-exceptions"
 // CHECK-NOT: "-fexceptions"
 // CHECK-NOT: "-fcommon"
@@ -29,3 +30,4 @@
 // CHECK-G0: xcc"
 // CHECK-G0-NOT: "-g"
 // CHECK-G0: xcc"
+

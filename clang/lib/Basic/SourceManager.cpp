@@ -17,7 +17,8 @@
 #include "clang/Basic/SourceLocation.h"
 #include "clang/Basic/SourceManagerInternals.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/None.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -37,7 +38,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <optional>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -59,10 +59,12 @@ unsigned ContentCache::getSizeBytesMapped() const {
 /// Returns the kind of memory used to back the memory buffer for
 /// this content cache.  This is used for performance analysis.
 llvm::MemoryBuffer::BufferKind ContentCache::getMemoryBufferKind() const {
-  if (Buffer == nullptr) {
-    assert(0 && "Buffer should never be null");
+  assert(Buffer);
+
+  // Should be unreachable, but keep for sanity.
+  if (!Buffer)
     return llvm::MemoryBuffer::MemoryBuffer_Malloc;
-  }
+
   return Buffer->getBufferKind();
 }
 
@@ -98,23 +100,23 @@ const char *ContentCache::getInvalidBOM(StringRef BufStr) {
   return InvalidBOM;
 }
 
-std::optional<llvm::MemoryBufferRef>
+llvm::Optional<llvm::MemoryBufferRef>
 ContentCache::getBufferOrNone(DiagnosticsEngine &Diag, FileManager &FM,
                               SourceLocation Loc) const {
   // Lazily create the Buffer for ContentCaches that wrap files.  If we already
   // computed it, just return what we have.
   if (IsBufferInvalid)
-    return std::nullopt;
+    return None;
   if (Buffer)
     return Buffer->getMemBufferRef();
   if (!ContentsEntry)
-    return std::nullopt;
+    return None;
 
   // Start with the assumption that the buffer is invalid to simplify early
   // return paths.
   IsBufferInvalid = true;
 
-  auto BufferOrError = FM.getBufferForFile(*ContentsEntry, IsFileVolatile);
+  auto BufferOrError = FM.getBufferForFile(ContentsEntry, IsFileVolatile);
 
   // If we were unable to open the file, then we are in an inconsistent
   // situation where the content cache referenced a file which no longer
@@ -130,7 +132,7 @@ ContentCache::getBufferOrNone(DiagnosticsEngine &Diag, FileManager &FM,
       Diag.Report(Loc, diag::err_cannot_open_file)
           << ContentsEntry->getName() << BufferOrError.getError().message();
 
-    return std::nullopt;
+    return None;
   }
 
   Buffer = std::move(*BufferOrError);
@@ -152,7 +154,7 @@ ContentCache::getBufferOrNone(DiagnosticsEngine &Diag, FileManager &FM,
       Diag.Report(Loc, diag::err_file_too_large)
         << ContentsEntry->getName();
 
-    return std::nullopt;
+    return None;
   }
 
   // Unless this is a named pipe (in which case we can handle a mismatch),
@@ -167,7 +169,7 @@ ContentCache::getBufferOrNone(DiagnosticsEngine &Diag, FileManager &FM,
       Diag.Report(Loc, diag::err_file_modified)
         << ContentsEntry->getName();
 
-    return std::nullopt;
+    return None;
   }
 
   // If the buffer is valid, check to see if it has a UTF Byte Order Mark
@@ -179,7 +181,7 @@ ContentCache::getBufferOrNone(DiagnosticsEngine &Diag, FileManager &FM,
   if (InvalidBOM) {
     Diag.Report(Loc, diag::err_unsupported_bom)
       << InvalidBOM << ContentsEntry->getName();
-    return std::nullopt;
+    return None;
   }
 
   // Buffer has been validated.
@@ -205,30 +207,28 @@ void LineTableInfo::AddLineNote(FileID FID, unsigned Offset, unsigned LineNo,
                                 SrcMgr::CharacteristicKind FileKind) {
   std::vector<LineEntry> &Entries = LineEntries[FID];
 
+  // An unspecified FilenameID means use the last filename if available, or the
+  // main source file otherwise.
+  if (FilenameID == -1 && !Entries.empty())
+    FilenameID = Entries.back().FilenameID;
+
   assert((Entries.empty() || Entries.back().FileOffset < Offset) &&
          "Adding line entries out of order!");
 
   unsigned IncludeOffset = 0;
-  if (EntryExit == 1) {
-    // Push #include
+  if (EntryExit == 0) {  // No #include stack change.
+    IncludeOffset = Entries.empty() ? 0 : Entries.back().IncludeOffset;
+  } else if (EntryExit == 1) {
     IncludeOffset = Offset-1;
-  } else {
-    const auto *PrevEntry = Entries.empty() ? nullptr : &Entries.back();
-    if (EntryExit == 2) {
-      // Pop #include
-      assert(PrevEntry && PrevEntry->IncludeOffset &&
-             "PPDirectives should have caught case when popping empty include "
-             "stack");
-      PrevEntry = FindNearestLineEntry(FID, PrevEntry->IncludeOffset);
-    }
-    if (PrevEntry) {
+  } else if (EntryExit == 2) {
+    assert(!Entries.empty() && Entries.back().IncludeOffset &&
+       "PPDirectives should have caught case when popping empty include stack");
+
+    // Get the include loc of the last entries' include loc as our include loc.
+    IncludeOffset = 0;
+    if (const LineEntry *PrevEntry =
+          FindNearestLineEntry(FID, Entries.back().IncludeOffset))
       IncludeOffset = PrevEntry->IncludeOffset;
-      if (FilenameID == -1) {
-        // An unspecified FilenameID means use the previous (or containing)
-        // filename if available, or the main source file otherwise.
-        FilenameID = PrevEntry->FilenameID;
-      }
-    }
   }
 
   Entries.push_back(LineEntry::get(Offset, LineNo, FilenameID, FileKind,
@@ -324,7 +324,8 @@ SourceManager::~SourceManager() {
       ContentCacheAlloc.Deallocate(MemBufferInfos[i]);
     }
   }
-  for (auto I = FileInfos.begin(), E = FileInfos.end(); I != E; ++I) {
+  for (llvm::DenseMap<const FileEntry*, SrcMgr::ContentCache*>::iterator
+       I = FileInfos.begin(), E = FileInfos.end(); I != E; ++I) {
     if (I->second) {
       I->second->~ContentCache();
       ContentCacheAlloc.Deallocate(I->second);
@@ -337,7 +338,6 @@ void SourceManager::clearIDTables() {
   LocalSLocEntryTable.clear();
   LoadedSLocEntryTable.clear();
   SLocEntryLoaded.clear();
-  SLocEntryOffsetLoaded.clear();
   LastLineNoFileIDQuery = FileID();
   LastLineNoContentCache = nullptr;
   LastFileIDLookup = FileID();
@@ -399,7 +399,8 @@ ContentCache &SourceManager::getOrCreateContentCache(FileEntryRef FileEnt,
   if (OverriddenFilesInfo) {
     // If the file contents are overridden with contents from another file,
     // pass that file to ContentCache.
-    auto overI = OverriddenFilesInfo->OverriddenFiles.find(FileEnt);
+    llvm::DenseMap<const FileEntry *, const FileEntry *>::iterator
+        overI = OverriddenFilesInfo->OverriddenFiles.find(FileEnt);
     if (overI == OverriddenFilesInfo->OverriddenFiles.end())
       new (Entry) ContentCache(FileEnt);
     else
@@ -454,17 +455,13 @@ SourceManager::AllocateLoadedSLocEntries(unsigned NumSLocEntries,
                                          SourceLocation::UIntTy TotalSize) {
   assert(ExternalSLocEntries && "Don't have an external sloc source");
   // Make sure we're not about to run out of source locations.
-  if (CurrentLoadedOffset < TotalSize ||
-      CurrentLoadedOffset - TotalSize < NextLocalOffset) {
+  if (CurrentLoadedOffset - TotalSize < NextLocalOffset)
     return std::make_pair(0, 0);
-  }
   LoadedSLocEntryTable.resize(LoadedSLocEntryTable.size() + NumSLocEntries);
   SLocEntryLoaded.resize(LoadedSLocEntryTable.size());
-  SLocEntryOffsetLoaded.resize(LoadedSLocEntryTable.size());
   CurrentLoadedOffset -= TotalSize;
-  int BaseID = -int(LoadedSLocEntryTable.size()) - 1;
-  LoadedSLocEntryAllocBegin.push_back(FileID::get(BaseID));
-  return std::make_pair(BaseID, CurrentLoadedOffset);
+  int ID = LoadedSLocEntryTable.size();
+  return std::make_pair(-ID - 1, CurrentLoadedOffset);
 }
 
 /// As part of recovering from missing or changed content, produce a
@@ -530,6 +527,17 @@ FileID SourceManager::getNextFileID(FileID FID) const {
 
 /// Create a new FileID that represents the specified file
 /// being \#included from the specified IncludePosition.
+///
+/// This translates NULL into standard input.
+FileID SourceManager::createFileID(const FileEntry *SourceFile,
+                                   SourceLocation IncludePos,
+                                   SrcMgr::CharacteristicKind FileCharacter,
+                                   int LoadedID,
+                                   SourceLocation::UIntTy LoadedOffset) {
+  return createFileID(SourceFile->getLastRef(), IncludePos, FileCharacter,
+                      LoadedID, LoadedOffset);
+}
+
 FileID SourceManager::createFileID(FileEntryRef SourceFile,
                                    SourceLocation IncludePos,
                                    SrcMgr::CharacteristicKind FileCharacter,
@@ -577,7 +585,7 @@ FileID SourceManager::createFileID(const llvm::MemoryBufferRef &Buffer,
 /// Get the FileID for \p SourceFile if it exists. Otherwise, create a
 /// new FileID for the \p SourceFile.
 FileID
-SourceManager::getOrCreateFileID(FileEntryRef SourceFile,
+SourceManager::getOrCreateFileID(const FileEntry *SourceFile,
                                  SrcMgr::CharacteristicKind FileCharacter) {
   FileID ID = translateFile(SourceFile);
   return ID.isValid() ? ID : createFileID(SourceFile, SourceLocation(),
@@ -599,14 +607,13 @@ FileID SourceManager::createFileIDImpl(ContentCache &File, StringRef Filename,
     assert(!SLocEntryLoaded[Index] && "FileID already loaded");
     LoadedSLocEntryTable[Index] = SLocEntry::get(
         LoadedOffset, FileInfo::get(IncludePos, File, FileCharacter, Filename));
-    SLocEntryLoaded[Index] = SLocEntryOffsetLoaded[Index] = true;
+    SLocEntryLoaded[Index] = true;
     return FileID::get(LoadedID);
   }
   unsigned FileSize = File.getSize();
   if (!(NextLocalOffset + FileSize + 1 > NextLocalOffset &&
         NextLocalOffset + FileSize + 1 <= CurrentLoadedOffset)) {
-    Diag.Report(IncludePos, diag::err_sloc_space_too_large);
-    noteSLocAddressSpaceUsage(Diag);
+    Diag.Report(IncludePos, diag::err_include_too_large);
     return FileID();
   }
   LocalSLocEntryTable.push_back(
@@ -622,21 +629,23 @@ FileID SourceManager::createFileIDImpl(ContentCache &File, StringRef Filename,
   return LastFileIDLookup = FID;
 }
 
-SourceLocation SourceManager::createMacroArgExpansionLoc(
-    SourceLocation SpellingLoc, SourceLocation ExpansionLoc, unsigned Length) {
+SourceLocation
+SourceManager::createMacroArgExpansionLoc(SourceLocation SpellingLoc,
+                                          SourceLocation ExpansionLoc,
+                                          unsigned TokLength) {
   ExpansionInfo Info = ExpansionInfo::createForMacroArg(SpellingLoc,
                                                         ExpansionLoc);
-  return createExpansionLocImpl(Info, Length);
+  return createExpansionLocImpl(Info, TokLength);
 }
 
 SourceLocation SourceManager::createExpansionLoc(
     SourceLocation SpellingLoc, SourceLocation ExpansionLocStart,
-    SourceLocation ExpansionLocEnd, unsigned Length,
+    SourceLocation ExpansionLocEnd, unsigned TokLength,
     bool ExpansionIsTokenRange, int LoadedID,
     SourceLocation::UIntTy LoadedOffset) {
   ExpansionInfo Info = ExpansionInfo::create(
       SpellingLoc, ExpansionLocStart, ExpansionLocEnd, ExpansionIsTokenRange);
-  return createExpansionLocImpl(Info, Length, LoadedID, LoadedOffset);
+  return createExpansionLocImpl(Info, TokLength, LoadedID, LoadedOffset);
 }
 
 SourceLocation SourceManager::createTokenSplitLoc(SourceLocation Spelling,
@@ -651,7 +660,7 @@ SourceLocation SourceManager::createTokenSplitLoc(SourceLocation Spelling,
 
 SourceLocation
 SourceManager::createExpansionLocImpl(const ExpansionInfo &Info,
-                                      unsigned Length, int LoadedID,
+                                      unsigned TokLength, int LoadedID,
                                       SourceLocation::UIntTy LoadedOffset) {
   if (LoadedID < 0) {
     assert(LoadedID != -1 && "Loading sentinel FileID");
@@ -659,34 +668,27 @@ SourceManager::createExpansionLocImpl(const ExpansionInfo &Info,
     assert(Index < LoadedSLocEntryTable.size() && "FileID out of range");
     assert(!SLocEntryLoaded[Index] && "FileID already loaded");
     LoadedSLocEntryTable[Index] = SLocEntry::get(LoadedOffset, Info);
-    SLocEntryLoaded[Index] = SLocEntryOffsetLoaded[Index] = true;
+    SLocEntryLoaded[Index] = true;
     return SourceLocation::getMacroLoc(LoadedOffset);
   }
   LocalSLocEntryTable.push_back(SLocEntry::get(NextLocalOffset, Info));
-  if (NextLocalOffset + Length + 1 <= NextLocalOffset ||
-      NextLocalOffset + Length + 1 > CurrentLoadedOffset) {
-    Diag.Report(SourceLocation(), diag::err_sloc_space_too_large);
-    // FIXME: call `noteSLocAddressSpaceUsage` to report details to users and
-    // use a source location from `Info` to point at an error.
-    // Currently, both cause Clang to run indefinitely, this needs to be fixed.
-    // FIXME: return an error instead of crashing. Returning invalid source
-    // locations causes compiler to run indefinitely.
-    llvm::report_fatal_error("ran out of source locations");
-  }
+  assert(NextLocalOffset + TokLength + 1 > NextLocalOffset &&
+         NextLocalOffset + TokLength + 1 <= CurrentLoadedOffset &&
+         "Ran out of source locations!");
   // See createFileID for that +1.
-  NextLocalOffset += Length + 1;
-  return SourceLocation::getMacroLoc(NextLocalOffset - (Length + 1));
+  NextLocalOffset += TokLength + 1;
+  return SourceLocation::getMacroLoc(NextLocalOffset - (TokLength + 1));
 }
 
-std::optional<llvm::MemoryBufferRef>
-SourceManager::getMemoryBufferForFileOrNone(FileEntryRef File) {
-  SrcMgr::ContentCache &IR = getOrCreateContentCache(File);
+llvm::Optional<llvm::MemoryBufferRef>
+SourceManager::getMemoryBufferForFileOrNone(const FileEntry *File) {
+  SrcMgr::ContentCache &IR = getOrCreateContentCache(File->getLastRef());
   return IR.getBufferOrNone(Diag, getFileManager(), SourceLocation());
 }
 
 void SourceManager::overrideFileContents(
-    FileEntryRef SourceFile, std::unique_ptr<llvm::MemoryBuffer> Buffer) {
-  SrcMgr::ContentCache &IR = getOrCreateContentCache(SourceFile);
+    const FileEntry *SourceFile, std::unique_ptr<llvm::MemoryBuffer> Buffer) {
+  SrcMgr::ContentCache &IR = getOrCreateContentCache(SourceFile->getLastRef());
 
   IR.setBuffer(std::move(Buffer));
   IR.BufferOverridden = true;
@@ -695,43 +697,39 @@ void SourceManager::overrideFileContents(
 }
 
 void SourceManager::overrideFileContents(const FileEntry *SourceFile,
-                                         FileEntryRef NewFile) {
-  assert(SourceFile->getSize() == NewFile.getSize() &&
+                                         const FileEntry *NewFile) {
+  assert(SourceFile->getSize() == NewFile->getSize() &&
          "Different sizes, use the FileManager to create a virtual file with "
          "the correct size");
-  assert(FileInfos.find_as(SourceFile) == FileInfos.end() &&
+  assert(FileInfos.count(SourceFile) == 0 &&
          "This function should be called at the initialization stage, before "
          "any parsing occurs.");
-  // FileEntryRef is not default-constructible.
-  auto Pair = getOverriddenFilesInfo().OverriddenFiles.insert(
-      std::make_pair(SourceFile, NewFile));
-  if (!Pair.second)
-    Pair.first->second = NewFile;
+  getOverriddenFilesInfo().OverriddenFiles[SourceFile] = NewFile;
 }
 
-OptionalFileEntryRef
+Optional<FileEntryRef>
 SourceManager::bypassFileContentsOverride(FileEntryRef File) {
   assert(isFileOverridden(&File.getFileEntry()));
-  OptionalFileEntryRef BypassFile = FileMgr.getBypassFile(File);
+  llvm::Optional<FileEntryRef> BypassFile = FileMgr.getBypassFile(File);
 
   // If the file can't be found in the FS, give up.
   if (!BypassFile)
-    return std::nullopt;
+    return None;
 
   (void)getOrCreateContentCache(*BypassFile);
   return BypassFile;
 }
 
-void SourceManager::setFileIsTransient(FileEntryRef File) {
-  getOrCreateContentCache(File).IsTransient = true;
+void SourceManager::setFileIsTransient(const FileEntry *File) {
+  getOrCreateContentCache(File->getLastRef()).IsTransient = true;
 }
 
-std::optional<StringRef>
+Optional<StringRef>
 SourceManager::getNonBuiltinFilenameForID(FileID FID) const {
   if (const SrcMgr::SLocEntry *Entry = getSLocEntryForFile(FID))
     if (Entry->getFile().getContentCache().OrigEntry)
       return Entry->getFile().getName();
-  return std::nullopt;
+  return None;
 }
 
 StringRef SourceManager::getBufferData(FileID FID, bool *Invalid) const {
@@ -741,19 +739,19 @@ StringRef SourceManager::getBufferData(FileID FID, bool *Invalid) const {
   return B ? *B : "<<<<<INVALID SOURCE LOCATION>>>>>";
 }
 
-std::optional<StringRef>
+llvm::Optional<StringRef>
 SourceManager::getBufferDataIfLoaded(FileID FID) const {
   if (const SrcMgr::SLocEntry *Entry = getSLocEntryForFile(FID))
     return Entry->getFile().getContentCache().getBufferDataIfLoaded();
-  return std::nullopt;
+  return None;
 }
 
-std::optional<StringRef> SourceManager::getBufferDataOrNone(FileID FID) const {
+llvm::Optional<StringRef> SourceManager::getBufferDataOrNone(FileID FID) const {
   if (const SrcMgr::SLocEntry *Entry = getSLocEntryForFile(FID))
     if (auto B = Entry->getFile().getContentCache().getBufferOrNone(
             Diag, getFileManager(), SourceLocation()))
       return B->getBuffer();
-  return std::nullopt;
+  return None;
 }
 
 //===----------------------------------------------------------------------===//
@@ -794,28 +792,24 @@ FileID SourceManager::getFileIDLocal(SourceLocation::UIntTy SLocOffset) const {
 
   // See if this is near the file point - worst case we start scanning from the
   // most newly created FileID.
+  const SrcMgr::SLocEntry *I;
 
-  // LessIndex - This is the lower bound of the range that we're searching.
-  // We know that the offset corresponding to the FileID is less than
-  // SLocOffset.
-  unsigned LessIndex = 0;
-  // upper bound of the search range.
-  unsigned GreaterIndex = LocalSLocEntryTable.size();
-  if (LastFileIDLookup.ID >= 0) {
-    // Use the LastFileIDLookup to prune the search space.
-    if (LocalSLocEntryTable[LastFileIDLookup.ID].getOffset() < SLocOffset)
-      LessIndex = LastFileIDLookup.ID;
-    else
-      GreaterIndex = LastFileIDLookup.ID;
+  if (LastFileIDLookup.ID < 0 ||
+      LocalSLocEntryTable[LastFileIDLookup.ID].getOffset() < SLocOffset) {
+    // Neither loc prunes our search.
+    I = LocalSLocEntryTable.end();
+  } else {
+    // Perhaps it is near the file point.
+    I = LocalSLocEntryTable.begin()+LastFileIDLookup.ID;
   }
 
-  // Find the FileID that contains this.
+  // Find the FileID that contains this.  "I" is an iterator that points to a
+  // FileID whose offset is known to be larger than SLocOffset.
   unsigned NumProbes = 0;
   while (true) {
-    --GreaterIndex;
-    assert(GreaterIndex < LocalSLocEntryTable.size());
-    if (LocalSLocEntryTable[GreaterIndex].getOffset() <= SLocOffset) {
-      FileID Res = FileID::get(int(GreaterIndex));
+    --I;
+    if (I->getOffset() <= SLocOffset) {
+      FileID Res = FileID::get(int(I - LocalSLocEntryTable.begin()));
       // Remember it.  We have good locality across FileID lookups.
       LastFileIDLookup = Res;
       NumLinearScans += NumProbes+1;
@@ -825,6 +819,13 @@ FileID SourceManager::getFileIDLocal(SourceLocation::UIntTy SLocOffset) const {
       break;
   }
 
+  // Convert "I" back into an index.  We know that it is an entry whose index is
+  // larger than the offset we are looking for.
+  unsigned GreaterIndex = I - LocalSLocEntryTable.begin();
+  // LessIndex - This is the lower bound of the range that we're searching.
+  // We know that the offset corresponding to the FileID is is less than
+  // SLocOffset.
+  unsigned LessIndex = 0;
   NumProbes = 0;
   while (true) {
     unsigned MiddleIndex = (GreaterIndex-LessIndex)/2+LessIndex;
@@ -861,12 +862,74 @@ FileID SourceManager::getFileIDLocal(SourceLocation::UIntTy SLocOffset) const {
 /// This function knows that the SourceLocation is in a loaded buffer, not a
 /// local one.
 FileID SourceManager::getFileIDLoaded(SourceLocation::UIntTy SLocOffset) const {
+  // Sanity checking, otherwise a bug may lead to hanging in release build.
   if (SLocOffset < CurrentLoadedOffset) {
     assert(0 && "Invalid SLocOffset or bad function choice");
     return FileID();
   }
 
-  return FileID::get(ExternalSLocEntries->getSLocEntryID(SLocOffset));
+  // Essentially the same as the local case, but the loaded array is sorted
+  // in the other direction.
+
+  // First do a linear scan from the last lookup position, if possible.
+  unsigned I;
+  int LastID = LastFileIDLookup.ID;
+  if (LastID >= 0 || getLoadedSLocEntryByID(LastID).getOffset() < SLocOffset)
+    I = 0;
+  else
+    I = (-LastID - 2) + 1;
+
+  unsigned NumProbes;
+  for (NumProbes = 0; NumProbes < 8; ++NumProbes, ++I) {
+    // Make sure the entry is loaded!
+    const SrcMgr::SLocEntry &E = getLoadedSLocEntry(I);
+    if (E.getOffset() <= SLocOffset) {
+      FileID Res = FileID::get(-int(I) - 2);
+      LastFileIDLookup = Res;
+      NumLinearScans += NumProbes + 1;
+      return Res;
+    }
+  }
+
+  // Linear scan failed. Do the binary search. Note the reverse sorting of the
+  // table: GreaterIndex is the one where the offset is greater, which is
+  // actually a lower index!
+  unsigned GreaterIndex = I;
+  unsigned LessIndex = LoadedSLocEntryTable.size();
+  NumProbes = 0;
+  while (true) {
+    ++NumProbes;
+    unsigned MiddleIndex = (LessIndex - GreaterIndex) / 2 + GreaterIndex;
+    const SrcMgr::SLocEntry &E = getLoadedSLocEntry(MiddleIndex);
+    if (E.getOffset() == 0)
+      return FileID(); // invalid entry.
+
+    ++NumProbes;
+
+    if (E.getOffset() > SLocOffset) {
+      // Sanity checking, otherwise a bug may lead to hanging in release build.
+      if (GreaterIndex == MiddleIndex) {
+        assert(0 && "binary search missed the entry");
+        return FileID();
+      }
+      GreaterIndex = MiddleIndex;
+      continue;
+    }
+
+    if (isOffsetInFileID(FileID::get(-int(MiddleIndex) - 2), SLocOffset)) {
+      FileID Res = FileID::get(-int(MiddleIndex) - 2);
+      LastFileIDLookup = Res;
+      NumBinaryProbes += NumProbes;
+      return Res;
+    }
+
+    // Sanity checking, otherwise a bug may lead to hanging in release build.
+    if (LessIndex == MiddleIndex) {
+      assert(0 && "binary search missed the entry");
+      return FileID();
+    }
+    LessIndex = MiddleIndex;
+  }
 }
 
 SourceLocation SourceManager::
@@ -953,7 +1016,7 @@ SourceLocation SourceManager::getImmediateSpellingLoc(SourceLocation Loc) const{
 
 /// Return the filename of the file containing a SourceLocation.
 StringRef SourceManager::getFilename(SourceLocation SpellingLoc) const {
-  if (OptionalFileEntryRef F = getFileEntryRefForID(getFileID(SpellingLoc)))
+  if (const FileEntry *F = getFileEntryForID(getFileID(SpellingLoc)))
     return F->getName();
   return StringRef();
 }
@@ -1106,7 +1169,7 @@ const char *SourceManager::getCharacterData(SourceLocation SL,
 
     return "<<<<INVALID BUFFER>>>>";
   }
-  std::optional<llvm::MemoryBufferRef> Buffer =
+  llvm::Optional<llvm::MemoryBufferRef> Buffer =
       Entry.getFile().getContentCache().getBufferOrNone(Diag, getFileManager(),
                                                         SourceLocation());
   if (Invalid)
@@ -1119,7 +1182,7 @@ const char *SourceManager::getCharacterData(SourceLocation SL,
 /// this is significantly cheaper to compute than the line number.
 unsigned SourceManager::getColumnNumber(FileID FID, unsigned FilePos,
                                         bool *Invalid) const {
-  std::optional<llvm::MemoryBufferRef> MemBuf = getBufferOrNone(FID);
+  llvm::Optional<llvm::MemoryBufferRef> MemBuf = getBufferOrNone(FID);
   if (Invalid)
     *Invalid = !MemBuf;
 
@@ -1215,21 +1278,22 @@ LineOffsetMapping LineOffsetMapping::get(llvm::MemoryBufferRef Buffer,
   // Line #1 starts at char 0.
   LineOffsets.push_back(0);
 
-  const unsigned char *Start = (const unsigned char *)Buffer.getBufferStart();
+  const unsigned char *Buf = (const unsigned char *)Buffer.getBufferStart();
   const unsigned char *End = (const unsigned char *)Buffer.getBufferEnd();
-  const unsigned char *Buf = Start;
+  const std::size_t BufLen = End - Buf;
 
+  unsigned I = 0;
   uint64_t Word;
 
   // scan sizeof(Word) bytes at a time for new lines.
   // This is much faster than scanning each byte independently.
-  if ((unsigned long)(End - Start) > sizeof(Word)) {
+  if (BufLen > sizeof(Word)) {
     do {
-      Word = llvm::support::endian::read64(Buf, llvm::endianness::little);
+      Word = llvm::support::endian::read64(Buf + I, llvm::support::little);
       // no new line => jump over sizeof(Word) bytes.
       auto Mask = likelyhasbetween(Word, '\n', '\r');
       if (!Mask) {
-        Buf += sizeof(Word);
+        I += sizeof(Word);
         continue;
       }
 
@@ -1237,35 +1301,33 @@ LineOffsetMapping LineOffsetMapping::get(llvm::MemoryBufferRef Buffer,
       // in [\n, \r + 1 [
 
       // Scan for the next newline - it's very likely there's one.
-      unsigned N = llvm::countr_zero(Mask) - 7; // -7 because 0x80 is the marker
+      unsigned N =
+          llvm::countTrailingZeros(Mask) - 7; // -7 because 0x80 is the marker
       Word >>= N;
-      Buf += N / 8 + 1;
+      I += N / 8 + 1;
       unsigned char Byte = Word;
-      switch (Byte) {
-      case '\r':
+      if (Byte == '\n') {
+        LineOffsets.push_back(I);
+      } else if (Byte == '\r') {
         // If this is \r\n, skip both characters.
-        if (*Buf == '\n') {
-          ++Buf;
-        }
-        [[fallthrough]];
-      case '\n':
-        LineOffsets.push_back(Buf - Start);
-      };
-    } while (Buf < End - sizeof(Word) - 1);
+        if (Buf[I] == '\n')
+          ++I;
+        LineOffsets.push_back(I);
+      }
+    } while (I < BufLen - sizeof(Word) - 1);
   }
 
   // Handle tail using a regular check.
-  while (Buf < End) {
-    if (*Buf == '\n') {
-      LineOffsets.push_back(Buf - Start + 1);
-    } else if (*Buf == '\r') {
+  while (I < BufLen) {
+    if (Buf[I] == '\n') {
+      LineOffsets.push_back(I + 1);
+    } else if (Buf[I] == '\r') {
       // If this is \r\n, skip both characters.
-      if (Buf + 1 < End && Buf[1] == '\n') {
-        ++Buf;
-      }
-      LineOffsets.push_back(Buf - Start + 1);
+      if (I + 1 < BufLen && Buf[I + 1] == '\n')
+        ++I;
+      LineOffsets.push_back(I + 1);
     }
-    ++Buf;
+    ++I;
   }
 
   return LineOffsetMapping(LineOffsets, Alloc);
@@ -1306,9 +1368,9 @@ unsigned SourceManager::getLineNumber(FileID FID, unsigned FilePos,
   }
 
   // If this is the first use of line information for this buffer, compute the
-  // SourceLineCache for it on demand.
+  /// SourceLineCache for it on demand.
   if (!Content->SourceLineCache) {
-    std::optional<llvm::MemoryBufferRef> Buffer =
+    llvm::Optional<llvm::MemoryBufferRef> Buffer =
         Content->getBufferOrNone(Diag, getFileManager(), SourceLocation());
     if (Invalid)
       *Invalid = !Buffer;
@@ -1658,7 +1720,7 @@ SourceLocation SourceManager::translateLineCol(FileID FID,
 
   // If this is the first use of line information for this buffer, compute the
   // SourceLineCache for it on demand.
-  std::optional<llvm::MemoryBufferRef> Buffer =
+  llvm::Optional<llvm::MemoryBufferRef> Buffer =
       Content->getBufferOrNone(Diag, getFileManager());
   if (!Buffer)
     return SourceLocation();
@@ -1735,11 +1797,11 @@ void SourceManager::computeMacroArgsCache(MacroArgsMap &MacroArgsCache,
         if (Entry.getFile().NumCreatedFIDs)
           ID += Entry.getFile().NumCreatedFIDs - 1 /*because of next ++ID*/;
         continue;
-      }
-      // If file was included but not from FID, there is no more files/macros
-      // that may be "contained" in this file.
-      if (IncludeLoc.isValid())
+      } else if (IncludeLoc.isValid()) {
+        // If file was included but not from FID, there is no more files/macros
+        // that may be "contained" in this file.
         return;
+      }
       continue;
     }
 
@@ -1911,39 +1973,14 @@ SourceManager::getDecomposedIncludedLoc(FileID FID) const {
   return DecompLoc;
 }
 
-bool SourceManager::isInTheSameTranslationUnitImpl(
-    const std::pair<FileID, unsigned> &LOffs,
-    const std::pair<FileID, unsigned> &ROffs) const {
-  // If one is local while the other is loaded.
-  if (isLoadedFileID(LOffs.first) != isLoadedFileID(ROffs.first))
-    return false;
-
-  if (isLoadedFileID(LOffs.first) && isLoadedFileID(ROffs.first)) {
-    auto FindSLocEntryAlloc = [this](FileID FID) {
-      // Loaded FileIDs are negative, we store the lowest FileID from each
-      // allocation, later allocations have lower FileIDs.
-      return llvm::lower_bound(LoadedSLocEntryAllocBegin, FID,
-                               std::greater<FileID>{});
-    };
-
-    // If both are loaded from different AST files.
-    if (FindSLocEntryAlloc(LOffs.first) != FindSLocEntryAlloc(ROffs.first))
-      return false;
-  }
-
-  return true;
-}
-
 /// Given a decomposed source location, move it up the include/expansion stack
-/// to the parent source location within the same translation unit.  If this is
-/// possible, return the decomposed version of the parent in Loc and return
-/// false.  If Loc is a top-level entry, return true and don't modify it.
-static bool
-MoveUpTranslationUnitIncludeHierarchy(std::pair<FileID, unsigned> &Loc,
-                                      const SourceManager &SM) {
+/// to the parent source location.  If this is possible, return the decomposed
+/// version of the parent in Loc and return false.  If Loc is the top-level
+/// entry, return true and don't modify it.
+static bool MoveUpIncludeHierarchy(std::pair<FileID, unsigned> &Loc,
+                                   const SourceManager &SM) {
   std::pair<FileID, unsigned> UpperLoc = SM.getDecomposedIncludedLoc(Loc.first);
-  if (UpperLoc.first.isInvalid() ||
-      !SM.isInTheSameTranslationUnitImpl(UpperLoc, Loc))
+  if (UpperLoc.first.isInvalid())
     return true; // We reached the top.
 
   Loc = UpperLoc;
@@ -1957,7 +1994,6 @@ InBeforeInTUCacheEntry &SourceManager::getInBeforeInTUCache(FileID LFID,
   // This is a magic number for limiting the cache size.  It was experimentally
   // derived from a small Objective-C project (where the cache filled
   // out to ~250 items).  We can make it larger if necessary.
-  // FIXME: this is almost certainly full these days. Use an LRU cache?
   enum { MagicCacheSize = 300 };
   IsBeforeInTUCacheKey Key(LFID, RFID);
 
@@ -1966,7 +2002,7 @@ InBeforeInTUCacheEntry &SourceManager::getInBeforeInTUCache(FileID LFID,
   // use.  When they update the value, the cache will get automatically
   // updated as well.
   if (IBTUCache.size() < MagicCacheSize)
-    return IBTUCache.try_emplace(Key, LFID, RFID).first->second;
+    return IBTUCache[Key];
 
   // Otherwise, do a lookup that will not construct a new value.
   InBeforeInTUCache::iterator I = IBTUCache.find(Key);
@@ -1974,7 +2010,6 @@ InBeforeInTUCacheEntry &SourceManager::getInBeforeInTUCache(FileID LFID,
     return I->second;
 
   // Fall back to the overflow value.
-  IBTUCacheOverflow.setQueryFIDs(LFID, RFID);
   return IBTUCacheOverflow;
 }
 
@@ -1999,18 +2034,45 @@ bool SourceManager::isBeforeInTranslationUnit(SourceLocation LHS,
   std::pair<bool, bool> InSameTU = isInTheSameTranslationUnit(LOffs, ROffs);
   if (InSameTU.first)
     return InSameTU.second;
-  // TODO: This should be unreachable, but some clients are calling this
-  //       function before making sure LHS and RHS are in the same TU.
-  return LOffs.first < ROffs.first;
+
+  // If we arrived here, the location is either in a built-ins buffer or
+  // associated with global inline asm. PR5662 and PR22576 are examples.
+
+  StringRef LB = getBufferOrFake(LOffs.first).getBufferIdentifier();
+  StringRef RB = getBufferOrFake(ROffs.first).getBufferIdentifier();
+  bool LIsBuiltins = LB == "<built-in>";
+  bool RIsBuiltins = RB == "<built-in>";
+  // Sort built-in before non-built-in.
+  if (LIsBuiltins || RIsBuiltins) {
+    if (LIsBuiltins != RIsBuiltins)
+      return LIsBuiltins;
+    // Both are in built-in buffers, but from different files. We just claim that
+    // lower IDs come first.
+    return LOffs.first < ROffs.first;
+  }
+  bool LIsAsm = LB == "<inline asm>";
+  bool RIsAsm = RB == "<inline asm>";
+  // Sort assembler after built-ins, but before the rest.
+  if (LIsAsm || RIsAsm) {
+    if (LIsAsm != RIsAsm)
+      return RIsAsm;
+    assert(LOffs.first == ROffs.first);
+    return false;
+  }
+  bool LIsScratch = LB == "<scratch space>";
+  bool RIsScratch = RB == "<scratch space>";
+  // Sort scratch after inline asm, but before the rest.
+  if (LIsScratch || RIsScratch) {
+    if (LIsScratch != RIsScratch)
+      return LIsScratch;
+    return LOffs.second < ROffs.second;
+  }
+  llvm_unreachable("Unsortable locations found");
 }
 
 std::pair<bool, bool> SourceManager::isInTheSameTranslationUnit(
     std::pair<FileID, unsigned> &LOffs,
     std::pair<FileID, unsigned> &ROffs) const {
-  // If the source locations are not in the same TU, return early.
-  if (!isInTheSameTranslationUnitImpl(LOffs, ROffs))
-    return std::make_pair(false, false);
-
   // If the source locations are in the same file, just compare offsets.
   if (LOffs.first == ROffs.first)
     return std::make_pair(true, LOffs.second < ROffs.second);
@@ -2022,115 +2084,58 @@ std::pair<bool, bool> SourceManager::isInTheSameTranslationUnit(
 
   // If we are comparing a source location with multiple locations in the same
   // file, we get a big win by caching the result.
-  if (IsBeforeInTUCache.isCacheValid())
+  if (IsBeforeInTUCache.isCacheValid(LOffs.first, ROffs.first))
     return std::make_pair(
         true, IsBeforeInTUCache.getCachedResult(LOffs.second, ROffs.second));
 
-  // Okay, we missed in the cache, we'll compute the answer and populate it.
+  // Okay, we missed in the cache, start updating the cache for this query.
+  IsBeforeInTUCache.setQueryFIDs(LOffs.first, ROffs.first,
+                          /*isLFIDBeforeRFID=*/LOffs.first.ID < ROffs.first.ID);
+
   // We need to find the common ancestor. The only way of doing this is to
   // build the complete include chain for one and then walking up the chain
   // of the other looking for a match.
-
-  // A location within a FileID on the path up from LOffs to the main file.
-  struct Entry {
-    std::pair<FileID, unsigned> DecomposedLoc; // FileID redundant, but clearer.
-    FileID ChildFID; // Used for breaking ties. Invalid for the initial loc.
-  };
-  llvm::SmallDenseMap<FileID, Entry, 16> LChain;
-
-  FileID LChild;
+  // We use a map from FileID to Offset to store the chain. Easier than writing
+  // a custom set hash info that only depends on the first part of a pair.
+  using LocSet = llvm::SmallDenseMap<FileID, unsigned, 16>;
+  LocSet LChain;
   do {
-    LChain.try_emplace(LOffs.first, Entry{LOffs, LChild});
+    LChain.insert(LOffs);
     // We catch the case where LOffs is in a file included by ROffs and
     // quit early. The other way round unfortunately remains suboptimal.
-    if (LOffs.first == ROffs.first)
-      break;
-    LChild = LOffs.first;
-  } while (!MoveUpTranslationUnitIncludeHierarchy(LOffs, *this));
-
-  FileID RChild;
-  do {
-    auto LIt = LChain.find(ROffs.first);
-    if (LIt != LChain.end()) {
-      // Compare the locations within the common file and cache them.
-      LOffs = LIt->second.DecomposedLoc;
-      LChild = LIt->second.ChildFID;
-      // The relative order of LChild and RChild is a tiebreaker when
-      // - locs expand to the same location (occurs in macro arg expansion)
-      // - one loc is a parent of the other (we consider the parent as "first")
-      // For the parent entry to be first, its invalid child file ID must
-      // compare smaller to the valid child file ID of the other entry.
-      // However loaded FileIDs are <0, so we perform *unsigned* comparison!
-      // This changes the relative order of local vs loaded FileIDs, but it
-      // doesn't matter as these are never mixed in macro expansion.
-      unsigned LChildID = LChild.ID;
-      unsigned RChildID = RChild.ID;
-      assert(((LOffs.second != ROffs.second) ||
-              (LChildID == 0 || RChildID == 0) ||
-              isInSameSLocAddrSpace(getComposedLoc(LChild, 0),
-                                    getComposedLoc(RChild, 0), nullptr)) &&
-             "Mixed local/loaded FileIDs with same include location?");
-      IsBeforeInTUCache.setCommonLoc(LOffs.first, LOffs.second, ROffs.second,
-                                     LChildID < RChildID);
-      return std::make_pair(
-          true, IsBeforeInTUCache.getCachedResult(LOffs.second, ROffs.second));
-    }
-    RChild = ROffs.first;
-  } while (!MoveUpTranslationUnitIncludeHierarchy(ROffs, *this));
-
-  // If we found no match, the location is either in a built-ins buffer or
-  // associated with global inline asm. PR5662 and PR22576 are examples.
-
-  StringRef LB = getBufferOrFake(LOffs.first).getBufferIdentifier();
-  StringRef RB = getBufferOrFake(ROffs.first).getBufferIdentifier();
-
-  bool LIsBuiltins = LB == "<built-in>";
-  bool RIsBuiltins = RB == "<built-in>";
-  // Sort built-in before non-built-in.
-  if (LIsBuiltins || RIsBuiltins) {
-    if (LIsBuiltins != RIsBuiltins)
-      return std::make_pair(true, LIsBuiltins);
-    // Both are in built-in buffers, but from different files. We just claim
-    // that lower IDs come first.
-    return std::make_pair(true, LOffs.first < ROffs.first);
+  } while (LOffs.first != ROffs.first && !MoveUpIncludeHierarchy(LOffs, *this));
+  LocSet::iterator I;
+  while((I = LChain.find(ROffs.first)) == LChain.end()) {
+    if (MoveUpIncludeHierarchy(ROffs, *this))
+      break; // Met at topmost file.
   }
+  if (I != LChain.end())
+    LOffs = *I;
 
-  bool LIsAsm = LB == "<inline asm>";
-  bool RIsAsm = RB == "<inline asm>";
-  // Sort assembler after built-ins, but before the rest.
-  if (LIsAsm || RIsAsm) {
-    if (LIsAsm != RIsAsm)
-      return std::make_pair(true, RIsAsm);
-    assert(LOffs.first == ROffs.first);
-    return std::make_pair(true, false);
+  // If we exited because we found a nearest common ancestor, compare the
+  // locations within the common file and cache them.
+  if (LOffs.first == ROffs.first) {
+    IsBeforeInTUCache.setCommonLoc(LOffs.first, LOffs.second, ROffs.second);
+    return std::make_pair(
+        true, IsBeforeInTUCache.getCachedResult(LOffs.second, ROffs.second));
   }
-
-  bool LIsScratch = LB == "<scratch space>";
-  bool RIsScratch = RB == "<scratch space>";
-  // Sort scratch after inline asm, but before the rest.
-  if (LIsScratch || RIsScratch) {
-    if (LIsScratch != RIsScratch)
-      return std::make_pair(true, LIsScratch);
-    return std::make_pair(true, LOffs.second < ROffs.second);
-  }
-
-  llvm_unreachable("Unsortable locations found");
+  // Clear the lookup cache, it depends on a common location.
+  IsBeforeInTUCache.clear();
+  return std::make_pair(false, false);
 }
 
 void SourceManager::PrintStats() const {
   llvm::errs() << "\n*** Source Manager Stats:\n";
   llvm::errs() << FileInfos.size() << " files mapped, " << MemBufferInfos.size()
                << " mem buffers mapped.\n";
-  llvm::errs() << LocalSLocEntryTable.size() << " local SLocEntries allocated ("
+  llvm::errs() << LocalSLocEntryTable.size() << " local SLocEntry's allocated ("
                << llvm::capacity_in_bytes(LocalSLocEntryTable)
-               << " bytes of capacity), " << NextLocalOffset
-               << "B of SLoc address space used.\n";
-  llvm::errs() << LoadedSLocEntryTable.size()
-               << " loaded SLocEntries allocated ("
-               << llvm::capacity_in_bytes(LoadedSLocEntryTable)
                << " bytes of capacity), "
+               << NextLocalOffset << "B of Sloc address space used.\n";
+  llvm::errs() << LoadedSLocEntryTable.size()
+               << " loaded SLocEntries allocated, "
                << MaxLoadedOffset - CurrentLoadedOffset
-               << "B of SLoc address space used.\n";
+               << "B of Sloc address space used.\n";
 
   unsigned NumLineNumsComputed = 0;
   unsigned NumFileBytesMapped = 0;
@@ -2151,7 +2156,7 @@ LLVM_DUMP_METHOD void SourceManager::dump() const {
   llvm::raw_ostream &out = llvm::errs();
 
   auto DumpSLocEntry = [&](int ID, const SrcMgr::SLocEntry &Entry,
-                           std::optional<SourceLocation::UIntTy> NextStart) {
+                           llvm::Optional<SourceLocation::UIntTy> NextStart) {
     out << "SLocEntry <FileID " << ID << "> " << (Entry.isFile() ? "file" : "expansion")
         << " <SourceLocation " << Entry.getOffset() << ":";
     if (NextStart)
@@ -2191,103 +2196,15 @@ LLVM_DUMP_METHOD void SourceManager::dump() const {
                                    : LocalSLocEntryTable[ID + 1].getOffset());
   }
   // Dump loaded SLocEntries.
-  std::optional<SourceLocation::UIntTy> NextStart;
+  llvm::Optional<SourceLocation::UIntTy> NextStart;
   for (unsigned Index = 0; Index != LoadedSLocEntryTable.size(); ++Index) {
     int ID = -(int)Index - 2;
     if (SLocEntryLoaded[Index]) {
       DumpSLocEntry(ID, LoadedSLocEntryTable[Index], NextStart);
       NextStart = LoadedSLocEntryTable[Index].getOffset();
     } else {
-      NextStart = std::nullopt;
+      NextStart = None;
     }
-  }
-}
-
-void SourceManager::noteSLocAddressSpaceUsage(
-    DiagnosticsEngine &Diag, std::optional<unsigned> MaxNotes) const {
-  struct Info {
-    // A location where this file was entered.
-    SourceLocation Loc;
-    // Number of times this FileEntry was entered.
-    unsigned Inclusions = 0;
-    // Size usage from the file itself.
-    uint64_t DirectSize = 0;
-    // Total size usage from the file and its macro expansions.
-    uint64_t TotalSize = 0;
-  };
-  using UsageMap = llvm::MapVector<const FileEntry*, Info>;
-
-  UsageMap Usage;
-  uint64_t CountedSize = 0;
-
-  auto AddUsageForFileID = [&](FileID ID) {
-    // The +1 here is because getFileIDSize doesn't include the extra byte for
-    // the one-past-the-end location.
-    unsigned Size = getFileIDSize(ID) + 1;
-
-    // Find the file that used this address space, either directly or by
-    // macro expansion.
-    SourceLocation FileStart = getFileLoc(getComposedLoc(ID, 0));
-    FileID FileLocID = getFileID(FileStart);
-    const FileEntry *Entry = getFileEntryForID(FileLocID);
-
-    Info &EntryInfo = Usage[Entry];
-    if (EntryInfo.Loc.isInvalid())
-      EntryInfo.Loc = FileStart;
-    if (ID == FileLocID) {
-      ++EntryInfo.Inclusions;
-      EntryInfo.DirectSize += Size;
-    }
-    EntryInfo.TotalSize += Size;
-    CountedSize += Size;
-  };
-
-  // Loaded SLocEntries have indexes counting downwards from -2.
-  for (size_t Index = 0; Index != LoadedSLocEntryTable.size(); ++Index) {
-    AddUsageForFileID(FileID::get(-2 - Index));
-  }
-  // Local SLocEntries have indexes counting upwards from 0.
-  for (size_t Index = 0; Index != LocalSLocEntryTable.size(); ++Index) {
-    AddUsageForFileID(FileID::get(Index));
-  }
-
-  // Sort the usage by size from largest to smallest. Break ties by raw source
-  // location.
-  auto SortedUsage = Usage.takeVector();
-  auto Cmp = [](const UsageMap::value_type &A, const UsageMap::value_type &B) {
-    return A.second.TotalSize > B.second.TotalSize ||
-           (A.second.TotalSize == B.second.TotalSize &&
-            A.second.Loc < B.second.Loc);
-  };
-  auto SortedEnd = SortedUsage.end();
-  if (MaxNotes && SortedUsage.size() > *MaxNotes) {
-    SortedEnd = SortedUsage.begin() + *MaxNotes;
-    std::nth_element(SortedUsage.begin(), SortedEnd, SortedUsage.end(), Cmp);
-  }
-  std::sort(SortedUsage.begin(), SortedEnd, Cmp);
-
-  // Produce note on sloc address space usage total.
-  uint64_t LocalUsage = NextLocalOffset;
-  uint64_t LoadedUsage = MaxLoadedOffset - CurrentLoadedOffset;
-  int UsagePercent = static_cast<int>(100.0 * double(LocalUsage + LoadedUsage) /
-                                      MaxLoadedOffset);
-  Diag.Report(SourceLocation(), diag::note_total_sloc_usage)
-    << LocalUsage << LoadedUsage << (LocalUsage + LoadedUsage) << UsagePercent;
-
-  // Produce notes on sloc address space usage for each file with a high usage.
-  uint64_t ReportedSize = 0;
-  for (auto &[Entry, FileInfo] :
-       llvm::make_range(SortedUsage.begin(), SortedEnd)) {
-    Diag.Report(FileInfo.Loc, diag::note_file_sloc_usage)
-        << FileInfo.Inclusions << FileInfo.DirectSize
-        << (FileInfo.TotalSize - FileInfo.DirectSize);
-    ReportedSize += FileInfo.TotalSize;
-  }
-
-  // Describe any remaining usage not reported in the per-file usage.
-  if (ReportedSize != CountedSize) {
-    Diag.Report(SourceLocation(), diag::note_file_misc_sloc_usage)
-        << (SortedUsage.end() - SortedEnd) << CountedSize - ReportedSize;
   }
 }
 
@@ -2314,11 +2231,11 @@ SourceManager::MemoryBufferSizes SourceManager::getMemoryBufferSizes() const {
 }
 
 size_t SourceManager::getDataStructureSizes() const {
-  size_t size = llvm::capacity_in_bytes(MemBufferInfos) +
-                llvm::capacity_in_bytes(LocalSLocEntryTable) +
-                llvm::capacity_in_bytes(LoadedSLocEntryTable) +
-                llvm::capacity_in_bytes(SLocEntryLoaded) +
-                llvm::capacity_in_bytes(FileInfos);
+  size_t size = llvm::capacity_in_bytes(MemBufferInfos)
+    + llvm::capacity_in_bytes(LocalSLocEntryTable)
+    + llvm::capacity_in_bytes(LoadedSLocEntryTable)
+    + llvm::capacity_in_bytes(SLocEntryLoaded)
+    + llvm::capacity_in_bytes(FileInfos);
 
   if (OverriddenFilesInfo)
     size += llvm::capacity_in_bytes(OverriddenFilesInfo->OverriddenFiles);
@@ -2346,9 +2263,8 @@ SourceManagerForFile::SourceManagerForFile(StringRef FileName,
       IntrusiveRefCntPtr<DiagnosticIDs>(new DiagnosticIDs),
       new DiagnosticOptions);
   SourceMgr = std::make_unique<SourceManager>(*Diagnostics, *FileMgr);
-  FileEntryRef FE = llvm::cantFail(FileMgr->getFileRef(FileName));
-  FileID ID =
-      SourceMgr->createFileID(FE, SourceLocation(), clang::SrcMgr::C_User);
+  FileID ID = SourceMgr->createFileID(*FileMgr->getFile(FileName),
+                                      SourceLocation(), clang::SrcMgr::C_User);
   assert(ID.isValid());
   SourceMgr->setMainFileID(ID);
 }

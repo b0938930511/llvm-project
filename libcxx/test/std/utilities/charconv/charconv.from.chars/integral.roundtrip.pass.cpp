@@ -6,14 +6,19 @@
 //
 //===----------------------------------------------------------------------===//
 
-// UNSUPPORTED: c++03, c++11, c++14
+// UNSUPPORTED: c++03
+// UNSUPPORTED: !libc++ && c++11
+// UNSUPPORTED: !libc++ && c++14
 
-// ADDITIONAL_COMPILE_FLAGS(has-fconstexpr-steps): -fconstexpr-steps=12712420
+// The roundtrip test uses to_chars, which requires functions in the dylib
+// that were introduced in Mac OS 10.15.
+//
+// XFAIL: use_system_cxx_lib && target={{.+}}-apple-macosx10.{{9|10|11|12|13|14}}
 
 // <charconv>
 
-// constexpr from_chars_result from_chars(const char* first, const char* last,
-//                                        Integral& value, int base = 10)
+// from_chars_result from_chars(const char* first, const char* last,
+//                              Integral& value, int base = 10)
 
 #include <charconv>
 #include "test_macros.h"
@@ -24,7 +29,7 @@ struct test_basics : roundtrip_test_base<T>
 {
     using roundtrip_test_base<T>::test;
 
-    TEST_CONSTEXPR_CXX23 void operator()()
+    void operator()()
     {
         test(0);
         test(42);
@@ -54,7 +59,7 @@ struct test_signed : roundtrip_test_base<T>
 {
     using roundtrip_test_base<T>::test;
 
-    TEST_CONSTEXPR_CXX23 void operator()()
+    void operator()()
     {
         test(-1);
         test(-12);
@@ -75,19 +80,10 @@ struct test_signed : roundtrip_test_base<T>
     }
 };
 
-TEST_CONSTEXPR_CXX23 bool test()
+int main(int, char**)
 {
     run<test_basics>(integrals);
     run<test_signed>(all_signed);
-
-    return true;
-}
-
-int main(int, char**) {
-    test();
-#if TEST_STD_VER > 20
-    static_assert(test());
-#endif
 
     return 0;
 }

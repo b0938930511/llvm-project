@@ -3,97 +3,173 @@
 
 using namespace lldb_private;
 
+// result strings (scheme/hostname/port/path) passed into UriParser::Parse
+// are initialized to kAsdf so we can verify that they are unmodified if the
+// URI is invalid
+static const char *kAsdf = "asdf";
+
+class UriTestCase {
+public:
+  UriTestCase(const char *uri, const char *scheme, const char *hostname,
+              int port, const char *path)
+      : m_uri(uri), m_result(true), m_scheme(scheme), m_hostname(hostname),
+        m_port(port), m_path(path) {}
+
+  UriTestCase(const char *uri)
+      : m_uri(uri), m_result(false), m_scheme(kAsdf), m_hostname(kAsdf),
+        m_port(1138), m_path(kAsdf) {}
+
+  const char *m_uri;
+  bool m_result;
+  const char *m_scheme;
+  const char *m_hostname;
+  int m_port;
+  const char *m_path;
+};
+
+#define VALIDATE                                                               \
+  llvm::StringRef scheme(kAsdf);                                               \
+  llvm::StringRef hostname(kAsdf);                                             \
+  int port(1138);                                                              \
+  llvm::StringRef path(kAsdf);                                                 \
+  EXPECT_EQ(testCase.m_result,                                                 \
+            UriParser::Parse(testCase.m_uri, scheme, hostname, port, path));   \
+  EXPECT_STREQ(testCase.m_scheme, scheme.str().c_str());                       \
+  EXPECT_STREQ(testCase.m_hostname, hostname.str().c_str());                   \
+  EXPECT_EQ(testCase.m_port, port);                                            \
+  EXPECT_STREQ(testCase.m_path, path.str().c_str());
+
 TEST(UriParserTest, Minimal) {
-  EXPECT_EQ((URI{"x", "y", std::nullopt, "/"}), URI::Parse("x://y"));
+  const UriTestCase testCase("x://y", "x", "y", -1, "/");
+  VALIDATE
 }
 
 TEST(UriParserTest, MinimalPort) {
-  EXPECT_EQ((URI{"x", "y", 1, "/"}), URI::Parse("x://y:1"));
+  const UriTestCase testCase("x://y:1", "x", "y", 1, "/");
+  llvm::StringRef scheme(kAsdf);
+  llvm::StringRef hostname(kAsdf);
+  int port(1138);
+  llvm::StringRef path(kAsdf);
+  bool result = UriParser::Parse(testCase.m_uri, scheme, hostname, port, path);
+  EXPECT_EQ(testCase.m_result, result);
+
+  EXPECT_STREQ(testCase.m_scheme, scheme.str().c_str());
+  EXPECT_STREQ(testCase.m_hostname, hostname.str().c_str());
+  EXPECT_EQ(testCase.m_port, port);
+  EXPECT_STREQ(testCase.m_path, path.str().c_str());
 }
 
 TEST(UriParserTest, MinimalPath) {
-  EXPECT_EQ((URI{"x", "y", std::nullopt, "/"}), URI::Parse("x://y/"));
+  const UriTestCase testCase("x://y/", "x", "y", -1, "/");
+  VALIDATE
 }
 
 TEST(UriParserTest, MinimalPortPath) {
-  EXPECT_EQ((URI{"x", "y", 1, "/"}), URI::Parse("x://y:1/"));
+  const UriTestCase testCase("x://y:1/", "x", "y", 1, "/");
+  VALIDATE
 }
 
 TEST(UriParserTest, LongPath) {
-  EXPECT_EQ((URI{"x", "y", std::nullopt, "/abc/def/xyz"}),
-            URI::Parse("x://y/abc/def/xyz"));
+  const UriTestCase testCase("x://y/abc/def/xyz", "x", "y", -1, "/abc/def/xyz");
+  VALIDATE
 }
 
 TEST(UriParserTest, TypicalPortPathIPv4) {
-  EXPECT_EQ((URI{"connect", "192.168.100.132", 5432, "/"}),
-            URI::Parse("connect://192.168.100.132:5432/"));
+  const UriTestCase testCase("connect://192.168.100.132:5432/", "connect",
+                             "192.168.100.132", 5432, "/");
+  VALIDATE;
 }
 
 TEST(UriParserTest, TypicalPortPathIPv6) {
-  EXPECT_EQ(
-      (URI{"connect", "2601:600:107f:db64:a42b:4faa:284:3082", 5432, "/"}),
-      URI::Parse("connect://[2601:600:107f:db64:a42b:4faa:284:3082]:5432/"));
+  const UriTestCase testCase(
+      "connect://[2601:600:107f:db64:a42b:4faa:284:3082]:5432/", "connect",
+      "2601:600:107f:db64:a42b:4faa:284:3082", 5432, "/");
+  VALIDATE;
 }
 
 TEST(UriParserTest, BracketedHostnamePort) {
-  EXPECT_EQ((URI{"connect", "192.168.100.132", 5432, "/"}),
-            URI::Parse("connect://[192.168.100.132]:5432/"));
+  const UriTestCase testCase("connect://[192.168.100.132]:5432/", "connect",
+                             "192.168.100.132", 5432, "/");
+  llvm::StringRef scheme(kAsdf);
+  llvm::StringRef hostname(kAsdf);
+  int port(1138);
+  llvm::StringRef path(kAsdf);
+  bool result = UriParser::Parse(testCase.m_uri, scheme, hostname, port, path);
+  EXPECT_EQ(testCase.m_result, result);
+
+  EXPECT_STREQ(testCase.m_scheme, scheme.str().c_str());
+  EXPECT_STREQ(testCase.m_hostname, hostname.str().c_str());
+  EXPECT_EQ(testCase.m_port, port);
+  EXPECT_STREQ(testCase.m_path, path.str().c_str());
 }
 
 TEST(UriParserTest, BracketedHostname) {
-  EXPECT_EQ((URI{"connect", "192.168.100.132", std::nullopt, "/"}),
-            URI::Parse("connect://[192.168.100.132]"));
+  const UriTestCase testCase("connect://[192.168.100.132]", "connect",
+                             "192.168.100.132", -1, "/");
+  VALIDATE
 }
 
 TEST(UriParserTest, BracketedHostnameWithPortIPv4) {
   // Android device over IPv4: port is a part of the hostname.
-  EXPECT_EQ((URI{"connect", "192.168.100.132:1234", std::nullopt, "/"}),
-            URI::Parse("connect://[192.168.100.132:1234]"));
+  const UriTestCase testCase("connect://[192.168.100.132:1234]", "connect",
+                             "192.168.100.132:1234", -1, "/");
+  VALIDATE
 }
 
 TEST(UriParserTest, BracketedHostnameWithPortIPv6) {
   // Android device over IPv6: port is a part of the hostname.
-  EXPECT_EQ((URI{"connect", "[2601:600:107f:db64:a42b:4faa:284]:1234",
-                 std::nullopt, "/"}),
-            URI::Parse("connect://[[2601:600:107f:db64:a42b:4faa:284]:1234]"));
+  const UriTestCase testCase(
+      "connect://[[2601:600:107f:db64:a42b:4faa:284]:1234]", "connect",
+      "[2601:600:107f:db64:a42b:4faa:284]:1234", -1, "/");
+  VALIDATE
 }
 
 TEST(UriParserTest, BracketedHostnameWithColon) {
-  EXPECT_EQ((URI{"connect", "192.168.100.132:5555", 1234, "/"}),
-            URI::Parse("connect://[192.168.100.132:5555]:1234"));
+  const UriTestCase testCase("connect://[192.168.100.132:5555]:1234", "connect",
+                             "192.168.100.132:5555", 1234, "/");
+  VALIDATE
 }
 
 TEST(UriParserTest, SchemeHostSeparator) {
-  EXPECT_EQ(std::nullopt, URI::Parse("x:/y"));
+  const UriTestCase testCase("x:/y");
+  VALIDATE
 }
 
 TEST(UriParserTest, SchemeHostSeparator2) {
-  EXPECT_EQ(std::nullopt, URI::Parse("x:y"));
+  const UriTestCase testCase("x:y");
+  VALIDATE
 }
 
 TEST(UriParserTest, SchemeHostSeparator3) {
-  EXPECT_EQ(std::nullopt, URI::Parse("x//y"));
+  const UriTestCase testCase("x//y");
+  VALIDATE
 }
 
 TEST(UriParserTest, SchemeHostSeparator4) {
-  EXPECT_EQ(std::nullopt, URI::Parse("x/y"));
+  const UriTestCase testCase("x/y");
+  VALIDATE
 }
 
 TEST(UriParserTest, BadPort) {
-  EXPECT_EQ(std::nullopt, URI::Parse("x://y:a/"));
+  const UriTestCase testCase("x://y:a/");
+  VALIDATE
 }
 
 TEST(UriParserTest, BadPort2) {
-  EXPECT_EQ(std::nullopt, URI::Parse("x://y:5432a/"));
+  const UriTestCase testCase("x://y:5432a/");
+  VALIDATE
 }
 
-TEST(UriParserTest, Empty) { EXPECT_EQ(std::nullopt, URI::Parse("")); }
+TEST(UriParserTest, Empty) {
+  const UriTestCase testCase("");
+  VALIDATE
+}
 
 TEST(UriParserTest, PortOverflow) {
-  EXPECT_EQ(std::nullopt,
-            URI::Parse("x://"
-                       "y:"
-                       "0123456789012345678901234567890123456789012345678"
-                       "9012345678901234567890123456789012345678901234567"
-                       "89/"));
+  const UriTestCase testCase("x://"
+                             "y:"
+                             "0123456789012345678901234567890123456789012345678"
+                             "9012345678901234567890123456789012345678901234567"
+                             "89/");
+  VALIDATE
 }

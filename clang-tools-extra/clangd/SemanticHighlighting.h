@@ -21,7 +21,6 @@
 #define LLVM_CLANG_TOOLS_EXTRA_CLANGD_SEMANTICHIGHLIGHTING_H
 
 #include "Protocol.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace clang {
@@ -49,10 +48,6 @@ enum class HighlightingKind {
   Concept,
   Primitive,
   Macro,
-  Modifier,
-  Operator,
-  Bracket,
-  Label,
 
   // This one is different from the other kinds as it's a line style
   // rather than a token style.
@@ -62,12 +57,10 @@ enum class HighlightingKind {
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, HighlightingKind K);
-std::optional<HighlightingKind>
-highlightingKindFromString(llvm::StringRef Name);
 
 enum class HighlightingModifier {
   Declaration,
-  Definition,
+  // FIXME: Definition (needs findExplicitReferences support)
   Deprecated,
   Deduced,
   Readonly,
@@ -76,10 +69,6 @@ enum class HighlightingModifier {
   Virtual,
   DependentName,
   DefaultLibrary,
-  UsedAsMutableReference,
-  UsedAsMutablePointer,
-  ConstructorOrDestructor,
-  UserDefined,
 
   FunctionScope,
   ClassScope,
@@ -91,8 +80,6 @@ enum class HighlightingModifier {
 static_assert(static_cast<unsigned>(HighlightingModifier::LastModifier) < 32,
               "Increase width of modifiers bitfield!");
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, HighlightingModifier K);
-std::optional<HighlightingModifier>
-highlightingModifierFromString(llvm::StringRef Name);
 
 // Contains all information needed for the highlighting a token.
 struct HighlightingToken {
@@ -111,20 +98,13 @@ bool operator<(const HighlightingToken &L, const HighlightingToken &R);
 
 // Returns all HighlightingTokens from an AST. Only generates highlights for the
 // main AST.
-std::vector<HighlightingToken>
-getSemanticHighlightings(ParsedAST &AST, bool IncludeInactiveRegionTokens);
+std::vector<HighlightingToken> getSemanticHighlightings(ParsedAST &AST);
 
-std::vector<SemanticToken> toSemanticTokens(llvm::ArrayRef<HighlightingToken>,
-                                            llvm::StringRef Code);
+std::vector<SemanticToken> toSemanticTokens(llvm::ArrayRef<HighlightingToken>);
 llvm::StringRef toSemanticTokenType(HighlightingKind Kind);
 llvm::StringRef toSemanticTokenModifier(HighlightingModifier Modifier);
 std::vector<SemanticTokensEdit> diffTokens(llvm::ArrayRef<SemanticToken> Before,
                                            llvm::ArrayRef<SemanticToken> After);
-
-// Returns ranges of the file that are inside an inactive preprocessor branch.
-// The preprocessor directives at the beginning and end of a branch themselves
-// are not included.
-std::vector<Range> getInactiveRegions(ParsedAST &AST);
 
 } // namespace clangd
 } // namespace clang

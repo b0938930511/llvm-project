@@ -1,4 +1,5 @@
-//===-- MCTargetOptionsCommandFlags.cpp -----------------------*- C++ //-*-===//
+//===-- MCTargetOptionsCommandFlags.cpp --------------------------*- C++
+//-*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -26,27 +27,24 @@ using namespace llvm;
 
 #define MCOPT_EXP(TY, NAME)                                                    \
   MCOPT(TY, NAME)                                                              \
-  std::optional<TY> llvm::mc::getExplicit##NAME() {                            \
+  Optional<TY> llvm::mc::getExplicit##NAME() {                                 \
     if (NAME##View->getNumOccurrences()) {                                     \
       TY res = *NAME##View;                                                    \
       return res;                                                              \
     }                                                                          \
-    return std::nullopt;                                                       \
+    return None;                                                               \
   }
 
 MCOPT_EXP(bool, RelaxAll)
 MCOPT(bool, IncrementalLinkerCompatible)
 MCOPT(int, DwarfVersion)
 MCOPT(bool, Dwarf64)
-MCOPT(EmitDwarfUnwindType, EmitDwarfUnwind)
-MCOPT(bool, EmitCompactUnwindNonCanonical)
 MCOPT(bool, ShowMCInst)
 MCOPT(bool, FatalWarnings)
 MCOPT(bool, NoWarn)
 MCOPT(bool, NoDeprecatedWarn)
 MCOPT(bool, NoTypeCheck)
 MCOPT(std::string, ABIName)
-MCOPT(std::string, AsSecureLogFile)
 
 llvm::mc::RegisterMCTargetOptionsFlags::RegisterMCTargetOptionsFlags() {
 #define MCBINDOPT(NAME)                                                        \
@@ -74,27 +72,6 @@ llvm::mc::RegisterMCTargetOptionsFlags::RegisterMCTargetOptionsFlags() {
       "dwarf64",
       cl::desc("Generate debugging info in the 64-bit DWARF format"));
   MCBINDOPT(Dwarf64);
-
-  static cl::opt<EmitDwarfUnwindType> EmitDwarfUnwind(
-      "emit-dwarf-unwind", cl::desc("Whether to emit DWARF EH frame entries."),
-      cl::init(EmitDwarfUnwindType::Default),
-      cl::values(clEnumValN(EmitDwarfUnwindType::Always, "always",
-                            "Always emit EH frame entries"),
-                 clEnumValN(EmitDwarfUnwindType::NoCompactUnwind,
-                            "no-compact-unwind",
-                            "Only emit EH frame entries when compact unwind is "
-                            "not available"),
-                 clEnumValN(EmitDwarfUnwindType::Default, "default",
-                            "Use target platform default")));
-  MCBINDOPT(EmitDwarfUnwind);
-
-  static cl::opt<bool> EmitCompactUnwindNonCanonical(
-      "emit-compact-unwind-non-canonical",
-      cl::desc(
-          "Whether to try to emit Compact Unwind for non canonical entries."),
-      cl::init(
-          false)); // By default, use DWARF for non-canonical personalities.
-  MCBINDOPT(EmitCompactUnwindNonCanonical);
 
   static cl::opt<bool> ShowMCInst(
       "asm-show-inst",
@@ -124,10 +101,6 @@ llvm::mc::RegisterMCTargetOptionsFlags::RegisterMCTargetOptionsFlags() {
       cl::init(""));
   MCBINDOPT(ABIName);
 
-  static cl::opt<std::string> AsSecureLogFile(
-      "as-secure-log-file", cl::desc("As secure log file name"), cl::Hidden);
-  MCBINDOPT(AsSecureLogFile);
-
 #undef MCBINDOPT
 }
 
@@ -143,9 +116,5 @@ MCTargetOptions llvm::mc::InitMCTargetOptionsFromFlags() {
   Options.MCNoWarn = getNoWarn();
   Options.MCNoDeprecatedWarn = getNoDeprecatedWarn();
   Options.MCNoTypeCheck = getNoTypeCheck();
-  Options.EmitDwarfUnwind = getEmitDwarfUnwind();
-  Options.EmitCompactUnwindNonCanonical = getEmitCompactUnwindNonCanonical();
-  Options.AsSecureLogFile = getAsSecureLogFile();
-
   return Options;
 }

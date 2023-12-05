@@ -10,11 +10,11 @@
 
 // template<class charT, class traits, class Allocator>
 //   basic_string<charT,traits,Allocator>
-//   operator+(charT lhs, const basic_string<charT,traits,Allocator>& rhs); // constexpr since C++20
+//   operator+(charT lhs, const basic_string<charT,traits,Allocator>& rhs);
 
 // template<class charT, class traits, class Allocator>
 //   basic_string<charT,traits,Allocator>&&
-//   operator+(charT lhs, basic_string<charT,traits,Allocator>&& rhs); // constexpr since C++20
+//   operator+(charT lhs, basic_string<charT,traits,Allocator>&& rhs);
 
 #include <string>
 #include <utility>
@@ -24,44 +24,47 @@
 #include "min_allocator.h"
 
 template <class S>
-TEST_CONSTEXPR_CXX20 void test0(typename S::value_type lhs, const S& rhs, const S& x) {
+void test0(typename S::value_type lhs, const S& rhs, const S& x) {
   assert(lhs + rhs == x);
 }
 
 #if TEST_STD_VER >= 11
 template <class S>
-TEST_CONSTEXPR_CXX20 void test1(typename S::value_type lhs, S&& rhs, const S& x) {
-  assert(lhs + std::move(rhs) == x);
+void test1(typename S::value_type lhs, S&& rhs, const S& x) {
+  assert(lhs + move(rhs) == x);
 }
 #endif
-
-template <class S>
-TEST_CONSTEXPR_CXX20 void test_string() {
-  test0('a', S(""), S("a"));
-  test0('a', S("12345"), S("a12345"));
-  test0('a', S("1234567890"), S("a1234567890"));
-  test0('a', S("12345678901234567890"), S("a12345678901234567890"));
-#if TEST_STD_VER >= 11
-  test1('a', S(""), S("a"));
-  test1('a', S("12345"), S("a12345"));
-  test1('a', S("1234567890"), S("a1234567890"));
-  test1('a', S("12345678901234567890"), S("a12345678901234567890"));
-#endif
-}
-
-TEST_CONSTEXPR_CXX20 bool test() {
-  test_string<std::string>();
-#if TEST_STD_VER >= 11
-  test_string<std::basic_string<char, std::char_traits<char>, min_allocator<char> > >();
-#endif
-
-  return true;
-}
 
 int main(int, char**) {
-  test();
-#if TEST_STD_VER > 17
-  static_assert(test());
+  {
+    typedef std::string S;
+    test0('a', S(""), S("a"));
+    test0('a', S("12345"), S("a12345"));
+    test0('a', S("1234567890"), S("a1234567890"));
+    test0('a', S("12345678901234567890"), S("a12345678901234567890"));
+  }
+#if TEST_STD_VER >= 11
+  {
+    typedef std::string S;
+    test1('a', S(""), S("a"));
+    test1('a', S("12345"), S("a12345"));
+    test1('a', S("1234567890"), S("a1234567890"));
+    test1('a', S("12345678901234567890"), S("a12345678901234567890"));
+  }
+  {
+    typedef std::basic_string<char, std::char_traits<char>,
+                              min_allocator<char> >
+        S;
+    test0('a', S(""), S("a"));
+    test0('a', S("12345"), S("a12345"));
+    test0('a', S("1234567890"), S("a1234567890"));
+    test0('a', S("12345678901234567890"), S("a12345678901234567890"));
+
+    test1('a', S(""), S("a"));
+    test1('a', S("12345"), S("a12345"));
+    test1('a', S("1234567890"), S("a1234567890"));
+    test1('a', S("12345678901234567890"), S("a12345678901234567890"));
+  }
 #endif
 
   return 0;

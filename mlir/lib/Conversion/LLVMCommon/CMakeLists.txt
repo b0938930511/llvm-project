@@ -3,7 +3,6 @@ add_mlir_conversion_library(MLIRLLVMCommonConversion
   LoweringOptions.cpp
   MemRefBuilder.cpp
   Pattern.cpp
-  PrintCallHelper.cpp
   StructBuilder.cpp
   TypeConverter.cpp
   VectorPattern.cpp
@@ -13,7 +12,7 @@ add_mlir_conversion_library(MLIRLLVMCommonConversion
 
   LINK_LIBS PUBLIC
   MLIRIR
-  MLIRLLVMDialect
+  MLIRLLVMIR
   MLIRSupport
   MLIRTransforms
   )

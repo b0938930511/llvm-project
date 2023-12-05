@@ -149,7 +149,7 @@ Status NativeRegisterContextFreeBSD_arm64::WriteRegister(
 }
 
 Status NativeRegisterContextFreeBSD_arm64::ReadAllRegisterValues(
-    lldb::WritableDataBufferSP &data_sp) {
+    lldb::DataBufferSP &data_sp) {
   Status error;
 
   error = ReadRegisterSet(RegisterInfoPOSIX_arm64::GPRegSet);
@@ -186,7 +186,7 @@ Status NativeRegisterContextFreeBSD_arm64::WriteAllRegisterValues(
     return error;
   }
 
-  const uint8_t *src = data_sp->GetBytes();
+  uint8_t *src = data_sp->GetBytes();
   if (src == nullptr) {
     error.SetErrorStringWithFormat("NativeRegisterContextFreeBSD_arm64::%s "
                                    "DataBuffer::GetBytes() returned a null "
@@ -227,7 +227,7 @@ llvm::Error NativeRegisterContextFreeBSD_arm64::CopyHardwareWatchpointsFrom(
 
 llvm::Error NativeRegisterContextFreeBSD_arm64::ReadHardwareDebugInfo() {
 #ifdef LLDB_HAS_FREEBSD_WATCHPOINT
-  Log *log = GetLog(POSIXLog::Registers);
+  Log *log(ProcessPOSIXLog::GetLogIfAllCategoriesSet(POSIX_LOG_REGISTERS));
 
   // we're fully stateful, so no need to reread control registers ever
   if (m_read_dbreg)

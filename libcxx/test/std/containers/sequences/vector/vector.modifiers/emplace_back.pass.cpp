@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// UNSUPPORTED: c++03 && !stdlib=libc++
+// UNSUPPORTED: c++03
 
 // <vector>
 
@@ -26,14 +26,13 @@ class A
     int i_;
     double d_;
 
+    A(const A&);
+    A& operator=(const A&);
 public:
-    A(const A&) = delete;
-    A& operator=(const A&) = delete;
-
-    TEST_CONSTEXPR_CXX14 A(int i, double d)
+    A(int i, double d)
         : i_(i), d_(d) {}
 
-    TEST_CONSTEXPR_CXX14 A(A&& a)
+    A(A&& a)
         : i_(a.i_),
           d_(a.d_)
     {
@@ -41,7 +40,7 @@ public:
         a.d_ = 0;
     }
 
-    TEST_CONSTEXPR_CXX14 A& operator=(A&& a)
+    A& operator=(A&& a)
     {
         i_ = a.i_;
         d_ = a.d_;
@@ -50,11 +49,11 @@ public:
         return *this;
     }
 
-    TEST_CONSTEXPR_CXX14 int geti() const {return i_;}
-    TEST_CONSTEXPR_CXX14 double getd() const {return d_;}
+    int geti() const {return i_;}
+    double getd() const {return d_;}
 };
 
-TEST_CONSTEXPR_CXX20 bool tests()
+int main(int, char**)
 {
     {
         std::vector<A> c;
@@ -111,7 +110,7 @@ TEST_CONSTEXPR_CXX20 bool tests()
         assert(is_contiguous_container_asan_correct(c));
     }
     {
-        std::vector<A, min_allocator<A> > c;
+        std::vector<A, min_allocator<A>> c;
 #if TEST_STD_VER > 14
         A& r1 = c.emplace_back(2, 3.5);
         assert(c.size() == 1);
@@ -138,34 +137,7 @@ TEST_CONSTEXPR_CXX20 bool tests()
         assert(is_contiguous_container_asan_correct(c));
     }
     {
-      std::vector<A, safe_allocator<A> > c;
-#if TEST_STD_VER > 14
-      A& r1 = c.emplace_back(2, 3.5);
-      assert(c.size() == 1);
-      assert(&r1 == &c.back());
-      assert(c.front().geti() == 2);
-      assert(c.front().getd() == 3.5);
-      assert(is_contiguous_container_asan_correct(c));
-      A& r2 = c.emplace_back(3, 4.5);
-      assert(c.size() == 2);
-      assert(&r2 == &c.back());
-#else
-        c.emplace_back(2, 3.5);
-        assert(c.size() == 1);
-        assert(c.front().geti() == 2);
-        assert(c.front().getd() == 3.5);
-        assert(is_contiguous_container_asan_correct(c));
-        c.emplace_back(3, 4.5);
-        assert(c.size() == 2);
-#endif
-        assert(c.front().geti() == 2);
-        assert(c.front().getd() == 3.5);
-        assert(c.back().geti() == 3);
-        assert(c.back().getd() == 4.5);
-        assert(is_contiguous_container_asan_correct(c));
-    }
-    {
-        std::vector<Tag_X, TaggingAllocator<Tag_X> > c;
+        std::vector<Tag_X, TaggingAllocator<Tag_X>> c;
         c.emplace_back();
         assert(c.size() == 1);
         c.emplace_back(1, 2, 3);
@@ -184,14 +156,5 @@ TEST_CONSTEXPR_CXX20 bool tests()
         for (int i = 0; i < sz; ++i)
             assert(c[i] == i);
     }
-    return true;
-}
-
-int main(int, char**)
-{
-    tests();
-#if TEST_STD_VER > 17
-    static_assert(tests());
-#endif
-    return 0;
+  return 0;
 }

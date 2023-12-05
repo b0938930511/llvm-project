@@ -5,7 +5,7 @@ int printf(const char *msg, ...);
 
 #define FMT "%hd %hu %d %u %hhd %hhu %c"
 
-int main(void) {
+int main() {
   _Bool b = 0;
   printf(FMT,
          b, // expected-warning {{format specifies type 'short' but the argument has type '_Bool'}}

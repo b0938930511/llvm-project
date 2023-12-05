@@ -50,6 +50,8 @@
 #include "clang/Analysis/Analyses/ThreadSafetyUtil.h"
 #include "clang/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/None.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
@@ -58,7 +60,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
-#include <optional>
 #include <string>
 #include <utility>
 
@@ -74,7 +75,7 @@ namespace til {
 class BasicBlock;
 
 /// Enum for the different distinct classes of SExpr
-enum TIL_Opcode : unsigned char {
+enum TIL_Opcode {
 #define TIL_OPCODE_DEF(X) COP_##X,
 #include "ThreadSafetyOps.def"
 #undef TIL_OPCODE_DEF
@@ -277,7 +278,7 @@ class SExpr {
 public:
   SExpr() = delete;
 
-  TIL_Opcode opcode() const { return Opcode; }
+  TIL_Opcode opcode() const { return static_cast<TIL_Opcode>(Opcode); }
 
   // Subclasses of SExpr must define the following:
   //
@@ -319,9 +320,8 @@ public:
 protected:
   SExpr(TIL_Opcode Op) : Opcode(Op) {}
   SExpr(const SExpr &E) : Opcode(E.Opcode), Flags(E.Flags) {}
-  SExpr &operator=(const SExpr &) = delete;
 
-  const TIL_Opcode Opcode;
+  const unsigned char Opcode;
   unsigned char Reserved = 0;
   unsigned short Flags = 0;
   unsigned SExprID = 0;
@@ -332,7 +332,7 @@ protected:
 namespace ThreadSafetyTIL {
 
 inline bool isTrivial(const SExpr *E) {
-  TIL_Opcode Op = E->opcode();
+  unsigned Op = E->opcode();
   return Op == COP_Variable || Op == COP_Literal || Op == COP_LiteralPtr;
 }
 
@@ -489,10 +489,6 @@ public:
   Undefined(const Stmt *S = nullptr) : SExpr(COP_Undefined), Cstmt(S) {}
   Undefined(const Undefined &U) : SExpr(U), Cstmt(U.Cstmt) {}
 
-  // The copy assignment operator is defined as deleted pending further
-  // motivation.
-  Undefined &operator=(const Undefined &) = delete;
-
   static bool classof(const SExpr *E) { return E->opcode() == COP_Undefined; }
 
   template <class V>
@@ -571,10 +567,6 @@ public:
   LiteralT(T Dat) : Literal(ValueType::getValueType<T>()), Val(Dat) {}
   LiteralT(const LiteralT<T> &L) : Literal(L), Val(L.Val) {}
 
-  // The copy assignment operator is defined as deleted pending further
-  // motivation.
-  LiteralT &operator=(const LiteralT<T> &) = delete;
-
   T value() const { return Val;}
   T& value() { return Val; }
 
@@ -642,14 +634,15 @@ typename V::R_SExpr Literal::traverse(V &Vs, typename V::R_Ctx Ctx) {
 /// At compile time, pointer literals are represented by symbolic names.
 class LiteralPtr : public SExpr {
 public:
-  LiteralPtr(const ValueDecl *D) : SExpr(COP_LiteralPtr), Cvdecl(D) {}
+  LiteralPtr(const ValueDecl *D) : SExpr(COP_LiteralPtr), Cvdecl(D) {
+    assert(D && "ValueDecl must not be null");
+  }
   LiteralPtr(const LiteralPtr &) = default;
 
   static bool classof(const SExpr *E) { return E->opcode() == COP_LiteralPtr; }
 
   // The clang declaration for the value that this pointer points to.
   const ValueDecl *clangDecl() const { return Cvdecl; }
-  void setClangDecl(const ValueDecl *VD) { Cvdecl = VD; }
 
   template <class V>
   typename V::R_SExpr traverse(V &Vs, typename V::R_Ctx Ctx) {
@@ -658,8 +651,6 @@ public:
 
   template <class C>
   typename C::CType compare(const LiteralPtr* E, C& Cmp) const {
-    if (!Cvdecl || !E->Cvdecl)
-      return Cmp.comparePointers(this, E);
     return Cmp.comparePointers(Cvdecl, E->Cvdecl);
   }
 
@@ -966,7 +957,7 @@ public:
 
 private:
   SExpr* Rec;
-  mutable std::optional<std::string> SlotName;
+  mutable llvm::Optional<std::string> SlotName;
   const ValueDecl *Cvdecl;
 };
 
@@ -1439,7 +1430,9 @@ public:
   BasicBlock *elseBlock() { return Branches[1]; }
 
   /// Return the list of basic blocks that this terminator can branch to.
-  ArrayRef<BasicBlock *> successors() { return llvm::ArrayRef(Branches); }
+  ArrayRef<BasicBlock*> successors() {
+    return llvm::makeArrayRef(Branches);
+  }
 
   template <class V>
   typename V::R_SExpr traverse(V &Vs, typename V::R_Ctx Ctx) {
@@ -1470,7 +1463,7 @@ public:
   static bool classof(const SExpr *E) { return E->opcode() == COP_Return; }
 
   /// Return an empty list.
-  ArrayRef<BasicBlock *> successors() { return std::nullopt; }
+  ArrayRef<BasicBlock *> successors() { return None; }
 
   SExpr *returnValue() { return Retval; }
   const SExpr *returnValue() const { return Retval; }
@@ -1496,7 +1489,7 @@ inline ArrayRef<BasicBlock*> Terminator::successors() {
     case COP_Branch: return cast<Branch>(this)->successors();
     case COP_Return: return cast<Return>(this)->successors();
     default:
-      return std::nullopt;
+      return None;
   }
 }
 

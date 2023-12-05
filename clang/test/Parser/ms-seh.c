@@ -1,6 +1,6 @@
 // RUN: %clang_cc1 %s -fsyntax-only -Wmicrosoft -verify -fms-extensions
 
-void f(void) {
+void f() {
   int a;
 
   __try a; // expected-error {{expected '{'}} expected-warning {{expression result unused}}
@@ -9,14 +9,14 @@ void f(void) {
   }
 } // expected-error {{expected '__except' or '__finally' block}}
 
-void g(void) {
+void g() {
   int a;
 
   __try {
   } __except(1) a; // expected-error {{expected '{'}} expected-warning {{expression result unused}}
 }
 
-void h(void) {
+void h() {
   int a;
 
   __try {

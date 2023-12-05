@@ -12,7 +12,6 @@
 
 #include "clang/StaticAnalyzer/Checkers/BuiltinCheckerRegistration.h"
 #include "clang/StaticAnalyzer/Core/Checker.h"
-#include "clang/StaticAnalyzer/Core/PathSensitive/CallDescription.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CallEvent.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CheckerContext.h"
 
@@ -61,7 +60,7 @@ class STLAlgorithmModeling : public Checker<eval::Call> {
 public:
   STLAlgorithmModeling() = default;
 
-  bool AggressiveStdFindModeling = false;
+  bool AggressiveStdFindModeling;
 
   bool evalCall(const CallEvent &Call, CheckerContext &C) const;
 }; //
@@ -131,7 +130,7 @@ void STLAlgorithmModeling::Find(CheckerContext &C, const CallExpr *CE,
                                         nonloc::SymbolVal(NewPos->getOffset()),
                                         nonloc::SymbolVal(Pos->getOffset()),
                                         SVB.getConditionType());
-    assert(isa<DefinedSVal>(GreaterOrEqual) &&
+    assert(GreaterOrEqual.getAs<DefinedSVal>() &&
            "Symbol comparison must be a `DefinedSVal`");
     StateFound = StateFound->assume(GreaterOrEqual.castAs<DefinedSVal>(), true);
   }
@@ -153,7 +152,7 @@ void STLAlgorithmModeling::Find(CheckerContext &C, const CallExpr *CE,
                               nonloc::SymbolVal(NewPos->getOffset()),
                               nonloc::SymbolVal(Pos->getOffset()),
                               SVB.getConditionType());
-    assert(isa<DefinedSVal>(Less) &&
+    assert(Less.getAs<DefinedSVal>() &&
            "Symbol comparison must be a `DefinedSVal`");
     StateFound = StateFound->assume(Less.castAs<DefinedSVal>(), true);
   }

@@ -73,9 +73,9 @@
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/MC/MCAsmInfo.h"
-#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
@@ -131,9 +131,11 @@ public:
     bool runOnMachineFunction(MachineFunction &MF) override {
       bool Changed = false;
 
-      for (MachineBasicBlock &B : llvm::make_early_inc_range(MF))
+      for (MachineFunction::iterator I = MF.begin(); I != MF.end();) {
+        MachineBasicBlock &B = *I++;
         if (processBlock(B))
           Changed = true;
+      }
 
       return Changed;
     }

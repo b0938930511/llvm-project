@@ -5,16 +5,15 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-///
-/// \file
-/// This file implements an indexed map. The index map template takes two
-/// types. The first is the mapped type and the second is a functor
-/// that maps its argument to a size_t. On instantiation a "null" value
-/// can be provided to be used as a "does not exist" indicator in the
-/// map. A member function grow() is provided that given the value of
-/// the maximally indexed key (the argument of the functor) makes sure
-/// the map has enough space for it.
-///
+//
+// This file implements an indexed map. The index map template takes two
+// types. The first is the mapped type and the second is a functor
+// that maps its argument to a size_t. On instantiation a "null" value
+// can be provided to be used as a "does not exist" indicator in the
+// map. A member function grow() is provided that given the value of
+// the maximally indexed key (the argument of the functor) makes sure
+// the map has enough space for it.
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef LLVM_ADT_INDEXEDMAP_H
@@ -22,7 +21,6 @@
 
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/identity.h"
 #include <cassert>
 
 namespace llvm {

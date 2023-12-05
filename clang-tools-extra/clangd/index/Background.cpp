@@ -10,7 +10,9 @@
 #include "Compiler.h"
 #include "Config.h"
 #include "Headers.h"
+#include "ParsedAST.h"
 #include "SourceCode.h"
+#include "Symbol.h"
 #include "URI.h"
 #include "index/BackgroundIndexLoader.h"
 #include "index/FileIndex.h"
@@ -20,7 +22,6 @@
 #include "index/Ref.h"
 #include "index/Relation.h"
 #include "index/Serialization.h"
-#include "index/Symbol.h"
 #include "index/SymbolCollector.h"
 #include "support/Context.h"
 #include "support/Logger.h"
@@ -30,13 +31,15 @@
 #include "support/Trace.h"
 #include "clang/Basic/SourceLocation.h"
 #include "clang/Basic/SourceManager.h"
-#include "clang/Basic/Stack.h"
-#include "clang/Frontend/FrontendAction.h"
+#include "clang/Driver/Types.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Threading.h"
@@ -50,7 +53,6 @@
 #include <memory>
 #include <mutex>
 #include <numeric>
-#include <optional>
 #include <queue>
 #include <random>
 #include <string>
@@ -80,7 +82,7 @@ llvm::SmallString<128> getAbsolutePath(const tooling::CompileCommand &Cmd) {
 bool shardIsStale(const LoadedShard &LS, llvm::vfs::FileSystem *FS) {
   auto Buf = FS->getBufferForFile(LS.AbsolutePath);
   if (!Buf) {
-    vlog("Background-index: Couldn't read {0} to validate stored index: {1}",
+    elog("Background-index: Couldn't read {0} to validate stored index: {1}",
          LS.AbsolutePath, Buf.getError().message());
     // There is no point in indexing an unreadable file.
     return false;
@@ -94,7 +96,6 @@ BackgroundIndex::BackgroundIndex(
     const ThreadsafeFS &TFS, const GlobalCompilationDatabase &CDB,
     BackgroundIndexStorage::Factory IndexStorageFactory, Options Opts)
     : SwapIndex(std::make_unique<MemIndex>()), TFS(TFS), CDB(CDB),
-      IndexingPriority(Opts.IndexingPriority),
       ContextProvider(std::move(Opts.ContextProvider)),
       IndexedSymbols(IndexContents::All),
       Rebuilder(this, &IndexedSymbols, Opts.ThreadPoolSize),
@@ -109,7 +110,6 @@ BackgroundIndex::BackgroundIndex(
   for (unsigned I = 0; I < Opts.ThreadPoolSize; ++I) {
     ThreadPool.runAsync("background-worker-" + llvm::Twine(I + 1),
                         [this, Ctx(Context::current().clone())]() mutable {
-                          clang::noteBottomOfStack();
                           WithContext BGContext(std::move(Ctx));
                           Queue.work([&] { Rebuilder.idle(); });
                         });
@@ -126,7 +126,7 @@ BackgroundQueue::Task BackgroundIndex::changedFilesTask(
   BackgroundQueue::Task T([this, ChangedFiles] {
     trace::Span Tracer("BackgroundIndexEnqueue");
 
-    std::optional<WithContext> WithProvidedContext;
+    llvm::Optional<WithContext> WithProvidedContext;
     if (ContextProvider)
       WithProvidedContext.emplace(ContextProvider(/*Path=*/""));
 
@@ -157,9 +157,9 @@ static llvm::StringRef filenameWithoutExtension(llvm::StringRef Path) {
 
 BackgroundQueue::Task BackgroundIndex::indexFileTask(std::string Path) {
   std::string Tag = filenameWithoutExtension(Path).str();
-  uint64_t Key = llvm::xxh3_64bits(Path);
+  uint64_t Key = llvm::xxHash64(Path);
   BackgroundQueue::Task T([this, Path(std::move(Path))] {
-    std::optional<WithContext> WithProvidedContext;
+    llvm::Optional<WithContext> WithProvidedContext;
     if (ContextProvider)
       WithProvidedContext.emplace(ContextProvider(Path));
     auto Cmd = CDB.getCompileCommand(Path);
@@ -169,7 +169,6 @@ BackgroundQueue::Task BackgroundIndex::indexFileTask(std::string Path) {
       elog("Indexing {0} failed: {1}", Path, std::move(Error));
   });
   T.QueuePri = IndexFile;
-  T.ThreadPri = IndexingPriority;
   T.Tag = std::move(Tag);
   T.Key = Key;
   return T;
@@ -290,10 +289,10 @@ llvm::Error BackgroundIndex::index(tooling::CompileCommand Cmd) {
   // digests.
   IndexOpts.FileFilter = [&ShardVersionsSnapshot](const SourceManager &SM,
                                                   FileID FID) {
-    const auto F = SM.getFileEntryRefForID(FID);
+    const auto *F = SM.getFileEntryForID(FID);
     if (!F)
       return false; // Skip invalid files.
-    auto AbsPath = getCanonicalPath(*F, SM.getFileManager());
+    auto AbsPath = getCanonicalPath(F, SM);
     if (!AbsPath)
       return false; // Skip files without absolute path.
     auto Digest = digestFile(SM, FID);
@@ -399,7 +398,7 @@ BackgroundIndex::loadProject(std::vector<std::string> MainFiles) {
   Rebuilder.loadedShard(LoadedShards);
   Rebuilder.doneLoading();
 
-  auto FS = TFS.view(/*CWD=*/std::nullopt);
+  auto FS = TFS.view(/*CWD=*/llvm::None);
   llvm::DenseSet<PathRef> TUsToIndex;
   // We'll accept data from stale shards, but ensure the files get reindexed
   // soon.

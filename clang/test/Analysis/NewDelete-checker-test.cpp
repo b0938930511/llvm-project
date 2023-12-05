@@ -105,13 +105,13 @@ void testNewInvalidationPlacement(PtrWrapper *w) {
 
 void testUseZeroAlloc1() {
   int *p = (int *)operator new(0);
-  *p = 1; // newdelete-warning {{Use of memory allocated with size zero}}
+  *p = 1; // newdelete-warning {{Use of zero-allocated memory}}
   delete p;
 }
 
 int testUseZeroAlloc2() {
   int *p = (int *)operator new[](0);
-  return p[0]; // newdelete-warning {{Use of memory allocated with size zero}}
+  return p[0]; // newdelete-warning {{Use of zero-allocated memory}}
   delete[] p;
 }
 
@@ -119,7 +119,7 @@ void f(int);
 
 void testUseZeroAlloc3() {
   int *p = new int[0];
-  f(*p); // newdelete-warning {{Use of memory allocated with size zero}}
+  f(*p); // newdelete-warning {{Use of zero-allocated memory}}
   delete[] p;
 }
 
@@ -385,11 +385,7 @@ class DerefClass{
 public:
   int *x;
   DerefClass() {}
-  ~DerefClass() {
-    int i = 0;
-    x = &i;
-    *x = 1;
-  }
+  ~DerefClass() {*x = 1;}
 };
 
 void testDoubleDeleteClassInstance() {

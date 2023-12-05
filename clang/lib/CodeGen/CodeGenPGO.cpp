@@ -21,10 +21,9 @@
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MD5.h"
-#include <optional>
 
 static llvm::cl::opt<bool>
-    EnableValueProfiling("enable-value-profiling",
+    EnableValueProfiling("enable-value-profiling", llvm::cl::ZeroOrMore,
                          llvm::cl::desc("Enable value profiling"),
                          llvm::cl::Hidden, llvm::cl::init(false));
 
@@ -132,7 +131,7 @@ public:
   static_assert(LastHashType <= TooBig, "Too many types in HashType");
 
   PGOHash(PGOHashVersion HashVersion)
-      : Working(0), Count(0), HashVersion(HashVersion) {}
+      : Working(0), Count(0), HashVersion(HashVersion), MD5() {}
   void combine(HashType Type);
   uint64_t finalize();
   PGOHashVersion getHashVersion() const { return HashVersion; }
@@ -376,9 +375,9 @@ struct ComputeRegionCounts : public ConstStmtVisitor<ComputeRegionCounts> {
 
   /// BreakContinueStack - Keep counts of breaks and continues inside loops.
   struct BreakContinue {
-    uint64_t BreakCount = 0;
-    uint64_t ContinueCount = 0;
-    BreakContinue() = default;
+    uint64_t BreakCount;
+    uint64_t ContinueCount;
+    BreakContinue() : BreakCount(0), ContinueCount(0) {}
   };
   SmallVector<BreakContinue, 8> BreakContinueStack;
 
@@ -650,14 +649,6 @@ struct ComputeRegionCounts : public ConstStmtVisitor<ComputeRegionCounts> {
 
   void VisitIfStmt(const IfStmt *S) {
     RecordStmtCount(S);
-
-    if (S->isConsteval()) {
-      const Stmt *Stm = S->isNegatedConsteval() ? S->getThen() : S->getElse();
-      if (Stm)
-        Visit(Stm);
-      return;
-    }
-
     uint64_t ParentCount = CurrentCount;
     if (S->getInit())
       Visit(S->getInit());
@@ -755,9 +746,8 @@ void PGOHash::combine(HashType Type) {
   // Pass through MD5 if enough work has built up.
   if (Count && Count % NumTypesPerWord == 0) {
     using namespace llvm::support;
-    uint64_t Swapped =
-        endian::byte_swap<uint64_t, llvm::endianness::little>(Working);
-    MD5.update(llvm::ArrayRef((uint8_t *)&Swapped, sizeof(Swapped)));
+    uint64_t Swapped = endian::byte_swap<uint64_t, little>(Working);
+    MD5.update(llvm::makeArrayRef((uint8_t *)&Swapped, sizeof(Swapped)));
     Working = 0;
   }
 
@@ -782,9 +772,8 @@ uint64_t PGOHash::finalize() {
       MD5.update({(uint8_t)Working});
     } else {
       using namespace llvm::support;
-      uint64_t Swapped =
-          endian::byte_swap<uint64_t, llvm::endianness::little>(Working);
-      MD5.update(llvm::ArrayRef((uint8_t *)&Swapped, sizeof(Swapped)));
+      uint64_t Swapped = endian::byte_swap<uint64_t, little>(Working);
+      MD5.update(llvm::makeArrayRef((uint8_t *)&Swapped, sizeof(Swapped)));
     }
   }
 
@@ -824,8 +813,6 @@ void CodeGenPGO::assignRegionCounters(GlobalDecl GD, llvm::Function *Fn) {
 
   CGM.ClearUnusedCoverageMapping(D);
   if (Fn->hasFnAttribute(llvm::Attribute::NoProfile))
-    return;
-  if (Fn->hasFnAttribute(llvm::Attribute::SkipProfile))
     return;
 
   setFuncName(Fn);
@@ -954,22 +941,25 @@ CodeGenPGO::applyFunctionAttributes(llvm::IndexedInstrProfReader *PGOReader,
 
 void CodeGenPGO::emitCounterIncrement(CGBuilderTy &Builder, const Stmt *S,
                                       llvm::Value *StepV) {
-  if (!RegionCounterMap || !Builder.GetInsertBlock())
+  if (!CGM.getCodeGenOpts().hasProfileClangInstr() || !RegionCounterMap)
+    return;
+  if (!Builder.GetInsertBlock())
     return;
 
   unsigned Counter = (*RegionCounterMap)[S];
+  auto *I8PtrTy = llvm::Type::getInt8PtrTy(CGM.getLLVMContext());
 
-  llvm::Value *Args[] = {FuncNameVar,
+  llvm::Value *Args[] = {llvm::ConstantExpr::getBitCast(FuncNameVar, I8PtrTy),
                          Builder.getInt64(FunctionHash),
                          Builder.getInt32(NumRegionCounters),
                          Builder.getInt32(Counter), StepV};
   if (!StepV)
     Builder.CreateCall(CGM.getIntrinsic(llvm::Intrinsic::instrprof_increment),
-                       ArrayRef(Args, 4));
+                       makeArrayRef(Args, 4));
   else
     Builder.CreateCall(
         CGM.getIntrinsic(llvm::Intrinsic::instrprof_increment_step),
-        ArrayRef(Args));
+        makeArrayRef(Args));
 }
 
 void CodeGenPGO::setValueProfilingFlag(llvm::Module &M) {
@@ -997,7 +987,7 @@ void CodeGenPGO::valueProfile(CGBuilderTy &Builder, uint32_t ValueKind,
     auto BuilderInsertPoint = Builder.saveIP();
     Builder.SetInsertPoint(ValueSite);
     llvm::Value *Args[5] = {
-        FuncNameVar,
+        llvm::ConstantExpr::getBitCast(FuncNameVar, Builder.getInt8PtrTy()),
         Builder.getInt64(FunctionHash),
         Builder.CreatePtrToInt(ValuePtr, Builder.getInt64Ty()),
         Builder.getInt32(ValueKind),
@@ -1035,7 +1025,7 @@ void CodeGenPGO::loadRegionCounts(llvm::IndexedInstrProfReader *PGOReader,
   llvm::Expected<llvm::InstrProfRecord> RecordExpected =
       PGOReader->getInstrProfRecord(FuncName, FunctionHash);
   if (auto E = RecordExpected.takeError()) {
-    auto IPE = std::get<0>(llvm::InstrProfError::take(std::move(E)));
+    auto IPE = llvm::InstrProfError::take(std::move(E));
     if (IPE == llvm::instrprof_error::unknown_function)
       CGM.getPGOStats().addMissing(IsInMainFile);
     else if (IPE == llvm::instrprof_error::hash_mismatch)
@@ -1116,7 +1106,7 @@ CodeGenFunction::createProfileWeightsForLoop(const Stmt *Cond,
                                              uint64_t LoopCount) const {
   if (!PGO.haveRegionCounts())
     return nullptr;
-  std::optional<uint64_t> CondCount = PGO.getStmtCount(Cond);
+  Optional<uint64_t> CondCount = PGO.getStmtCount(Cond);
   if (!CondCount || *CondCount == 0)
     return nullptr;
   return createProfileWeights(LoopCount,

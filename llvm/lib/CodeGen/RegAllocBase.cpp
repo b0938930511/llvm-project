@@ -85,7 +85,7 @@ void RegAllocBase::allocatePhysRegs() {
   seedLiveRegs();
 
   // Continue assigning vregs one at a time to available physical registers.
-  while (const LiveInterval *VirtReg = dequeue()) {
+  while (LiveInterval *VirtReg = dequeue()) {
     assert(!VRM->hasPhys(VirtReg->reg()) && "Register already assigned");
 
     // Unused registers can appear when the spiller coalesces snippets.
@@ -140,7 +140,10 @@ void RegAllocBase::allocatePhysRegs() {
 
       // Keep going after reporting the error.
       VRM->assignVirt2Phys(VirtReg->reg(), AllocOrder.front());
-    } else if (AvailablePhysReg)
+      continue;
+    }
+
+    if (AvailablePhysReg)
       Matrix->assign(*VirtReg, AvailablePhysReg);
 
     for (Register Reg : SplitVRegs) {
@@ -156,7 +159,7 @@ void RegAllocBase::allocatePhysRegs() {
         continue;
       }
       LLVM_DEBUG(dbgs() << "queuing new interval: " << *SplitVirtReg << "\n");
-      assert(SplitVirtReg->reg().isVirtual() &&
+      assert(Register::isVirtualRegister(SplitVirtReg->reg()) &&
              "expect split value in virtual register");
       enqueue(SplitVirtReg);
       ++NumNewQueued;
@@ -166,14 +169,14 @@ void RegAllocBase::allocatePhysRegs() {
 
 void RegAllocBase::postOptimization() {
   spiller().postOptimization();
-  for (auto *DeadInst : DeadRemats) {
+  for (auto DeadInst : DeadRemats) {
     LIS->RemoveMachineInstrFromMaps(*DeadInst);
     DeadInst->eraseFromParent();
   }
   DeadRemats.clear();
 }
 
-void RegAllocBase::enqueue(const LiveInterval *LI) {
+void RegAllocBase::enqueue(LiveInterval *LI) {
   const Register Reg = LI->reg();
 
   assert(Reg.isVirtual() && "Can only enqueue virtual registers");

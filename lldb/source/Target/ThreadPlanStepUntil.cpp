@@ -14,7 +14,6 @@
 #include "lldb/Target/RegisterContext.h"
 #include "lldb/Target/StopInfo.h"
 #include "lldb/Target/Target.h"
-#include "lldb/Utility/LLDBLog.h"
 #include "lldb/Utility/Log.h"
 
 using namespace lldb;
@@ -182,7 +181,7 @@ void ThreadPlanStepUntil::AnalyzeStop() {
         } else
           m_should_stop = false;
 
-        if (this_site->GetNumberOfConstituents() == 1)
+        if (this_site->GetNumberOfOwners() == 1)
           m_explains_stop = true;
         else
           m_explains_stop = false;
@@ -228,7 +227,7 @@ void ThreadPlanStepUntil::AnalyzeStop() {
             // only breakpoint here, then we do explain the stop, and we'll
             // continue. If not then we should let higher plans handle this
             // stop.
-            if (this_site->GetNumberOfConstituents() == 1)
+            if (this_site->GetNumberOfOwners() == 1)
               m_explains_stop = true;
             else {
               m_should_stop = true;
@@ -316,7 +315,7 @@ bool ThreadPlanStepUntil::MischiefManaged() {
   // here.
   bool done = false;
   if (IsPlanComplete()) {
-    Log *log = GetLog(LLDBLog::Step);
+    Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_STEP));
     LLDB_LOGF(log, "Completed step until plan.");
 
     Clear();

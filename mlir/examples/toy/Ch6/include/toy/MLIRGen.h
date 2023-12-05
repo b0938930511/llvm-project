@@ -11,16 +11,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef TOY_MLIRGEN_H
-#define TOY_MLIRGEN_H
+#ifndef MLIR_TUTORIAL_TOY_MLIRGEN_H_
+#define MLIR_TUTORIAL_TOY_MLIRGEN_H_
 
 #include <memory>
 
 namespace mlir {
 class MLIRContext;
-template <typename OpTy>
-class OwningOpRef;
-class ModuleOp;
+class OwningModuleRef;
 } // namespace mlir
 
 namespace toy {
@@ -28,8 +26,7 @@ class ModuleAST;
 
 /// Emit IR for the given Toy moduleAST, returns a newly created MLIR module
 /// or nullptr on failure.
-mlir::OwningOpRef<mlir::ModuleOp> mlirGen(mlir::MLIRContext &context,
-                                          ModuleAST &moduleAST);
+mlir::OwningModuleRef mlirGen(mlir::MLIRContext &context, ModuleAST &moduleAST);
 } // namespace toy
 
-#endif // TOY_MLIRGEN_H
+#endif // MLIR_TUTORIAL_TOY_MLIRGEN_H_

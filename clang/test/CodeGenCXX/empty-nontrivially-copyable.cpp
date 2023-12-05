@@ -13,14 +13,14 @@ struct Empty {
 };
 
 bool foo(Empty e) {
-// CHECK: @_Z3foo5Empty(ptr noundef %e)
-// CHECK: call {{.*}} @_ZN5Empty5checkEv(ptr {{[^,]*}} %e)
+// CHECK: @_Z3foo5Empty(%struct.Empty* %e)
+// CHECK: call {{.*}} @_ZN5Empty5checkEv(%struct.Empty* {{[^,]*}} %e)
   return e.check();
 }
 
 void caller(Empty &e) {
-// CHECK: @_Z6callerR5Empty(ptr noundef nonnull align {{[0-9]+}} dereferenceable({{[0-9]+}}) %e)
-// CHECK: call {{.*}} @_ZN5EmptyC1ERKS_(ptr {{[^,]*}} [[NEWTMP:%.*]], ptr
-// CHECK: call {{.*}} @_Z3foo5Empty(ptr noundef [[NEWTMP]])
+// CHECK: @_Z6callerR5Empty(%struct.Empty* nonnull align {{[0-9]+}} dereferenceable({{[0-9]+}}) %e)
+// CHECK: call {{.*}} @_ZN5EmptyC1ERKS_(%struct.Empty* {{[^,]*}} [[NEWTMP:%.*]], %struct.Empty*
+// CHECK: call {{.*}} @_Z3foo5Empty(%struct.Empty* [[NEWTMP]])
   foo(e);
 }

@@ -66,7 +66,8 @@ MachineModuleSlotTracker::MachineModuleSlotTracker(
     const MachineFunction *MF, bool ShouldInitializeAllMetadata)
     : ModuleSlotTracker(MF->getFunction().getParent(),
                         ShouldInitializeAllMetadata),
-      TheFunction(MF->getFunction()), TheMMI(MF->getMMI()) {
+      TheFunction(MF->getFunction()), TheMMI(MF->getMMI()), MDNStartSlot(0),
+      MDNEndSlot(0) {
   setProcessHook([this](AbstractSlotTrackerStorage *AST, const Module *M,
                         bool ShouldInitializeAllMetadata) {
     this->processMachineModule(AST, M, ShouldInitializeAllMetadata);

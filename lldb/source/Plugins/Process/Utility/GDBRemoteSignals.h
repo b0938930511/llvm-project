@@ -13,8 +13,7 @@
 
 namespace lldb_private {
 
-/// Initially carries signals defined by the GDB Remote Serial Protocol.
-/// Can be filled with platform's signals through PlatformRemoteGDBServer.
+/// Empty set of Unix signals to be filled by PlatformRemoteGDBServer
 class GDBRemoteSignals : public UnixSignals {
 public:
   GDBRemoteSignals();

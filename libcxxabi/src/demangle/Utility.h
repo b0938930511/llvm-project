@@ -6,81 +6,70 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Provide some utility classes for use in the demangler.
-// There are two copies of this file in the source tree.  The one in libcxxabi
-// is the original and the one in llvm is the copy.  Use cp-to-llvm.sh to update
-// the copy.  See README.txt for more details.
+// Provide some utility classes for use in the demangler(s).
 //
 //===----------------------------------------------------------------------===//
 
 #ifndef DEMANGLE_UTILITY_H
 #define DEMANGLE_UTILITY_H
 
-#include "DemangleConfig.h"
-
-#include <array>
+#include "StringView.h"
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <iterator>
 #include <limits>
-#include <string_view>
 
 DEMANGLE_NAMESPACE_BEGIN
 
 // Stream that AST nodes write their string representation into after the AST
 // has been parsed.
-class OutputBuffer {
+class OutputStream {
   char *Buffer = nullptr;
   size_t CurrentPosition = 0;
   size_t BufferCapacity = 0;
 
-  // Ensure there are at least N more positions in the buffer.
+  // Ensure there is at least n more positions in buffer.
   void grow(size_t N) {
-    size_t Need = N + CurrentPosition;
-    if (Need > BufferCapacity) {
-      // Reduce the number of reallocations, with a bit of hysteresis. The
-      // number here is chosen so the first allocation will more-than-likely not
-      // allocate more than 1K.
-      Need += 1024 - 32;
+    if (N + CurrentPosition >= BufferCapacity) {
       BufferCapacity *= 2;
-      if (BufferCapacity < Need)
-        BufferCapacity = Need;
+      if (BufferCapacity < N + CurrentPosition)
+        BufferCapacity = N + CurrentPosition;
       Buffer = static_cast<char *>(std::realloc(Buffer, BufferCapacity));
       if (Buffer == nullptr)
-        std::abort();
+        std::terminate();
     }
   }
 
-  OutputBuffer &writeUnsigned(uint64_t N, bool isNeg = false) {
-    std::array<char, 21> Temp;
-    char *TempPtr = Temp.data() + Temp.size();
+  void writeUnsigned(uint64_t N, bool isNeg = false) {
+    // Handle special case...
+    if (N == 0) {
+      *this << '0';
+      return;
+    }
 
-    // Output at least one character.
-    do {
+    char Temp[21];
+    char *TempPtr = std::end(Temp);
+
+    while (N) {
       *--TempPtr = char('0' + N % 10);
       N /= 10;
-    } while (N);
+    }
 
-    // Add negative sign.
+    // Add negative sign...
     if (isNeg)
       *--TempPtr = '-';
-
-    return operator+=(
-        std::string_view(TempPtr, Temp.data() + Temp.size() - TempPtr));
+    this->operator<<(StringView(TempPtr, std::end(Temp)));
   }
 
 public:
-  OutputBuffer(char *StartBuf, size_t Size)
-      : Buffer(StartBuf), BufferCapacity(Size) {}
-  OutputBuffer(char *StartBuf, size_t *SizePtr)
-      : OutputBuffer(StartBuf, StartBuf ? *SizePtr : 0) {}
-  OutputBuffer() = default;
-  // Non-copyable
-  OutputBuffer(const OutputBuffer &) = delete;
-  OutputBuffer &operator=(const OutputBuffer &) = delete;
-
-  operator std::string_view() const {
-    return std::string_view(Buffer, CurrentPosition);
+  OutputStream(char *StartBuf, size_t Size)
+      : Buffer(StartBuf), CurrentPosition(0), BufferCapacity(Size) {}
+  OutputStream() = default;
+  void reset(char *Buffer_, size_t BufferCapacity_) {
+    CurrentPosition = 0;
+    Buffer = Buffer_;
+    BufferCapacity = BufferCapacity_;
   }
 
   /// If a ParameterPackExpansion (or similar type) is encountered, the offset
@@ -88,91 +77,60 @@ public:
   unsigned CurrentPackIndex = std::numeric_limits<unsigned>::max();
   unsigned CurrentPackMax = std::numeric_limits<unsigned>::max();
 
-  /// When zero, we're printing template args and '>' needs to be parenthesized.
-  /// Use a counter so we can simply increment inside parentheses.
-  unsigned GtIsGt = 1;
-
-  bool isGtInsideTemplateArgs() const { return GtIsGt == 0; }
-
-  void printOpen(char Open = '(') {
-    GtIsGt++;
-    *this += Open;
-  }
-  void printClose(char Close = ')') {
-    GtIsGt--;
-    *this += Close;
-  }
-
-  OutputBuffer &operator+=(std::string_view R) {
-    if (size_t Size = R.size()) {
-      grow(Size);
-      std::memcpy(Buffer + CurrentPosition, &*R.begin(), Size);
-      CurrentPosition += Size;
-    }
+  OutputStream &operator+=(StringView R) {
+    size_t Size = R.size();
+    if (Size == 0)
+      return *this;
+    grow(Size);
+    std::memmove(Buffer + CurrentPosition, R.begin(), Size);
+    CurrentPosition += Size;
     return *this;
   }
 
-  OutputBuffer &operator+=(char C) {
+  OutputStream &operator+=(char C) {
     grow(1);
     Buffer[CurrentPosition++] = C;
     return *this;
   }
 
-  OutputBuffer &prepend(std::string_view R) {
-    size_t Size = R.size();
+  OutputStream &operator<<(StringView R) { return (*this += R); }
 
-    grow(Size);
-    std::memmove(Buffer + Size, Buffer, CurrentPosition);
-    std::memcpy(Buffer, &*R.begin(), Size);
-    CurrentPosition += Size;
+  OutputStream &operator<<(char C) { return (*this += C); }
 
+  OutputStream &operator<<(long long N) {
+    if (N < 0)
+      writeUnsigned(static_cast<unsigned long long>(-N), true);
+    else
+      writeUnsigned(static_cast<unsigned long long>(N));
     return *this;
   }
 
-  OutputBuffer &operator<<(std::string_view R) { return (*this += R); }
-
-  OutputBuffer &operator<<(char C) { return (*this += C); }
-
-  OutputBuffer &operator<<(long long N) {
-    return writeUnsigned(static_cast<unsigned long long>(std::abs(N)), N < 0);
+  OutputStream &operator<<(unsigned long long N) {
+    writeUnsigned(N, false);
+    return *this;
   }
 
-  OutputBuffer &operator<<(unsigned long long N) {
-    return writeUnsigned(N, false);
-  }
-
-  OutputBuffer &operator<<(long N) {
+  OutputStream &operator<<(long N) {
     return this->operator<<(static_cast<long long>(N));
   }
 
-  OutputBuffer &operator<<(unsigned long N) {
+  OutputStream &operator<<(unsigned long N) {
     return this->operator<<(static_cast<unsigned long long>(N));
   }
 
-  OutputBuffer &operator<<(int N) {
+  OutputStream &operator<<(int N) {
     return this->operator<<(static_cast<long long>(N));
   }
 
-  OutputBuffer &operator<<(unsigned int N) {
+  OutputStream &operator<<(unsigned int N) {
     return this->operator<<(static_cast<unsigned long long>(N));
-  }
-
-  void insert(size_t Pos, const char *S, size_t N) {
-    DEMANGLE_ASSERT(Pos <= CurrentPosition, "");
-    if (N == 0)
-      return;
-    grow(N);
-    std::memmove(Buffer + Pos + N, Buffer + Pos, CurrentPosition - Pos);
-    std::memcpy(Buffer + Pos, S, N);
-    CurrentPosition += N;
   }
 
   size_t getCurrentPosition() const { return CurrentPosition; }
   void setCurrentPosition(size_t NewPos) { CurrentPosition = NewPos; }
 
   char back() const {
-    DEMANGLE_ASSERT(CurrentPosition, "");
-    return Buffer[CurrentPosition - 1];
+    return CurrentPosition ? Buffer[CurrentPosition - 1] : '\0';
   }
 
   bool empty() const { return CurrentPosition == 0; }
@@ -182,21 +140,51 @@ public:
   size_t getBufferCapacity() const { return BufferCapacity; }
 };
 
-template <class T> class ScopedOverride {
-  T &Loc;
-  T Original;
+template <class T> class SwapAndRestore {
+  T &Restore;
+  T OriginalValue;
+  bool ShouldRestore = true;
 
 public:
-  ScopedOverride(T &Loc_) : ScopedOverride(Loc_, Loc_) {}
+  SwapAndRestore(T &Restore_) : SwapAndRestore(Restore_, Restore_) {}
 
-  ScopedOverride(T &Loc_, T NewVal) : Loc(Loc_), Original(Loc_) {
-    Loc_ = std::move(NewVal);
+  SwapAndRestore(T &Restore_, T NewVal)
+      : Restore(Restore_), OriginalValue(Restore) {
+    Restore = std::move(NewVal);
   }
-  ~ScopedOverride() { Loc = std::move(Original); }
+  ~SwapAndRestore() {
+    if (ShouldRestore)
+      Restore = std::move(OriginalValue);
+  }
 
-  ScopedOverride(const ScopedOverride &) = delete;
-  ScopedOverride &operator=(const ScopedOverride &) = delete;
+  void shouldRestore(bool ShouldRestore_) { ShouldRestore = ShouldRestore_; }
+
+  void restoreNow(bool Force) {
+    if (!Force && !ShouldRestore)
+      return;
+
+    Restore = std::move(OriginalValue);
+    ShouldRestore = false;
+  }
+
+  SwapAndRestore(const SwapAndRestore &) = delete;
+  SwapAndRestore &operator=(const SwapAndRestore &) = delete;
 };
+
+inline bool initializeOutputStream(char *Buf, size_t *N, OutputStream &S,
+                                   size_t InitSize) {
+  size_t BufferSize;
+  if (Buf == nullptr) {
+    Buf = static_cast<char *>(std::malloc(InitSize));
+    if (Buf == nullptr)
+      return false;
+    BufferSize = InitSize;
+  } else
+    BufferSize = *N;
+
+  S.reset(Buf, BufferSize);
+  return true;
+}
 
 DEMANGLE_NAMESPACE_END
 

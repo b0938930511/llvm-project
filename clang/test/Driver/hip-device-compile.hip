@@ -1,3 +1,4 @@
+// REQUIRES: clang-driver
 // REQUIRES: x86-registered-target
 // REQUIRES: amdgpu-registered-target
 
@@ -6,56 +7,48 @@
 // is specified.
 
 // Output unbundled bitcode.
-// RUN: %clang -c -emit-llvm --cuda-device-only -### --target=x86_64-linux-gnu \
-// RUN:   --rocm-path=%S/Inputs/rocm -o a.bc -x hip --cuda-gpu-arch=gfx900 --no-gpu-bundle-output \
+// RUN: %clang -c -emit-llvm --cuda-device-only -### -target x86_64-linux-gnu \
+// RUN:   -o a.bc -x hip --cuda-gpu-arch=gfx900 --no-gpu-bundle-output \
 // RUN:   --hip-device-lib=lib1.bc \
 // RUN:   --hip-device-lib-path=%S/Inputs/hip_multiple_inputs/lib1 \
 // RUN:   %S/Inputs/hip_multiple_inputs/a.cu \
 // RUN: 2>&1 | FileCheck -check-prefixes=CHECK,BC,NBUN %s
 
 // Output bundled bitcode.
-// RUN: %clang -c -emit-llvm --cuda-device-only -### --target=x86_64-linux-gnu \
-// RUN:   --rocm-path=%S/Inputs/rocm -o a.bc -x hip --cuda-gpu-arch=gfx900 --no-gpu-bundle-output \
+// RUN: %clang -c -emit-llvm --cuda-device-only -### -target x86_64-linux-gnu \
+// RUN:   -o a.bc -x hip --cuda-gpu-arch=gfx900 --no-gpu-bundle-output \
 // RUN:   --hip-device-lib=lib1.bc \
 // RUN:   --hip-device-lib-path=%S/Inputs/hip_multiple_inputs/lib1 \
 // RUN:   %S/Inputs/hip_multiple_inputs/a.cu --gpu-bundle-output \
 // RUN: 2>&1 | FileCheck -check-prefixes=CHECK,BCBUN %s
 
 // Output unbundled LLVM IR.
-// RUN: %clang -c -S -emit-llvm --cuda-device-only -### --target=x86_64-linux-gnu \
-// RUN:   --rocm-path=%S/Inputs/rocm -o a.ll -x hip --cuda-gpu-arch=gfx900 --no-gpu-bundle-output \
+// RUN: %clang -c -S -emit-llvm --cuda-device-only -### -target x86_64-linux-gnu \
+// RUN:   -o a.ll -x hip --cuda-gpu-arch=gfx900 --no-gpu-bundle-output \
 // RUN:   --hip-device-lib=lib1.bc \
 // RUN:   --hip-device-lib-path=%S/Inputs/hip_multiple_inputs/lib1 \
 // RUN:   %S/Inputs/hip_multiple_inputs/a.cu \
 // RUN: 2>&1 | FileCheck -check-prefixes=CHECK,LL,NBUN %s
 
 // Output bundled LLVM IR.
-// RUN: %clang -c -S -emit-llvm --cuda-device-only -### --target=x86_64-linux-gnu \
-// RUN:   --rocm-path=%S/Inputs/rocm -o a.ll -x hip --cuda-gpu-arch=gfx900 --no-gpu-bundle-output \
+// RUN: %clang -c -S -emit-llvm --cuda-device-only -### -target x86_64-linux-gnu \
+// RUN:   -o a.ll -x hip --cuda-gpu-arch=gfx900 --no-gpu-bundle-output \
 // RUN:   --hip-device-lib=lib1.bc \
 // RUN:   --hip-device-lib-path=%S/Inputs/hip_multiple_inputs/lib1 \
 // RUN:   %S/Inputs/hip_multiple_inputs/a.cu --gpu-bundle-output \
 // RUN: 2>&1 | FileCheck -check-prefixes=CHECK,LLBUN %s
 
 // Output unbundled assembly.
-// RUN: %clang -c -S --cuda-device-only -### --target=x86_64-linux-gnu \
-// RUN:   --rocm-path=%S/Inputs/rocm -o a.s -x hip --cuda-gpu-arch=gfx900 --no-gpu-bundle-output \
+// RUN: %clang -c -S --cuda-device-only -### -target x86_64-linux-gnu \
+// RUN:   -o a.s -x hip --cuda-gpu-arch=gfx900 --no-gpu-bundle-output \
 // RUN:   --hip-device-lib=lib1.bc \
 // RUN:   --hip-device-lib-path=%S/Inputs/hip_multiple_inputs/lib1 \
 // RUN:   %S/Inputs/hip_multiple_inputs/a.cu \
 // RUN: 2>&1 | FileCheck -check-prefixes=CHECK,ASM,NBUN %s
 
-// Output relocatable.
-// RUN: %clang -c --cuda-device-only -### --target=x86_64-linux-gnu \
-// RUN:   --rocm-path=%S/Inputs/rocm -o a.o -x hip --cuda-gpu-arch=gfx900 -fhip-emit-relocatable \
-// RUN:   --hip-device-lib=lib1.bc \
-// RUN:   --hip-device-lib-path=%S/Inputs/hip_multiple_inputs/lib1 \
-// RUN:   %S/Inputs/hip_multiple_inputs/a.cu \
-// RUN: 2>&1 | FileCheck -check-prefixes=CHECK,NBUN,RELOC %s
-
 // Output bundled assembly.
-// RUN: %clang -c -S --cuda-device-only -### --target=x86_64-linux-gnu \
-// RUN:   --rocm-path=%S/Inputs/rocm -o a.s -x hip --cuda-gpu-arch=gfx900 --no-gpu-bundle-output \
+// RUN: %clang -c -S --cuda-device-only -### -target x86_64-linux-gnu \
+// RUN:   -o a.s -x hip --cuda-gpu-arch=gfx900 --no-gpu-bundle-output \
 // RUN:   --hip-device-lib=lib1.bc \
 // RUN:   --hip-device-lib-path=%S/Inputs/hip_multiple_inputs/lib1 \
 // RUN:   %S/Inputs/hip_multiple_inputs/a.cu --gpu-bundle-output \
@@ -76,7 +69,6 @@
 // LLBUN-SAME: "-o" "{{.*}}.ll"
 // ASM-SAME: "-o" "a.s"
 // ASMBUN-SAME: "-o" "{{.*}}.s"
-// RELOC-SAME: "-o" "a.o"
 // CHECK-SAME: {{".*a.cu"}}
 
 // CHECK-NOT: {{"*.llvm-link"}}
@@ -84,9 +76,9 @@
 // CHECK-NOT: {{".*llc"}}
 // CHECK-NOT: {{".*lld.*"}}
 // NBUN-NOT: {{".*clang-offload-bundler"}}
-// BCBUN: {{".*clang-offload-bundler"}}{{.*}}"-output=a.bc"
-// LLBUN: {{".*clang-offload-bundler"}}{{.*}}"-output=a.ll"
-// ASMBUN: {{".*clang-offload-bundler"}}{{.*}}"-output=a.s"
+// BCBUN: {{".*clang-offload-bundler"}}{{.*}}"-outputs=a.bc"
+// LLBUN: {{".*clang-offload-bundler"}}{{.*}}"-outputs=a.ll"
+// ASMBUN: {{".*clang-offload-bundler"}}{{.*}}"-outputs=a.s"
 // CHECK-NOT: {{".*ld.*"}}{{.*}}"-o"
 
 // If neither -emit-llvm nor -S is used in device only compilation,
@@ -94,32 +86,32 @@
 // specified.
 
 // Output bundled code objects.
-// RUN: %clang -c --cuda-device-only -### --target=x86_64-linux-gnu \
-// RUN:   --rocm-path=%S/Inputs/rocm -o a.o -x hip --cuda-gpu-arch=gfx900 \
+// RUN: %clang -c --cuda-device-only -### -target x86_64-linux-gnu \
+// RUN:   -o a.o -x hip --cuda-gpu-arch=gfx900 \
 // RUN:   --hip-device-lib=lib1.bc \
 // RUN:   --hip-device-lib-path=%S/Inputs/hip_multiple_inputs/lib1 \
 // RUN:   %S/Inputs/hip_multiple_inputs/a.cu \
 // RUN: 2>&1 | FileCheck -check-prefixes=OBJ,OBJ-BUN %s
 
 // Output unbundled code objects.
-// RUN: %clang -c --cuda-device-only -### --target=x86_64-linux-gnu \
-// RUN:   --rocm-path=%S/Inputs/rocm -o a.o -x hip --cuda-gpu-arch=gfx900 \
+// RUN: %clang -c --cuda-device-only -### -target x86_64-linux-gnu \
+// RUN:   -o a.o -x hip --cuda-gpu-arch=gfx900 \
 // RUN:   --hip-device-lib=lib1.bc \
 // RUN:   --hip-device-lib-path=%S/Inputs/hip_multiple_inputs/lib1 \
 // RUN:   %S/Inputs/hip_multiple_inputs/a.cu --no-gpu-bundle-output \
 // RUN: 2>&1 | FileCheck -check-prefixes=OBJ,OBJ-UBUN %s
 
 // Output bundled code objects.
-// RUN: %clang --cuda-device-only -### --target=x86_64-linux-gnu \
-// RUN:   --rocm-path=%S/Inputs/rocm -o a.o -x hip --cuda-gpu-arch=gfx900 \
+// RUN: %clang --cuda-device-only -### -target x86_64-linux-gnu \
+// RUN:   -o a.o -x hip --cuda-gpu-arch=gfx900 \
 // RUN:   --hip-device-lib=lib1.bc \
 // RUN:   --hip-device-lib-path=%S/Inputs/hip_multiple_inputs/lib1 \
 // RUN:   %S/Inputs/hip_multiple_inputs/a.cu \
 // RUN: 2>&1 | FileCheck -check-prefixes=OBJ,OBJ-BUN %s
 
 // Output unbundled code objects.
-// RUN: %clang --cuda-device-only -### --target=x86_64-linux-gnu \
-// RUN:   --rocm-path=%S/Inputs/rocm -o a.o -x hip --cuda-gpu-arch=gfx900 \
+// RUN: %clang --cuda-device-only -### -target x86_64-linux-gnu \
+// RUN:   -o a.o -x hip --cuda-gpu-arch=gfx900 \
 // RUN:   --hip-device-lib=lib1.bc \
 // RUN:   --hip-device-lib-path=%S/Inputs/hip_multiple_inputs/lib1 \
 // RUN:   %S/Inputs/hip_multiple_inputs/a.cu --no-gpu-bundle-output \
@@ -131,5 +123,5 @@
 // OBJ-NOT: {{".*llc"}}
 // OBJ-BUN: {{".*lld.*"}}{{.*}}"-o" "{{.*}}.o"
 // OBJ-UBUN: {{".*lld.*"}}{{.*}}"-o" "a.o"
-// OBJ-BUN: {{".*clang-offload-bundler"}}{{.*}}"-output=a.o"
+// OBJ-BUN: {{".*clang-offload-bundler"}}{{.*}}"-outputs=a.o"
 // OBJ-UBUN-NOT: {{".*clang-offload-bundler"}}

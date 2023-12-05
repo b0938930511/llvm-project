@@ -10,9 +10,10 @@
 
 // Test weak_ptr<T> with trivial_abi as return-type.
 
-// ADDITIONAL_COMPILE_FLAGS: -Wno-macro-redefined -D_LIBCPP_ABI_ENABLE_SHARED_PTR_TRIVIAL_ABI
+// ADDITIONAL_COMPILE_FLAGS: -D_LIBCPP_ABI_ENABLE_SHARED_PTR_TRIVIAL_ABI
 
-// XFAIL: gcc
+// There were assertion failures in both parse and codegen, which are fixed in clang 11.
+// UNSUPPORTED: gcc, clang-4, clang-5, clang-6, clang-7, clang-8, clang-9, clang-10
 
 #include <memory>
 #include <cassert>
@@ -21,8 +22,6 @@ __attribute__((noinline)) void call_something() { asm volatile(""); }
 
 struct Node {
   explicit Node() {}
-  Node(const Node&) = default;
-  Node& operator=(const Node&) = default;
   ~Node() {}
 };
 
@@ -50,9 +49,8 @@ int main(int, char**) {
   //
   // With trivial_abi, local_addr is the address of a local variable in
   // make_val, and hence different from &ret.
-#if !defined(__i386__) && !defined(__arm__) && !defined(_WIN32) && !defined(_AIX)
+#if !defined(__i386__) && !defined(__arm__) && !defined(_WIN32)
   // On X86, structs are never returned in registers.
-  // On AIX, structs are never returned in registers.
   // On ARM32, structs larger than 4 bytes cannot be returned in registers.
   // On Windows, structs with a destructor are always returned indirectly.
   // Thus, weak_ptr will be passed indirectly even if it is trivial.

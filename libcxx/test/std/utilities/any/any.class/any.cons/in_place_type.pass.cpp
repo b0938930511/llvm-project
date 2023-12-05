@@ -8,6 +8,9 @@
 
 // UNSUPPORTED: c++03, c++11, c++14
 
+// Throwing bad_any_cast is supported starting in macosx10.13
+// XFAIL: use_system_cxx_lib && target={{.+}}-apple-macosx10.{{9|10|11|12}} && !no-exceptions
+
 // <any>
 
 // template <class T, class ...Args> any(in_place_type_t<T>, Args&&...);
@@ -29,6 +32,9 @@
 #include "test_macros.h"
 #include "test_convertible.h"
 
+using std::any;
+using std::any_cast;
+
 template <class Type>
 void test_in_place_type() {
     // constructing from a small type should perform no allocations.
@@ -36,7 +42,7 @@ void test_in_place_type() {
     assert(Type::count == 0);
     Type::reset();
     {
-        std::any a(std::in_place_type<Type>);
+        any a(std::in_place_type<Type>);
 
         assert(Type::count == 1);
         assert(Type::copied == 0);
@@ -46,7 +52,7 @@ void test_in_place_type() {
     assert(Type::count == 0);
     Type::reset();
     { // Test that the in_place argument is properly decayed
-        std::any a(std::in_place_type<Type&>);
+        any a(std::in_place_type<Type&>);
 
         assert(Type::count == 1);
         assert(Type::copied == 0);
@@ -56,7 +62,7 @@ void test_in_place_type() {
     assert(Type::count == 0);
     Type::reset();
     {
-        std::any a(std::in_place_type<Type>, 101);
+        any a(std::in_place_type<Type>, 101);
 
         assert(Type::count == 1);
         assert(Type::copied == 0);
@@ -66,7 +72,7 @@ void test_in_place_type() {
     assert(Type::count == 0);
     Type::reset();
     {
-        std::any a(std::in_place_type<Type>, -1, 42, -1);
+        any a(std::in_place_type<Type>, -1, 42, -1);
 
         assert(Type::count == 1);
         assert(Type::copied == 0);
@@ -82,21 +88,21 @@ void test_in_place_type_tracked() {
     // constructing from a small type should perform no allocations.
     DisableAllocationGuard g(isSmallType<Type>()); ((void)g);
     {
-        std::any a(std::in_place_type<Type>);
+        any a(std::in_place_type<Type>);
         assertArgsMatch<Type>(a);
     }
     {
-        std::any a(std::in_place_type<Type>, -1, 42, -1);
+        any a(std::in_place_type<Type>, -1, 42, -1);
         assertArgsMatch<Type, int, int, int>(a);
     }
     // initializer_list constructor tests
     {
-        std::any a(std::in_place_type<Type>, {-1, 42, -1});
+        any a(std::in_place_type<Type>, {-1, 42, -1});
         assertArgsMatch<Type, std::initializer_list<int>>(a);
     }
     {
         int x = 42;
-        std::any a(std::in_place_type<Type&>, {-1, 42, -1}, x);
+        any a(std::in_place_type<Type&>, {-1, 42, -1}, x);
         assertArgsMatch<Type, std::initializer_list<int>, int&>(a);
     }
 }
@@ -107,24 +113,24 @@ void test_in_place_type_decayed() {
     {
         using Type = decltype(test_func);
         using DecayT = void(*)();
-        std::any a(std::in_place_type<Type>, test_func);
+        any a(std::in_place_type<Type>, test_func);
         assert(containsType<DecayT>(a));
-        assert(std::any_cast<DecayT>(a) == test_func);
+        assert(any_cast<DecayT>(a) == test_func);
     }
     {
         int my_arr[5];
         using Type = int(&)[5];
         using DecayT = int*;
-        std::any a(std::in_place_type<Type>, my_arr);
+        any a(std::in_place_type<Type>, my_arr);
         assert(containsType<DecayT>(a));
-        assert(std::any_cast<DecayT>(a) == my_arr);
+        assert(any_cast<DecayT>(a) == my_arr);
     }
     {
         using Type = int[5];
         using DecayT = int*;
-        std::any a(std::in_place_type<Type>);
+        any a(std::in_place_type<Type>);
         assert(containsType<DecayT>(a));
-        assert(std::any_cast<DecayT>(a) == nullptr);
+        assert(any_cast<DecayT>(a) == nullptr);
     }
 }
 

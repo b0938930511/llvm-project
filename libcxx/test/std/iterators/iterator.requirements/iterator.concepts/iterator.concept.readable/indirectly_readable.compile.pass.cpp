@@ -7,13 +7,15 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
+// UNSUPPORTED: libcpp-no-concepts
+// UNSUPPORTED: gcc-10
 
 // template<class In>
 // concept indirectly_readable;
 
-#include <concepts>
 #include <iterator>
-#include <type_traits>
+
+#include <concepts>
 
 #include "read_write.h"
 

@@ -11,13 +11,18 @@
 
 // raw_storage_iterator
 
-#include <cassert>
 #include <memory>
 #include <type_traits>
-#include <utility>
+#include <cassert>
 
 #include "test_macros.h"
 #include <MoveOnly.h>
+
+#if TEST_STD_VER >= 11
+#define DELETE_FUNCTION = delete
+#else
+#define DELETE_FUNCTION
+#endif
 
 int A_constructed = 0;
 
@@ -31,7 +36,7 @@ public:
     ~A() {--A_constructed; data_ = 0;}
 
     bool operator==(int i) const {return data_ == i;}
-    A* operator& () = delete;
+    A* operator& () DELETE_FUNCTION;
 };
 
 int main(int, char**)

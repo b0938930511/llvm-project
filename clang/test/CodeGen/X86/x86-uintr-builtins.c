@@ -2,21 +2,21 @@
 
 #include <x86gprintrin.h>
 
-void test_clui(void) {
+void test_clui() {
 // CHECK-LABEL: @test_clui
 // CHECK: call void @llvm.x86.clui()
 // CHECK: ret
   _clui();
 }
 
-void test_stui(void) {
+void test_stui() {
 // CHECK-LABEL: @test_stui
 // CHECK: call void @llvm.x86.stui()
 // CHECK: ret
   _stui();
 }
 
-unsigned char test_testui(void) {
+unsigned char test_testui() {
 // CHECK-LABEL: @test_testui
 // CHECK: %[[TMP0:.+]] = call i8 @llvm.x86.testui()
 // CHECK: ret i8 %[[TMP0]]

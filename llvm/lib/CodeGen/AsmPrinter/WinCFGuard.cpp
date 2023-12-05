@@ -15,8 +15,11 @@
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineModuleInfo.h"
+#include "llvm/CodeGen/MachineOperand.h"
 #include "llvm/IR/Constants.h"
-#include "llvm/IR/InstrTypes.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/Metadata.h"
+#include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCObjectFileInfo.h"
 #include "llvm/MC/MCStreamer.h"
 
@@ -24,9 +27,9 @@
 
 using namespace llvm;
 
-WinCFGuard::WinCFGuard(AsmPrinter *A) : Asm(A) {}
+WinCFGuard::WinCFGuard(AsmPrinter *A) : AsmPrinterHandler(), Asm(A) {}
 
-WinCFGuard::~WinCFGuard() = default;
+WinCFGuard::~WinCFGuard() {}
 
 void WinCFGuard::endFunction(const MachineFunction *MF) {
 
@@ -75,7 +78,7 @@ static bool isPossibleIndirectCallTarget(const Function *F) {
 }
 
 MCSymbol *WinCFGuard::lookupImpSymbol(const MCSymbol *Sym) {
-  if (Sym->getName().starts_with("__imp_"))
+  if (Sym->getName().startswith("__imp_"))
     return nullptr;
   return Asm->OutContext.lookupSymbol(Twine("__imp_") + Sym->getName());
 }
@@ -107,19 +110,19 @@ void WinCFGuard::endModule() {
 
   // Emit the symbol index of each GFIDs entry to form the .gfids section.
   auto &OS = *Asm->OutStreamer;
-  OS.switchSection(Asm->OutContext.getObjectFileInfo()->getGFIDsSection());
+  OS.SwitchSection(Asm->OutContext.getObjectFileInfo()->getGFIDsSection());
   for (const MCSymbol *S : GFIDsEntries)
-    OS.emitCOFFSymbolIndex(S);
+    OS.EmitCOFFSymbolIndex(S);
 
   // Emit the symbol index of each GIATs entry to form the .giats section.
-  OS.switchSection(Asm->OutContext.getObjectFileInfo()->getGIATsSection());
+  OS.SwitchSection(Asm->OutContext.getObjectFileInfo()->getGIATsSection());
   for (const MCSymbol *S : GIATsEntries) {
-    OS.emitCOFFSymbolIndex(S);
+    OS.EmitCOFFSymbolIndex(S);
   }
 
   // Emit the symbol index of each longjmp target to form the .gljmp section.
-  OS.switchSection(Asm->OutContext.getObjectFileInfo()->getGLJMPSection());
+  OS.SwitchSection(Asm->OutContext.getObjectFileInfo()->getGLJMPSection());
   for (const MCSymbol *S : LongjmpTargets) {
-    OS.emitCOFFSymbolIndex(S);
+    OS.EmitCOFFSymbolIndex(S);
   }
 }

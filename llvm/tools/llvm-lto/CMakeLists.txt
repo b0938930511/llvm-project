@@ -8,13 +8,11 @@ set(LLVM_LINK_COMPONENTS
   CodeGen
   Core
   IRReader
-  IPO
   LTO
   MC
   Object
   Support
   Target
-  TargetParser
   )
 
 add_llvm_tool(llvm-lto

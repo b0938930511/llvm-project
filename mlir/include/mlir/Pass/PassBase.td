@@ -76,10 +76,7 @@ class PassBase<string passArg, string base> {
   string description = "";
 
   // A C++ constructor call to create an instance of this pass.
-  // If empty, the default constructor declarations and definitions
-  // 'createPassName()' and 'createPassName(const PassNameOptions &options)'
-  // will be generated and the former will be used for the pass instantiation.
-  code constructor = "";
+  code constructor = [{}];
 
   // A list of dialects this pass may produce entities in.
   list<string> dependentDialects = [];
@@ -95,8 +92,7 @@ class PassBase<string passArg, string base> {
 class Pass<string passArg, string operation = "">
   : PassBase<passArg, "::mlir::OperationPass<" # operation # ">">;
 
-// This class represents an mlir::InterfacePass.
-class InterfacePass<string passArg, string interface>
-  : PassBase<passArg, "::mlir::InterfacePass<" # interface # ">">;
+// This class represents an mlir::FunctionPass.
+class FunctionPass<string passArg> : PassBase<passArg, "::mlir::FunctionPass">;
 
 #endif // MLIR_PASS_PASSBASE

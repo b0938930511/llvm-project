@@ -16,6 +16,7 @@
 
 #include "mlir/IR/DialectInterface.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/Reducer/PassDetail.h"
 #include "mlir/Reducer/Passes.h"
 #include "mlir/Reducer/ReductionNode.h"
 #include "mlir/Reducer/ReductionPatternInterface.h"
@@ -27,11 +28,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/ManagedStatic.h"
-
-namespace mlir {
-#define GEN_PASS_DEF_REDUCTIONTREE
-#include "mlir/Reducer/Passes.h.inc"
-} // namespace mlir
 
 using namespace mlir;
 
@@ -45,7 +41,7 @@ static void applyPatterns(Region &region,
   std::vector<Operation *> opsNotInRange;
   std::vector<Operation *> opsInRange;
   size_t keepIndex = 0;
-  for (const auto &op : enumerate(region.getOps())) {
+  for (auto op : enumerate(region.getOps())) {
     int index = op.index();
     if (keepIndex < rangeToKeep.size() &&
         index == rangeToKeep[keepIndex].second)
@@ -60,13 +56,10 @@ static void applyPatterns(Region &region,
   // matching in above iteration. Besides, erase op not-in-range may end up in
   // invalid module, so `applyOpPatternsAndFold` should come before that
   // transform.
-  for (Operation *op : opsInRange) {
+  for (Operation *op : opsInRange)
     // `applyOpPatternsAndFold` returns whether the op is convered. Omit it
     // because we don't have expectation this reduction will be success or not.
-    GreedyRewriteConfig config;
-    config.strictMode = GreedyRewriteStrictness::ExistingOps;
-    (void)applyOpPatternsAndFold(op, patterns, config);
-  }
+    (void)applyOpPatternsAndFold(op, patterns);
 
   if (eraseOpNotInRange)
     for (Operation *op : opsNotInRange) {
@@ -99,7 +92,7 @@ static LogicalResult findOptimal(ModuleOp module, Region &region,
       {0, std::distance(region.op_begin(), region.op_end())}};
 
   ReductionNode *root = allocator.Allocate();
-  new (root) ReductionNode(nullptr, ranges, allocator);
+  new (root) ReductionNode(nullptr, std::move(ranges), allocator);
   // Duplicate the module for root node and locate the region in the copy.
   if (failed(root->initialize(module, region)))
     llvm_unreachable("unexpected initialization failure");
@@ -190,7 +183,7 @@ public:
 /// This class defines the Reduction Tree Pass. It provides a framework to
 /// to implement a reduction pass using a tree structure to keep track of the
 /// generated reduced variants.
-class ReductionTreePass : public impl::ReductionTreeBase<ReductionTreePass> {
+class ReductionTreePass : public ReductionTreeBase<ReductionTreePass> {
 public:
   ReductionTreePass() = default;
   ReductionTreePass(const ReductionTreePass &pass) = default;
@@ -206,7 +199,7 @@ private:
   FrozenRewritePatternSet reducerPatterns;
 };
 
-} // namespace
+} // end anonymous namespace
 
 LogicalResult ReductionTreePass::initialize(MLIRContext *context) {
   RewritePatternSet patterns(context);
@@ -220,12 +213,7 @@ void ReductionTreePass::runOnOperation() {
   Operation *topOperation = getOperation();
   while (topOperation->getParentOp() != nullptr)
     topOperation = topOperation->getParentOp();
-  ModuleOp module = dyn_cast<ModuleOp>(topOperation);
-  if (!module) {
-    emitError(getOperation()->getLoc())
-        << "top-level op must be 'builtin.module'";
-    return signalPassFailure();
-  }
+  ModuleOp module = cast<ModuleOp>(topOperation);
 
   SmallVector<Operation *, 8> workList;
   workList.push_back(getOperation());

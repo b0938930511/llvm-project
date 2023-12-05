@@ -1,8 +1,4 @@
-// RUN: %clang_cc1 -triple powerpc64le-linux-unknown -target-cpu pwr10 %s \
-// RUN:   -emit-llvm -o - | FileCheck %s
-// RUN: %clang_cc1 -triple powerpc64le-linux-unknown -target-cpu pwr9 %s \
-// RUN:   -emit-llvm -o - | FileCheck %s
-// RUN: %clang_cc1 -triple powerpc64le-linux-unknown -target-cpu pwr8 %s \
+// RUN: %clang_cc1 -triple powerpc64le-linux-unknown -target-cpu future %s \
 // RUN:   -emit-llvm -o - | FileCheck %s
 
 // CHECK: _Z2f1Pu13__vector_quad

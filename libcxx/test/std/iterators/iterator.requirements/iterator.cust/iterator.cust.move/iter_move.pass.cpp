@@ -7,20 +7,20 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
+// UNSUPPORTED: libcpp-no-concepts
+// UNSUPPORTED: gcc-10
 
 // template<class I>
 // unspecified iter_move;
 
-#include <algorithm>
-#include <array>
-#include <cassert>
 #include <iterator>
-#include <type_traits>
+
+#include <array>
+#include <algorithm>
+#include <cassert>
 #include <utility>
 
 #include "../unqualified_lookup_wrapper.h"
-
-using IterMoveT = decltype(std::ranges::iter_move);
 
 // Wrapper around an iterator for testing `iter_move` when an unqualified call to `iter_move` isn't
 // possible.
@@ -50,11 +50,8 @@ private:
   I base_ = I{};
 };
 
-template <class I>
-iterator_wrapper(I) -> iterator_wrapper<I>;
-
-template <typename It, typename Out>
-constexpr void unqualified_lookup_move(It first_, It last_, Out result_first_, Out result_last_) {
+template <typename I>
+constexpr void unqualified_lookup_move(I first_, I last_, I result_first_, I result_last_) {
   auto first = ::check_unqualified_lookup::unqualified_lookup_wrapper{std::move(first_)};
   auto last = ::check_unqualified_lookup::unqualified_lookup_wrapper{std::move(last_)};
   auto result_first = ::check_unqualified_lookup::unqualified_lookup_wrapper{std::move(result_first_)};
@@ -67,8 +64,8 @@ constexpr void unqualified_lookup_move(It first_, It last_, Out result_first_, O
   }
 }
 
-template <typename It, typename Out>
-constexpr void lvalue_move(It first_, It last_, Out result_first_, Out result_last_) {
+template <typename I>
+constexpr void lvalue_move(I first_, I last_, I result_first_, I result_last_) {
   auto first = iterator_wrapper{std::move(first_)};
   auto last = ::iterator_wrapper{std::move(last_)};
   auto result_first = iterator_wrapper{std::move(result_first_)};
@@ -82,8 +79,8 @@ constexpr void lvalue_move(It first_, It last_, Out result_first_, Out result_la
   }
 }
 
-template <typename It, typename Out>
-constexpr void rvalue_move(It first_, It last_, Out result_first_, Out result_last_) {
+template <typename I>
+constexpr void rvalue_move(I first_, I last_, I result_first_, I result_last_) {
   auto first = iterator_wrapper{std::move(first_)};
   auto last = iterator_wrapper{std::move(last_)};
   auto result_first = iterator_wrapper{std::move(result_first_)};
@@ -117,7 +114,7 @@ struct WithoutADL {
   constexpr bool operator==(WithoutADL const&) const;
 };
 
-constexpr bool test() {
+constexpr bool check_iter_move() {
   constexpr int full_size = 100;
   constexpr int half_size = full_size / 2;
   constexpr int reset = 0;
@@ -177,19 +174,18 @@ constexpr bool test() {
   return true;
 }
 
-static_assert(!std::is_invocable_v<IterMoveT, int*, int*>); // too many arguments
-static_assert(!std::is_invocable_v<IterMoveT, int>);
+template <typename T>
+concept can_iter_move = requires (T t) { std::ranges::iter_move(t); };
 
-// Test ADL-proofing.
-struct Incomplete;
-template<class T> struct Holder { T t; };
-static_assert(std::is_invocable_v<IterMoveT, Holder<Incomplete>**>);
-static_assert(std::is_invocable_v<IterMoveT, Holder<Incomplete>**&>);
+int main(int, char**) {
+  static_assert(check_iter_move());
+  check_iter_move();
 
-int main(int, char**)
-{
-  test();
-  static_assert(test());
+  // Make sure that `iter_move` SFINAEs away when the type can't be iter_move'd
+  {
+    struct NoIterMove { };
+    static_assert(!can_iter_move<NoIterMove>);
+  }
 
   return 0;
 }

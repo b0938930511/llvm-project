@@ -20,9 +20,11 @@
 #include "llvm/CodeGen/MachineDominators.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineInstr.h"
+#include "llvm/CodeGen/MachineOperand.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/SlotIndexes.h"
 #include "llvm/CodeGen/TargetRegisterInfo.h"
+#include "llvm/MC/LaneBitmask.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
@@ -217,18 +219,13 @@ bool LiveRangeCalc::findReachingDefs(LiveRange &LR, MachineBasicBlock &UseMBB,
       report_fatal_error("Use not jointly dominated by defs.");
     }
 
-    if (Register::isPhysicalRegister(PhysReg)) {
+    if (Register::isPhysicalRegister(PhysReg) && !MBB->isLiveIn(PhysReg)) {
+      MBB->getParent()->verify();
       const TargetRegisterInfo *TRI = MRI->getTargetRegisterInfo();
-      bool IsLiveIn = MBB->isLiveIn(PhysReg);
-      for (MCRegAliasIterator Alias(PhysReg, TRI, false); !IsLiveIn && Alias.isValid(); ++Alias)
-        IsLiveIn = MBB->isLiveIn(*Alias);
-      if (!IsLiveIn) {
-        MBB->getParent()->verify();
-        errs() << "The register " << printReg(PhysReg, TRI)
-               << " needs to be live in to " << printMBBReference(*MBB)
-               << ", but is missing from the live-in list.\n";
-        report_fatal_error("Invalid global physical register");
-      }
+      errs() << "The register " << printReg(PhysReg, TRI)
+             << " needs to be live in to " << printMBBReference(*MBB)
+             << ", but is missing from the live-in list.\n";
+      report_fatal_error("Invalid global physical register");
     }
 #endif
     FoundUndef |= MBB->pred_empty();

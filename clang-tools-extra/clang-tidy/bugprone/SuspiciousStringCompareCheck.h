@@ -11,12 +11,14 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::bugprone {
+namespace clang {
+namespace tidy {
+namespace bugprone {
 
 /// Find suspicious calls to string compare functions.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/bugprone/suspicious-string-compare.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/bugprone-suspicious-string-compare.html
 class SuspiciousStringCompareCheck : public ClangTidyCheck {
 public:
   SuspiciousStringCompareCheck(StringRef Name, ClangTidyContext *Context);
@@ -27,9 +29,11 @@ public:
 private:
   const bool WarnOnImplicitComparison;
   const bool WarnOnLogicalNotComparison;
-  const StringRef StringCompareLikeFunctions;
+  const std::string StringCompareLikeFunctions;
 };
 
-} // namespace clang::tidy::bugprone
+} // namespace bugprone
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_BUGPRONE_SUSPICIOUSSTRINGCOMPARECHECK_H

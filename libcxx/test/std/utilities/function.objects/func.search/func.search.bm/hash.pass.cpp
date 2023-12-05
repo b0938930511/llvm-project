@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14
+// XFAIL: libc++
 
 // <functional>
 
@@ -32,14 +33,14 @@
 
 
 #include <algorithm>
-#include <cassert>
 #include <functional>
+#include <cassert>
 
 #include "test_macros.h"
 #include "test_iterators.h"
 
 template <typename T> struct MyHash {
-    std::size_t operator () (T t) const { return static_cast<size_t>(t); }
+    size_t operator () (T t) const { return static_cast<size_t>(t); }
 };
 
 template <typename Iter1, typename Iter2>

@@ -15,8 +15,8 @@
 #define LLVM_LIB_TARGET_MIPS_MCTARGETDESC_MIPSASMBACKEND_H
 
 #include "MCTargetDesc/MipsFixupKinds.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/MC/MCAsmBackend.h"
-#include "llvm/TargetParser/Triple.h"
 
 namespace llvm {
 
@@ -32,8 +32,7 @@ class MipsAsmBackend : public MCAsmBackend {
 public:
   MipsAsmBackend(const Target &T, const MCRegisterInfo &MRI, const Triple &TT,
                  StringRef CPU, bool N32)
-      : MCAsmBackend(TT.isLittleEndian() ? llvm::endianness::little
-                                         : llvm::endianness::big),
+      : MCAsmBackend(TT.isLittleEndian() ? support::little : support::big),
         TheTriple(TT), IsN32(N32) {}
 
   std::unique_ptr<MCObjectTargetWriter>
@@ -44,7 +43,7 @@ public:
                   uint64_t Value, bool IsResolved,
                   const MCSubtargetInfo *STI) const override;
 
-  std::optional<MCFixupKind> getFixupKind(StringRef Name) const override;
+  Optional<MCFixupKind> getFixupKind(StringRef Name) const override;
   const MCFixupKindInfo &getFixupKindInfo(MCFixupKind Kind) const override;
 
   unsigned getNumFixupKinds() const override {
@@ -64,8 +63,7 @@ public:
     return false;
   }
 
-  bool writeNopData(raw_ostream &OS, uint64_t Count,
-                    const MCSubtargetInfo *STI) const override;
+  bool writeNopData(raw_ostream &OS, uint64_t Count) const override;
 
   bool shouldForceRelocation(const MCAssembler &Asm, const MCFixup &Fixup,
                              const MCValue &Target) override;

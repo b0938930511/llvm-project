@@ -15,8 +15,7 @@ following types of bugs:
 * Out-of-bounds accesses to heap, stack and globals
 * Use-after-free
 * Use-after-return (clang flag ``-fsanitize-address-use-after-return=(never|runtime|always)`` default: ``runtime``)
-    * Enable with: ``ASAN_OPTIONS=detect_stack_use_after_return=1`` (already enabled on Linux).
-    * Disable with: ``ASAN_OPTIONS=detect_stack_use_after_return=0``.
+    * Enable ``runtime`` with: ``ASAN_OPTIONS=detect_stack_use_after_return=1``
 * Use-after-scope (clang flag ``-fsanitize-address-use-after-scope``)
 * Double-free, invalid free
 * Memory leaks (experimental)
@@ -26,13 +25,7 @@ Typical slowdown introduced by AddressSanitizer is **2x**.
 How to build
 ============
 
-Build LLVM/Clang with `CMake <https://llvm.org/docs/CMake.html>` and enable
-the ``compiler-rt`` runtime. An example CMake configuration that will allow
-for the use/testing of AddressSanitizer:
-
-.. code-block:: console
-
-   $ cmake -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_PROJECTS="clang" -DLLVM_ENABLE_RUNTIMES="compiler-rt" <path to source>/llvm
+Build LLVM/Clang with `CMake <https://llvm.org/docs/CMake.html>`_.
 
 Usage
 =====
@@ -150,8 +143,8 @@ Stack Use After Return (UAR)
 AddressSanitizer can optionally detect stack use after return problems.
 This is available by default, or explicitly
 (``-fsanitize-address-use-after-return=runtime``).
-To disable this check at runtime, set the environment variable
-``ASAN_OPTIONS=detect_stack_use_after_return=0``.
+To enable this check at runtime, set the environment variable
+``ASAN_OPTIONS=detect_stack_use_after_return=1``.
 
 Enabling this check (``-fsanitize-address-use-after-return=always``) will
 reduce code size.  The code size may be reduced further by completely
@@ -159,8 +152,8 @@ eliminating this check (``-fsanitize-address-use-after-return=never``).
 
 To summarize: ``-fsanitize-address-use-after-return=<mode>``
   * ``never``: Completely disables detection of UAR errors (reduces code size).
-  * ``runtime``: Adds the code for detection, but it can be disable via the
-    runtime environment (``ASAN_OPTIONS=detect_stack_use_after_return=0``).
+  * ``runtime``: Adds the code for detection, but must be enabled via the
+    runtime environment (``ASAN_OPTIONS=detect_stack_use_after_return=1``).
   * ``always``: Enables detection of UAR errors in all cases. (reduces code
     size, but not as much as ``never``).
 
@@ -236,12 +229,6 @@ compilers, so we suggest to use it together with
 The same attribute used on a global variable prevents AddressSanitizer
 from adding redzones around it and detecting out of bounds accesses.
 
-
-AddressSanitizer also supports
-``__attribute__((disable_sanitizer_instrumentation))``. This attribute
-works similar to ``__attribute__((no_sanitize("address")))``, but it also
-prevents instrumentation performed by other sanitizers.
-
 Suppressing Errors in Recompiled Code (Ignorelist)
 --------------------------------------------------
 
@@ -295,11 +282,11 @@ Code generation control
 Instrumentation code outlining
 ------------------------------
 
-By default AddressSanitizer inlines the instrumentation code to improve the
+By default AddressSanitizer inlines the instumentation code to improve the
 run-time performance, which leads to increased binary size. Using the
 (clang flag ``-fsanitize-address-outline-instrumentation` default: ``false``)
-flag forces all code instrumentation to be outlined, which reduces the size
-of the generated code, but also reduces the run-time performance.
+flag forces all code instumentation to be outlined, which reduces the size
+of the generated code, but also reduces the run-time performace.
 
 Limitations
 ===========

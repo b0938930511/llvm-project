@@ -780,11 +780,11 @@ void test_unsigned_long(unsigned long x) {
   // CHECK: fix-it:"{{.*}}":{[[@LINE-3]]:9-[[@LINE-3]]:24}:""
 }
 
-long long test_array(void) {
+long long test_array() {
   return llabs((long long[]){1});
   // expected-warning@-1 {{absolute value of array type}}
 }
-long long test_function_pointer(void) {
+long long test_function_pointer() {
   return llabs(&test_function_pointer);
   // expected-warning@-1 {{absolute value of pointer type}}
 }
@@ -792,7 +792,7 @@ long long test_void_pointer(void *x) {
   return llabs(x);
   // expected-warning@-1 {{absolute value of pointer type}}
 }
-long long test_function(void) {
+long long test_function() {
   return llabs(test_function);
   // expected-warning@-1 {{absolute value of function type}}
 }

@@ -77,7 +77,7 @@ class TraversalKindScope {
   TraversalKind TK = TK_AsIs;
 
 public:
-  TraversalKindScope(ASTContext &ASTCtx, std::optional<TraversalKind> ScopeTK)
+  TraversalKindScope(ASTContext &ASTCtx, llvm::Optional<TraversalKind> ScopeTK)
       : Ctx(ASTCtx.getParentMapContext()) {
     TK = Ctx.getTraversalKind();
     if (ScopeTK)
@@ -90,27 +90,29 @@ public:
 /// Container for either a single DynTypedNode or for an ArrayRef to
 /// DynTypedNode. For use with ParentMap.
 class DynTypedNodeList {
-  union {
-    DynTypedNode SingleNode;
-    ArrayRef<DynTypedNode> Nodes;
-  };
+  llvm::AlignedCharArrayUnion<DynTypedNode, ArrayRef<DynTypedNode>> Storage;
   bool IsSingleNode;
 
 public:
   DynTypedNodeList(const DynTypedNode &N) : IsSingleNode(true) {
-    new (&SingleNode) DynTypedNode(N);
+    new (&Storage) DynTypedNode(N);
   }
 
   DynTypedNodeList(ArrayRef<DynTypedNode> A) : IsSingleNode(false) {
-    new (&Nodes) ArrayRef<DynTypedNode>(A);
+    new (&Storage) ArrayRef<DynTypedNode>(A);
   }
 
   const DynTypedNode *begin() const {
-    return !IsSingleNode ? Nodes.begin() : &SingleNode;
+    if (!IsSingleNode)
+      return reinterpret_cast<const ArrayRef<DynTypedNode> *>(&Storage)
+          ->begin();
+    return reinterpret_cast<const DynTypedNode *>(&Storage);
   }
 
   const DynTypedNode *end() const {
-    return !IsSingleNode ? Nodes.end() : &SingleNode + 1;
+    if (!IsSingleNode)
+      return reinterpret_cast<const ArrayRef<DynTypedNode> *>(&Storage)->end();
+    return reinterpret_cast<const DynTypedNode *>(&Storage) + 1;
   }
 
   size_t size() const { return end() - begin(); }

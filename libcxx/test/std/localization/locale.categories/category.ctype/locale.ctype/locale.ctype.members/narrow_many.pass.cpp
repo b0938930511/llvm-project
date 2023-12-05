@@ -12,8 +12,6 @@
 
 // const charT* narrow(const charT* low, const charT*, char dfault, char* to) const;
 
-// XFAIL: no-wide-characters
-
 #include <locale>
 #include <string>
 #include <vector>

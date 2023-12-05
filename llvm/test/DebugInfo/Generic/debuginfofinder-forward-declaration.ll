@@ -1,3 +1,4 @@
+; RUN: opt -analyze -module-debuginfo -enable-new-pm=0 < %s | FileCheck %s
 ; RUN: opt -passes='print<module-debuginfo>' -disable-output 2>&1 < %s \
 ; RUN:   | FileCheck %s
 
@@ -18,7 +19,7 @@
 
 source_filename = "test/DebugInfo/Generic/debuginfofinder-forward-declaration.ll"
 
-%struct.Y = type { ptr }
+%struct.Y = type { %struct.X* }
 %struct.X = type opaque
 
 @y = common global %struct.Y zeroinitializer, align 8, !dbg !0

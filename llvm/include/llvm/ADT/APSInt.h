@@ -5,11 +5,10 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-///
-/// \file
-/// This file implements the APSInt class, which is a simple class that
-/// represents an arbitrary sized integer that knows its signedness.
-///
+//
+// This file implements the APSInt class, which is a simple class that
+// represents an arbitrary sized integer that knows its signedness.
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef LLVM_ADT_APSINT_H
@@ -20,19 +19,19 @@
 namespace llvm {
 
 /// An arbitrary precision integer that knows its signedness.
-class [[nodiscard]] APSInt : public APInt {
-  bool IsUnsigned = false;
+class LLVM_NODISCARD APSInt : public APInt {
+  bool IsUnsigned;
 
 public:
   /// Default constructor that creates an uninitialized APInt.
-  explicit APSInt() = default;
+  explicit APSInt() : IsUnsigned(false) {}
 
   /// Create an APSInt with the specified width, default to unsigned.
   explicit APSInt(uint32_t BitWidth, bool isUnsigned = true)
-      : APInt(BitWidth, 0), IsUnsigned(isUnsigned) {}
+   : APInt(BitWidth, 0), IsUnsigned(isUnsigned) {}
 
   explicit APSInt(APInt I, bool isUnsigned = true)
-      : APInt(std::move(I)), IsUnsigned(isUnsigned) {}
+   : APInt(std::move(I)), IsUnsigned(isUnsigned) {}
 
   /// Construct an APSInt from a string representation.
   ///
@@ -59,7 +58,7 @@ public:
   /// that 0 is not a positive value.
   ///
   /// \returns true if this APSInt is positive.
-  bool isStrictlyPositive() const { return isNonNegative() && !isZero(); }
+  bool isStrictlyPositive() const { return isNonNegative() && !isNullValue(); }
 
   APSInt &operator=(APInt RHS) {
     // Retain our current sign.
@@ -85,24 +84,10 @@ public:
   }
   using APInt::toString;
 
-  /// If this int is representable using an int64_t.
-  bool isRepresentableByInt64() const {
-    // For unsigned values with 64 active bits, they technically fit into a
-    // int64_t, but the user may get negative numbers and has to manually cast
-    // them to unsigned. Let's not bet the user has the sanity to do that and
-    // not give them a vague value at the first place.
-    return isSigned() ? isSignedIntN(64) : isIntN(63);
-  }
-
   /// Get the correctly-extended \c int64_t value.
   int64_t getExtValue() const {
-    assert(isRepresentableByInt64() && "Too many bits for int64_t");
+    assert(getMinSignedBits() <= 64 && "Too many bits for int64_t");
     return isSigned() ? getSExtValue() : getZExtValue();
-  }
-
-  std::optional<int64_t> tryExtValue() const {
-    return isRepresentableByInt64() ? std::optional<int64_t>(getExtValue())
-                                    : std::nullopt;
   }
 
   APSInt trunc(uint32_t width) const {
@@ -151,39 +136,37 @@ public:
   APSInt operator>>(unsigned Amt) const {
     return IsUnsigned ? APSInt(lshr(Amt), true) : APSInt(ashr(Amt), false);
   }
-  APSInt &operator>>=(unsigned Amt) {
+  APSInt& operator>>=(unsigned Amt) {
     if (IsUnsigned)
       lshrInPlace(Amt);
     else
       ashrInPlace(Amt);
     return *this;
   }
-  APSInt relativeShr(unsigned Amt) const {
-    return IsUnsigned ? APSInt(relativeLShr(Amt), true)
-                      : APSInt(relativeAShr(Amt), false);
-  }
 
-  inline bool operator<(const APSInt &RHS) const {
+  inline bool operator<(const APSInt& RHS) const {
     assert(IsUnsigned == RHS.IsUnsigned && "Signedness mismatch!");
     return IsUnsigned ? ult(RHS) : slt(RHS);
   }
-  inline bool operator>(const APSInt &RHS) const {
+  inline bool operator>(const APSInt& RHS) const {
     assert(IsUnsigned == RHS.IsUnsigned && "Signedness mismatch!");
     return IsUnsigned ? ugt(RHS) : sgt(RHS);
   }
-  inline bool operator<=(const APSInt &RHS) const {
+  inline bool operator<=(const APSInt& RHS) const {
     assert(IsUnsigned == RHS.IsUnsigned && "Signedness mismatch!");
     return IsUnsigned ? ule(RHS) : sle(RHS);
   }
-  inline bool operator>=(const APSInt &RHS) const {
+  inline bool operator>=(const APSInt& RHS) const {
     assert(IsUnsigned == RHS.IsUnsigned && "Signedness mismatch!");
     return IsUnsigned ? uge(RHS) : sge(RHS);
   }
-  inline bool operator==(const APSInt &RHS) const {
+  inline bool operator==(const APSInt& RHS) const {
     assert(IsUnsigned == RHS.IsUnsigned && "Signedness mismatch!");
     return eq(RHS);
   }
-  inline bool operator!=(const APSInt &RHS) const { return !((*this) == RHS); }
+  inline bool operator!=(const APSInt& RHS) const {
+    return !((*this) == RHS);
+  }
 
   bool operator==(int64_t RHS) const {
     return compareValues(*this, get(RHS)) == 0;
@@ -208,110 +191,104 @@ public:
   // signedness information.
 
   APSInt operator<<(unsigned Bits) const {
-    return APSInt(static_cast<const APInt &>(*this) << Bits, IsUnsigned);
+    return APSInt(static_cast<const APInt&>(*this) << Bits, IsUnsigned);
   }
-  APSInt &operator<<=(unsigned Amt) {
-    static_cast<APInt &>(*this) <<= Amt;
+  APSInt& operator<<=(unsigned Amt) {
+    static_cast<APInt&>(*this) <<= Amt;
     return *this;
-  }
-  APSInt relativeShl(unsigned Amt) const {
-    return IsUnsigned ? APSInt(relativeLShl(Amt), true)
-                      : APSInt(relativeAShl(Amt), false);
   }
 
-  APSInt &operator++() {
-    ++(static_cast<APInt &>(*this));
+  APSInt& operator++() {
+    ++(static_cast<APInt&>(*this));
     return *this;
   }
-  APSInt &operator--() {
-    --(static_cast<APInt &>(*this));
+  APSInt& operator--() {
+    --(static_cast<APInt&>(*this));
     return *this;
   }
   APSInt operator++(int) {
-    return APSInt(++static_cast<APInt &>(*this), IsUnsigned);
+    return APSInt(++static_cast<APInt&>(*this), IsUnsigned);
   }
   APSInt operator--(int) {
-    return APSInt(--static_cast<APInt &>(*this), IsUnsigned);
+    return APSInt(--static_cast<APInt&>(*this), IsUnsigned);
   }
   APSInt operator-() const {
-    return APSInt(-static_cast<const APInt &>(*this), IsUnsigned);
+    return APSInt(-static_cast<const APInt&>(*this), IsUnsigned);
   }
-  APSInt &operator+=(const APSInt &RHS) {
+  APSInt& operator+=(const APSInt& RHS) {
     assert(IsUnsigned == RHS.IsUnsigned && "Signedness mismatch!");
-    static_cast<APInt &>(*this) += RHS;
+    static_cast<APInt&>(*this) += RHS;
     return *this;
   }
-  APSInt &operator-=(const APSInt &RHS) {
+  APSInt& operator-=(const APSInt& RHS) {
     assert(IsUnsigned == RHS.IsUnsigned && "Signedness mismatch!");
-    static_cast<APInt &>(*this) -= RHS;
+    static_cast<APInt&>(*this) -= RHS;
     return *this;
   }
-  APSInt &operator*=(const APSInt &RHS) {
+  APSInt& operator*=(const APSInt& RHS) {
     assert(IsUnsigned == RHS.IsUnsigned && "Signedness mismatch!");
-    static_cast<APInt &>(*this) *= RHS;
+    static_cast<APInt&>(*this) *= RHS;
     return *this;
   }
-  APSInt &operator&=(const APSInt &RHS) {
+  APSInt& operator&=(const APSInt& RHS) {
     assert(IsUnsigned == RHS.IsUnsigned && "Signedness mismatch!");
-    static_cast<APInt &>(*this) &= RHS;
+    static_cast<APInt&>(*this) &= RHS;
     return *this;
   }
-  APSInt &operator|=(const APSInt &RHS) {
+  APSInt& operator|=(const APSInt& RHS) {
     assert(IsUnsigned == RHS.IsUnsigned && "Signedness mismatch!");
-    static_cast<APInt &>(*this) |= RHS;
+    static_cast<APInt&>(*this) |= RHS;
     return *this;
   }
-  APSInt &operator^=(const APSInt &RHS) {
+  APSInt& operator^=(const APSInt& RHS) {
     assert(IsUnsigned == RHS.IsUnsigned && "Signedness mismatch!");
-    static_cast<APInt &>(*this) ^= RHS;
+    static_cast<APInt&>(*this) ^= RHS;
     return *this;
   }
 
-  APSInt operator&(const APSInt &RHS) const {
+  APSInt operator&(const APSInt& RHS) const {
     assert(IsUnsigned == RHS.IsUnsigned && "Signedness mismatch!");
-    return APSInt(static_cast<const APInt &>(*this) & RHS, IsUnsigned);
+    return APSInt(static_cast<const APInt&>(*this) & RHS, IsUnsigned);
   }
 
-  APSInt operator|(const APSInt &RHS) const {
+  APSInt operator|(const APSInt& RHS) const {
     assert(IsUnsigned == RHS.IsUnsigned && "Signedness mismatch!");
-    return APSInt(static_cast<const APInt &>(*this) | RHS, IsUnsigned);
+    return APSInt(static_cast<const APInt&>(*this) | RHS, IsUnsigned);
   }
 
   APSInt operator^(const APSInt &RHS) const {
     assert(IsUnsigned == RHS.IsUnsigned && "Signedness mismatch!");
-    return APSInt(static_cast<const APInt &>(*this) ^ RHS, IsUnsigned);
+    return APSInt(static_cast<const APInt&>(*this) ^ RHS, IsUnsigned);
   }
 
-  APSInt operator*(const APSInt &RHS) const {
+  APSInt operator*(const APSInt& RHS) const {
     assert(IsUnsigned == RHS.IsUnsigned && "Signedness mismatch!");
-    return APSInt(static_cast<const APInt &>(*this) * RHS, IsUnsigned);
+    return APSInt(static_cast<const APInt&>(*this) * RHS, IsUnsigned);
   }
-  APSInt operator+(const APSInt &RHS) const {
+  APSInt operator+(const APSInt& RHS) const {
     assert(IsUnsigned == RHS.IsUnsigned && "Signedness mismatch!");
-    return APSInt(static_cast<const APInt &>(*this) + RHS, IsUnsigned);
+    return APSInt(static_cast<const APInt&>(*this) + RHS, IsUnsigned);
   }
-  APSInt operator-(const APSInt &RHS) const {
+  APSInt operator-(const APSInt& RHS) const {
     assert(IsUnsigned == RHS.IsUnsigned && "Signedness mismatch!");
-    return APSInt(static_cast<const APInt &>(*this) - RHS, IsUnsigned);
+    return APSInt(static_cast<const APInt&>(*this) - RHS, IsUnsigned);
   }
   APSInt operator~() const {
-    return APSInt(~static_cast<const APInt &>(*this), IsUnsigned);
+    return APSInt(~static_cast<const APInt&>(*this), IsUnsigned);
   }
 
   /// Return the APSInt representing the maximum integer value with the given
   /// bit width and signedness.
   static APSInt getMaxValue(uint32_t numBits, bool Unsigned) {
     return APSInt(Unsigned ? APInt::getMaxValue(numBits)
-                           : APInt::getSignedMaxValue(numBits),
-                  Unsigned);
+                           : APInt::getSignedMaxValue(numBits), Unsigned);
   }
 
   /// Return the APSInt representing the minimum integer value with the given
   /// bit width and signedness.
   static APSInt getMinValue(uint32_t numBits, bool Unsigned) {
     return APSInt(Unsigned ? APInt::getMinValue(numBits)
-                           : APInt::getSignedMinValue(numBits),
-                  Unsigned);
+                           : APInt::getSignedMinValue(numBits), Unsigned);
   }
 
   /// Determine if two APSInts have the same value, zero- or
@@ -351,7 +328,7 @@ public:
 
   /// Used to insert APSInt objects, or objects that contain APSInt objects,
   /// into FoldingSets.
-  void Profile(FoldingSetNodeID &ID) const;
+  void Profile(FoldingSetNodeID& ID) const;
 };
 
 inline bool operator==(int64_t V1, const APSInt &V2) { return V2 == V1; }
@@ -367,17 +344,17 @@ inline raw_ostream &operator<<(raw_ostream &OS, const APSInt &I) {
 }
 
 /// Provide DenseMapInfo for APSInt, using the DenseMapInfo for APInt.
-template <> struct DenseMapInfo<APSInt, void> {
+template <> struct DenseMapInfo<APSInt> {
   static inline APSInt getEmptyKey() {
-    return APSInt(DenseMapInfo<APInt, void>::getEmptyKey());
+    return APSInt(DenseMapInfo<APInt>::getEmptyKey());
   }
 
   static inline APSInt getTombstoneKey() {
-    return APSInt(DenseMapInfo<APInt, void>::getTombstoneKey());
+    return APSInt(DenseMapInfo<APInt>::getTombstoneKey());
   }
 
   static unsigned getHashValue(const APSInt &Key) {
-    return DenseMapInfo<APInt, void>::getHashValue(Key);
+    return DenseMapInfo<APInt>::getHashValue(Key);
   }
 
   static bool isEqual(const APSInt &LHS, const APSInt &RHS) {

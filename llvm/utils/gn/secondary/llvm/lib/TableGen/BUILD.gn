@@ -6,7 +6,6 @@ static_library("TableGen") {
     "Error.cpp",
     "JSONBackend.cpp",
     "Main.cpp",
-    "Parser.cpp",
     "Record.cpp",
     "SetTheory.cpp",
     "StringMatcher.cpp",

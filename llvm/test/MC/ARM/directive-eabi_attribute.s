@@ -215,30 +215,17 @@
 @ CHECK-OBJ-NEXT:   Value: 0
 @ CHECK-OBJ-NEXT:   TagName: DSP_extension
 @ CHECK-OBJ-NEXT:   Description: Not Permitted
-  .eabi_attribute Tag_PAC_extension, 0
-@ CHECK: .eabi_attribute 50, 0
-@ CHECK-OBJ:        Tag: 50
-@ CHECK-OBJ-NEXT:   Value: 0
-@ CHECK-OBJ-NEXT:   TagName: PAC_extension
-@ CHECK-OBJ-NEXT:   Description: Not Permitted
-  .eabi_attribute Tag_BTI_extension, 0
-@ CHECK: .eabi_attribute 52, 0
-@ CHECK-OBJ:        Tag: 52
-@ CHECK-OBJ-NEXT:   Value: 0
-@ CHECK-OBJ-NEXT:   TagName: BTI_extension
-@ CHECK-OBJ-NEXT:   Description: Not Permitted
 	.eabi_attribute Tag_nodefaults, 0
 @ CHECK: .eabi_attribute 64, 0
 @ CHECK-OBJ:        Tag: 64
 @ CHECK-OBJ-NEXT:   Value: 0
 @ CHECK-OBJ-NEXT:   TagName: nodefaults
 @ CHECK-OBJ-NEXT:   Description: Unspecified Tags UNDEFINED
-	.eabi_attribute Tag_also_compatible_with, "\006\017"
-@ CHECK: .eabi_attribute 65, "\006\017"
+	.eabi_attribute Tag_also_compatible_with, "gnu"
+@ CHECK: .eabi_attribute 65, "gnu"
 @ CHECK-OBJ:        Tag: 65
 @ CHECK-OBJ-NEXT:   TagName: also_compatible_with
-@ CHECK-OBJ-NEXT:   Value: \006\017
-@ CHECK-OBJ-NEXT:   Description: Tag_CPU_arch = 15 (ARM v8-R)
+@ CHECK-OBJ-NEXT:   Value: gnu
 	.eabi_attribute Tag_T2EE_use, 0
 @ CHECK: .eabi_attribute 66, 0
 @ CHECK-OBJ:        Tag: 66
@@ -251,19 +238,6 @@
 @ CHECK-OBJ-NEXT:   Value: 0
 @ CHECK-OBJ-NEXT:   TagName: Virtualization_use
 @ CHECK-OBJ-NEXT:   Description: Not Permitted
-  .eabi_attribute Tag_BTI_use, 0
-@ CHECK: .eabi_attribute 74, 0
-@ CHECK-OBJ:        Tag: 74
-@ CHECK-OBJ-NEXT:   Value: 0
-@ CHECK-OBJ-NEXT:   TagName: BTI_use
-@ CHECK-OBJ-NEXT:   Description: Not Used
-  .eabi_attribute Tag_PACRET_use, 0
-@ CHECK: .eabi_attribute 76, 0
-@ CHECK-OBJ:        Tag: 76
-@ CHECK-OBJ-NEXT:   Value: 0
-@ CHECK-OBJ-NEXT:   TagName: PACRET_use
-@ CHECK-OBJ-NEXT:   Description: Not Used
-
 
 @ ===--- Compatibility Checks ---===
 

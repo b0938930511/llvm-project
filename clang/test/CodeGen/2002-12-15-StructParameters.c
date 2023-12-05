@@ -10,7 +10,7 @@ typedef struct
 void foo(void*);
 void bar(compile_stack_type T, unsigned);
 
-void test(void) {
+void test() {
   compile_stack_type CST;
   foo(&CST);
 

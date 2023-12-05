@@ -2,23 +2,21 @@
 
 namespace functions
 {
-  template<typename T>
-  struct S {
-  static void foo(int) requires false {}
+  void foo(int) requires false {}
   // expected-note@-1 3{{because 'false' evaluated to false}}
-  static void bar(int) requires true {}
-  };
+  // expected-note@-2 {{candidate function not viable: constraints not satisfied}}
+  void bar(int) requires true {}
 
   void a(int);
   void a(double);
 
   void baz() {
-    S<int>::foo(1); // expected-error{{invalid reference to function 'foo': constraints not satisfied}}
-    S<int>::bar(1);
-    void (*p1)(int) = S<int>::foo; // expected-error{{invalid reference to function 'foo': constraints not satisfied}}
-    void (*p3)(int) = S<int>::bar;
-    decltype(S<int>::foo)* a1 = nullptr; // expected-error{{invalid reference to function 'foo': constraints not satisfied}}
-    decltype(S<int>::bar)* a2 = nullptr;
+    foo(1); // expected-error{{no matching function for call to 'foo'}}
+    bar(1);
+    void (*p1)(int) = foo; // expected-error{{invalid reference to function 'foo': constraints not satisfied}}
+    void (*p3)(int) = bar;
+    decltype(foo)* a1 = nullptr; // expected-error{{invalid reference to function 'foo': constraints not satisfied}}
+    decltype(bar)* a2 = nullptr;
   }
 }
 
@@ -26,7 +24,7 @@ namespace methods
 {
   template<typename T>
   struct A {
-    static void foo(int) requires (sizeof(T) == 1) {} // expected-note 3{{because 'sizeof(char[2]) == 1' (2 == 1) evaluated to false}}
+    static void foo(int) requires (sizeof(T) == 1) {} // expected-note 3{{because 'sizeof(char [2]) == 1' (2 == 1) evaluated to false}}
     static void bar(int) requires (sizeof(T) == 2) {} // expected-note 3{{because 'sizeof(char) == 2' (1 == 2) evaluated to false}}
     // Make sure the function body is not instantiated before constraints are checked.
     static auto baz(int) requires (sizeof(T) == 2) { return T::foo(); } // expected-note{{because 'sizeof(char) == 2' (1 == 2) evaluated to false}}

@@ -11,7 +11,7 @@
 
 #include "lldb/Utility/LLDBAssert.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SmallVector.h"
 
 #include <memory>
 #include <mutex>
@@ -32,16 +32,15 @@ public:
 
   void ManageObject(T *new_object) {
     std::lock_guard<std::mutex> guard(m_mutex);
-    auto ret = m_objects.insert(new_object);
-    assert(ret.second && "ManageObject called twice for the same object?");
-    (void)ret;
+    assert(!llvm::is_contained(m_objects, new_object) &&
+           "ManageObject called twice for the same object?");
+    m_objects.push_back(new_object);
   }
 
   std::shared_ptr<T> GetSharedPointer(T *desired_object) {
     std::lock_guard<std::mutex> guard(m_mutex);
     auto this_sp = this->shared_from_this();
-    size_t count =  m_objects.count(desired_object);
-    if (count == 0) {
+    if (!llvm::is_contained(m_objects, desired_object)) {
       lldbassert(false && "object not found in shared cluster when expected");
       desired_object = nullptr;
     }
@@ -49,15 +48,9 @@ public:
   }
 
 private:
-  ClusterManager() : m_objects() {}
-  // The cluster manager is used primarily to manage the
-  // children of root ValueObjects. So it will always have
-  // one element - the root.  Pointers will often have dynamic
-  // values, so having 2 entries is pretty common.  It's also
-  // pretty common to have small (2,3) structs, so setting the
-  // static size to 4 will cover those cases with no allocations
-  // w/o wasting too much space.
-  llvm::SmallPtrSet<T *, 4> m_objects;
+  ClusterManager() : m_objects(), m_mutex() {}
+
+  llvm::SmallVector<T *, 16> m_objects;
   std::mutex m_mutex;
 };
 

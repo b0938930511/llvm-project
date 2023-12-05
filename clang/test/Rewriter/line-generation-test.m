@@ -3,23 +3,24 @@
 // RUN: FileCheck  -check-prefix CHECK-LINE --input-file=%t-rw.cpp %s
 // RUN: %clang_cc1 -fms-extensions -rewrite-objc %t.mm -o %t-rwnog.cpp
 // RUN: FileCheck  -check-prefix CHECK-NOLINE --input-file=%t-rwnog.cpp %s
+// rdar://13138170
 
 __attribute__((objc_root_class)) @interface MyObject {
 @public
-    id _myLeader;
+    id _myMaster;
     id _isTickledPink;
 }
-@property(retain) id myLeader;
+@property(retain) id myMaster;
 @property(assign) id isTickledPink;
 @end
 
 @implementation MyObject
 
-@synthesize myLeader = _myLeader;
+@synthesize myMaster = _myMaster;
 @synthesize isTickledPink = _isTickledPink;
 
 - (void) doSomething {
-    _myLeader = _isTickledPink;
+    _myMaster = _isTickledPink;
 }
 
 @end
@@ -27,13 +28,13 @@ __attribute__((objc_root_class)) @interface MyObject {
 MyObject * foo ()
 {
 	MyObject* p;
-        p.isTickledPink = p.myLeader;	// ok
-	p->_isTickledPink = p->_myLeader;
+        p.isTickledPink = p.myMaster;	// ok
+	p->_isTickledPink = p->_myMaster;
 	return p->_isTickledPink;
 }
 
-// CHECK-LINE: #line 21
-// CHECK-LINE: #line 27
-// CHECK-NOLINE-NOT: #line 21
-// CHECK-NOLINE-NOT: #line 27
+// CHECK-LINE: #line 22
+// CHECK-LINE: #line 28
+// CHECK-NOLINE-NOT: #line 22
+// CHECK-NOLINE-NOT: #line 28
 

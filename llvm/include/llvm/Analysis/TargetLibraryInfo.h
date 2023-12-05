@@ -11,59 +11,24 @@
 
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/Optional.h"
+#include "llvm/IR/Function.h"
 #include "llvm/IR/InstrTypes.h"
+#include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
-#include "llvm/TargetParser/Triple.h"
-#include <optional>
 
 namespace llvm {
-
 template <typename T> class ArrayRef;
-class Function;
-class Module;
 class Triple;
 
-/// Provides info so a possible vectorization of a function can be
-/// computed. Function 'VectorFnName' is equivalent to 'ScalarFnName'
-/// vectorized by a factor 'VectorizationFactor'.
-/// The VABIPrefix string holds information about isa, mask, vlen,
-/// and vparams so a scalar-to-vector mapping of the form:
-///    _ZGV<isa><mask><vlen><vparams>_<scalarname>(<vectorname>)
-/// can be constructed where:
-///
-/// <isa> = "_LLVM_"
-/// <mask> = "M" if masked, "N" if no mask.
-/// <vlen> = Number of concurrent lanes, stored in the `VectorizationFactor`
-///          field of the `VecDesc` struct. If the number of lanes is scalable
-///          then 'x' is printed instead.
-/// <vparams> = "v", as many as are the numArgs.
-/// <scalarname> = the name of the scalar function.
-/// <vectorname> = the name of the vector function.
-class VecDesc {
+/// Describes a possible vectorization of a function.
+/// Function 'VectorFnName' is equivalent to 'ScalarFnName' vectorized
+/// by a factor 'VectorizationFactor'.
+struct VecDesc {
   StringRef ScalarFnName;
   StringRef VectorFnName;
   ElementCount VectorizationFactor;
-  bool Masked;
-  StringRef VABIPrefix;
-
-public:
-  VecDesc() = delete;
-  VecDesc(StringRef ScalarFnName, StringRef VectorFnName,
-          ElementCount VectorizationFactor, bool Masked, StringRef VABIPrefix)
-      : ScalarFnName(ScalarFnName), VectorFnName(VectorFnName),
-        VectorizationFactor(VectorizationFactor), Masked(Masked),
-        VABIPrefix(VABIPrefix) {}
-
-  StringRef getScalarFnName() const { return ScalarFnName; }
-  StringRef getVectorFnName() const { return VectorFnName; }
-  ElementCount getVectorizationFactor() const { return VectorizationFactor; }
-  bool isMasked() const { return Masked; }
-  StringRef getVABIPrefix() const { return VABIPrefix; }
-
-  /// Returns a vector function ABI variant string on the form:
-  ///    _ZGV<isa><mask><vlen><vparams>_<scalarname>(<vectorname>)
-  std::string getVectorFunctionABIVariantString() const;
 };
 
   enum LibFunc : unsigned {
@@ -84,9 +49,9 @@ class TargetLibraryInfoImpl {
   friend class TargetLibraryInfo;
 
   unsigned char AvailableArray[(NumLibFuncs+3)/4];
-  DenseMap<unsigned, std::string> CustomNames;
+  llvm::DenseMap<unsigned, std::string> CustomNames;
   static StringLiteral const StandardNames[NumLibFuncs];
-  bool ShouldExtI32Param, ShouldExtI32Return, ShouldSignExtI32Param, ShouldSignExtI32Return;
+  bool ShouldExtI32Param, ShouldExtI32Return, ShouldSignExtI32Param;
   unsigned SizeOfInt;
 
   enum AvailabilityState {
@@ -111,7 +76,7 @@ class TargetLibraryInfoImpl {
   /// Return true if the function type FTy is valid for the library function
   /// F, regardless of whether the function is available.
   bool isValidProtoForLibFunc(const FunctionType &FTy, LibFunc F,
-                              const Module &M) const;
+                              const DataLayout *DL) const;
 
 public:
   /// List of known vector-functions libraries.
@@ -127,9 +92,7 @@ public:
     DarwinLibSystemM, // Use Darwin's libsystem_m.
     LIBMVEC_X86,      // GLIBC Vector Math library.
     MASSV,            // IBM MASS vector library.
-    SVML,             // Intel short vector math library.
-    SLEEFGNUABI, // SLEEF - SIMD Library for Evaluating Elementary Functions.
-    ArmPL        // Arm Performance Libraries.
+    SVML              // Intel short vector math library.
   };
 
   TargetLibraryInfoImpl();
@@ -152,8 +115,6 @@ public:
   ///
   /// If it is one of the known library functions, return true and set F to the
   /// corresponding value.
-  ///
-  /// FDecl is assumed to have a parent Module when using this function.
   bool getLibFunc(const Function &FDecl, LibFunc &F) const;
 
   /// Forces a function to be marked as unavailable.
@@ -172,7 +133,7 @@ public:
     if (StandardNames[F] != Name) {
       setState(F, CustomName);
       CustomNames[F] = std::string(Name);
-      assert(CustomNames.contains(F));
+      assert(CustomNames.find(F) != CustomNames.end());
     } else {
       setState(F, StandardName);
     }
@@ -189,14 +150,12 @@ public:
 
   /// Calls addVectorizableFunctions with a known preset of functions for the
   /// given vector library.
-  void addVectorizableFunctionsFromVecLib(enum VectorLibrary VecLib,
-                                          const llvm::Triple &TargetTriple);
+  void addVectorizableFunctionsFromVecLib(enum VectorLibrary VecLib);
 
   /// Return true if the function F has a vector equivalent with vectorization
   /// factor VF.
   bool isFunctionVectorizable(StringRef F, const ElementCount &VF) const {
-    return !(getVectorizedFunction(F, VF, false).empty() &&
-             getVectorizedFunction(F, VF, true).empty());
+    return !getVectorizedFunction(F, VF).empty();
   }
 
   /// Return true if the function F has a vector equivalent with any
@@ -205,14 +164,7 @@ public:
 
   /// Return the name of the equivalent of F, vectorized with factor VF. If no
   /// such mapping exists, return the empty string.
-  StringRef getVectorizedFunction(StringRef F, const ElementCount &VF,
-                                  bool Masked) const;
-
-  /// Return a pointer to a VecDesc object holding all info for scalar to vector
-  /// mappings in TLI for the equivalent of F, vectorized with factor VF.
-  /// If no such mapping exists, return nullpointer.
-  const VecDesc *getVectorMappingInfo(StringRef F, const ElementCount &VF,
-                                      bool Masked) const;
+  StringRef getVectorizedFunction(StringRef F, const ElementCount &VF) const;
 
   /// Set to true iff i32 parameters to library functions should have signext
   /// or zeroext attributes if they correspond to C-level int or unsigned int,
@@ -234,18 +186,9 @@ public:
     ShouldSignExtI32Param = Val;
   }
 
-  /// Set to true iff i32 results from library functions should have signext
-  /// attribute if they correspond to C-level int or unsigned int.
-  void setShouldSignExtI32Return(bool Val) {
-    ShouldSignExtI32Return = Val;
-  }
-
   /// Returns the size of the wchar_t type in bytes or 0 if the size is unknown.
   /// This queries the 'wchar_size' metadata.
   unsigned getWCharSize(const Module &M) const;
-
-  /// Returns the size of the size_t type in bits.
-  unsigned getSizeTSize(const Module &M) const;
 
   /// Get size of a C-level int or unsigned int, in bits.
   unsigned getIntSize() const {
@@ -286,7 +229,7 @@ class TargetLibraryInfo {
 
 public:
   explicit TargetLibraryInfo(const TargetLibraryInfoImpl &Impl,
-                             std::optional<const Function *> F = std::nullopt)
+                             Optional<const Function *> F = None)
       : Impl(&Impl), OverrideAsUnavailable(NumLibFuncs) {
     if (!F)
       return;
@@ -295,7 +238,7 @@ public:
     else {
       // Disable individual libc/libm calls in TargetLibraryInfo.
       LibFunc LF;
-      AttributeSet FnAttrs = (*F)->getAttributes().getFnAttrs();
+      AttributeSet FnAttrs = (*F)->getAttributes().getFnAttributes();
       for (const Attribute &Attr : FnAttrs) {
         if (!Attr.isStringAttribute())
           continue;
@@ -309,10 +252,15 @@ public:
   }
 
   // Provide value semantics.
-  TargetLibraryInfo(const TargetLibraryInfo &TLI) = default;
+  TargetLibraryInfo(const TargetLibraryInfo &TLI)
+      : Impl(TLI.Impl), OverrideAsUnavailable(TLI.OverrideAsUnavailable) {}
   TargetLibraryInfo(TargetLibraryInfo &&TLI)
       : Impl(TLI.Impl), OverrideAsUnavailable(TLI.OverrideAsUnavailable) {}
-  TargetLibraryInfo &operator=(const TargetLibraryInfo &TLI) = default;
+  TargetLibraryInfo &operator=(const TargetLibraryInfo &TLI) {
+    Impl = TLI.Impl;
+    OverrideAsUnavailable = TLI.OverrideAsUnavailable;
+    return *this;
+  }
   TargetLibraryInfo &operator=(TargetLibraryInfo &&TLI) {
     Impl = TLI.Impl;
     OverrideAsUnavailable = TLI.OverrideAsUnavailable;
@@ -332,13 +280,6 @@ public:
     // We can inline if the union of the caller and callee's nobuiltin
     // attributes is no stricter than the caller's nobuiltin attributes.
     return B == OverrideAsUnavailable;
-  }
-
-  /// Return true if the function type FTy is valid for the library function
-  /// F, regardless of whether the function is available.
-  bool isValidProtoForLibFunc(const FunctionType &FTy, LibFunc F,
-                              const Module &M) const {
-    return Impl->isValidProtoForLibFunc(FTy, F, M);
   }
 
   /// Searches for a particular function name.
@@ -388,13 +329,8 @@ public:
   bool isFunctionVectorizable(StringRef F) const {
     return Impl->isFunctionVectorizable(F);
   }
-  StringRef getVectorizedFunction(StringRef F, const ElementCount &VF,
-                                  bool Masked = false) const {
-    return Impl->getVectorizedFunction(F, VF, Masked);
-  }
-  const VecDesc *getVectorMappingInfo(StringRef F, const ElementCount &VF,
-                                      bool Masked) const {
-    return Impl->getVectorMappingInfo(F, VF, Masked);
+  StringRef getVectorizedFunction(StringRef F, const ElementCount &VF) const {
+    return Impl->getVectorizedFunction(F, VF);
   }
 
   /// Tests if the function is both available and a candidate for optimized code
@@ -421,7 +357,6 @@ public:
     case LibFunc_trunc:        case LibFunc_truncf:     case LibFunc_truncl:
     case LibFunc_log2:         case LibFunc_log2f:      case LibFunc_log2l:
     case LibFunc_exp2:         case LibFunc_exp2f:      case LibFunc_exp2l:
-    case LibFunc_ldexp:        case LibFunc_ldexpf:     case LibFunc_ldexpl:
     case LibFunc_memcpy:       case LibFunc_memset:     case LibFunc_memmove:
     case LibFunc_memcmp:       case LibFunc_bcmp:       case LibFunc_strcmp:
     case LibFunc_strcpy:       case LibFunc_stpcpy:     case LibFunc_strlen:
@@ -441,115 +376,30 @@ public:
     return Impl->CustomNames.find(F)->second;
   }
 
-  static void initExtensionsForTriple(bool &ShouldExtI32Param,
-                                      bool &ShouldExtI32Return,
-                                      bool &ShouldSignExtI32Param,
-                                      bool &ShouldSignExtI32Return,
-                                      const Triple &T) {
-    ShouldExtI32Param     = ShouldExtI32Return     = false;
-    ShouldSignExtI32Param = ShouldSignExtI32Return = false;
-
-    // PowerPC64, Sparc64, SystemZ need signext/zeroext on i32 parameters and
-    // returns corresponding to C-level ints and unsigned ints.
-    if (T.isPPC64() || T.getArch() == Triple::sparcv9 ||
-        T.getArch() == Triple::systemz) {
-      ShouldExtI32Param = true;
-      ShouldExtI32Return = true;
-    }
-    // LoongArch, Mips, and riscv64, on the other hand, need signext on i32
-    // parameters corresponding to both signed and unsigned ints.
-    if (T.isLoongArch() || T.isMIPS() || T.isRISCV64()) {
-      ShouldSignExtI32Param = true;
-    }
-    // LoongArch and riscv64 need signext on i32 returns corresponding to both
-    // signed and unsigned ints.
-    if (T.isLoongArch() || T.isRISCV64()) {
-      ShouldSignExtI32Return = true;
-    }
-  }
-
   /// Returns extension attribute kind to be used for i32 parameters
   /// corresponding to C-level int or unsigned int.  May be zeroext, signext,
   /// or none.
-private:
-  static Attribute::AttrKind getExtAttrForI32Param(bool ShouldExtI32Param_,
-                                                   bool ShouldSignExtI32Param_,
-                                                   bool Signed = true) {
-    if (ShouldExtI32Param_)
+  Attribute::AttrKind getExtAttrForI32Param(bool Signed = true) const {
+    if (Impl->ShouldExtI32Param)
       return Signed ? Attribute::SExt : Attribute::ZExt;
-    if (ShouldSignExtI32Param_)
+    if (Impl->ShouldSignExtI32Param)
       return Attribute::SExt;
     return Attribute::None;
-  }
-
-public:
-  static Attribute::AttrKind getExtAttrForI32Param(const Triple &T,
-                                                   bool Signed = true) {
-    bool ShouldExtI32Param, ShouldExtI32Return;
-    bool ShouldSignExtI32Param, ShouldSignExtI32Return;
-    initExtensionsForTriple(ShouldExtI32Param, ShouldExtI32Return,
-                            ShouldSignExtI32Param, ShouldSignExtI32Return, T);
-    return getExtAttrForI32Param(ShouldExtI32Param, ShouldSignExtI32Param,
-                                 Signed);
-  }
-
-  Attribute::AttrKind getExtAttrForI32Param(bool Signed = true) const {
-    return getExtAttrForI32Param(Impl->ShouldExtI32Param,
-                                 Impl->ShouldSignExtI32Param, Signed);
   }
 
   /// Returns extension attribute kind to be used for i32 return values
   /// corresponding to C-level int or unsigned int.  May be zeroext, signext,
   /// or none.
-private:
-  static Attribute::AttrKind getExtAttrForI32Return(bool ShouldExtI32Return_,
-                                                    bool ShouldSignExtI32Return_,
-                                                    bool Signed) {
-    if (ShouldExtI32Return_)
-      return Signed ? Attribute::SExt : Attribute::ZExt;
-    if (ShouldSignExtI32Return_)
-      return Attribute::SExt;
-    return Attribute::None;
-  }
-
-public:
-  static Attribute::AttrKind getExtAttrForI32Return(const Triple &T,
-                                                   bool Signed = true) {
-    bool ShouldExtI32Param, ShouldExtI32Return;
-    bool ShouldSignExtI32Param, ShouldSignExtI32Return;
-    initExtensionsForTriple(ShouldExtI32Param, ShouldExtI32Return,
-                            ShouldSignExtI32Param, ShouldSignExtI32Return, T);
-    return getExtAttrForI32Return(ShouldExtI32Return, ShouldSignExtI32Return,
-                                  Signed);
-  }
-
   Attribute::AttrKind getExtAttrForI32Return(bool Signed = true) const {
-    return getExtAttrForI32Return(Impl->ShouldExtI32Return,
-                                  Impl->ShouldSignExtI32Return, Signed);
-  }
-
-  // Helper to create an AttributeList for args (and ret val) which all have
-  // the same signedness. Attributes in AL may be passed in to include them
-  // as well in the returned AttributeList.
-  AttributeList getAttrList(LLVMContext *C, ArrayRef<unsigned> ArgNos,
-                            bool Signed, bool Ret = false,
-                            AttributeList AL = AttributeList()) const {
-    if (auto AK = getExtAttrForI32Param(Signed))
-      for (auto ArgNo : ArgNos)
-        AL = AL.addParamAttribute(*C, ArgNo, AK);
-    if (Ret)
-      if (auto AK = getExtAttrForI32Return(Signed))
-        AL = AL.addRetAttribute(*C, AK);
-    return AL;
+    if (Impl->ShouldExtI32Return)
+      return Signed ? Attribute::SExt : Attribute::ZExt;
+    return Attribute::None;
   }
 
   /// \copydoc TargetLibraryInfoImpl::getWCharSize()
   unsigned getWCharSize(const Module &M) const {
     return Impl->getWCharSize(M);
   }
-
-  /// \copydoc TargetLibraryInfoImpl::getSizeTSize()
-  unsigned getSizeTSize(const Module &M) const { return Impl->getSizeTSize(M); }
 
   /// \copydoc TargetLibraryInfoImpl::getIntSize()
   unsigned getIntSize() const {
@@ -593,7 +443,7 @@ public:
   ///
   /// This will use the module's triple to construct the library info for that
   /// module.
-  TargetLibraryAnalysis() = default;
+  TargetLibraryAnalysis() {}
 
   /// Construct a library analysis with baseline Module-level info.
   ///
@@ -607,12 +457,12 @@ private:
   friend AnalysisInfoMixin<TargetLibraryAnalysis>;
   static AnalysisKey Key;
 
-  std::optional<TargetLibraryInfoImpl> BaselineInfoImpl;
+  Optional<TargetLibraryInfoImpl> BaselineInfoImpl;
 };
 
 class TargetLibraryInfoWrapperPass : public ImmutablePass {
   TargetLibraryAnalysis TLA;
-  std::optional<TargetLibraryInfo> TLI;
+  Optional<TargetLibraryInfo> TLI;
 
   virtual void anchor();
 

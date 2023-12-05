@@ -15,6 +15,7 @@
 #include "lldb/lldb-private-forward.h"
 
 #include "GDBRemoteCommunicationServer.h"
+#include "GDBRemoteCommunicationServerCommon.h"
 
 class StringExtractorGDBRemote;
 
@@ -25,7 +26,8 @@ class ProcessGDBRemote;
 
 class GDBRemoteCommunicationServerCommon : public GDBRemoteCommunicationServer {
 public:
-  GDBRemoteCommunicationServerCommon();
+  GDBRemoteCommunicationServerCommon(const char *comm_name,
+                                     const char *listener_name);
 
   ~GDBRemoteCommunicationServerCommon() override;
 
@@ -68,8 +70,6 @@ protected:
   PacketResult Handle_vFile_symlink(StringExtractorGDBRemote &packet);
 
   PacketResult Handle_vFile_unlink(StringExtractorGDBRemote &packet);
-
-  PacketResult Handle_vFile_FStat(StringExtractorGDBRemote &packet);
 
   PacketResult Handle_vFile_Stat(StringExtractorGDBRemote &packet);
 

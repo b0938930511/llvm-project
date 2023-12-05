@@ -1,8 +1,6 @@
 // RUN: %libomp-compile-and-run | %sort-threads | FileCheck %s
 // REQUIRES: ompt, multicpu
 // UNSUPPORTED: gcc
-// Compilation fails for icc
-// XFAIL: icc
 #include "callback.h"
 
 int main() {

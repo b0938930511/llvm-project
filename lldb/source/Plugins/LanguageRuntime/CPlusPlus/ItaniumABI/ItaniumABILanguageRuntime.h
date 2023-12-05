@@ -35,7 +35,7 @@ public:
   static lldb_private::LanguageRuntime *
   CreateInstance(Process *process, lldb::LanguageType language);
 
-  static llvm::StringRef GetPluginNameStatic() { return "itanium"; }
+  static lldb_private::ConstString GetPluginNameStatic();
 
   static char ID;
 
@@ -46,10 +46,6 @@ public:
   static bool classof(const LanguageRuntime *runtime) {
     return runtime->isA(&ID);
   }
-
-
-  llvm::Expected<LanguageRuntime::VTableInfo>
-  GetVTableInfo(ValueObject &in_value, bool check_type) override;
 
   bool GetDynamicTypeAndAddress(ValueObject &in_value,
                                 lldb::DynamicValueType use_dynamic,
@@ -75,12 +71,14 @@ public:
                           bool catch_bp, bool throw_bp) override;
 
   lldb::SearchFilterSP CreateExceptionSearchFilter() override;
-
+  
   lldb::ValueObjectSP GetExceptionObjectForThread(
       lldb::ThreadSP thread_sp) override;
 
   // PluginInterface protocol
-  llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
+  lldb_private::ConstString GetPluginName() override;
+
+  uint32_t GetPluginVersion() override;
 
 protected:
   lldb::BreakpointResolverSP
@@ -93,33 +91,24 @@ protected:
 
 private:
   typedef std::map<lldb_private::Address, TypeAndOrName> DynamicTypeCache;
-  typedef std::map<lldb_private::Address, VTableInfo> VTableInfoCache;
 
   ItaniumABILanguageRuntime(Process *process)
       : // Call CreateInstance instead.
-        lldb_private::CPPLanguageRuntime(process) {}
+        lldb_private::CPPLanguageRuntime(process), m_cxx_exception_bp_sp(),
+        m_dynamic_type_map(), m_dynamic_type_map_mutex() {}
 
   lldb::BreakpointSP m_cxx_exception_bp_sp;
   DynamicTypeCache m_dynamic_type_map;
-  VTableInfoCache m_vtable_info_map;
-  std::mutex m_mutex;
+  std::mutex m_dynamic_type_map_mutex;
 
-  TypeAndOrName GetTypeInfo(ValueObject &in_value,
-                            const VTableInfo &vtable_info);
+  TypeAndOrName GetTypeInfoFromVTableAddress(ValueObject &in_value,
+                                             lldb::addr_t original_ptr,
+                                             lldb::addr_t vtable_addr);
 
   TypeAndOrName GetDynamicTypeInfo(const lldb_private::Address &vtable_addr);
 
   void SetDynamicTypeInfo(const lldb_private::Address &vtable_addr,
                           const TypeAndOrName &type_info);
-
-  // Check if a compiler type has a vtable.
-  //
-  // If the compiler type is a pointer or a reference, this function will check
-  // if the pointee type has a vtable, else it will check the type passed in.
-  //
-  // Returns an error if the type of the value doesn't have a vtable with an
-  // explanation why, or returns an Error::success() if the type has a vtable.
-  llvm::Error TypeHasVTable(CompilerType compiler_type);
 };
 
 } // namespace lldb_private

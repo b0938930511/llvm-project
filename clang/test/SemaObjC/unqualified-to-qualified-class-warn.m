@@ -1,4 +1,5 @@
 // RUN: %clang_cc1  -fsyntax-only -verify %s
+// rdar://9091389
 
 @protocol Fooable
 - (void)foo;
@@ -21,7 +22,7 @@
 void functionTakingAClassConformingToAProtocol(AClass <Fooable> *instance) { // expected-note {{passing argument to parameter 'instance' here}}
 }
 
-int main (void) {
+int main () {
     AClass *aobject = 0;
     BClass *bobject = 0;
     functionTakingAClassConformingToAProtocol(aobject);  // expected-warning {{incompatible pointer types passing 'AClass *' to parameter of type 'AClass<Fooable> *'}}
@@ -29,6 +30,7 @@ int main (void) {
     return 0;
 }
 
+// rdar://9267196
 @interface NSObject @end
 
 @protocol MyProtocol

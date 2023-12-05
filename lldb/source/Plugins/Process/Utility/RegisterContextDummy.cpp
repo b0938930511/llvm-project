@@ -102,8 +102,7 @@ bool RegisterContextDummy::WriteRegister(
   return false;
 }
 
-bool RegisterContextDummy::ReadAllRegisterValues(
-    lldb::WritableDataBufferSP &data_sp) {
+bool RegisterContextDummy::ReadAllRegisterValues(lldb::DataBufferSP &data_sp) {
   return false;
 }
 

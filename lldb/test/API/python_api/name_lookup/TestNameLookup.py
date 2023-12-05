@@ -3,6 +3,8 @@ Test SBTarget APIs.
 """
 
 
+
+import unittest2
 import lldb
 from lldbsuite.test.decorators import *
 from lldbsuite.test.lldbtest import *
@@ -10,7 +12,10 @@ from lldbsuite.test import lldbutil
 
 
 class TestNameLookup(TestBase):
-    @expectedFailureAll(oslist=["windows"], bugnumber="llvm.org/pr21765")
+
+    mydir = TestBase.compute_mydir(__file__)
+
+    @expectedFailureAll(oslist=["windows"], bugnumber='llvm.org/pr21765')
     def test_target(self):
         """Exercise SBTarget.FindFunctions() with various name masks.
 
@@ -18,7 +23,7 @@ class TestNameLookup(TestBase):
         This test verifies that using a mangled name with eFunctionNameTypeFull works
         and that using a function basename with eFunctionNameTypeFull works for all
         C++ functions that are at the global namespace level."""
-        self.build()
+        self.build();
         exe = self.getBuildArtifact("a.out")
 
         # Create a target by the debugger.
@@ -30,15 +35,11 @@ class TestNameLookup(TestBase):
         c_name_to_symbol = {}
         cpp_name_to_symbol = {}
         mangled_to_symbol = {}
-        num_symbols = exe_module.GetNumSymbols()
+        num_symbols = exe_module.GetNumSymbols();
         for i in range(num_symbols):
-            symbol = exe_module.GetSymbolAtIndex(i)
+            symbol = exe_module.GetSymbolAtIndex(i);
             name = symbol.GetName()
-            if (
-                name
-                and "unique_function_name" in name
-                and "__PRETTY_FUNCTION__" not in name
-            ):
+            if name and 'unique_function_name' in name and '__PRETTY_FUNCTION__' not in name:
                 mangled = symbol.GetMangledName()
                 if mangled:
                     mangled_to_symbol[mangled] = symbol
@@ -57,3 +58,5 @@ class TestNameLookup(TestBase):
             for symbol_context in symbol_contexts:
                 self.assertTrue(symbol_context.GetFunction().IsValid())
                 self.assertTrue(symbol_context.GetSymbol().IsValid())
+
+

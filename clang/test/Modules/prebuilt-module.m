@@ -5,6 +5,6 @@
 
 // expected-no-diagnostics
 @import prebuilt;
-int test(void) {
+int test() {
   return a;
 }

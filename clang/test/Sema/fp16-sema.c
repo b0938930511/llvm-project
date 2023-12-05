@@ -1,5 +1,4 @@
-// RUN: %clang_cc1 -fsyntax-only -triple x86_64-pc-linux-gnu -Wno-strict-prototypes -verify %s
-// // REQUIRES: x86-registered-target
+// RUN: %clang_cc1 -fsyntax-only -verify %s
 
 // Functions cannot have parameters of type __fp16.
 extern void f (__fp16); // expected-error {{parameters cannot have __fp16 type; did you forget * ?}}

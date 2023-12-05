@@ -14,10 +14,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "MCTargetDesc/WebAssemblyMCTargetDesc.h"
+#include "Utils/WebAssemblyUtilities.h"
 #include "WebAssembly.h"
 #include "WebAssemblyMachineFunctionInfo.h"
 #include "WebAssemblySubtarget.h"
-#include "WebAssemblyUtilities.h"
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
@@ -33,21 +33,21 @@ using namespace llvm;
 #define DEBUG_TYPE "wasm-mclower-prepass"
 
 namespace {
-class WebAssemblyMCLowerPrePass final : public ModulePass {
+class WebAssemblyMCLowerPrePass final : public MachineFunctionPass {
   StringRef getPassName() const override {
     return "WebAssembly MC Lower Pre Pass";
   }
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.setPreservesCFG();
-    ModulePass::getAnalysisUsage(AU);
+    MachineFunctionPass::getAnalysisUsage(AU);
   }
 
-  bool runOnModule(Module &M) override;
+  bool runOnMachineFunction(MachineFunction &MF) override;
 
 public:
   static char ID; // Pass identification, replacement for typeid
-  WebAssemblyMCLowerPrePass() : ModulePass(ID) {}
+  WebAssemblyMCLowerPrePass() : MachineFunctionPass(ID) {}
 };
 } // end anonymous namespace
 
@@ -57,46 +57,30 @@ INITIALIZE_PASS(
     "Collects information ahead of time for MC lowering",
     false, false)
 
-ModulePass *llvm::createWebAssemblyMCLowerPrePass() {
+FunctionPass *llvm::createWebAssemblyMCLowerPrePass() {
   return new WebAssemblyMCLowerPrePass();
 }
 
-// NOTE: this is a ModulePass since we need to enforce that this code has run
-// for all functions before AsmPrinter. If this way of doing things is ever
-// suboptimal, we could opt to make it a MachineFunctionPass and instead use
-// something like createBarrierNoopPass() to enforce ordering.
-//
-// The information stored here is essential for emitExternalDecls in the Wasm
-// AsmPrinter
-bool WebAssemblyMCLowerPrePass::runOnModule(Module &M) {
-  auto *MMIWP = getAnalysisIfAvailable<MachineModuleInfoWrapperPass>();
-  if (!MMIWP)
-    return true;
+bool WebAssemblyMCLowerPrePass::runOnMachineFunction(MachineFunction &MF) {
+  LLVM_DEBUG(dbgs() << "********** MC Lower Pre Pass **********\n"
+                       "********** Function: "
+                    << MF.getName() << '\n');
 
-  MachineModuleInfo &MMI = MMIWP->getMMI();
+  MachineModuleInfo &MMI = MF.getMMI();
   MachineModuleInfoWasm &MMIW = MMI.getObjFileInfo<MachineModuleInfoWasm>();
 
-  for (Function &F : M) {
-    MachineFunction *MF = MMI.getMachineFunction(F);
-    if (!MF)
-      continue;
-
-    LLVM_DEBUG(dbgs() << "********** MC Lower Pre Pass **********\n"
-                         "********** Function: "
-                      << MF->getName() << '\n');
-
-    for (MachineBasicBlock &MBB : *MF) {
-      for (auto &MI : MBB) {
-        // FIXME: what should all be filtered out beyond these?
-        if (MI.isDebugInstr() || MI.isInlineAsm())
-          continue;
-        for (MachineOperand &MO : MI.uses()) {
-          if (MO.isSymbol()) {
-            MMIW.MachineSymbolsUsed.insert(MO.getSymbolName());
-          }
+  for (MachineBasicBlock &MBB : MF) {
+    for (auto &MI : MBB) {
+      // FIXME: what should all be filtered out beyond these?
+      if (MI.isDebugInstr() || MI.isInlineAsm())
+        continue;
+      for (MachineOperand &MO : MI.uses()) {
+        if (MO.isSymbol()) {
+          MMIW.MachineSymbolsUsed.insert(MO.getSymbolName());
         }
       }
     }
   }
+
   return true;
 }

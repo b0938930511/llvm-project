@@ -68,7 +68,7 @@ private:
         if (CallInst *CI = dyn_cast<CallInst>(I)) {
           if (!CI->use_empty())
             CI->replaceAllUsesWith(Constant::getNullValue(CI->getType()));
-          CI->eraseFromParent();
+          CI->getParent()->getInstList().erase(CI);
           break;
         }
     return false;
@@ -143,7 +143,7 @@ private:
   }
 
   bool runOnFunction(Function &F) override {
-    AttributeSet A = F.getAttributes().getFnAttrs();
+    AttributeSet A = F.getAttributes().getFnAttributes();
     if (A.hasAttribute("bugpoint-crash"))
       abort();
     return false;

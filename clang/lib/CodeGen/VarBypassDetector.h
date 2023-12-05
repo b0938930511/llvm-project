@@ -55,7 +55,7 @@ public:
   /// Returns true if the variable declaration was by bypassed by any goto or
   /// switch statement.
   bool IsBypassed(const VarDecl *D) const {
-    return AlwaysBypassed || Bypasses.contains(D);
+    return AlwaysBypassed || Bypasses.find(D) != Bypasses.end();
   }
 
 private:

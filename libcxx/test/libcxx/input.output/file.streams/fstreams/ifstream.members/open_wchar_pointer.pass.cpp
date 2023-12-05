@@ -13,10 +13,6 @@
 
 // void open(const wchar_t* s, ios_base::openmode mode = ios_base::in);
 
-// This extension is only provided on Windows.
-// REQUIRES: windows
-// UNSUPPORTED: no-wide-characters
-
 // FILE_DEPENDENCIES: test.dat
 
 #include <fstream>
@@ -24,7 +20,9 @@
 
 #include "test_macros.h"
 
-int main(int, char**) {
+int main(int, char**)
+{
+#ifdef _LIBCPP_HAS_OPEN_WITH_WCHAR
     {
         std::ifstream fs;
         assert(!fs.is_open());
@@ -49,6 +47,7 @@ int main(int, char**) {
         fs >> c;
         assert(c == L'r');
     }
+#endif
 
-    return 0;
+  return 0;
 }

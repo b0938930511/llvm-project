@@ -5,10 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-///
-/// \file
-/// This file defines the PriorityQueue class.
-///
+//
+// This file defines the PriorityQueue class.
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef LLVM_ADT_PRIORITYQUEUE_H

@@ -4,6 +4,6 @@ typedef long double LD;
 
 // CHECK: ret fp128
 
-LD foo0(void) {
+LD foo0() {
   return 2.625L;
 }

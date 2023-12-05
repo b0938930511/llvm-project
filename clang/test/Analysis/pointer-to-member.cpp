@@ -310,13 +310,3 @@ void test() {
 }
 } // namespace testStaticCasting
 
-namespace D126198 {
-class Base {};
-class Derived : public Base {};
-int foo(int Derived::*);
-
-int test() {
-  int Base::*p = nullptr;
-  return foo(p); // no-crash
-}
-} // namespace D126198

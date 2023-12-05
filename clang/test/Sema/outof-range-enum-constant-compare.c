@@ -3,7 +3,7 @@
 // RUN: %clang_cc1 -triple=x86_64-pc-linux-gnu -fsyntax-only -DUNSIGNED -DSILENCE -Wno-tautological-constant-out-of-range-compare -verify %s
 // RUN: %clang_cc1 -triple=x86_64-pc-win32 -fsyntax-only -DSIGNED -DSILENCE -Wno-tautological-constant-out-of-range-compare -verify %s
 
-int main(void) {
+int main() {
   enum A { A_a = 2 };
   enum A a;
 
@@ -219,7 +219,7 @@ int main(void) {
 }
 
 // https://bugs.llvm.org/show_bug.cgi?id=35009
-int PR35009(void) {
+int PR35009() {
   enum A { A_a = 2 };
   enum A a;
 

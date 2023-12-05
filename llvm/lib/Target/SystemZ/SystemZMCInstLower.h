@@ -18,6 +18,7 @@ class MCInst;
 class MCOperand;
 class MachineInstr;
 class MachineOperand;
+class Mangler;
 class SystemZAsmPrinter;
 
 class LLVM_LIBRARY_VISIBILITY SystemZMCInstLower {

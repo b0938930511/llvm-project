@@ -9,22 +9,18 @@
 #include "Headers.h"
 
 #include "Compiler.h"
-#include "Matchers.h"
 #include "TestFS.h"
 #include "TestTU.h"
 #include "clang/Basic/TokenKinds.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Frontend/FrontendActions.h"
-#include "clang/Tooling/Inclusions/HeaderIncludes.h"
+#include "clang/Lex/PreprocessorOptions.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/Error.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Testing/Support/Error.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include <optional>
 
 namespace clang {
 namespace clangd {
@@ -33,7 +29,6 @@ namespace {
 using ::testing::AllOf;
 using ::testing::Contains;
 using ::testing::ElementsAre;
-using ::testing::IsEmpty;
 using ::testing::Not;
 using ::testing::UnorderedElementsAre;
 
@@ -69,21 +64,14 @@ private:
   }
 
 protected:
-  IncludeStructure::HeaderID getID(StringRef Filename,
-                                   IncludeStructure &Includes) {
-    auto &SM = Clang->getSourceManager();
-    auto Entry = SM.getFileManager().getFileRef(Filename);
-    EXPECT_THAT_EXPECTED(Entry, llvm::Succeeded());
-    return Includes.getOrCreateID(*Entry);
-  }
-
   IncludeStructure collectIncludes() {
-    Clang = setupClang();
+    auto Clang = setupClang();
     PreprocessOnlyAction Action;
     EXPECT_TRUE(
         Action.BeginSourceFile(*Clang, Clang->getFrontendOpts().Inputs[0]));
     IncludeStructure Includes;
-    Includes.collect(*Clang);
+    Clang->getPreprocessor().addPPCallbacks(
+        collectIncludeStructureCallback(Clang->getSourceManager(), &Includes));
     EXPECT_FALSE(Action.Execute());
     Action.EndSourceFile();
     return Includes;
@@ -93,7 +81,7 @@ protected:
   // inserted.
   std::string calculate(PathRef Original, PathRef Preferred = "",
                         const std::vector<Inclusion> &Inclusions = {}) {
-    Clang = setupClang();
+    auto Clang = setupClang();
     PreprocessOnlyAction Action;
     EXPECT_TRUE(
         Action.BeginSourceFile(*Clang, Clang->getFrontendOpts().Inputs[0]));
@@ -115,12 +103,11 @@ protected:
       return "";
     auto Path = Inserter.calculateIncludePath(Inserted, MainFile);
     Action.EndSourceFile();
-    return Path.value_or("");
+    return Path.getValueOr("");
   }
 
-  std::optional<TextEdit> insert(llvm::StringRef VerbatimHeader,
-                                 tooling::IncludeDirective Directive) {
-    Clang = setupClang();
+  llvm::Optional<TextEdit> insert(llvm::StringRef VerbatimHeader) {
+    auto Clang = setupClang();
     PreprocessOnlyAction Action;
     EXPECT_TRUE(
         Action.BeginSourceFile(*Clang, Clang->getFrontendOpts().Inputs[0]));
@@ -128,7 +115,7 @@ protected:
     IncludeInserter Inserter(MainFile, /*Code=*/"", format::getLLVMStyle(),
                              CDB.getCompileCommand(MainFile)->Directory,
                              &Clang->getPreprocessor().getHeaderSearchInfo());
-    auto Edit = Inserter.insert(VerbatimHeader, Directive);
+    auto Edit = Inserter.insert(VerbatimHeader);
     Action.EndSourceFile();
     return Edit;
   }
@@ -139,20 +126,19 @@ protected:
   std::string Subdir = testPath("sub");
   std::string SearchDirArg = (llvm::Twine("-I") + Subdir).str();
   IgnoringDiagConsumer IgnoreDiags;
-  std::unique_ptr<CompilerInstance> Clang;
 };
 
-MATCHER_P(written, Name, "") { return arg.Written == Name; }
-MATCHER_P(resolved, Name, "") { return arg.Resolved == Name; }
-MATCHER_P(includeLine, N, "") { return arg.HashLine == N; }
-MATCHER_P(directive, D, "") { return arg.Directive == D; }
+MATCHER_P(Written, Name, "") { return arg.Written == Name; }
+MATCHER_P(Resolved, Name, "") { return arg.Resolved == Name; }
+MATCHER_P(IncludeLine, N, "") { return arg.HashLine == N; }
+MATCHER_P(Directive, D, "") { return arg.Directive == D; }
 
 MATCHER_P2(Distance, File, D, "") {
-  if (arg.getFirst() != File)
-    *result_listener << "file =" << static_cast<unsigned>(arg.getFirst());
-  if (arg.getSecond() != D)
-    *result_listener << "distance =" << arg.getSecond();
-  return arg.getFirst() == File && arg.getSecond() == D;
+  if (arg.getKey() != File)
+    *result_listener << "file =" << arg.getKey().str();
+  if (arg.getValue() != D)
+    *result_listener << "distance =" << arg.getValue();
+  return arg.getKey() == File && arg.getValue() == D;
 }
 
 TEST_F(HeadersTest, CollectRewrittenAndResolved) {
@@ -162,13 +148,12 @@ TEST_F(HeadersTest, CollectRewrittenAndResolved) {
   std::string BarHeader = testPath("sub/bar.h");
   FS.Files[BarHeader] = "";
 
-  auto Includes = collectIncludes();
-  EXPECT_THAT(Includes.MainFileIncludes,
+  EXPECT_THAT(collectIncludes().MainFileIncludes,
               UnorderedElementsAre(
-                  AllOf(written("\"sub/bar.h\""), resolved(BarHeader))));
-  EXPECT_THAT(Includes.includeDepth(getID(MainFile, Includes)),
-              UnorderedElementsAre(Distance(getID(MainFile, Includes), 0u),
-                                   Distance(getID(BarHeader, Includes), 1u)));
+                  AllOf(Written("\"sub/bar.h\""), Resolved(BarHeader))));
+  EXPECT_THAT(collectIncludes().includeDepth(MainFile),
+              UnorderedElementsAre(Distance(MainFile, 0u),
+                                   Distance(testPath("sub/bar.h"), 1u)));
 }
 
 TEST_F(HeadersTest, OnlyCollectInclusionsInMain) {
@@ -181,48 +166,17 @@ TEST_F(HeadersTest, OnlyCollectInclusionsInMain) {
   FS.Files[MainFile] = R"cpp(
 #include "bar.h"
 )cpp";
-  auto Includes = collectIncludes();
   EXPECT_THAT(
-      Includes.MainFileIncludes,
-      UnorderedElementsAre(AllOf(written("\"bar.h\""), resolved(BarHeader))));
-  EXPECT_THAT(Includes.includeDepth(getID(MainFile, Includes)),
-              UnorderedElementsAre(Distance(getID(MainFile, Includes), 0u),
-                                   Distance(getID(BarHeader, Includes), 1u),
-                                   Distance(getID(BazHeader, Includes), 2u)));
+      collectIncludes().MainFileIncludes,
+      UnorderedElementsAre(AllOf(Written("\"bar.h\""), Resolved(BarHeader))));
+  EXPECT_THAT(collectIncludes().includeDepth(MainFile),
+              UnorderedElementsAre(Distance(MainFile, 0u),
+                                   Distance(testPath("sub/bar.h"), 1u),
+                                   Distance(testPath("sub/baz.h"), 2u)));
   // includeDepth() also works for non-main files.
-  EXPECT_THAT(Includes.includeDepth(getID(BarHeader, Includes)),
-              UnorderedElementsAre(Distance(getID(BarHeader, Includes), 0u),
-                                   Distance(getID(BazHeader, Includes), 1u)));
-}
-
-TEST_F(HeadersTest, CacheBySpellingIsBuiltForMainInclusions) {
-  std::string FooHeader = testPath("foo.h");
-  FS.Files[FooHeader] = R"cpp(
-  void foo();
-)cpp";
-  std::string BarHeader = testPath("bar.h");
-  FS.Files[BarHeader] = R"cpp(
-  void bar();
-)cpp";
-  std::string BazHeader = testPath("baz.h");
-  FS.Files[BazHeader] = R"cpp(
-  void baz();
-)cpp";
-  FS.Files[MainFile] = R"cpp(
-#include "foo.h"
-#include "bar.h"
-#include "baz.h"
-)cpp";
-  auto Includes = collectIncludes();
-  EXPECT_THAT(Includes.MainFileIncludes,
-              UnorderedElementsAre(written("\"foo.h\""), written("\"bar.h\""),
-                                   written("\"baz.h\"")));
-  EXPECT_THAT(Includes.mainFileIncludesWithSpelling("\"foo.h\""),
-              UnorderedElementsAre(&Includes.MainFileIncludes[0]));
-  EXPECT_THAT(Includes.mainFileIncludesWithSpelling("\"bar.h\""),
-              UnorderedElementsAre(&Includes.MainFileIncludes[1]));
-  EXPECT_THAT(Includes.mainFileIncludesWithSpelling("\"baz.h\""),
-              UnorderedElementsAre(&Includes.MainFileIncludes[2]));
+  EXPECT_THAT(collectIncludes().includeDepth(testPath("sub/bar.h")),
+              UnorderedElementsAre(Distance(testPath("sub/bar.h"), 0u),
+                                   Distance(testPath("sub/baz.h"), 1u)));
 }
 
 TEST_F(HeadersTest, PreambleIncludesPresentOnce) {
@@ -238,7 +192,7 @@ TEST_F(HeadersTest, PreambleIncludesPresentOnce) {
   )cpp");
   TU.HeaderFilename = "a.h"; // suppress "not found".
   EXPECT_THAT(TU.build().getIncludeStructure().MainFileIncludes,
-              ElementsAre(includeLine(1), includeLine(3), includeLine(5)));
+              ElementsAre(IncludeLine(1), IncludeLine(3), IncludeLine(5)));
 }
 
 TEST_F(HeadersTest, UnResolvedInclusion) {
@@ -247,33 +201,9 @@ TEST_F(HeadersTest, UnResolvedInclusion) {
 )cpp";
 
   EXPECT_THAT(collectIncludes().MainFileIncludes,
-              UnorderedElementsAre(AllOf(written("\"foo.h\""), resolved(""))));
-  EXPECT_THAT(collectIncludes().IncludeChildren, IsEmpty());
-}
-
-TEST_F(HeadersTest, IncludedFilesGraph) {
-  FS.Files[MainFile] = R"cpp(
-#include "bar.h"
-#include "foo.h"
-)cpp";
-  std::string BarHeader = testPath("bar.h");
-  FS.Files[BarHeader] = "";
-  std::string FooHeader = testPath("foo.h");
-  FS.Files[FooHeader] = R"cpp(
-#include "bar.h"
-#include "baz.h"
-)cpp";
-  std::string BazHeader = testPath("baz.h");
-  FS.Files[BazHeader] = "";
-
-  auto Includes = collectIncludes();
-  llvm::DenseMap<IncludeStructure::HeaderID,
-                 SmallVector<IncludeStructure::HeaderID>>
-      Expected = {{getID(MainFile, Includes),
-                   {getID(BarHeader, Includes), getID(FooHeader, Includes)}},
-                  {getID(FooHeader, Includes),
-                   {getID(BarHeader, Includes), getID(BazHeader, Includes)}}};
-  EXPECT_EQ(Includes.IncludeChildren, Expected);
+              UnorderedElementsAre(AllOf(Written("\"foo.h\""), Resolved(""))));
+  EXPECT_THAT(collectIncludes().includeDepth(MainFile),
+              UnorderedElementsAre(Distance(MainFile, 0u)));
 }
 
 TEST_F(HeadersTest, IncludeDirective) {
@@ -286,18 +216,9 @@ TEST_F(HeadersTest, IncludeDirective) {
   // ms-compatibility changes meaning of #import, make sure it is turned off.
   CDB.ExtraClangFlags.push_back("-fno-ms-compatibility");
   EXPECT_THAT(collectIncludes().MainFileIncludes,
-              UnorderedElementsAre(directive(tok::pp_include),
-                                   directive(tok::pp_import),
-                                   directive(tok::pp_include_next)));
-}
-
-TEST_F(HeadersTest, SearchPath) {
-  FS.Files["foo/bar.h"] = "x";
-  FS.Files["foo/bar/baz.h"] = "y";
-  CDB.ExtraClangFlags.push_back("-Ifoo/bar");
-  CDB.ExtraClangFlags.push_back("-Ifoo/bar/..");
-  EXPECT_THAT(collectIncludes().SearchPathsCanonical,
-              ElementsAre(Subdir, testPath("foo/bar"), testPath("foo")));
+              UnorderedElementsAre(Directive(tok::pp_include),
+                                   Directive(tok::pp_import),
+                                   Directive(tok::pp_include_next)));
 }
 
 TEST_F(HeadersTest, InsertInclude) {
@@ -358,13 +279,9 @@ TEST_F(HeadersTest, DontInsertDuplicateResolved) {
 }
 
 TEST_F(HeadersTest, PreferInserted) {
-  auto Edit = insert("<y>", tooling::IncludeDirective::Include);
-  ASSERT_TRUE(Edit);
-  EXPECT_EQ(Edit->newText, "#include <y>\n");
-
-  Edit = insert("\"header.h\"", tooling::IncludeDirective::Import);
-  ASSERT_TRUE(Edit);
-  EXPECT_EQ(Edit->newText, "#import \"header.h\"\n");
+  auto Edit = insert("<y>");
+  EXPECT_TRUE(Edit.hasValue());
+  EXPECT_TRUE(StringRef(Edit->newText).contains("<y>"));
 }
 
 TEST(Headers, NoHeaderSearchInfo) {
@@ -385,7 +302,7 @@ TEST(Headers, NoHeaderSearchInfo) {
   EXPECT_EQ(Inserter.shouldInsertInclude(HeaderPath, Verbatim), true);
 
   EXPECT_EQ(Inserter.calculateIncludePath(Inserting, "sub2/main2.cpp"),
-            std::nullopt);
+            llvm::None);
 }
 
 TEST_F(HeadersTest, PresumedLocations) {
@@ -402,14 +319,13 @@ TEST_F(HeadersTest, PresumedLocations) {
   // Including through non-builtin file has no effects.
   FS.Files[MainFile] = "#include \"__preamble_patch__.h\"\n\n";
   EXPECT_THAT(collectIncludes().MainFileIncludes,
-              Not(Contains(written("<a.h>"))));
+              Not(Contains(Written("<a.h>"))));
 
   // Now include through built-in file.
   CDB.ExtraClangFlags = {"-include", testPath(HeaderFile)};
   EXPECT_THAT(collectIncludes().MainFileIncludes,
-              Contains(AllOf(includeLine(2), written("<a.h>"))));
+              Contains(AllOf(IncludeLine(2), Written("<a.h>"))));
 }
-
 } // namespace
 } // namespace clangd
 } // namespace clang

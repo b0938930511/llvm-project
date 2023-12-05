@@ -5,23 +5,22 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-///
-/// \file
-/// This file defines the SparseMultiSet class, which adds multiset behavior to
-/// the SparseSet.
-///
-/// A sparse multiset holds a small number of objects identified by integer keys
-/// from a moderately sized universe. The sparse multiset uses more memory than
-/// other containers in order to provide faster operations. Any key can map to
-/// multiple values. A SparseMultiSetNode class is provided, which serves as a
-/// convenient base class for the contents of a SparseMultiSet.
-///
+//
+// This file defines the SparseMultiSet class, which adds multiset behavior to
+// the SparseSet.
+//
+// A sparse multiset holds a small number of objects identified by integer keys
+// from a moderately sized universe. The sparse multiset uses more memory than
+// other containers in order to provide faster operations. Any key can map to
+// multiple values. A SparseMultiSetNode class is provided, which serves as a
+// convenient base class for the contents of a SparseMultiSet.
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef LLVM_ADT_SPARSEMULTISET_H
 #define LLVM_ADT_SPARSEMULTISET_H
 
-#include "llvm/ADT/identity.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SparseSet.h"
 #include <cassert>
@@ -84,7 +83,8 @@ template<typename ValueT,
          typename KeyFunctorT = identity<unsigned>,
          typename SparseT = uint8_t>
 class SparseMultiSet {
-  static_assert(std::is_unsigned_v<SparseT>,
+  static_assert(std::numeric_limits<SparseT>::is_integer &&
+                !std::numeric_limits<SparseT>::is_signed,
                 "SparseT must be an unsigned integer type");
 
   /// The actual data that's stored, as a doubly-linked list implemented via

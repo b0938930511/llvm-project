@@ -42,13 +42,7 @@ int main() {
   return 0;
 }
 
-// Required for dyld macOS 12.0+
-#if (__APPLE__)
-__attribute__((weak))
-#endif
-__attribute__((disable_sanitizer_instrumentation))
-extern "C" void
-__tsan_on_report(void *report) {
+void __tsan_on_report(void *report) {
   const char *type;
   void *addr;
   void *start;

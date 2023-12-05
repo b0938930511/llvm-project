@@ -10,6 +10,6 @@
 
 using namespace llvm::codeview;
 
-DebugSubsectionRef::~DebugSubsectionRef() = default;
+DebugSubsectionRef::~DebugSubsectionRef() {}
 
-DebugSubsection::~DebugSubsection() = default;
+DebugSubsection::~DebugSubsection() {}

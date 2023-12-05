@@ -12,7 +12,9 @@
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::bugprone {
+namespace clang {
+namespace tidy {
+namespace bugprone {
 
 namespace {
 
@@ -71,7 +73,7 @@ SuspiciousMissingCommaCheck::SuspiciousMissingCommaCheck(
     StringRef Name, ClangTidyContext *Context)
     : ClangTidyCheck(Name, Context),
       SizeThreshold(Options.get("SizeThreshold", 5U)),
-      RatioThreshold(std::stod(Options.get("RatioThreshold", ".2").str())),
+      RatioThreshold(std::stod(Options.get("RatioThreshold", ".2"))),
       MaxConcatenatedTokens(Options.get("MaxConcatenatedTokens", 5U)) {}
 
 void SuspiciousMissingCommaCheck::storeOptions(
@@ -123,4 +125,6 @@ void SuspiciousMissingCommaCheck::check(
        "suspicious string literal, probably missing a comma");
 }
 
-} // namespace clang::tidy::bugprone
+} // namespace bugprone
+} // namespace tidy
+} // namespace clang

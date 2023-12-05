@@ -16,7 +16,6 @@
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Object/MachOUniversal.h"
-#include "llvm/Support/MemAlloc.h"
 
 using namespace llvm;
 using namespace object;
@@ -120,8 +119,6 @@ LLVMBinaryType LLVMBinaryGetType(LLVMBinaryRef BR) {
         return LLVMBinaryTypeMachO64L;
       case ID_MachO64B:
         return LLVMBinaryTypeMachO64B;
-      case ID_Offload:
-        return LLVMBinaryTypeOffload;
       case ID_Wasm:
         return LLVMBinaryTypeWasm;
       case ID_StartObjects:
@@ -225,7 +222,8 @@ void LLVMMoveToContainingSection(LLVMSectionIteratorRef Sect,
    std::string Buf;
    raw_string_ostream OS(Buf);
    logAllUnhandledErrors(SecOrErr.takeError(), OS);
-   report_fatal_error(Twine(OS.str()));
+   OS.flush();
+   report_fatal_error(Buf);
   }
   *unwrap(Sect) = *SecOrErr;
 }
@@ -306,7 +304,8 @@ const char *LLVMGetSymbolName(LLVMSymbolIteratorRef SI) {
     std::string Buf;
     raw_string_ostream OS(Buf);
     logAllUnhandledErrors(Ret.takeError(), OS);
-    report_fatal_error(Twine(OS.str()));
+    OS.flush();
+    report_fatal_error(Buf);
   }
   return Ret->data();
 }
@@ -317,7 +316,8 @@ uint64_t LLVMGetSymbolAddress(LLVMSymbolIteratorRef SI) {
     std::string Buf;
     raw_string_ostream OS(Buf);
     logAllUnhandledErrors(Ret.takeError(), OS);
-    report_fatal_error(Twine(OS.str()));
+    OS.flush();
+    report_fatal_error(Buf);
   }
   return *Ret;
 }

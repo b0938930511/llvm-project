@@ -2,7 +2,7 @@
 // RUN: %clang_cc1 -emit-llvm -o - -triple i386-apple-darwin10 -fblocks %s
 typedef int __attribute__((aligned(32)))  ai;
 
-void f(void) {
+void f() {
   __block ai a = 10;
 
   ^{
@@ -10,7 +10,7 @@ void f(void) {
   }();
 }
 
-void g(void) {
+void g() {
   __block double a = 10;
 
   ^{

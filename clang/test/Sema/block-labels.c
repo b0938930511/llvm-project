@@ -1,8 +1,8 @@
 // RUN: %clang_cc1 %s -verify -fblocks -fsyntax-only
 
-void xx(void);
+void xx();
 
-int a(void) { 
+int a() { 
   A:
   
   if (1) xx();
@@ -10,15 +10,15 @@ int a(void) {
          A: return 1;
        }();
 }
-int b(void) { 
+int b() { 
   A: return ^{int a; A:return 1;}();
 }
 
-int d(void) { 
+int d() { 
   A: return ^{int a; A: a = ^{int a; A:return 1;}() + ^{int b; A:return 2;}(); return a; }();
 }
 
-int c(void) { 
+int c() { 
   goto A;     // expected-error {{use of undeclared label 'A'}}
   return ^{
        A:

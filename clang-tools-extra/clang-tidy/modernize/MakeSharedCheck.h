@@ -11,7 +11,9 @@
 
 #include "MakeSmartPtrCheck.h"
 
-namespace clang::tidy::modernize {
+namespace clang {
+namespace tidy {
+namespace modernize {
 
 /// Replace the pattern:
 /// \code
@@ -24,7 +26,7 @@ namespace clang::tidy::modernize {
 /// \endcode
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/modernize/make-shared.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/modernize-make-shared.html
 class MakeSharedCheck : public MakeSmartPtrCheck {
 public:
   MakeSharedCheck(StringRef Name, ClangTidyContext *Context);
@@ -33,6 +35,8 @@ protected:
   SmartPtrTypeMatcher getSmartPointerTypeMatcher() const override;
 };
 
-} // namespace clang::tidy::modernize
+} // namespace modernize
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_MODERNIZE_MAKE_SHARED_H

@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This pass lowers instrprof_* intrinsics emitted by an instrumentor.
+// This pass lowers instrprof_* intrinsics emitted by a frontend for profiling.
 // It also builds the data structures and initialization code needed for
 // updating execution counts and emitting the profile at runtime.
 //
@@ -14,9 +14,9 @@
 
 #include "llvm/Transforms/Instrumentation/InstrProfiling.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Analysis/BlockFrequencyInfo.h"
 #include "llvm/Analysis/BranchProbabilityInfo.h"
@@ -24,12 +24,9 @@
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/CFG.h"
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/Constants.h"
-#include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalValue.h"
@@ -43,31 +40,22 @@
 #include "llvm/InitializePasses.h"
 #include "llvm/Pass.h"
 #include "llvm/ProfileData/InstrProf.h"
-#include "llvm/ProfileData/InstrProfCorrelator.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/TargetParser/Triple.h"
-#include "llvm/Transforms/Instrumentation/PGOInstrumentation.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 #include "llvm/Transforms/Utils/SSAUpdater.h"
 #include <algorithm>
 #include <cassert>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
 using namespace llvm;
 
 #define DEBUG_TYPE "instrprof"
-
-namespace llvm {
-cl::opt<bool>
-    DebugInfoCorrelate("debug-info-correlate",
-                       cl::desc("Use debug info to correlate profiles."),
-                       cl::init(false));
-} // namespace llvm
 
 namespace {
 
@@ -76,10 +64,10 @@ cl::opt<bool> DoHashBasedCounterSplit(
     cl::desc("Rename counter variable of a comdat function based on cfg hash"),
     cl::init(true));
 
-cl::opt<bool>
-    RuntimeCounterRelocation("runtime-counter-relocation",
-                             cl::desc("Enable relocating counters at runtime."),
-                             cl::init(false));
+cl::opt<bool> RuntimeCounterRelocation(
+    "runtime-counter-relocation",
+    cl::desc("Enable relocating counters at runtime."),
+    cl::init(false));
 
 cl::opt<bool> ValueProfileStaticAlloc(
     "vp-static-alloc",
@@ -97,18 +85,18 @@ cl::opt<double> NumCountersPerValueSite(
     cl::init(1.0));
 
 cl::opt<bool> AtomicCounterUpdateAll(
-    "instrprof-atomic-counter-update-all",
+    "instrprof-atomic-counter-update-all", cl::ZeroOrMore,
     cl::desc("Make all profile counter updates atomic (for testing only)"),
     cl::init(false));
 
 cl::opt<bool> AtomicCounterUpdatePromoted(
-    "atomic-counter-update-promoted",
+    "atomic-counter-update-promoted", cl::ZeroOrMore,
     cl::desc("Do counter update using atomic fetch add "
              " for promoted counters only"),
     cl::init(false));
 
 cl::opt<bool> AtomicFirstCounter(
-    "atomic-first-counter",
+    "atomic-first-counter", cl::ZeroOrMore,
     cl::desc("Use atomic fetch add for first counter in a function (usually "
              "the entry counter)"),
     cl::init(false));
@@ -118,38 +106,67 @@ cl::opt<bool> AtomicFirstCounter(
 // pipeline is setup, i.e., the default value of true of this option
 // does not mean the promotion will be done by default. Explicitly
 // setting this option can override the default behavior.
-cl::opt<bool> DoCounterPromotion("do-counter-promotion",
+cl::opt<bool> DoCounterPromotion("do-counter-promotion", cl::ZeroOrMore,
                                  cl::desc("Do counter register promotion"),
                                  cl::init(false));
 cl::opt<unsigned> MaxNumOfPromotionsPerLoop(
-    "max-counter-promotions-per-loop", cl::init(20),
+    cl::ZeroOrMore, "max-counter-promotions-per-loop", cl::init(20),
     cl::desc("Max number counter promotions per loop to avoid"
              " increasing register pressure too much"));
 
 // A debug option
 cl::opt<int>
-    MaxNumOfPromotions("max-counter-promotions", cl::init(-1),
+    MaxNumOfPromotions(cl::ZeroOrMore, "max-counter-promotions", cl::init(-1),
                        cl::desc("Max number of allowed counter promotions"));
 
 cl::opt<unsigned> SpeculativeCounterPromotionMaxExiting(
-    "speculative-counter-promotion-max-exiting", cl::init(3),
+    cl::ZeroOrMore, "speculative-counter-promotion-max-exiting", cl::init(3),
     cl::desc("The max number of exiting blocks of a loop to allow "
              " speculative counter promotion"));
 
 cl::opt<bool> SpeculativeCounterPromotionToLoop(
-    "speculative-counter-promotion-to-loop",
+    cl::ZeroOrMore, "speculative-counter-promotion-to-loop", cl::init(false),
     cl::desc("When the option is false, if the target block is in a loop, "
              "the promotion will be disallowed unless the promoted counter "
              " update can be further/iteratively promoted into an acyclic "
              " region."));
 
 cl::opt<bool> IterativeCounterPromotion(
-    "iterative-counter-promotion", cl::init(true),
+    cl::ZeroOrMore, "iterative-counter-promotion", cl::init(true),
     cl::desc("Allow counter promotion across the whole loop nest."));
 
 cl::opt<bool> SkipRetExitBlock(
-    "skip-ret-exit-block", cl::init(true),
+    cl::ZeroOrMore, "skip-ret-exit-block", cl::init(true),
     cl::desc("Suppress counter promotion if exit blocks contain ret."));
+
+class InstrProfilingLegacyPass : public ModulePass {
+  InstrProfiling InstrProf;
+
+public:
+  static char ID;
+
+  InstrProfilingLegacyPass() : ModulePass(ID) {}
+  InstrProfilingLegacyPass(const InstrProfOptions &Options, bool IsCS = false)
+      : ModulePass(ID), InstrProf(Options, IsCS) {
+    initializeInstrProfilingLegacyPassPass(*PassRegistry::getPassRegistry());
+  }
+
+  StringRef getPassName() const override {
+    return "Frontend instrumentation-based coverage lowering";
+  }
+
+  bool runOnModule(Module &M) override {
+    auto GetTLI = [this](Function &F) -> TargetLibraryInfo & {
+      return this->getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(F);
+    };
+    return InstrProf.run(M, GetTLI);
+  }
+
+  void getAnalysisUsage(AnalysisUsage &AU) const override {
+    AU.setPreservesCFG();
+    AU.addRequired<TargetLibraryInfoWrapperPass>();
+  }
+};
 
 ///
 /// A helper class to promote one counter RMW operation in the loop
@@ -184,19 +201,6 @@ public:
       Value *Addr = cast<StoreInst>(Store)->getPointerOperand();
       Type *Ty = LiveInValue->getType();
       IRBuilder<> Builder(InsertPos);
-      if (auto *AddrInst = dyn_cast_or_null<IntToPtrInst>(Addr)) {
-        // If isRuntimeCounterRelocationEnabled() is true then the address of
-        // the store instruction is computed with two instructions in
-        // InstrProfiling::getCounterAddress(). We need to copy those
-        // instructions to this block to compute Addr correctly.
-        // %BiasAdd = add i64 ptrtoint <__profc_>, <__llvm_profile_counter_bias>
-        // %Addr = inttoptr i64 %BiasAdd to i64*
-        auto *OrigBiasInst = dyn_cast<BinaryOperator>(AddrInst->getOperand(0));
-        assert(OrigBiasInst->getOpcode() == Instruction::BinaryOps::Add);
-        Value *BiasInst = Builder.Insert(OrigBiasInst->clone());
-        Addr = Builder.CreateIntToPtr(BiasInst,
-                                      PointerType::getUnqual(Ty->getContext()));
-      }
       if (AtomicCounterUpdatePromoted)
         // automic update currently can only be promoted across the current
         // loop, not the whole loop nest.
@@ -234,7 +238,8 @@ public:
   PGOCounterPromoter(
       DenseMap<Loop *, SmallVector<LoadStorePair, 8>> &LoopToCands,
       Loop &CurLoop, LoopInfo &LI, BlockFrequencyInfo *BFI)
-      : LoopToCandidates(LoopToCands), L(CurLoop), LI(LI), BFI(BFI) {
+      : LoopToCandidates(LoopToCands), ExitBlocks(), InsertPts(), L(CurLoop),
+        LI(LI), BFI(BFI) {
 
     // Skip collection of ExitBlocks and InsertPts for loops that will not be
     // able to have counters promoted.
@@ -246,10 +251,7 @@ public:
       return;
 
     for (BasicBlock *ExitBlock : LoopExitBlocks) {
-      if (BlockSet.insert(ExitBlock).second &&
-          llvm::none_of(predecessors(ExitBlock), [&](const BasicBlock *Pred) {
-            return llvm::isPresplitCoroSuspendExitEdge(*Pred, *ExitBlock);
-          })) {
+      if (BlockSet.insert(ExitBlock).second) {
         ExitBlocks.push_back(ExitBlock);
         InsertPts.push_back(&*ExitBlock->getFirstInsertionPt());
       }
@@ -267,7 +269,7 @@ public:
     // of the loop, the result profile is incomplete.
     // FIXME: add other heuristics to detect long running loops.
     if (SkipRetExitBlock) {
-      for (auto *BB : ExitBlocks)
+      for (auto BB : ExitBlocks)
         if (isa<ReturnInst>(BB->getTerminator()))
           return false;
     }
@@ -292,7 +294,8 @@ public:
         auto PreheaderCount = BFI->getBlockProfileCount(L.getLoopPreheader());
         // If the average loop trip count is not greater than 1.5, we skip
         // promotion.
-        if (PreheaderCount && (*PreheaderCount * 3) >= (*InstrCount * 2))
+        if (PreheaderCount &&
+            (PreheaderCount.getValue() * 3) >= (InstrCount.getValue() * 2))
           continue;
       }
 
@@ -328,9 +331,8 @@ private:
 
   // Check whether the loop satisfies the basic conditions needed to perform
   // Counter Promotions.
-  bool
-  isPromotionPossible(Loop *LP,
-                      const SmallVectorImpl<BasicBlock *> &LoopExitBlocks) {
+  bool isPromotionPossible(Loop *LP,
+                           const SmallVectorImpl<BasicBlock *> &LoopExitBlocks) {
     // We can't insert into a catchswitch.
     if (llvm::any_of(LoopExitBlocks, [](BasicBlock *Exit) {
           return isa<CatchSwitchInst>(Exit->getTerminator());
@@ -418,34 +420,40 @@ PreservedAnalyses InstrProfiling::run(Module &M, ModuleAnalysisManager &AM) {
   return PreservedAnalyses::none();
 }
 
+char InstrProfilingLegacyPass::ID = 0;
+INITIALIZE_PASS_BEGIN(
+    InstrProfilingLegacyPass, "instrprof",
+    "Frontend instrumentation-based coverage lowering.", false, false)
+INITIALIZE_PASS_DEPENDENCY(TargetLibraryInfoWrapperPass)
+INITIALIZE_PASS_END(
+    InstrProfilingLegacyPass, "instrprof",
+    "Frontend instrumentation-based coverage lowering.", false, false)
+
+ModulePass *
+llvm::createInstrProfilingLegacyPass(const InstrProfOptions &Options,
+                                     bool IsCS) {
+  return new InstrProfilingLegacyPass(Options, IsCS);
+}
+
+static InstrProfIncrementInst *castToIncrementInst(Instruction *Instr) {
+  InstrProfIncrementInst *Inc = dyn_cast<InstrProfIncrementInstStep>(Instr);
+  if (Inc)
+    return Inc;
+  return dyn_cast<InstrProfIncrementInst>(Instr);
+}
+
 bool InstrProfiling::lowerIntrinsics(Function *F) {
   bool MadeChange = false;
   PromotionCandidates.clear();
   for (BasicBlock &BB : *F) {
-    for (Instruction &Instr : llvm::make_early_inc_range(BB)) {
-      if (auto *IPIS = dyn_cast<InstrProfIncrementInstStep>(&Instr)) {
-        lowerIncrement(IPIS);
+    for (auto I = BB.begin(), E = BB.end(); I != E;) {
+      auto Instr = I++;
+      InstrProfIncrementInst *Inc = castToIncrementInst(&*Instr);
+      if (Inc) {
+        lowerIncrement(Inc);
         MadeChange = true;
-      } else if (auto *IPI = dyn_cast<InstrProfIncrementInst>(&Instr)) {
-        lowerIncrement(IPI);
-        MadeChange = true;
-      } else if (auto *IPC = dyn_cast<InstrProfTimestampInst>(&Instr)) {
-        lowerTimestamp(IPC);
-        MadeChange = true;
-      } else if (auto *IPC = dyn_cast<InstrProfCoverInst>(&Instr)) {
-        lowerCover(IPC);
-        MadeChange = true;
-      } else if (auto *IPVP = dyn_cast<InstrProfValueProfileInst>(&Instr)) {
-        lowerValueProfileInst(IPVP);
-        MadeChange = true;
-      } else if (auto *IPMP = dyn_cast<InstrProfMCDCBitmapParameters>(&Instr)) {
-        IPMP->eraseFromParent();
-        MadeChange = true;
-      } else if (auto *IPBU = dyn_cast<InstrProfMCDCTVBitmapUpdate>(&Instr)) {
-        lowerMCDCTestVectorBitmapUpdate(IPBU);
-        MadeChange = true;
-      } else if (auto *IPTU = dyn_cast<InstrProfMCDCCondBitmapUpdate>(&Instr)) {
-        lowerMCDCCondBitmapUpdate(IPTU);
+      } else if (auto *Ind = dyn_cast<InstrProfValueProfileInst>(Instr)) {
+        lowerValueProfileInst(Ind);
         MadeChange = true;
       }
     }
@@ -512,26 +520,21 @@ void InstrProfiling::promoteCounterLoadStores(Function *F) {
   }
 }
 
-static bool needsRuntimeHookUnconditionally(const Triple &TT) {
-  // On Fuchsia, we only need runtime hook if any counters are present.
-  if (TT.isOSFuchsia())
-    return false;
-
-  return true;
-}
-
 /// Check if the module contains uses of any profiling intrinsics.
 static bool containsProfilingIntrinsics(Module &M) {
-  auto containsIntrinsic = [&](int ID) {
-    if (auto *F = M.getFunction(Intrinsic::getName(ID)))
-      return !F->use_empty();
-    return false;
-  };
-  return containsIntrinsic(llvm::Intrinsic::instrprof_cover) ||
-         containsIntrinsic(llvm::Intrinsic::instrprof_increment) ||
-         containsIntrinsic(llvm::Intrinsic::instrprof_increment_step) ||
-         containsIntrinsic(llvm::Intrinsic::instrprof_timestamp) ||
-         containsIntrinsic(llvm::Intrinsic::instrprof_value_profile);
+  if (auto *F = M.getFunction(
+          Intrinsic::getName(llvm::Intrinsic::instrprof_increment)))
+    if (!F->use_empty())
+      return true;
+  if (auto *F = M.getFunction(
+          Intrinsic::getName(llvm::Intrinsic::instrprof_increment_step)))
+    if (!F->use_empty())
+      return true;
+  if (auto *F = M.getFunction(
+          Intrinsic::getName(llvm::Intrinsic::instrprof_value_profile)))
+    if (!F->use_empty())
+      return true;
+  return false;
 }
 
 bool InstrProfiling::run(
@@ -545,43 +548,35 @@ bool InstrProfiling::run(
   UsedVars.clear();
   TT = Triple(M.getTargetTriple());
 
-  bool MadeChange = false;
-  bool NeedsRuntimeHook = needsRuntimeHookUnconditionally(TT);
-  if (NeedsRuntimeHook)
-    MadeChange = emitRuntimeHook();
+  // Emit the runtime hook even if no counters are present.
+  bool MadeChange = emitRuntimeHook();
 
-  bool ContainsProfiling = containsProfilingIntrinsics(M);
+  // Emit the bias variable in each module when counter relocation is enabled.
+  if (isRuntimeCounterRelocationEnabled())
+    MadeChange |= emitBiasVar();
+
+  // Improve compile time by avoiding linear scans when there is no work.
   GlobalVariable *CoverageNamesVar =
       M.getNamedGlobal(getCoverageUnusedNamesVarName());
-  // Improve compile time by avoiding linear scans when there is no work.
-  if (!ContainsProfiling && !CoverageNamesVar)
+  if (!containsProfilingIntrinsics(M) && !CoverageNamesVar)
     return MadeChange;
 
   // We did not know how many value sites there would be inside
   // the instrumented function. This is counting the number of instrumented
   // target value sites to enter it as field in the profile data variable.
   for (Function &F : M) {
-    InstrProfCntrInstBase *FirstProfInst = nullptr;
-    for (BasicBlock &BB : F) {
-      for (auto I = BB.begin(), E = BB.end(); I != E; I++) {
+    InstrProfIncrementInst *FirstProfIncInst = nullptr;
+    for (BasicBlock &BB : F)
+      for (auto I = BB.begin(), E = BB.end(); I != E; I++)
         if (auto *Ind = dyn_cast<InstrProfValueProfileInst>(I))
           computeNumValueSiteCounts(Ind);
-        else {
-          if (FirstProfInst == nullptr &&
-              (isa<InstrProfIncrementInst>(I) || isa<InstrProfCoverInst>(I)))
-            FirstProfInst = dyn_cast<InstrProfCntrInstBase>(I);
-          // If the MCDCBitmapParameters intrinsic seen, create the bitmaps.
-          if (const auto &Params = dyn_cast<InstrProfMCDCBitmapParameters>(I))
-            static_cast<void>(getOrCreateRegionBitmaps(Params));
-        }
-      }
-    }
+        else if (FirstProfIncInst == nullptr)
+          FirstProfIncInst = dyn_cast<InstrProfIncrementInst>(I);
 
-    // Use a profile intrinsic to create the region counters and data variable.
-    // Also create the data variable based on the MCDCParams.
-    if (FirstProfInst != nullptr) {
-      static_cast<void>(getOrCreateRegionCounters(FirstProfInst));
-    }
+    // Value profiling intrinsic lowering requires per-function profile data
+    // variable to be created first.
+    if (FirstProfIncInst != nullptr)
+      static_cast<void>(getOrCreateRegionCounters(FirstProfIncInst));
   }
 
   for (Function &F : M)
@@ -597,14 +592,6 @@ bool InstrProfiling::run(
 
   emitVNodes();
   emitNameData();
-
-  // Emit runtime hook for the cases where the target does not unconditionally
-  // require pulling in profile runtime, and coverage is enabled on code that is
-  // not eliminated by the front-end, e.g. unused functions with internal
-  // linkage.
-  if (!NeedsRuntimeHook && ContainsProfiling)
-    emitRuntimeHook();
-
   emitRegistration();
   emitUses();
   emitInitialization();
@@ -629,7 +616,7 @@ static FunctionCallee getOrInsertValueProfilingCall(
 #include "llvm/ProfileData/InstrProfData.inc"
   };
   auto *ValueProfilingCallTy =
-      FunctionType::get(ReturnTy, ArrayRef(ParamTypes), false);
+      FunctionType::get(ReturnTy, makeArrayRef(ParamTypes), false);
   StringRef FuncName = CallType == ValueProfilingCallType::Default
                            ? getInstrProfValueProfFuncName()
                            : getInstrProfValueProfMemOpFuncName();
@@ -640,18 +627,16 @@ void InstrProfiling::computeNumValueSiteCounts(InstrProfValueProfileInst *Ind) {
   GlobalVariable *Name = Ind->getName();
   uint64_t ValueKind = Ind->getValueKind()->getZExtValue();
   uint64_t Index = Ind->getIndex()->getZExtValue();
-  auto &PD = ProfileDataMap[Name];
-  PD.NumValueSites[ValueKind] =
-      std::max(PD.NumValueSites[ValueKind], (uint32_t)(Index + 1));
+  auto It = ProfileDataMap.find(Name);
+  if (It == ProfileDataMap.end()) {
+    PerFunctionProfileData PD;
+    PD.NumValueSites[ValueKind] = Index + 1;
+    ProfileDataMap[Name] = PD;
+  } else if (It->second.NumValueSites[ValueKind] <= Index)
+    It->second.NumValueSites[ValueKind] = Index + 1;
 }
 
 void InstrProfiling::lowerValueProfileInst(InstrProfValueProfileInst *Ind) {
-  // TODO: Value profiling heavily depends on the data section which is omitted
-  // in lightweight mode. We need to move the value profile pointer to the
-  // Counter struct to get this working.
-  assert(
-      !DebugInfoCorrelate &&
-      "Value profiling is not yet supported with lightweight instrumentation");
   GlobalVariable *Name = Ind->getName();
   auto It = ProfileDataMap.find(Name);
   assert(It != ProfileDataMap.end() && It->second.DataVar &&
@@ -676,11 +661,15 @@ void InstrProfiling::lowerValueProfileInst(InstrProfValueProfileInst *Ind) {
   SmallVector<OperandBundleDef, 1> OpBundles;
   Ind->getOperandBundlesAsDefs(OpBundles);
   if (!IsMemOpSize) {
-    Value *Args[3] = {Ind->getTargetValue(), DataVar, Builder.getInt32(Index)};
+    Value *Args[3] = {Ind->getTargetValue(),
+                      Builder.CreateBitCast(DataVar, Builder.getInt8PtrTy()),
+                      Builder.getInt32(Index)};
     Call = Builder.CreateCall(getOrInsertValueProfilingCall(*M, *TLI), Args,
                               OpBundles);
   } else {
-    Value *Args[3] = {Ind->getTargetValue(), DataVar, Builder.getInt32(Index)};
+    Value *Args[3] = {Ind->getTargetValue(),
+                      Builder.CreateBitCast(DataVar, Builder.getInt8PtrTy()),
+                      Builder.getInt32(Index)};
     Call = Builder.CreateCall(
         getOrInsertValueProfilingCall(*M, *TLI, ValueProfilingCallType::MemOp),
         Args, OpBundles);
@@ -691,94 +680,31 @@ void InstrProfiling::lowerValueProfileInst(InstrProfValueProfileInst *Ind) {
   Ind->eraseFromParent();
 }
 
-Value *InstrProfiling::getCounterAddress(InstrProfCntrInstBase *I) {
-  auto *Counters = getOrCreateRegionCounters(I);
-  IRBuilder<> Builder(I);
-
-  if (isa<InstrProfTimestampInst>(I))
-    Counters->setAlignment(Align(8));
-
-  auto *Addr = Builder.CreateConstInBoundsGEP2_32(
-      Counters->getValueType(), Counters, 0, I->getIndex()->getZExtValue());
-
-  if (!isRuntimeCounterRelocationEnabled())
-    return Addr;
-
-  Type *Int64Ty = Type::getInt64Ty(M->getContext());
-  Function *Fn = I->getParent()->getParent();
-  LoadInst *&BiasLI = FunctionToProfileBiasMap[Fn];
-  if (!BiasLI) {
-    IRBuilder<> EntryBuilder(&Fn->getEntryBlock().front());
-    auto *Bias = M->getGlobalVariable(getInstrProfCounterBiasVarName());
-    if (!Bias) {
-      // Compiler must define this variable when runtime counter relocation
-      // is being used. Runtime has a weak external reference that is used
-      // to check whether that's the case or not.
-      Bias = new GlobalVariable(
-          *M, Int64Ty, false, GlobalValue::LinkOnceODRLinkage,
-          Constant::getNullValue(Int64Ty), getInstrProfCounterBiasVarName());
-      Bias->setVisibility(GlobalVariable::HiddenVisibility);
-      // A definition that's weak (linkonce_odr) without being in a COMDAT
-      // section wouldn't lead to link errors, but it would lead to a dead
-      // data word from every TU but one. Putting it in COMDAT ensures there
-      // will be exactly one data slot in the link.
-      if (TT.supportsCOMDAT())
-        Bias->setComdat(M->getOrInsertComdat(Bias->getName()));
-    }
-    BiasLI = EntryBuilder.CreateLoad(Int64Ty, Bias);
-  }
-  auto *Add = Builder.CreateAdd(Builder.CreatePtrToInt(Addr, Int64Ty), BiasLI);
-  return Builder.CreateIntToPtr(Add, Addr->getType());
-}
-
-Value *InstrProfiling::getBitmapAddress(InstrProfMCDCTVBitmapUpdate *I) {
-  auto *Bitmaps = getOrCreateRegionBitmaps(I);
-  IRBuilder<> Builder(I);
-
-  auto *Addr = Builder.CreateConstInBoundsGEP2_32(
-      Bitmaps->getValueType(), Bitmaps, 0, I->getBitmapIndex()->getZExtValue());
-
-  if (isRuntimeCounterRelocationEnabled()) {
-    LLVMContext &Ctx = M->getContext();
-    Ctx.diagnose(DiagnosticInfoPGOProfile(
-        M->getName().data(),
-        Twine("Runtime counter relocation is presently not supported for MC/DC "
-              "bitmaps."),
-        DS_Warning));
-  }
-
-  return Addr;
-}
-
-void InstrProfiling::lowerCover(InstrProfCoverInst *CoverInstruction) {
-  auto *Addr = getCounterAddress(CoverInstruction);
-  IRBuilder<> Builder(CoverInstruction);
-  // We store zero to represent that this block is covered.
-  Builder.CreateStore(Builder.getInt8(0), Addr);
-  CoverInstruction->eraseFromParent();
-}
-
-void InstrProfiling::lowerTimestamp(
-    InstrProfTimestampInst *TimestampInstruction) {
-  assert(TimestampInstruction->getIndex()->isZeroValue() &&
-         "timestamp probes are always the first probe for a function");
-  auto &Ctx = M->getContext();
-  auto *TimestampAddr = getCounterAddress(TimestampInstruction);
-  IRBuilder<> Builder(TimestampInstruction);
-  auto *CalleeTy =
-      FunctionType::get(Type::getVoidTy(Ctx), TimestampAddr->getType(), false);
-  auto Callee = M->getOrInsertFunction(
-      INSTR_PROF_QUOTE(INSTR_PROF_PROFILE_SET_TIMESTAMP), CalleeTy);
-  Builder.CreateCall(Callee, {TimestampAddr});
-  TimestampInstruction->eraseFromParent();
-}
-
 void InstrProfiling::lowerIncrement(InstrProfIncrementInst *Inc) {
-  auto *Addr = getCounterAddress(Inc);
+  GlobalVariable *Counters = getOrCreateRegionCounters(Inc);
 
   IRBuilder<> Builder(Inc);
+  uint64_t Index = Inc->getIndex()->getZExtValue();
+  Value *Addr = Builder.CreateConstInBoundsGEP2_64(Counters->getValueType(),
+                                                   Counters, 0, Index);
+
+  if (isRuntimeCounterRelocationEnabled()) {
+    Type *Int64Ty = Type::getInt64Ty(M->getContext());
+    Type *Int64PtrTy = Type::getInt64PtrTy(M->getContext());
+    Function *Fn = Inc->getParent()->getParent();
+    Instruction &I = Fn->getEntryBlock().front();
+    LoadInst *LI = dyn_cast<LoadInst>(&I);
+    if (!LI) {
+      IRBuilder<> Builder(&I);
+      GlobalVariable *Bias = M->getGlobalVariable(getInstrProfCounterBiasVarName());
+      LI = Builder.CreateLoad(Int64Ty, Bias);
+    }
+    auto *Add = Builder.CreateAdd(Builder.CreatePtrToInt(Addr, Int64Ty), LI);
+    Addr = Builder.CreateIntToPtr(Add, Int64PtrTy);
+  }
+
   if (Options.Atomic || AtomicCounterUpdateAll ||
-      (Inc->getIndex()->isZeroValue() && AtomicFirstCounter)) {
+      (Index == 0 && AtomicFirstCounter)) {
     Builder.CreateAtomicRMW(AtomicRMWInst::Add, Addr, Inc->getStep(),
                             MaybeAlign(), AtomicOrdering::Monotonic);
   } else {
@@ -803,108 +729,23 @@ void InstrProfiling::lowerCoverageData(GlobalVariable *CoverageNamesVar) {
 
     Name->setLinkage(GlobalValue::PrivateLinkage);
     ReferencedNames.push_back(Name);
-    if (isa<ConstantExpr>(NC))
-      NC->dropAllReferences();
+    NC->dropAllReferences();
   }
   CoverageNamesVar->eraseFromParent();
 }
 
-void InstrProfiling::lowerMCDCTestVectorBitmapUpdate(
-    InstrProfMCDCTVBitmapUpdate *Update) {
-  IRBuilder<> Builder(Update);
-  auto *Int8Ty = Type::getInt8Ty(M->getContext());
-  auto *Int8PtrTy = PointerType::getUnqual(M->getContext());
-  auto *Int32Ty = Type::getInt32Ty(M->getContext());
-  auto *Int64Ty = Type::getInt64Ty(M->getContext());
-  auto *MCDCCondBitmapAddr = Update->getMCDCCondBitmapAddr();
-  auto *BitmapAddr = getBitmapAddress(Update);
-
-  // Load Temp Val.
-  //  %mcdc.temp = load i32, ptr %mcdc.addr, align 4
-  auto *Temp = Builder.CreateLoad(Int32Ty, MCDCCondBitmapAddr, "mcdc.temp");
-
-  // Calculate byte offset using div8.
-  //  %1 = lshr i32 %mcdc.temp, 3
-  auto *BitmapByteOffset = Builder.CreateLShr(Temp, 0x3);
-
-  // Add byte offset to section base byte address.
-  //  %2 = zext i32 %1 to i64
-  //  %3 = add i64 ptrtoint (ptr @__profbm_test to i64), %2
-  auto *BitmapByteAddr =
-      Builder.CreateAdd(Builder.CreatePtrToInt(BitmapAddr, Int64Ty),
-                        Builder.CreateZExtOrBitCast(BitmapByteOffset, Int64Ty));
-
-  // Convert to a pointer.
-  //  %4 = inttoptr i32 %3 to ptr
-  BitmapByteAddr = Builder.CreateIntToPtr(BitmapByteAddr, Int8PtrTy);
-
-  // Calculate bit offset into bitmap byte by using div8 remainder (AND ~8)
-  //  %5 = and i32 %mcdc.temp, 7
-  //  %6 = trunc i32 %5 to i8
-  auto *BitToSet = Builder.CreateTrunc(Builder.CreateAnd(Temp, 0x7), Int8Ty);
-
-  // Shift bit offset left to form a bitmap.
-  //  %7 = shl i8 1, %6
-  auto *ShiftedVal = Builder.CreateShl(Builder.getInt8(0x1), BitToSet);
-
-  // Load profile bitmap byte.
-  //  %mcdc.bits = load i8, ptr %4, align 1
-  auto *Bitmap = Builder.CreateLoad(Int8Ty, BitmapByteAddr, "mcdc.bits");
-
-  // Perform logical OR of profile bitmap byte and shifted bit offset.
-  //  %8 = or i8 %mcdc.bits, %7
-  auto *Result = Builder.CreateOr(Bitmap, ShiftedVal);
-
-  // Store the updated profile bitmap byte.
-  //  store i8 %8, ptr %3, align 1
-  Builder.CreateStore(Result, BitmapByteAddr);
-  Update->eraseFromParent();
-}
-
-void InstrProfiling::lowerMCDCCondBitmapUpdate(
-    InstrProfMCDCCondBitmapUpdate *Update) {
-  IRBuilder<> Builder(Update);
-  auto *Int32Ty = Type::getInt32Ty(M->getContext());
-  auto *MCDCCondBitmapAddr = Update->getMCDCCondBitmapAddr();
-
-  // Load the MCDC temporary value from the stack.
-  //  %mcdc.temp = load i32, ptr %mcdc.addr, align 4
-  auto *Temp = Builder.CreateLoad(Int32Ty, MCDCCondBitmapAddr, "mcdc.temp");
-
-  // Zero-extend the evaluated condition boolean value (0 or 1) by 32bits.
-  //  %1 = zext i1 %tobool to i32
-  auto *CondV_32 = Builder.CreateZExt(Update->getCondBool(), Int32Ty);
-
-  // Shift the boolean value left (by the condition's ID) to form a bitmap.
-  //  %2 = shl i32 %1, <Update->getCondID()>
-  auto *ShiftedVal = Builder.CreateShl(CondV_32, Update->getCondID());
-
-  // Perform logical OR of the bitmap against the loaded MCDC temporary value.
-  //  %3 = or i32 %mcdc.temp, %2
-  auto *Result = Builder.CreateOr(Temp, ShiftedVal);
-
-  // Store the updated temporary value back to the stack.
-  //  store i32 %3, ptr %mcdc.addr, align 4
-  Builder.CreateStore(Result, MCDCCondBitmapAddr);
-  Update->eraseFromParent();
-}
-
 /// Get the name of a profiling variable for a particular function.
-static std::string getVarName(InstrProfInstBase *Inc, StringRef Prefix,
-                              bool &Renamed) {
+static std::string getVarName(InstrProfIncrementInst *Inc, StringRef Prefix) {
   StringRef NamePrefix = getInstrProfNameVarPrefix();
   StringRef Name = Inc->getName()->getName().substr(NamePrefix.size());
   Function *F = Inc->getParent()->getParent();
   Module *M = F->getParent();
   if (!DoHashBasedCounterSplit || !isIRPGOFlagSet(M) ||
-      !canRenameComdatFunc(*F)) {
-    Renamed = false;
+      !canRenameComdatFunc(*F))
     return (Prefix + Name).str();
-  }
-  Renamed = true;
   uint64_t FuncHash = Inc->getHash()->getZExtValue();
   SmallVector<char, 24> HashPostfix;
-  if (Name.ends_with((Twine(".") + Twine(FuncHash)).toStringRef(HashPostfix)))
+  if (Name.endswith((Twine(".") + Twine(FuncHash)).toStringRef(HashPostfix)))
     return (Prefix + Name).str();
   return (Prefix + Name + "." + Twine(FuncHash)).str();
 }
@@ -966,130 +807,35 @@ static inline bool shouldRecordFunctionAddr(Function *F) {
   return F->hasAddressTaken() || F->hasLinkOnceLinkage();
 }
 
-static inline bool shouldUsePublicSymbol(Function *Fn) {
-  // It isn't legal to make an alias of this function at all
-  if (Fn->isDeclarationForLinker())
-    return true;
-
-  // Symbols with local linkage can just use the symbol directly without
-  // introducing relocations
-  if (Fn->hasLocalLinkage())
-    return true;
-
-  // PGO + ThinLTO + CFI cause duplicate symbols to be introduced due to some
-  // unfavorable interaction between the new alias and the alias renaming done
-  // in LowerTypeTests under ThinLTO. For comdat functions that would normally
-  // be deduplicated, but the renaming scheme ends up preventing renaming, since
-  // it creates unique names for each alias, resulting in duplicated symbols. In
-  // the future, we should update the CFI related passes to migrate these
-  // aliases to the same module as the jump-table they refer to will be defined.
-  if (Fn->hasMetadata(LLVMContext::MD_type))
-    return true;
-
-  // For comdat functions, an alias would need the same linkage as the original
-  // function and hidden visibility. There is no point in adding an alias with
-  // identical linkage an visibility to avoid introducing symbolic relocations.
-  if (Fn->hasComdat() &&
-      (Fn->getVisibility() == GlobalValue::VisibilityTypes::HiddenVisibility))
-    return true;
-
-  // its OK to use an alias
-  return false;
-}
-
-static inline Constant *getFuncAddrForProfData(Function *Fn) {
-  auto *Int8PtrTy = PointerType::getUnqual(Fn->getContext());
-  // Store a nullptr in __llvm_profd, if we shouldn't use a real address
-  if (!shouldRecordFunctionAddr(Fn))
-    return ConstantPointerNull::get(Int8PtrTy);
-
-  // If we can't use an alias, we must use the public symbol, even though this
-  // may require a symbolic relocation.
-  if (shouldUsePublicSymbol(Fn))
-    return Fn;
-
-  // When possible use a private alias to avoid symbolic relocations.
-  auto *GA = GlobalAlias::create(GlobalValue::LinkageTypes::PrivateLinkage,
-                                 Fn->getName() + ".local", Fn);
-
-  // When the instrumented function is a COMDAT function, we cannot use a
-  // private alias. If we did, we would create reference to a local label in
-  // this function's section. If this version of the function isn't selected by
-  // the linker, then the metadata would introduce a reference to a discarded
-  // section. So, for COMDAT functions, we need to adjust the linkage of the
-  // alias. Using hidden visibility avoids a dynamic relocation and an entry in
-  // the dynamic symbol table.
-  //
-  // Note that this handles COMDAT functions with visibility other than Hidden,
-  // since that case is covered in shouldUsePublicSymbol()
-  if (Fn->hasComdat()) {
-    GA->setLinkage(Fn->getLinkage());
-    GA->setVisibility(GlobalValue::VisibilityTypes::HiddenVisibility);
-  }
-
-  // appendToCompilerUsed(*Fn->getParent(), {GA});
-
-  return GA;
-}
-
 static bool needsRuntimeRegistrationOfSectionRange(const Triple &TT) {
   // Don't do this for Darwin.  compiler-rt uses linker magic.
   if (TT.isOSDarwin())
     return false;
   // Use linker script magic to get data/cnts/name start/end.
-  if (TT.isOSAIX() || TT.isOSLinux() || TT.isOSFreeBSD() || TT.isOSNetBSD() ||
-      TT.isOSSolaris() || TT.isOSFuchsia() || TT.isPS() || TT.isOSWindows())
+  if (TT.isOSLinux() || TT.isOSFreeBSD() || TT.isOSNetBSD() ||
+      TT.isOSSolaris() || TT.isOSFuchsia() || TT.isPS4CPU() ||
+      TT.isOSWindows())
     return false;
 
   return true;
 }
 
-void InstrProfiling::maybeSetComdat(GlobalVariable *GV, Function *Fn,
-                                    StringRef VarName) {
-  bool DataReferencedByCode = profDataReferencedByCode(*M);
-  bool NeedComdat = needsComdatForCounter(*Fn, *M);
-  bool UseComdat = (NeedComdat || TT.isOSBinFormatELF());
-
-  if (!UseComdat)
-    return;
-
-  StringRef GroupName =
-      TT.isOSBinFormatCOFF() && DataReferencedByCode ? GV->getName() : VarName;
-  Comdat *C = M->getOrInsertComdat(GroupName);
-  if (!NeedComdat)
-    C->setSelectionKind(Comdat::NoDeduplicate);
-  GV->setComdat(C);
-  // COFF doesn't allow the comdat group leader to have private linkage, so
-  // upgrade private linkage to internal linkage to produce a symbol table
-  // entry.
-  if (TT.isOSBinFormatCOFF() && GV->hasPrivateLinkage())
-    GV->setLinkage(GlobalValue::InternalLinkage);
-}
-
-GlobalVariable *InstrProfiling::setupProfileSection(InstrProfInstBase *Inc,
-                                                    InstrProfSectKind IPSK) {
+GlobalVariable *
+InstrProfiling::getOrCreateRegionCounters(InstrProfIncrementInst *Inc) {
   GlobalVariable *NamePtr = Inc->getName();
+  auto It = ProfileDataMap.find(NamePtr);
+  PerFunctionProfileData PD;
+  if (It != ProfileDataMap.end()) {
+    if (It->second.RegionCounters)
+      return It->second.RegionCounters;
+    PD = It->second;
+  }
 
   // Match the linkage and visibility of the name global.
   Function *Fn = Inc->getParent()->getParent();
   GlobalValue::LinkageTypes Linkage = NamePtr->getLinkage();
   GlobalValue::VisibilityTypes Visibility = NamePtr->getVisibility();
 
-  // Use internal rather than private linkage so the counter variable shows up
-  // in the symbol table when using debug info for correlation.
-  if (DebugInfoCorrelate && TT.isOSBinFormatMachO() &&
-      Linkage == GlobalValue::PrivateLinkage)
-    Linkage = GlobalValue::InternalLinkage;
-
-  // Due to the limitation of binder as of 2021/09/28, the duplicate weak
-  // symbols in the same csect won't be discarded. When there are duplicate weak
-  // symbols, we can NOT guarantee that the relocations get resolved to the
-  // intended weak symbol, so we can not ensure the correctness of the relative
-  // CounterPtr, so we have to use private linkage for counter and data symbols.
-  if (TT.isOSBinFormatXCOFF()) {
-    Linkage = GlobalValue::PrivateLinkage;
-    Visibility = GlobalValue::DefaultVisibility;
-  }
   // Move the name variable to the right section. Place them in a COMDAT group
   // if the associated function is a COMDAT. This will make sure that only one
   // copy of counters of the COMDAT function will be emitted after linking. Keep
@@ -1107,180 +853,39 @@ GlobalVariable *InstrProfiling::setupProfileSection(InstrProfInstBase *Inc,
   // nodeduplicate COMDAT which is lowered to a zero-flag section group. This
   // allows -z start-stop-gc to discard the entire group when the function is
   // discarded.
-  bool Renamed;
-  GlobalVariable *Ptr;
-  StringRef VarPrefix;
-  std::string VarName;
-  if (IPSK == IPSK_cnts) {
-    VarPrefix = getInstrProfCountersVarPrefix();
-    VarName = getVarName(Inc, VarPrefix, Renamed);
-    InstrProfCntrInstBase *CntrIncrement = dyn_cast<InstrProfCntrInstBase>(Inc);
-    Ptr = createRegionCounters(CntrIncrement, VarName, Linkage);
-  } else if (IPSK == IPSK_bitmap) {
-    VarPrefix = getInstrProfBitmapVarPrefix();
-    VarName = getVarName(Inc, VarPrefix, Renamed);
-    InstrProfMCDCBitmapInstBase *BitmapUpdate =
-        dyn_cast<InstrProfMCDCBitmapInstBase>(Inc);
-    Ptr = createRegionBitmaps(BitmapUpdate, VarName, Linkage);
-  } else {
-    llvm_unreachable("Profile Section must be for Counters or Bitmaps");
-  }
-
-  Ptr->setVisibility(Visibility);
-  // Put the counters and bitmaps in their own sections so linkers can
-  // remove unneeded sections.
-  Ptr->setSection(getInstrProfSectionName(IPSK, TT.getObjectFormat()));
-  Ptr->setLinkage(Linkage);
-  maybeSetComdat(Ptr, Fn, VarName);
-  return Ptr;
-}
-
-GlobalVariable *
-InstrProfiling::createRegionBitmaps(InstrProfMCDCBitmapInstBase *Inc,
-                                    StringRef Name,
-                                    GlobalValue::LinkageTypes Linkage) {
-  uint64_t NumBytes = Inc->getNumBitmapBytes()->getZExtValue();
-  auto *BitmapTy = ArrayType::get(Type::getInt8Ty(M->getContext()), NumBytes);
-  auto GV = new GlobalVariable(*M, BitmapTy, false, Linkage,
-                               Constant::getNullValue(BitmapTy), Name);
-  GV->setAlignment(Align(1));
-  return GV;
-}
-
-GlobalVariable *
-InstrProfiling::getOrCreateRegionBitmaps(InstrProfMCDCBitmapInstBase *Inc) {
-  GlobalVariable *NamePtr = Inc->getName();
-  auto &PD = ProfileDataMap[NamePtr];
-  if (PD.RegionBitmaps)
-    return PD.RegionBitmaps;
-
-  // If RegionBitmaps doesn't already exist, create it by first setting up
-  // the corresponding profile section.
-  auto *BitmapPtr = setupProfileSection(Inc, IPSK_bitmap);
-  PD.RegionBitmaps = BitmapPtr;
-  PD.NumBitmapBytes = Inc->getNumBitmapBytes()->getZExtValue();
-  return PD.RegionBitmaps;
-}
-
-GlobalVariable *
-InstrProfiling::createRegionCounters(InstrProfCntrInstBase *Inc, StringRef Name,
-                                     GlobalValue::LinkageTypes Linkage) {
-  uint64_t NumCounters = Inc->getNumCounters()->getZExtValue();
-  auto &Ctx = M->getContext();
-  GlobalVariable *GV;
-  if (isa<InstrProfCoverInst>(Inc)) {
-    auto *CounterTy = Type::getInt8Ty(Ctx);
-    auto *CounterArrTy = ArrayType::get(CounterTy, NumCounters);
-    // TODO: `Constant::getAllOnesValue()` does not yet accept an array type.
-    std::vector<Constant *> InitialValues(NumCounters,
-                                          Constant::getAllOnesValue(CounterTy));
-    GV = new GlobalVariable(*M, CounterArrTy, false, Linkage,
-                            ConstantArray::get(CounterArrTy, InitialValues),
-                            Name);
-    GV->setAlignment(Align(1));
-  } else {
-    auto *CounterTy = ArrayType::get(Type::getInt64Ty(Ctx), NumCounters);
-    GV = new GlobalVariable(*M, CounterTy, false, Linkage,
-                            Constant::getNullValue(CounterTy), Name);
-    GV->setAlignment(Align(8));
-  }
-  return GV;
-}
-
-GlobalVariable *
-InstrProfiling::getOrCreateRegionCounters(InstrProfCntrInstBase *Inc) {
-  GlobalVariable *NamePtr = Inc->getName();
-  auto &PD = ProfileDataMap[NamePtr];
-  if (PD.RegionCounters)
-    return PD.RegionCounters;
-
-  // If RegionCounters doesn't already exist, create it by first setting up
-  // the corresponding profile section.
-  auto *CounterPtr = setupProfileSection(Inc, IPSK_cnts);
-  PD.RegionCounters = CounterPtr;
-
-  if (DebugInfoCorrelate) {
-    LLVMContext &Ctx = M->getContext();
-    Function *Fn = Inc->getParent()->getParent();
-    if (auto *SP = Fn->getSubprogram()) {
-      DIBuilder DB(*M, true, SP->getUnit());
-      Metadata *FunctionNameAnnotation[] = {
-          MDString::get(Ctx, InstrProfCorrelator::FunctionNameAttributeName),
-          MDString::get(Ctx, getPGOFuncNameVarInitializer(NamePtr)),
-      };
-      Metadata *CFGHashAnnotation[] = {
-          MDString::get(Ctx, InstrProfCorrelator::CFGHashAttributeName),
-          ConstantAsMetadata::get(Inc->getHash()),
-      };
-      Metadata *NumCountersAnnotation[] = {
-          MDString::get(Ctx, InstrProfCorrelator::NumCountersAttributeName),
-          ConstantAsMetadata::get(Inc->getNumCounters()),
-      };
-      auto Annotations = DB.getOrCreateArray({
-          MDNode::get(Ctx, FunctionNameAnnotation),
-          MDNode::get(Ctx, CFGHashAnnotation),
-          MDNode::get(Ctx, NumCountersAnnotation),
-      });
-      auto *DICounter = DB.createGlobalVariableExpression(
-          SP, CounterPtr->getName(), /*LinkageName=*/StringRef(), SP->getFile(),
-          /*LineNo=*/0, DB.createUnspecifiedType("Profile Data Type"),
-          CounterPtr->hasLocalLinkage(), /*IsDefined=*/true, /*Expr=*/nullptr,
-          /*Decl=*/nullptr, /*TemplateParams=*/nullptr, /*AlignInBits=*/0,
-          Annotations);
-      CounterPtr->addDebugInfo(DICounter);
-      DB.finalize();
-    }
-
-    // Mark the counter variable as used so that it isn't optimized out.
-    CompilerUsedVars.push_back(PD.RegionCounters);
-  }
-
-  // Create the data variable (if it doesn't already exist).
-  createDataVariable(Inc);
-
-  return PD.RegionCounters;
-}
-
-void InstrProfiling::createDataVariable(InstrProfCntrInstBase *Inc) {
-  // When debug information is correlated to profile data, a data variable
-  // is not needed.
-  if (DebugInfoCorrelate)
-    return;
-
-  GlobalVariable *NamePtr = Inc->getName();
-  auto &PD = ProfileDataMap[NamePtr];
-
-  // Return if data variable was already created.
-  if (PD.DataVar)
-    return;
-
-  LLVMContext &Ctx = M->getContext();
-
-  Function *Fn = Inc->getParent()->getParent();
-  GlobalValue::LinkageTypes Linkage = NamePtr->getLinkage();
-  GlobalValue::VisibilityTypes Visibility = NamePtr->getVisibility();
-
-  // Due to the limitation of binder as of 2021/09/28, the duplicate weak
-  // symbols in the same csect won't be discarded. When there are duplicate weak
-  // symbols, we can NOT guarantee that the relocations get resolved to the
-  // intended weak symbol, so we can not ensure the correctness of the relative
-  // CounterPtr, so we have to use private linkage for counter and data symbols.
-  if (TT.isOSBinFormatXCOFF()) {
-    Linkage = GlobalValue::PrivateLinkage;
-    Visibility = GlobalValue::DefaultVisibility;
-  }
-
   bool DataReferencedByCode = profDataReferencedByCode(*M);
   bool NeedComdat = needsComdatForCounter(*Fn, *M);
-  bool Renamed;
+  std::string CntsVarName = getVarName(Inc, getInstrProfCountersVarPrefix());
+  std::string DataVarName = getVarName(Inc, getInstrProfDataVarPrefix());
+  auto MaybeSetComdat = [&](GlobalVariable *GV) {
+    bool UseComdat = (NeedComdat || TT.isOSBinFormatELF());
+    if (UseComdat) {
+      StringRef GroupName = TT.isOSBinFormatCOFF() && DataReferencedByCode
+                                ? GV->getName()
+                                : CntsVarName;
+      Comdat *C = M->getOrInsertComdat(GroupName);
+      if (!NeedComdat)
+        C->setSelectionKind(Comdat::NoDeduplicate);
+      GV->setComdat(C);
+    }
+  };
 
-  // The Data Variable section is anchored to profile counters.
-  std::string CntsVarName =
-      getVarName(Inc, getInstrProfCountersVarPrefix(), Renamed);
-  std::string DataVarName =
-      getVarName(Inc, getInstrProfDataVarPrefix(), Renamed);
+  uint64_t NumCounters = Inc->getNumCounters()->getZExtValue();
+  LLVMContext &Ctx = M->getContext();
+  ArrayType *CounterTy = ArrayType::get(Type::getInt64Ty(Ctx), NumCounters);
 
-  auto *Int8PtrTy = PointerType::getUnqual(Ctx);
+  // Create the counters variable.
+  auto *CounterPtr =
+      new GlobalVariable(*M, CounterTy, false, Linkage,
+                         Constant::getNullValue(CounterTy), CntsVarName);
+  CounterPtr->setVisibility(Visibility);
+  CounterPtr->setSection(
+      getInstrProfSectionName(IPSK_cnts, TT.getObjectFormat()));
+  CounterPtr->setAlignment(Align(8));
+  MaybeSetComdat(CounterPtr);
+  CounterPtr->setLinkage(Linkage);
+
+  auto *Int8PtrTy = Type::getInt8PtrTy(Ctx);
   // Allocate statically the array of pointers to value profile nodes for
   // the current function.
   Constant *ValuesPtrExpr = ConstantPointerNull::get(Int8PtrTy);
@@ -1292,19 +897,15 @@ void InstrProfiling::createDataVariable(InstrProfCntrInstBase *Inc) {
     ArrayType *ValuesTy = ArrayType::get(Type::getInt64Ty(Ctx), NS);
     auto *ValuesVar = new GlobalVariable(
         *M, ValuesTy, false, Linkage, Constant::getNullValue(ValuesTy),
-        getVarName(Inc, getInstrProfValuesVarPrefix(), Renamed));
+        getVarName(Inc, getInstrProfValuesVarPrefix()));
     ValuesVar->setVisibility(Visibility);
     ValuesVar->setSection(
         getInstrProfSectionName(IPSK_vals, TT.getObjectFormat()));
     ValuesVar->setAlignment(Align(8));
-    maybeSetComdat(ValuesVar, Fn, CntsVarName);
-    ValuesPtrExpr = ValuesVar;
+    MaybeSetComdat(ValuesVar);
+    ValuesPtrExpr =
+        ConstantExpr::getBitCast(ValuesVar, Type::getInt8PtrTy(Ctx));
   }
-
-  uint64_t NumCounters = Inc->getNumCounters()->getZExtValue();
-  auto *CounterPtr = PD.RegionCounters;
-
-  uint64_t NumBitmapBytes = PD.NumBitmapBytes;
 
   // Create data variable.
   auto *IntPtrTy = M->getDataLayout().getIntPtrType(M->getContext());
@@ -1314,9 +915,11 @@ void InstrProfiling::createDataVariable(InstrProfCntrInstBase *Inc) {
 #define INSTR_PROF_DATA(Type, LLVMType, Name, Init) LLVMType,
 #include "llvm/ProfileData/InstrProfData.inc"
   };
-  auto *DataTy = StructType::get(Ctx, ArrayRef(DataTypes));
+  auto *DataTy = StructType::get(Ctx, makeArrayRef(DataTypes));
 
-  Constant *FunctionAddr = getFuncAddrForProfData(Fn);
+  Constant *FunctionAddr = shouldRecordFunctionAddr(Fn)
+                               ? ConstantExpr::getBitCast(Fn, Int8PtrTy)
+                               : ConstantPointerNull::get(Int8PtrTy);
 
   Constant *Int16ArrayVals[IPVK_Last + 1];
   for (uint32_t Kind = IPVK_First; Kind <= IPVK_Last; ++Kind)
@@ -1329,13 +932,8 @@ void InstrProfiling::createDataVariable(InstrProfCntrInstBase *Inc) {
   //
   // On COFF, a comdat leader cannot be local so we require DataReferencedByCode
   // to be false.
-  //
-  // If profd is in a deduplicate comdat, NS==0 with a hash suffix guarantees
-  // that other copies must have the same CFG and cannot have value profiling.
-  // If no hash suffix, other profd copies may be referenced by code.
-  if (NS == 0 && !(DataReferencedByCode && NeedComdat && !Renamed) &&
-      (TT.isOSBinFormatELF() ||
-       (!DataReferencedByCode && TT.isOSBinFormatCOFF()))) {
+  if (NS == 0 && (TT.isOSBinFormatELF() ||
+                  (!DataReferencedByCode && TT.isOSBinFormatCOFF()))) {
     Linkage = GlobalValue::PrivateLinkage;
     Visibility = GlobalValue::DefaultVisibility;
   }
@@ -1347,16 +945,6 @@ void InstrProfiling::createDataVariable(InstrProfCntrInstBase *Inc) {
       ConstantExpr::getSub(ConstantExpr::getPtrToInt(CounterPtr, IntPtrTy),
                            ConstantExpr::getPtrToInt(Data, IntPtrTy));
 
-  // Bitmaps are relative to the same data variable as profile counters.
-  GlobalVariable *BitmapPtr = PD.RegionBitmaps;
-  Constant *RelativeBitmapPtr = ConstantInt::get(IntPtrTy, 0);
-
-  if (BitmapPtr != nullptr) {
-    RelativeBitmapPtr =
-        ConstantExpr::getSub(ConstantExpr::getPtrToInt(BitmapPtr, IntPtrTy),
-                             ConstantExpr::getPtrToInt(Data, IntPtrTy));
-  }
-
   Constant *DataVals[] = {
 #define INSTR_PROF_DATA(Type, LLVMType, Name, Init) Init,
 #include "llvm/ProfileData/InstrProfData.inc"
@@ -1366,9 +954,12 @@ void InstrProfiling::createDataVariable(InstrProfCntrInstBase *Inc) {
   Data->setVisibility(Visibility);
   Data->setSection(getInstrProfSectionName(IPSK_data, TT.getObjectFormat()));
   Data->setAlignment(Align(INSTR_PROF_DATA_ALIGNMENT));
-  maybeSetComdat(Data, Fn, CntsVarName);
+  MaybeSetComdat(Data);
+  Data->setLinkage(Linkage);
 
+  PD.RegionCounters = CounterPtr;
   PD.DataVar = Data;
+  ProfileDataMap[NamePtr] = PD;
 
   // Mark the data variable as used so that it isn't stripped out.
   CompilerUsedVars.push_back(Data);
@@ -1378,6 +969,8 @@ void InstrProfiling::createDataVariable(InstrProfCntrInstBase *Inc) {
   NamePtr->setLinkage(GlobalValue::PrivateLinkage);
   // Collect the referenced names to be used by emitNameData.
   ReferencedNames.push_back(NamePtr);
+
+  return CounterPtr;
 }
 
 void InstrProfiling::emitVNodes() {
@@ -1416,7 +1009,7 @@ void InstrProfiling::emitVNodes() {
 #define INSTR_PROF_VALUE_NODE(Type, LLVMType, Name, Init) LLVMType,
 #include "llvm/ProfileData/InstrProfData.inc"
   };
-  auto *VNodeTy = StructType::get(Ctx, ArrayRef(VNodeTypes));
+  auto *VNodeTy = StructType::get(Ctx, makeArrayRef(VNodeTypes));
 
   ArrayType *VNodesTy = ArrayType::get(VNodeTy, NumCounters);
   auto *VNodesVar = new GlobalVariable(
@@ -1424,7 +1017,6 @@ void InstrProfiling::emitVNodes() {
       Constant::getNullValue(VNodesTy), getInstrProfVNodesVarName());
   VNodesVar->setSection(
       getInstrProfSectionName(IPSK_vnodes, TT.getObjectFormat()));
-  VNodesVar->setAlignment(M->getDataLayout().getABITypeAlign(VNodesTy));
   // VNodesVar is used by runtime but not referenced via relocation by other
   // sections. Conservatively make it linker retained.
   UsedVars.push_back(VNodesVar);
@@ -1439,12 +1031,12 @@ void InstrProfiling::emitNameData() {
   std::string CompressedNameStr;
   if (Error E = collectPGOFuncNameStrings(ReferencedNames, CompressedNameStr,
                                           DoInstrProfNameCompression)) {
-    report_fatal_error(Twine(toString(std::move(E))), false);
+    report_fatal_error(toString(std::move(E)), false);
   }
 
   auto &Ctx = M->getContext();
-  auto *NamesVal =
-      ConstantDataArray::getString(Ctx, StringRef(CompressedNameStr), false);
+  auto *NamesVal = ConstantDataArray::getString(
+      Ctx, StringRef(CompressedNameStr), false);
   NamesVar = new GlobalVariable(*M, NamesVal->getType(), true,
                                 GlobalValue::PrivateLinkage, NamesVal,
                                 getInstrProfNamesVarName());
@@ -1469,7 +1061,7 @@ void InstrProfiling::emitRegistration() {
 
   // Construct the function.
   auto *VoidTy = Type::getVoidTy(M->getContext());
-  auto *VoidPtrTy = PointerType::getUnqual(M->getContext());
+  auto *VoidPtrTy = Type::getInt8PtrTy(M->getContext());
   auto *Int64Ty = Type::getInt64Ty(M->getContext());
   auto *RegisterFTy = FunctionType::get(VoidTy, false);
   auto *RegisterF = Function::Create(RegisterFTy, GlobalValue::InternalLinkage,
@@ -1486,28 +1078,29 @@ void InstrProfiling::emitRegistration() {
   IRBuilder<> IRB(BasicBlock::Create(M->getContext(), "", RegisterF));
   for (Value *Data : CompilerUsedVars)
     if (!isa<Function>(Data))
-      IRB.CreateCall(RuntimeRegisterF, Data);
+      IRB.CreateCall(RuntimeRegisterF, IRB.CreateBitCast(Data, VoidPtrTy));
   for (Value *Data : UsedVars)
     if (Data != NamesVar && !isa<Function>(Data))
-      IRB.CreateCall(RuntimeRegisterF, Data);
+      IRB.CreateCall(RuntimeRegisterF, IRB.CreateBitCast(Data, VoidPtrTy));
 
   if (NamesVar) {
     Type *ParamTypes[] = {VoidPtrTy, Int64Ty};
     auto *NamesRegisterTy =
-        FunctionType::get(VoidTy, ArrayRef(ParamTypes), false);
+        FunctionType::get(VoidTy, makeArrayRef(ParamTypes), false);
     auto *NamesRegisterF =
         Function::Create(NamesRegisterTy, GlobalVariable::ExternalLinkage,
                          getInstrProfNamesRegFuncName(), M);
-    IRB.CreateCall(NamesRegisterF, {NamesVar, IRB.getInt64(NamesSize)});
+    IRB.CreateCall(NamesRegisterF, {IRB.CreateBitCast(NamesVar, VoidPtrTy),
+                                    IRB.getInt64(NamesSize)});
   }
 
   IRB.CreateRetVoid();
 }
 
 bool InstrProfiling::emitRuntimeHook() {
-  // We expect the linker to be invoked with -u<hook_var> flag for Linux
-  // in which case there is no need to emit the external variable.
-  if (TT.isOSLinux() || TT.isOSAIX())
+  // We expect the linker to be invoked with -u<hook_var> flag for Linux or
+  // Fuchsia, in which case there is no need to emit the user function.
+  if (TT.isOSLinux() || TT.isOSFuchsia())
     return false;
 
   // If the module's provided its own runtime, we don't need to do anything.
@@ -1519,30 +1112,24 @@ bool InstrProfiling::emitRuntimeHook() {
   auto *Var =
       new GlobalVariable(*M, Int32Ty, false, GlobalValue::ExternalLinkage,
                          nullptr, getInstrProfRuntimeHookVarName());
-  Var->setVisibility(GlobalValue::HiddenVisibility);
 
-  if (TT.isOSBinFormatELF() && !TT.isPS()) {
-    // Mark the user variable as used so that it isn't stripped out.
-    CompilerUsedVars.push_back(Var);
-  } else {
-    // Make a function that uses it.
-    auto *User = Function::Create(FunctionType::get(Int32Ty, false),
-                                  GlobalValue::LinkOnceODRLinkage,
-                                  getInstrProfRuntimeHookVarUseFuncName(), M);
-    User->addFnAttr(Attribute::NoInline);
-    if (Options.NoRedZone)
-      User->addFnAttr(Attribute::NoRedZone);
-    User->setVisibility(GlobalValue::HiddenVisibility);
-    if (TT.supportsCOMDAT())
-      User->setComdat(M->getOrInsertComdat(User->getName()));
+  // Make a function that uses it.
+  auto *User = Function::Create(FunctionType::get(Int32Ty, false),
+                                GlobalValue::LinkOnceODRLinkage,
+                                getInstrProfRuntimeHookVarUseFuncName(), M);
+  User->addFnAttr(Attribute::NoInline);
+  if (Options.NoRedZone)
+    User->addFnAttr(Attribute::NoRedZone);
+  User->setVisibility(GlobalValue::HiddenVisibility);
+  if (TT.supportsCOMDAT())
+    User->setComdat(M->getOrInsertComdat(User->getName()));
 
-    IRBuilder<> IRB(BasicBlock::Create(M->getContext(), "", User));
-    auto *Load = IRB.CreateLoad(Int32Ty, Var);
-    IRB.CreateRet(Load);
+  IRBuilder<> IRB(BasicBlock::Create(M->getContext(), "", User));
+  auto *Load = IRB.CreateLoad(Int32Ty, Var);
+  IRB.CreateRet(Load);
 
-    // Mark the function as used so that it isn't stripped out.
-    CompilerUsedVars.push_back(User);
-  }
+  // Mark the user variable as used so that it isn't stripped out.
+  CompilerUsedVars.push_back(User);
   return true;
 }
 
@@ -1551,12 +1138,12 @@ void InstrProfiling::emitUses() {
   // GlobalOpt/ConstantMerge) may not discard associated sections as a unit, so
   // we conservatively retain all unconditionally in the compiler.
   //
-  // On ELF and Mach-O, the linker can guarantee the associated sections will be
-  // retained or discarded as a unit, so llvm.compiler.used is sufficient.
-  // Similarly on COFF, if prof data is not referenced by code we use one comdat
-  // and ensure this GC property as well. Otherwise, we have to conservatively
-  // make all of the sections retained by the linker.
-  if (TT.isOSBinFormatELF() || TT.isOSBinFormatMachO() ||
+  // On ELF, the linker can guarantee the associated sections will be retained
+  // or discarded as a unit, so llvm.compiler.used is sufficient. Similarly on
+  // COFF, if prof data is not referenced by code we use one comdat and ensure
+  // this GC property as well. Otherwise, we have to conservatively make all of
+  // the sections retained by the linker.
+  if (TT.isOSBinFormatELF() ||
       (TT.isOSBinFormatCOFF() && !profDataReferencedByCode(*M)))
     appendToCompilerUsed(*M, CompilerUsedVars);
   else
@@ -1595,4 +1182,27 @@ void InstrProfiling::emitInitialization() {
   IRB.CreateRetVoid();
 
   appendToGlobalCtors(*M, F, 0);
+}
+
+bool InstrProfiling::emitBiasVar() {
+  // Module already provided its own variable, nothin to do.
+  if (M->getGlobalVariable(getInstrProfCounterBiasVarName()))
+    return false;
+
+  // Compiler must define this variable when runtime counter relocation
+  // is being used. Runtime has a weak external reference that is used
+  // to check whether that's the case or not.
+  Type *Int64Ty = Type::getInt64Ty(M->getContext());
+  auto *Bias = new GlobalVariable(*M, Int64Ty, false, GlobalValue::LinkOnceODRLinkage,
+                            Constant::getNullValue(Int64Ty),
+                            getInstrProfCounterBiasVarName());
+  Bias->setVisibility(GlobalVariable::HiddenVisibility);
+  // A definition that's weak (linkonce_odr) without being in a COMDAT
+  // section wouldn't lead to link errors, but it would lead to a dead
+  // data word from every TU but one. Putting it in COMDAT ensures there
+  // will be exactly one data slot in the link.
+  if (TT.supportsCOMDAT())
+    Bias->setComdat(M->getOrInsertComdat(Bias->getName()));
+
+  return true;
 }

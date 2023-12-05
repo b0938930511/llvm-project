@@ -17,7 +17,7 @@
 #include <foodir>
 #include "foodir/foodirheader.h"
 
-// CHECK: headerwithdirname_input{{\.o|.*\.s}}
+// CHECK: headerwithdirname_input.o
 // CHECK-NEXT: headerwithdirname_input.cpp
 // CHECK-NEXT: Inputs{{/|\\}}foodir
 

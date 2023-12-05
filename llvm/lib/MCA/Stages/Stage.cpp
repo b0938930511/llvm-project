@@ -24,6 +24,5 @@ void Stage::addListener(HWEventListener *Listener) {
   Listeners.insert(Listener);
 }
 
-char InstStreamPause::ID = 0;
 } // namespace mca
 } // namespace llvm

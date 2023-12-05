@@ -15,6 +15,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/iterator_range.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/ScheduleHazardRecognizer.h"
 #include "llvm/CodeGen/SelectionDAGNodes.h"
@@ -182,6 +183,8 @@ void SUnit::removePred(const SDep &D) {
   SUnit *N = D.getSUnit();
   SmallVectorImpl<SDep>::iterator Succ = llvm::find(N->Succs, P);
   assert(Succ != N->Succs.end() && "Mismatching preds / succs lists!");
+  N->Succs.erase(Succ);
+  Preds.erase(I);
   // Update the bookkeeping.
   if (P.getKind() == SDep::Data) {
     assert(NumPreds > 0 && "NumPreds will underflow!");
@@ -190,25 +193,21 @@ void SUnit::removePred(const SDep &D) {
     --N->NumSuccs;
   }
   if (!N->isScheduled) {
-    if (D.isWeak()) {
-      assert(WeakPredsLeft > 0 && "WeakPredsLeft will underflow!");
+    if (D.isWeak())
       --WeakPredsLeft;
-    } else {
+    else {
       assert(NumPredsLeft > 0 && "NumPredsLeft will underflow!");
       --NumPredsLeft;
     }
   }
   if (!isScheduled) {
-    if (D.isWeak()) {
-      assert(N->WeakSuccsLeft > 0 && "WeakSuccsLeft will underflow!");
+    if (D.isWeak())
       --N->WeakSuccsLeft;
-    } else {
+    else {
       assert(N->NumSuccsLeft > 0 && "NumSuccsLeft will underflow!");
       --N->NumSuccsLeft;
     }
   }
-  N->Succs.erase(Succ);
-  Preds.erase(I);
   if (P.getLatency() != 0) {
     this->setDepthDirty();
     N->setHeightDirty();
@@ -578,7 +577,8 @@ void ScheduleDAGTopologicalSort::DFS(const SUnit *SU, int UpperBound,
     SU = WorkList.back();
     WorkList.pop_back();
     Visited.set(SU->NodeNum);
-    for (const SDep &SuccDep : llvm::reverse(SU->Succs)) {
+    for (const SDep &SuccDep
+         : make_range(SU->Succs.rbegin(), SU->Succs.rend())) {
       unsigned s = SuccDep.getSUnit()->NodeNum;
       // Edges to non-SUnits are allowed but ignored (e.g. ExitSU).
       if (s >= Node2Index.size())
@@ -619,8 +619,8 @@ std::vector<int> ScheduleDAGTopologicalSort::GetSubGraph(const SUnit &StartSU,
   do {
     const SUnit *SU = WorkList.back();
     WorkList.pop_back();
-    for (const SDep &SD : llvm::reverse(SU->Succs)) {
-      const SUnit *Succ = SD.getSUnit();
+    for (int I = SU->Succs.size()-1; I >= 0; --I) {
+      const SUnit *Succ = SU->Succs[I].getSUnit();
       unsigned s = Succ->NodeNum;
       // Edges to non-SUnits are allowed but ignored (e.g. ExitSU).
       if (Succ->isBoundaryNode())
@@ -653,8 +653,8 @@ std::vector<int> ScheduleDAGTopologicalSort::GetSubGraph(const SUnit &StartSU,
   do {
     const SUnit *SU = WorkList.back();
     WorkList.pop_back();
-    for (const SDep &SD : llvm::reverse(SU->Preds)) {
-      const SUnit *Pred = SD.getSUnit();
+    for (int I = SU->Preds.size()-1; I >= 0; --I) {
+      const SUnit *Pred = SU->Preds[I].getSUnit();
       unsigned s = Pred->NodeNum;
       // Edges to non-SUnits are allowed but ignored (e.g. EntrySU).
       if (Pred->isBoundaryNode())
@@ -723,8 +723,6 @@ void ScheduleDAGTopologicalSort::AddSUnitWithoutPredecessors(const SUnit *SU) {
 
 bool ScheduleDAGTopologicalSort::IsReachable(const SUnit *SU,
                                              const SUnit *TargetSU) {
-  assert(TargetSU != nullptr && "Invalid target SUnit");
-  assert(SU != nullptr && "Invalid SUnit");
   FixOrder();
   // If insertion of the edge SU->TargetSU would create a cycle
   // then there is a path from TargetSU to SU.

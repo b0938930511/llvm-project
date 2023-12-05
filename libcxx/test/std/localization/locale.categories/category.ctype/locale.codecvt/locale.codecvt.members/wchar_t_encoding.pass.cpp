@@ -12,8 +12,6 @@
 
 // int encoding() const throw();
 
-// XFAIL: no-wide-characters
-
 #include <locale>
 #include <cassert>
 

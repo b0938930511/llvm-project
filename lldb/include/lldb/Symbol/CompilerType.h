@@ -10,18 +10,15 @@
 #define LLDB_SYMBOL_COMPILERTYPE_H
 
 #include <functional>
-#include <optional>
 #include <string>
 #include <vector>
 
 #include "lldb/lldb-private.h"
 #include "llvm/ADT/APSInt.h"
-#include "llvm/Support/Casting.h"
 
 namespace lldb_private {
 
 class DataExtractor;
-class TypeSystem;
 
 /// Generic representation of a type in a programming language.
 ///
@@ -41,82 +38,38 @@ public:
   /// implementation.
   ///
   /// \see lldb_private::TypeSystemClang::GetType(clang::QualType)
-  CompilerType(lldb::TypeSystemWP type_system,
-               lldb::opaque_compiler_type_t type);
-
-  /// This is a minimal wrapper of a TypeSystem shared pointer as
-  /// returned by CompilerType which conventien dyn_cast support.
-  class TypeSystemSPWrapper {
-    lldb::TypeSystemSP m_typesystem_sp;
-
-  public:
-    TypeSystemSPWrapper() = default;
-    TypeSystemSPWrapper(lldb::TypeSystemSP typesystem_sp)
-        : m_typesystem_sp(typesystem_sp) {}
-
-    template <class TypeSystemType> bool isa_and_nonnull() {
-      if (auto *ts = m_typesystem_sp.get())
-        return llvm::isa<TypeSystemType>(ts);
-      return false;
-    }
-
-    /// Return a shared_ptr<TypeSystemType> if dyn_cast succeeds.
-    template <class TypeSystemType>
-    std::shared_ptr<TypeSystemType> dyn_cast_or_null() {
-      if (isa_and_nonnull<TypeSystemType>())
-        return std::shared_ptr<TypeSystemType>(
-            m_typesystem_sp, llvm::cast<TypeSystemType>(m_typesystem_sp.get()));
-      return nullptr;
-    }
-
-    explicit operator bool() const {
-      return static_cast<bool>(m_typesystem_sp);
-    }
-    bool operator==(const TypeSystemSPWrapper &other) const;
-    bool operator!=(const TypeSystemSPWrapper &other) const {
-      return !(*this == other);
-    }
-
-    /// Only to be used in a one-off situations like
-    ///    if (typesystem && typesystem->method())
-    /// Do not store this pointer!
-    TypeSystem *operator->() const;
-
-    lldb::TypeSystemSP GetSharedPointer() const { return m_typesystem_sp; }
-  };
-
-  CompilerType(TypeSystemSPWrapper type_system,
-               lldb::opaque_compiler_type_t type);
+  CompilerType(TypeSystem *type_system, lldb::opaque_compiler_type_t type)
+      : m_type(type), m_type_system(type_system) {
+    assert(Verify() && "verification failed");
+  }
 
   CompilerType(const CompilerType &rhs)
-      : m_type_system(rhs.m_type_system), m_type(rhs.m_type) {}
+      : m_type(rhs.m_type), m_type_system(rhs.m_type_system) {}
 
   CompilerType() = default;
 
   /// Operators.
   /// \{
   const CompilerType &operator=(const CompilerType &rhs) {
-    m_type_system = rhs.m_type_system;
     m_type = rhs.m_type;
+    m_type_system = rhs.m_type_system;
     return *this;
   }
 
   bool operator<(const CompilerType &rhs) const {
-    auto lts = m_type_system.lock();
-    auto rts = rhs.m_type_system.lock();
-    if (lts.get() == rts.get())
+    if (m_type_system == rhs.m_type_system)
       return m_type < rhs.m_type;
-    return lts.get() < rts.get();
+    return m_type_system < rhs.m_type_system;
   }
   /// \}
 
   /// Tests.
   /// \{
   explicit operator bool() const {
-    return m_type_system.lock() && m_type;
+    return m_type != nullptr && m_type_system != nullptr;
   }
 
-  bool IsValid() const { return (bool)*this; }
+  bool IsValid() const { return m_type != nullptr && m_type_system != nullptr; }
 
   bool IsArrayType(CompilerType *element_type = nullptr,
                    uint64_t *size = nullptr,
@@ -141,6 +94,8 @@ public:
 
   bool IsConst() const;
 
+  bool IsCStringType(uint32_t &length) const;
+
   bool IsDefined() const;
 
   bool IsFloatingPointType(uint32_t &count, bool &is_complex) const;
@@ -156,8 +111,6 @@ public:
   bool IsVariadicFunctionType() const;
 
   bool IsFunctionPointerType() const;
-
-  bool IsMemberFunctionPointerType() const;
 
   bool
   IsBlockPointerType(CompilerType *function_pointer_type_ptr = nullptr) const;
@@ -189,8 +142,6 @@ public:
 
   bool IsScalarType() const;
 
-  bool IsTemplateType() const;
-
   bool IsTypedefType() const;
 
   bool IsVoidType() const;
@@ -201,8 +152,6 @@ public:
   bool GetCompleteType() const;
   /// \}
 
-  bool IsForcefullyCompleted() const;
-
   /// AST related queries.
   /// \{
   size_t GetPointerByteSize() const;
@@ -210,12 +159,9 @@ public:
 
   /// Accessors.
   /// \{
+  TypeSystem *GetTypeSystem() const { return m_type_system; }
 
-  /// Returns a shared pointer to the type system. The
-  /// TypeSystem::TypeSystemSPWrapper can be compared for equality.
-  TypeSystemSPWrapper GetTypeSystem() const;
-
-  ConstString GetTypeName(bool BaseOnly = false) const;
+  ConstString GetTypeName() const;
 
   ConstString GetDisplayTypeName() const;
 
@@ -228,9 +174,7 @@ public:
 
   lldb::TypeClass GetTypeClass() const;
 
-  void SetCompilerType(lldb::TypeSystemWP type_system,
-                       lldb::opaque_compiler_type_t type);
-  void SetCompilerType(TypeSystemSPWrapper type_system,
+  void SetCompilerType(TypeSystem *type_system,
                        lldb::opaque_compiler_type_t type);
 
   unsigned GetTypeQualifiers() const;
@@ -322,20 +266,23 @@ public:
   struct IntegralTemplateArgument;
 
   /// Return the size of the type in bytes.
-  std::optional<uint64_t> GetByteSize(ExecutionContextScope *exe_scope) const;
+  llvm::Optional<uint64_t> GetByteSize(ExecutionContextScope *exe_scope) const;
   /// Return the size of the type in bits.
-  std::optional<uint64_t> GetBitSize(ExecutionContextScope *exe_scope) const;
+  llvm::Optional<uint64_t> GetBitSize(ExecutionContextScope *exe_scope) const;
 
   lldb::Encoding GetEncoding(uint64_t &count) const;
 
   lldb::Format GetFormat() const;
 
-  std::optional<size_t> GetTypeBitAlign(ExecutionContextScope *exe_scope) const;
+  llvm::Optional<size_t>
+  GetTypeBitAlign(ExecutionContextScope *exe_scope) const;
 
   uint32_t GetNumChildren(bool omit_empty_base_classes,
                           const ExecutionContext *exe_ctx) const;
 
   lldb::BasicType GetBasicTypeEnumeration() const;
+
+  static lldb::BasicType GetBasicTypeEnumeration(ConstString name);
 
   /// If this type is an enumeration, iterate through all of its enumerators
   /// using a callback. If the callback returns true, keep iterating, else abort
@@ -378,7 +325,7 @@ public:
 
   /// Lookup a child given a name. This function will match base class names and
   /// member member names in "clang_type" only, not descendants.
-  uint32_t GetIndexOfChildWithName(llvm::StringRef name,
+  uint32_t GetIndexOfChildWithName(const char *name,
                                    bool omit_empty_base_classes) const;
 
   /// Lookup a child member given a name. This function will match member names
@@ -388,32 +335,17 @@ public:
   /// vector<vector<uint32_t>>
   /// so we catch all names that match a given child name, not just the first.
   size_t
-  GetIndexOfChildMemberWithName(llvm::StringRef name,
-                                bool omit_empty_base_classes,
+  GetIndexOfChildMemberWithName(const char *name, bool omit_empty_base_classes,
                                 std::vector<uint32_t> &child_indexes) const;
 
-  /// Return the number of template arguments the type has.
-  /// If expand_pack is true, then variadic argument packs are automatically
-  /// expanded to their supplied arguments. If it is false an argument pack
-  /// will only count as 1 argument.
-  size_t GetNumTemplateArguments(bool expand_pack = false) const;
+  size_t GetNumTemplateArguments() const;
 
-  // Return the TemplateArgumentKind of the template argument at index idx.
-  // If expand_pack is true, then variadic argument packs are automatically
-  // expanded to their supplied arguments. With expand_pack set to false, an
-  // arguement pack will count as 1 argument and return a type of Pack.
-  lldb::TemplateArgumentKind
-  GetTemplateArgumentKind(size_t idx, bool expand_pack = false) const;
-  CompilerType GetTypeTemplateArgument(size_t idx,
-                                       bool expand_pack = false) const;
+  lldb::TemplateArgumentKind GetTemplateArgumentKind(size_t idx) const;
+  CompilerType GetTypeTemplateArgument(size_t idx) const;
 
   /// Returns the value of the template argument and its type.
-  /// If expand_pack is true, then variadic argument packs are automatically
-  /// expanded to their supplied arguments. With expand_pack set to false, an
-  /// arguement pack will count as 1 argument and it is invalid to call this
-  /// method on the pack argument.
-  std::optional<IntegralTemplateArgument>
-  GetIntegralTemplateArgument(size_t idx, bool expand_pack = false) const;
+  llvm::Optional<IntegralTemplateArgument>
+  GetIntegralTemplateArgument(size_t idx) const;
 
   CompilerType GetTypeForFormatters() const;
 
@@ -430,10 +362,20 @@ public:
   LLVM_DUMP_METHOD void dump() const;
 #endif
 
+  void DumpValue(ExecutionContext *exe_ctx, Stream *s, lldb::Format format,
+                 const DataExtractor &data, lldb::offset_t data_offset,
+                 size_t data_byte_size, uint32_t bitfield_bit_size,
+                 uint32_t bitfield_bit_offset, bool show_types,
+                 bool show_summary, bool verbose, uint32_t depth);
+
   bool DumpTypeValue(Stream *s, lldb::Format format, const DataExtractor &data,
                      lldb::offset_t data_offset, size_t data_byte_size,
                      uint32_t bitfield_bit_size, uint32_t bitfield_bit_offset,
                      ExecutionContextScope *exe_scope);
+
+  void DumpSummary(ExecutionContext *exe_ctx, Stream *s,
+                   const DataExtractor &data, lldb::offset_t data_offset,
+                   size_t data_byte_size);
 
   /// Dump to stdout.
   void DumpTypeDescription(lldb::DescriptionLevel level =
@@ -451,8 +393,8 @@ public:
                         size_t data_byte_size, Scalar &value,
                         ExecutionContextScope *exe_scope) const;
   void Clear() {
-    m_type_system = {};
     m_type = nullptr;
+    m_type_system = nullptr;
   }
 
 private:
@@ -463,8 +405,8 @@ private:
   bool Verify() const;
 #endif
 
-  lldb::TypeSystemWP m_type_system;
   lldb::opaque_compiler_type_t m_type = nullptr;
+  TypeSystem *m_type_system = nullptr;
 };
 
 bool operator==(const CompilerType &lhs, const CompilerType &rhs);

@@ -6,7 +6,7 @@
 
 #include "html-diag-singlefile.h"
 
-int main(void){
+int main(){
   f();
   return 0;
 }

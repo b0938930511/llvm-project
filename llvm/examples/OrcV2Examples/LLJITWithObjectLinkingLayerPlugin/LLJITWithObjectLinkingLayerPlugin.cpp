@@ -83,11 +83,11 @@ public:
     return Error::success();
   }
 
-  Error notifyRemovingResources(JITDylib &JD, ResourceKey K) override {
+  Error notifyRemovingResources(ResourceKey K) override {
     return Error::success();
   }
 
-  void notifyTransferringResources(JITDylib &JD, ResourceKey DstKey,
+  void notifyTransferringResources(ResourceKey DstKey,
                                    ResourceKey SrcKey) override {}
 
 private:
@@ -100,15 +100,14 @@ private:
       return;
     }
 
-    ExecutorAddr InitAddr(B.getAddress().getValue() & ~(LineWidth - 1));
-    ExecutorAddr StartAddr = B.getAddress();
-    ExecutorAddr EndAddr = B.getAddress() + B.getSize();
+    JITTargetAddress InitAddr = B.getAddress() & ~(LineWidth - 1);
+    JITTargetAddress StartAddr = B.getAddress();
+    JITTargetAddress EndAddr = B.getAddress() + B.getSize();
     auto *Data = reinterpret_cast<const uint8_t *>(B.getContent().data());
 
-    for (ExecutorAddr CurAddr = InitAddr; CurAddr != EndAddr; ++CurAddr) {
+    for (JITTargetAddress CurAddr = InitAddr; CurAddr != EndAddr; ++CurAddr) {
       if (CurAddr % LineWidth == 0)
-        outs() << "          " << formatv("{0:x16}", CurAddr.getValue())
-               << ": ";
+        outs() << "          " << formatv("{0:x16}", CurAddr) << ": ";
       if (CurAddr < StartAddr)
         outs() << "   ";
       else
@@ -157,7 +156,7 @@ private:
         printBlockContent(B);
         BlocksAlreadyVisited.insert(&B);
 
-        if (!B.edges().empty()) {
+        if (!llvm::empty(B.edges())) {
           outs() << "        Edges:\n";
           for (auto &E : B.edges()) {
             outs() << "          "
@@ -183,7 +182,7 @@ static cl::opt<std::string>
     EntryPointName("entry", cl::desc("Symbol to call as main entry point"),
                    cl::init("entry"));
 
-static cl::list<std::string> InputObjects(cl::Positional,
+static cl::list<std::string> InputObjects(cl::Positional, cl::ZeroOrMore,
                                           cl::desc("input objects"));
 
 int main(int argc, char *argv[]) {
@@ -210,7 +209,7 @@ int main(int argc, char *argv[]) {
               [&](ExecutionSession &ES, const Triple &TT) {
                 // Create ObjectLinkingLayer.
                 auto ObjLinkingLayer = std::make_unique<ObjectLinkingLayer>(
-                    ES, ExitOnErr(jitlink::InProcessMemoryManager::Create()));
+                    ES, std::make_unique<jitlink::InProcessMemoryManager>());
                 // Add an instance of our plugin.
                 ObjLinkingLayer->addPlugin(std::make_unique<MyPlugin>());
                 return ObjLinkingLayer;
@@ -218,6 +217,13 @@ int main(int argc, char *argv[]) {
           .create());
 
   if (!InputObjects.empty()) {
+
+    // If we have input objects then reflect process symbols so the input
+    // objects can do interesting things, like call printf.
+    J->getMainJITDylib().addGenerator(
+        ExitOnErr(DynamicLibrarySearchGenerator::GetForCurrentProcess(
+            J->getDataLayout().getGlobalPrefix())));
+
     // Load the input objects.
     for (auto InputObject : InputObjects) {
       auto ObjBuffer =
@@ -234,8 +240,8 @@ int main(int argc, char *argv[]) {
   }
 
   // Look up the JIT'd function, cast it to a function pointer, then call it.
-  auto EntryAddr = ExitOnErr(J->lookup(EntryPointName));
-  auto *Entry = EntryAddr.toPtr<int()>();
+  auto EntrySym = ExitOnErr(J->lookup(EntryPointName));
+  auto *Entry = (int (*)())EntrySym.getAddress();
 
   int Result = Entry();
   outs() << "---Result---\n"

@@ -1,8 +1,9 @@
 //===--- MacroExpander.cpp - Format C++ code --------------------*- C++ -*-===//
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//                     The LLVM Compiler Infrastructure
+//
+// This file is distributed under the University of Illinois Open Source
+// License. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -52,10 +53,10 @@ public:
     Current = Tokens[0];
   }
 
-  // Parse the token stream and return the corresponding Definition object.
+  // Parse the token stream and return the corresonding Definition object.
   // Returns an empty definition object with a null-Name on error.
   MacroExpander::Definition parse() {
-    if (Current->isNot(tok::identifier))
+    if (!Current->is(tok::identifier))
       return {};
     Def.Name = Current->TokenText;
     nextToken();
@@ -125,8 +126,9 @@ MacroExpander::MacroExpander(
     IdentifierTable &IdentTable)
     : SourceMgr(SourceMgr), Style(Style), Allocator(Allocator),
       IdentTable(IdentTable) {
-  for (const std::string &Macro : Macros)
+  for (const std::string &Macro : Macros) {
     parseDefinition(Macro);
+  }
 }
 
 MacroExpander::~MacroExpander() = default;
@@ -141,42 +143,24 @@ void MacroExpander::parseDefinition(const std::string &Macro) {
   if (!Tokens.empty()) {
     DefinitionParser Parser(Tokens);
     auto Definition = Parser.parse();
-    if (Definition.ObjectLike) {
-      ObjectLike[Definition.Name] = std::move(Definition);
-    } else {
-      FunctionLike[Definition.Name][Definition.Params.size()] =
-          std::move(Definition);
-    }
+    Definitions[Definition.Name] = std::move(Definition);
   }
 }
 
 bool MacroExpander::defined(llvm::StringRef Name) const {
-  return FunctionLike.contains(Name) || ObjectLike.contains(Name);
+  return Definitions.find(Name) != Definitions.end();
 }
 
 bool MacroExpander::objectLike(llvm::StringRef Name) const {
-  return ObjectLike.contains(Name);
+  return Definitions.find(Name)->second.ObjectLike;
 }
 
-bool MacroExpander::hasArity(llvm::StringRef Name, unsigned Arity) const {
-  auto it = FunctionLike.find(Name);
-  return it != FunctionLike.end() && it->second.contains(Arity);
-}
-
-llvm::SmallVector<FormatToken *, 8>
-MacroExpander::expand(FormatToken *ID,
-                      std::optional<ArgsList> OptionalArgs) const {
-  if (OptionalArgs)
-    assert(hasArity(ID->TokenText, OptionalArgs->size()));
-  else
-    assert(objectLike(ID->TokenText));
-  const Definition &Def = OptionalArgs
-                              ? FunctionLike.find(ID->TokenText)
-                                    ->second.find(OptionalArgs.value().size())
-                                    ->second
-                              : ObjectLike.find(ID->TokenText)->second;
-  ArgsList Args = OptionalArgs ? OptionalArgs.value() : ArgsList();
+llvm::SmallVector<FormatToken *, 8> MacroExpander::expand(FormatToken *ID,
+                                                          ArgsList Args) const {
+  assert(defined(ID->TokenText));
   SmallVector<FormatToken *, 8> Result;
+  const Definition &Def = Definitions.find(ID->TokenText)->second;
+
   // Expand each argument at most once.
   llvm::StringSet<> ExpandedArgs;
 
@@ -191,7 +175,7 @@ MacroExpander::expand(FormatToken *ID,
   auto expandArgument = [&](FormatToken *Tok) -> bool {
     // If the current token references a parameter, expand the corresponding
     // argument.
-    if (Tok->isNot(tok::identifier) || ExpandedArgs.contains(Tok->TokenText))
+    if (!Tok->is(tok::identifier) || ExpandedArgs.contains(Tok->TokenText))
       return false;
     ExpandedArgs.insert(Tok->TokenText);
     auto I = Def.ArgMap.find(Tok->TokenText);

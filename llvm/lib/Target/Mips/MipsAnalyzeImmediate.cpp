@@ -25,8 +25,8 @@ void MipsAnalyzeImmediate::AddInstr(InstSeqLs &SeqLs, const Inst &I) {
     return;
   }
 
-  for (auto &S : SeqLs)
-    S.push_back(I);
+  for (InstSeqLs::iterator Iter = SeqLs.begin(); Iter != SeqLs.end(); ++Iter)
+    Iter->push_back(I);
 }
 
 void MipsAnalyzeImmediate::GetInstSeqLsADDiu(uint64_t Imm, unsigned RemSize,
@@ -43,7 +43,7 @@ void MipsAnalyzeImmediate::GetInstSeqLsORi(uint64_t Imm, unsigned RemSize,
 
 void MipsAnalyzeImmediate::GetInstSeqLsSLL(uint64_t Imm, unsigned RemSize,
                                            InstSeqLs &SeqLs) {
-  unsigned Shamt = llvm::countr_zero(Imm);
+  unsigned Shamt = countTrailingZeros(Imm);
   GetInstSeqLs(Imm >> Shamt, RemSize - Shamt, SeqLs);
   AddInstr(SeqLs, Inst(SLL, Shamt));
 }

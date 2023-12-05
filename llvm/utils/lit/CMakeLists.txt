@@ -4,6 +4,8 @@
 configure_lit_site_cfg(
   "${CMAKE_CURRENT_SOURCE_DIR}/tests/lit.site.cfg.in"
   "${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg"
+  OUTPUT_MAPPING
+  "${CMAKE_CURRENT_BINARY_DIR}/tests/lit.site.cfg"
   )
 
 # Lit's test suite creates output files next to the sources which makes the

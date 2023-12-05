@@ -2,7 +2,7 @@
 
 // This test should not exhibit use-after-free in LoopInfo.
 
-int a(void) {
+int a() {
   for (;;)
     for (;;)
       for (;;)

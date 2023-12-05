@@ -13,7 +13,7 @@ typedef struct {
 
 int foo(foostruct ic);
 
-void test(void) {
+void test() {
   foostruct xqic;
   foo(xqic);
 }

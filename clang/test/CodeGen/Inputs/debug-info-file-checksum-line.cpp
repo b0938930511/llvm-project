@@ -3,7 +3,7 @@ int foo(int x) {
 }
 
 #line 100
-void test1(void) {}
+void test1() {}
 
 #line 200
-void test2(void) {}
+void test2() {}

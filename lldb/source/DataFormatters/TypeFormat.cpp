@@ -23,7 +23,6 @@
 #include "lldb/Target/Target.h"
 #include "lldb/Utility/DataExtractor.h"
 #include "lldb/Utility/StreamString.h"
-#include <optional>
 
 using namespace lldb;
 using namespace lldb_private;
@@ -78,12 +77,11 @@ bool TypeFormatImpl_Format::FormatObject(ValueObject *valobj,
             if (target_sp) {
               size_t max_len = target_sp->GetMaximumSizeOfStringSummary();
               Status error;
-              WritableDataBufferSP buffer_sp(
-                  new DataBufferHeap(max_len + 1, 0));
+              DataBufferSP buffer_sp(new DataBufferHeap(max_len + 1, 0));
               Address address(valobj->GetPointerValue());
-              target_sp->ReadCStringFromMemory(
-                  address, (char *)buffer_sp->GetBytes(), max_len, error);
-              if (error.Success())
+              if (target_sp->ReadCStringFromMemory(
+                      address, (char *)buffer_sp->GetBytes(), max_len, error) &&
+                  error.Success())
                 data.SetData(buffer_sp);
             }
           }
@@ -96,7 +94,7 @@ bool TypeFormatImpl_Format::FormatObject(ValueObject *valobj,
 
         ExecutionContextScope *exe_scope =
             exe_ctx.GetBestExecutionContextScope();
-        std::optional<uint64_t> size = compiler_type.GetByteSize(exe_scope);
+        llvm::Optional<uint64_t> size = compiler_type.GetByteSize(exe_scope);
         if (!size)
           return false;
         StreamString sstr;

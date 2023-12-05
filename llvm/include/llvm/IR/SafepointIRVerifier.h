@@ -37,7 +37,7 @@ FunctionPass *createSafepointIRVerifierPass();
 class SafepointIRVerifierPass : public PassInfoMixin<SafepointIRVerifierPass> {
 
 public:
-  explicit SafepointIRVerifierPass() = default;
+  explicit SafepointIRVerifierPass() {}
 
   PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
 };

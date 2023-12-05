@@ -20,7 +20,7 @@ public:
   CFCString(const char *s, CFStringEncoding encoding = kCFStringEncodingUTF8);
   CFCString(const CFCString &rhs);
   CFCString &operator=(const CFCString &rhs);
-  ~CFCString() override;
+  virtual ~CFCString();
 
   const char *GetFileSystemRepresentation(std::string &str);
   CFStringRef SetFileSystemRepresentation(const char *path);

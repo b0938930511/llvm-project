@@ -22,7 +22,8 @@
 #include "asan_testing.h"
 
 template <class C>
-TEST_CONSTEXPR_CXX20 void test0()
+void
+test0()
 {
 #if TEST_STD_VER > 14
     static_assert((noexcept(C{})), "" );
@@ -44,7 +45,8 @@ TEST_CONSTEXPR_CXX20 void test0()
 }
 
 template <class C>
-TEST_CONSTEXPR_CXX20 void test1(const typename C::allocator_type& a)
+void
+test1(const typename C::allocator_type& a)
 {
 #if TEST_STD_VER > 14
     static_assert((noexcept(C{typename C::allocator_type{}})), "" );
@@ -58,7 +60,8 @@ TEST_CONSTEXPR_CXX20 void test1(const typename C::allocator_type& a)
     LIBCPP_ASSERT(is_contiguous_container_asan_correct(c));
 }
 
-TEST_CONSTEXPR_CXX20 bool tests() {
+int main(int, char**)
+{
     {
     test0<std::vector<int> >();
     test0<std::vector<NotConstructible> >();
@@ -96,14 +99,5 @@ TEST_CONSTEXPR_CXX20 bool tests() {
     }
 #endif
 
-    return true;
-}
-
-int main(int, char**)
-{
-    tests();
-#if TEST_STD_VER > 17
-    static_assert(tests());
-#endif
-    return 0;
+  return 0;
 }

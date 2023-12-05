@@ -15,8 +15,6 @@
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/InitializePasses.h"
-#include "llvm/Pass.h"
-#include "llvm/PassRegistry.h"
 #include "llvm/Support/CommandLine.h"
 
 using namespace llvm;
@@ -75,7 +73,7 @@ void MachineDominatorTree::releaseMemory() {
 
 void MachineDominatorTree::verifyAnalysis() const {
   if (DT && VerifyMachineDomInfo)
-    if (!DT->verify(MachineDomTree::VerificationLevel::Basic)) {
+    if (!DT->verify(DomTreeT::VerificationLevel::Basic)) {
       errs() << "MachineDominatorTree verification failed\n";
       abort();
     }

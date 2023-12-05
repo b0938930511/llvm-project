@@ -43,6 +43,7 @@ namespace {
     }
 
     const PPCInstrInfo *TII;
+    LiveIntervals *LIS;
 
 protected:
     bool processBlock(MachineBasicBlock &MBB) {
@@ -56,16 +57,13 @@ protected:
            I != IE;) {
         MachineInstr &MI = *I;
         IsPCREL = isPCREL(MI);
-        // There are a number of slight differences in code generation
-        // when we call .__get_tpointer (32-bit AIX TLS).
-        bool IsTLSTPRelMI = MI.getOpcode() == PPC::GETtlsTpointer32AIX;
 
         if (MI.getOpcode() != PPC::ADDItlsgdLADDR &&
             MI.getOpcode() != PPC::ADDItlsldLADDR &&
             MI.getOpcode() != PPC::ADDItlsgdLADDR32 &&
             MI.getOpcode() != PPC::ADDItlsldLADDR32 &&
             MI.getOpcode() != PPC::TLSGDAIX &&
-            MI.getOpcode() != PPC::TLSGDAIX8 && !IsTLSTPRelMI && !IsPCREL) {
+            MI.getOpcode() != PPC::TLSGDAIX8 && !IsPCREL) {
           // Although we create ADJCALLSTACKDOWN and ADJCALLSTACKUP
           // as scheduling fences, we skip creating fences if we already
           // have existing ADJCALLSTACKDOWN/UP to avoid nesting,
@@ -85,8 +83,11 @@ protected:
         Register InReg = PPC::NoRegister;
         Register GPR3 = Is64Bit ? PPC::X3 : PPC::R3;
         Register GPR4 = Is64Bit ? PPC::X4 : PPC::R4;
-        if (!IsPCREL && !IsTLSTPRelMI)
+        SmallVector<Register, 3> OrigRegs = {OutReg, GPR3};
+        if (!IsPCREL) {
           InReg = MI.getOperand(1).getReg();
+          OrigRegs.push_back(InReg);
+        }
         DebugLoc DL = MI.getDebugLoc();
 
         unsigned Opc1, Opc2;
@@ -119,12 +120,6 @@ protected:
           // set Opc2 here.
           Opc2 = PPC::GETtlsADDR32AIX;
           break;
-        case PPC::GETtlsTpointer32AIX:
-          // GETtlsTpointer32AIX is expanded to a call to GET_TPOINTER on AIX
-          // 32-bit mode within PPCAsmPrinter. This instruction does not need
-          // to change, so Opc2 is set to the same instruction opcode.
-          Opc2 = PPC::GETtlsTpointer32AIX;
-          break;
         case PPC::PADDI8pc:
           assert(IsPCREL && "Expecting General/Local Dynamic PCRel");
           Opc1 = PPC::PADDI8pc;
@@ -144,20 +139,19 @@ protected:
           BuildMI(MBB, I, DL, TII->get(PPC::ADJCALLSTACKDOWN)).addImm(0)
                                                               .addImm(0);
 
+        // The ADDItls* instruction is the first instruction in the
+        // repair range.
+        MachineBasicBlock::iterator First = I;
+        --First;
+
         if (IsAIX) {
           // The variable offset and region handle are copied in r4 and r3. The
           // copies are followed by GETtlsADDR32AIX/GETtlsADDR64AIX.
-          if (!IsTLSTPRelMI) {
-            BuildMI(MBB, I, DL, TII->get(TargetOpcode::COPY), GPR4)
-                .addReg(MI.getOperand(1).getReg());
-            BuildMI(MBB, I, DL, TII->get(TargetOpcode::COPY), GPR3)
-                .addReg(MI.getOperand(2).getReg());
-            BuildMI(MBB, I, DL, TII->get(Opc2), GPR3).addReg(GPR3).addReg(GPR4);
-          } else
-            // The opcode of GETtlsTpointer32AIX does not change, because later
-            // this instruction will be expanded into a call to .__get_tpointer,
-            // which will return the thread pointer into r3.
-            BuildMI(MBB, I, DL, TII->get(Opc2), GPR3);
+          BuildMI(MBB, I, DL, TII->get(TargetOpcode::COPY), GPR4)
+              .addReg(MI.getOperand(1).getReg());
+          BuildMI(MBB, I, DL, TII->get(TargetOpcode::COPY), GPR3)
+              .addReg(MI.getOperand(2).getReg());
+          BuildMI(MBB, I, DL, TII->get(Opc2), GPR3).addReg(GPR3).addReg(GPR4);
         } else {
           MachineInstr *Addi;
           if (IsPCREL) {
@@ -183,10 +177,16 @@ protected:
         BuildMI(MBB, I, DL, TII->get(TargetOpcode::COPY), OutReg)
           .addReg(GPR3);
 
+        // The COPY is the last instruction in the repair range.
+        MachineBasicBlock::iterator Last = I;
+        --Last;
+
         // Move past the original instruction and remove it.
         ++I;
         MI.removeFromParent();
 
+        // Repair the live intervals.
+        LIS->repairIntervalsInRange(&MBB, First, Last, OrigRegs);
         Changed = true;
       }
 
@@ -204,19 +204,24 @@ public:
 
     bool runOnMachineFunction(MachineFunction &MF) override {
       TII = MF.getSubtarget<PPCSubtarget>().getInstrInfo();
+      LIS = &getAnalysis<LiveIntervals>();
 
       bool Changed = false;
 
-      for (MachineBasicBlock &B : llvm::make_early_inc_range(MF))
+      for (MachineFunction::iterator I = MF.begin(); I != MF.end();) {
+        MachineBasicBlock &B = *I++;
         if (processBlock(B))
           Changed = true;
+      }
 
       return Changed;
     }
 
     void getAnalysisUsage(AnalysisUsage &AU) const override {
       AU.addRequired<LiveIntervals>();
+      AU.addPreserved<LiveIntervals>();
       AU.addRequired<SlotIndexes>();
+      AU.addPreserved<SlotIndexes>();
       MachineFunctionPass::getAnalysisUsage(AU);
     }
   };

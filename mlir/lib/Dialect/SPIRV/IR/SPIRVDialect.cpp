@@ -11,25 +11,22 @@
 //===----------------------------------------------------------------------===//
 
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
-
-#include "SPIRVParsingUtils.h"
-
-#include "mlir/Dialect/GPU/IR/CompilationInterfaces.h"
+#include "mlir/Dialect/SPIRV/IR/ParserUtils.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVTypes.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
-#include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/MLIRContext.h"
-#include "mlir/Parser/Parser.h"
+#include "mlir/Parser.h"
 #include "mlir/Transforms/InliningUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Sequence.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -42,8 +39,7 @@ using namespace mlir::spirv;
 // InlinerInterface
 //===----------------------------------------------------------------------===//
 
-/// Returns true if the given region contains spirv.Return or spirv.ReturnValue
-/// ops.
+/// Returns true if the given region contains spv.Return or spv.ReturnValue ops.
 static inline bool containsReturn(Region &region) {
   return llvm::any_of(region, [](Block &block) {
     Operation *terminator = block.getTerminator();
@@ -65,9 +61,9 @@ struct SPIRVInlinerInterface : public DialectInlinerInterface {
   /// Returns true if the given region 'src' can be inlined into the region
   /// 'dest' that is attached to an operation registered to the current dialect.
   bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
-                       IRMapping &) const final {
-    // Return true here when inlining into spirv.func, spirv.mlir.selection, and
-    // spirv.mlir.loop operations.
+                       BlockAndValueMapping &) const final {
+    // Return true here when inlining into spv.func, spv.mlir.selection, and
+    // spv.mlir.loop operations.
     auto *op = dest->getParentOp();
     return isa<spirv::FuncOp, spirv::SelectionOp, spirv::LoopOp>(op);
   }
@@ -76,7 +72,7 @@ struct SPIRVInlinerInterface : public DialectInlinerInterface {
   /// dialect, can be inlined into the region 'dest' that is attached to an
   /// operation registered to the current dialect.
   bool isLegalToInline(Operation *op, Region *dest, bool wouldBeCloned,
-                       IRMapping &) const final {
+                       BlockAndValueMapping &) const final {
     // TODO: Enable inlining structured control flows with return.
     if ((isa<spirv::SelectionOp, spirv::LoopOp>(op)) &&
         containsReturn(op->getRegion(0)))
@@ -95,22 +91,23 @@ struct SPIRVInlinerInterface : public DialectInlinerInterface {
       OpBuilder(op).create<spirv::BranchOp>(op->getLoc(), newDest);
       op->erase();
     } else if (auto retValOp = dyn_cast<spirv::ReturnValueOp>(op)) {
-      llvm_unreachable("unimplemented spirv.ReturnValue in inliner");
+      llvm_unreachable("unimplemented spv.ReturnValue in inliner");
     }
   }
 
   /// Handle the given inlined terminator by replacing it with a new operation
   /// as necessary.
-  void handleTerminator(Operation *op, ValueRange valuesToRepl) const final {
-    // Only spirv.ReturnValue needs to be handled here.
+  void handleTerminator(Operation *op,
+                        ArrayRef<Value> valuesToRepl) const final {
+    // Only spv.ReturnValue needs to be handled here.
     auto retValOp = dyn_cast<spirv::ReturnValueOp>(op);
     if (!retValOp)
       return;
 
     // Replace the values directly with the return operands.
     assert(valuesToRepl.size() == 1 &&
-           "spirv.ReturnValue expected to only handle one result");
-    valuesToRepl.front().replaceAllUsesWith(retValOp.getValue());
+           "spv.ReturnValue expected to only handle one result");
+    valuesToRepl.front().replaceAllUsesWith(retValOp.value());
   }
 };
 } // namespace
@@ -133,7 +130,6 @@ void SPIRVDialect::initialize() {
 
   // Allow unknown operations because SPIR-V is extensible.
   allowUnknownOperations();
-  declarePromisedInterface<TargetEnvAttr, gpu::TargetAttrInterface>();
 }
 
 std::string SPIRVDialect::getAttributeName(Decoration decoration) {
@@ -146,20 +142,20 @@ std::string SPIRVDialect::getAttributeName(Decoration decoration) {
 
 // Forward declarations.
 template <typename ValTy>
-static std::optional<ValTy> parseAndVerify(SPIRVDialect const &dialect,
-                                           DialectAsmParser &parser);
+static Optional<ValTy> parseAndVerify(SPIRVDialect const &dialect,
+                                      DialectAsmParser &parser);
 template <>
-std::optional<Type> parseAndVerify<Type>(SPIRVDialect const &dialect,
-                                         DialectAsmParser &parser);
+Optional<Type> parseAndVerify<Type>(SPIRVDialect const &dialect,
+                                    DialectAsmParser &parser);
 
 template <>
-std::optional<unsigned> parseAndVerify<unsigned>(SPIRVDialect const &dialect,
-                                                 DialectAsmParser &parser);
+Optional<unsigned> parseAndVerify<unsigned>(SPIRVDialect const &dialect,
+                                            DialectAsmParser &parser);
 
 static Type parseAndVerifyType(SPIRVDialect const &dialect,
                                DialectAsmParser &parser) {
   Type type;
-  SMLoc typeLoc = parser.getCurrentLocation();
+  llvm::SMLoc typeLoc = parser.getCurrentLocation();
   if (parser.parseType(type))
     return Type();
 
@@ -168,19 +164,19 @@ static Type parseAndVerifyType(SPIRVDialect const &dialect,
     return type;
 
   // Check other allowed types
-  if (auto t = llvm::dyn_cast<FloatType>(type)) {
+  if (auto t = type.dyn_cast<FloatType>()) {
     if (type.isBF16()) {
       parser.emitError(typeLoc, "cannot use 'bf16' to compose SPIR-V types");
       return Type();
     }
-  } else if (auto t = llvm::dyn_cast<IntegerType>(type)) {
+  } else if (auto t = type.dyn_cast<IntegerType>()) {
     if (!ScalarType::isValid(t)) {
       parser.emitError(typeLoc,
                        "only 1/8/16/32/64-bit integer type allowed but found ")
           << type;
       return Type();
     }
-  } else if (auto t = llvm::dyn_cast<VectorType>(type)) {
+  } else if (auto t = type.dyn_cast<VectorType>()) {
     if (t.getRank() != 1) {
       parser.emitError(typeLoc, "only 1-D vector allowed but found ") << t;
       return Type();
@@ -203,11 +199,11 @@ static Type parseAndVerifyType(SPIRVDialect const &dialect,
 static Type parseAndVerifyMatrixType(SPIRVDialect const &dialect,
                                      DialectAsmParser &parser) {
   Type type;
-  SMLoc typeLoc = parser.getCurrentLocation();
+  llvm::SMLoc typeLoc = parser.getCurrentLocation();
   if (parser.parseType(type))
     return Type();
 
-  if (auto t = llvm::dyn_cast<VectorType>(type)) {
+  if (auto t = type.dyn_cast<VectorType>()) {
     if (t.getRank() != 1) {
       parser.emitError(typeLoc, "only 1-D vector allowed but found ") << t;
       return Type();
@@ -220,7 +216,7 @@ static Type parseAndVerifyMatrixType(SPIRVDialect const &dialect,
       return Type();
     }
 
-    if (!llvm::isa<FloatType>(t.getElementType())) {
+    if (!t.getElementType().isa<FloatType>()) {
       parser.emitError(typeLoc, "matrix columns' elements must be of "
                                 "Float type, got ")
           << t.getElementType();
@@ -239,11 +235,11 @@ static Type parseAndVerifyMatrixType(SPIRVDialect const &dialect,
 static Type parseAndVerifySampledImageType(SPIRVDialect const &dialect,
                                            DialectAsmParser &parser) {
   Type type;
-  SMLoc typeLoc = parser.getCurrentLocation();
+  llvm::SMLoc typeLoc = parser.getCurrentLocation();
   if (parser.parseType(type))
     return Type();
 
-  if (!llvm::isa<ImageType>(type)) {
+  if (!type.isa<ImageType>()) {
     parser.emitError(typeLoc,
                      "sampled image must be composed using image type, got ")
         << type;
@@ -267,12 +263,12 @@ static LogicalResult parseOptionalArrayStride(const SPIRVDialect &dialect,
   if (parser.parseKeyword("stride") || parser.parseEqual())
     return failure();
 
-  SMLoc strideLoc = parser.getCurrentLocation();
-  std::optional<unsigned> optStride = parseAndVerify<unsigned>(dialect, parser);
+  llvm::SMLoc strideLoc = parser.getCurrentLocation();
+  Optional<unsigned> optStride = parseAndVerify<unsigned>(dialect, parser);
   if (!optStride)
     return failure();
 
-  if (!(stride = *optStride)) {
+  if (!(stride = optStride.getValue())) {
     parser.emitError(strideLoc, "ArrayStride must be greater than zero");
     return failure();
   }
@@ -284,7 +280,7 @@ static LogicalResult parseOptionalArrayStride(const SPIRVDialect &dialect,
 //                | vector-type
 //                | spirv-type
 //
-// array-type ::= `!spirv.array` `<` integer-literal `x` element-type
+// array-type ::= `!spv.array` `<` integer-literal `x` element-type
 //                (`,` `stride` `=` integer-literal)? `>`
 static Type parseArrayType(SPIRVDialect const &dialect,
                            DialectAsmParser &parser) {
@@ -292,7 +288,7 @@ static Type parseArrayType(SPIRVDialect const &dialect,
     return Type();
 
   SmallVector<int64_t, 1> countDims;
-  SMLoc countLoc = parser.getCurrentLocation();
+  llvm::SMLoc countLoc = parser.getCurrentLocation();
   if (parser.parseDimensionList(countDims, /*allowDynamic=*/false))
     return Type();
   if (countDims.size() != 1) {
@@ -322,53 +318,15 @@ static Type parseArrayType(SPIRVDialect const &dialect,
   return ArrayType::get(elementType, count, stride);
 }
 
-// cooperative-matrix-type ::=
-//   `!spirv.coopmatrix` `<` rows `x` columns `x` element-type `,`
-//                           scope `,` use `>`
+// cooperative-matrix-type ::= `!spv.coopmatrix` `<` element-type ',' scope ','
+//                                                   rows ',' columns>`
 static Type parseCooperativeMatrixType(SPIRVDialect const &dialect,
                                        DialectAsmParser &parser) {
-  if (parser.parseLess())
-    return {};
-
-  SmallVector<int64_t, 2> dims;
-  SMLoc countLoc = parser.getCurrentLocation();
-  if (parser.parseDimensionList(dims, /*allowDynamic=*/false))
-    return {};
-
-  if (dims.size() != 2) {
-    parser.emitError(countLoc, "expected row and column count");
-    return {};
-  }
-
-  auto elementTy = parseAndVerifyType(dialect, parser);
-  if (!elementTy)
-    return {};
-
-  Scope scope;
-  if (parser.parseComma() ||
-      spirv::parseEnumKeywordAttr(scope, parser, "scope <id>"))
-    return {};
-
-  CooperativeMatrixUseKHR use;
-  if (parser.parseComma() ||
-      spirv::parseEnumKeywordAttr(use, parser, "use <id>"))
-    return {};
-
-  if (parser.parseGreater())
-    return {};
-
-  return CooperativeMatrixType::get(elementTy, dims[0], dims[1], scope, use);
-}
-
-// nv-cooperative-matrix-type ::=
-//   `!spirv.NV.coopmatrix` `<` rows `x` columns `x` element-type `,` scope `>`
-static Type parseCooperativeMatrixNVType(SPIRVDialect const &dialect,
-                                         DialectAsmParser &parser) {
   if (parser.parseLess())
     return Type();
 
   SmallVector<int64_t, 2> dims;
-  SMLoc countLoc = parser.getCurrentLocation();
+  llvm::SMLoc countLoc = parser.getCurrentLocation();
   if (parser.parseDimensionList(dims, /*allowDynamic=*/false))
     return Type();
 
@@ -382,48 +340,12 @@ static Type parseCooperativeMatrixNVType(SPIRVDialect const &dialect,
     return Type();
 
   Scope scope;
-  if (parser.parseComma() ||
-      spirv::parseEnumKeywordAttr(scope, parser, "scope <id>"))
+  if (parser.parseComma() || parseEnumKeywordAttr(scope, parser, "scope <id>"))
     return Type();
 
   if (parser.parseGreater())
     return Type();
   return CooperativeMatrixNVType::get(elementTy, scope, dims[0], dims[1]);
-}
-
-// joint-matrix-type ::= `!spirv.jointmatrix` `<`rows `x` columns `x`
-// element-type
-//                                                       `,` layout `,` scope`>`
-static Type parseJointMatrixType(SPIRVDialect const &dialect,
-                                 DialectAsmParser &parser) {
-  if (parser.parseLess())
-    return Type();
-
-  SmallVector<int64_t, 2> dims;
-  SMLoc countLoc = parser.getCurrentLocation();
-  if (parser.parseDimensionList(dims, /*allowDynamic=*/false))
-    return Type();
-
-  if (dims.size() != 2) {
-    parser.emitError(countLoc, "expected rows and columns size");
-    return Type();
-  }
-
-  auto elementTy = parseAndVerifyType(dialect, parser);
-  if (!elementTy)
-    return Type();
-  MatrixLayout matrixLayout;
-  if (parser.parseComma() ||
-      spirv::parseEnumKeywordAttr(matrixLayout, parser, "matrixLayout <id>"))
-    return Type();
-  Scope scope;
-  if (parser.parseComma() ||
-      spirv::parseEnumKeywordAttr(scope, parser, "scope <id>"))
-    return Type();
-  if (parser.parseGreater())
-    return Type();
-  return JointMatrixINTELType::get(elementTy, scope, dims[0], dims[1],
-                                   matrixLayout);
 }
 
 // TODO: Reorder methods to be utilities first and parse*Type
@@ -434,7 +356,7 @@ static Type parseJointMatrixType(SPIRVDialect const &dialect,
 //                 | `Workgroup`
 //                 | <and other storage classes...>
 //
-// pointer-type ::= `!spirv.ptr<` element-type `,` storage-class `>`
+// pointer-type ::= `!spv.ptr<` element-type `,` storage-class `>`
 static Type parsePointerType(SPIRVDialect const &dialect,
                              DialectAsmParser &parser) {
   if (parser.parseLess())
@@ -445,7 +367,7 @@ static Type parsePointerType(SPIRVDialect const &dialect,
     return Type();
 
   StringRef storageClassSpec;
-  SMLoc storageClassLoc = parser.getCurrentLocation();
+  llvm::SMLoc storageClassLoc = parser.getCurrentLocation();
   if (parser.parseComma() || parser.parseKeyword(&storageClassSpec))
     return Type();
 
@@ -460,7 +382,7 @@ static Type parsePointerType(SPIRVDialect const &dialect,
   return PointerType::get(pointeeType, *storageClass);
 }
 
-// runtime-array-type ::= `!spirv.rtarray` `<` element-type
+// runtime-array-type ::= `!spv.rtarray` `<` element-type
 //                        (`,` `stride` `=` integer-literal)? `>`
 static Type parseRuntimeArrayType(SPIRVDialect const &dialect,
                                   DialectAsmParser &parser) {
@@ -480,14 +402,14 @@ static Type parseRuntimeArrayType(SPIRVDialect const &dialect,
   return RuntimeArrayType::get(elementType, stride);
 }
 
-// matrix-type ::= `!spirv.matrix` `<` integer-literal `x` element-type `>`
+// matrix-type ::= `!spv.matrix` `<` integer-literal `x` element-type `>`
 static Type parseMatrixType(SPIRVDialect const &dialect,
                             DialectAsmParser &parser) {
   if (parser.parseLess())
     return Type();
 
   SmallVector<int64_t, 1> countDims;
-  SMLoc countLoc = parser.getCurrentLocation();
+  llvm::SMLoc countLoc = parser.getCurrentLocation();
   if (parser.parseDimensionList(countDims, /*allowDynamic=*/false))
     return Type();
   if (countDims.size() != 1) {
@@ -517,12 +439,12 @@ static Type parseMatrixType(SPIRVDialect const &dialect,
 // Specialize this function to parse each of the parameters that define an
 // ImageType. By default it assumes this is an enum type.
 template <typename ValTy>
-static std::optional<ValTy> parseAndVerify(SPIRVDialect const &dialect,
-                                           DialectAsmParser &parser) {
+static Optional<ValTy> parseAndVerify(SPIRVDialect const &dialect,
+                                      DialectAsmParser &parser) {
   StringRef enumSpec;
-  SMLoc enumLoc = parser.getCurrentLocation();
+  llvm::SMLoc enumLoc = parser.getCurrentLocation();
   if (parser.parseKeyword(&enumSpec)) {
-    return std::nullopt;
+    return llvm::None;
   }
 
   auto val = spirv::symbolizeEnum<ValTy>(enumSpec);
@@ -532,27 +454,27 @@ static std::optional<ValTy> parseAndVerify(SPIRVDialect const &dialect,
 }
 
 template <>
-std::optional<Type> parseAndVerify<Type>(SPIRVDialect const &dialect,
-                                         DialectAsmParser &parser) {
+Optional<Type> parseAndVerify<Type>(SPIRVDialect const &dialect,
+                                    DialectAsmParser &parser) {
   // TODO: Further verify that the element type can be sampled
   auto ty = parseAndVerifyType(dialect, parser);
   if (!ty)
-    return std::nullopt;
+    return llvm::None;
   return ty;
 }
 
 template <typename IntTy>
-static std::optional<IntTy> parseAndVerifyInteger(SPIRVDialect const &dialect,
-                                                  DialectAsmParser &parser) {
+static Optional<IntTy> parseAndVerifyInteger(SPIRVDialect const &dialect,
+                                             DialectAsmParser &parser) {
   IntTy offsetVal = std::numeric_limits<IntTy>::max();
   if (parser.parseInteger(offsetVal))
-    return std::nullopt;
+    return llvm::None;
   return offsetVal;
 }
 
 template <>
-std::optional<unsigned> parseAndVerify<unsigned>(SPIRVDialect const &dialect,
-                                                 DialectAsmParser &parser) {
+Optional<unsigned> parseAndVerify<unsigned>(SPIRVDialect const &dialect,
+                                            DialectAsmParser &parser) {
   return parseAndVerifyInteger<unsigned>(dialect, parser);
 }
 
@@ -561,34 +483,32 @@ namespace {
 // parseAndVerify does the actual parsing and verification of individual
 // elements. This is a functor since parsing the last element of the list
 // (termination condition) needs partial specialization.
-template <typename ParseType, typename... Args>
-struct ParseCommaSeparatedList {
-  std::optional<std::tuple<ParseType, Args...>>
+template <typename ParseType, typename... Args> struct ParseCommaSeparatedList {
+  Optional<std::tuple<ParseType, Args...>>
   operator()(SPIRVDialect const &dialect, DialectAsmParser &parser) const {
     auto parseVal = parseAndVerify<ParseType>(dialect, parser);
     if (!parseVal)
-      return std::nullopt;
+      return llvm::None;
 
     auto numArgs = std::tuple_size<std::tuple<Args...>>::value;
     if (numArgs != 0 && failed(parser.parseComma()))
-      return std::nullopt;
+      return llvm::None;
     auto remainingValues = ParseCommaSeparatedList<Args...>{}(dialect, parser);
     if (!remainingValues)
-      return std::nullopt;
-    return std::tuple_cat(std::tuple<ParseType>(parseVal.value()),
-                          remainingValues.value());
+      return llvm::None;
+    return std::tuple_cat(std::tuple<ParseType>(parseVal.getValue()),
+                          remainingValues.getValue());
   }
 };
 
 // Partial specialization of the function to parse a comma separated list of
 // specs to parse the last element of the list.
-template <typename ParseType>
-struct ParseCommaSeparatedList<ParseType> {
-  std::optional<std::tuple<ParseType>>
-  operator()(SPIRVDialect const &dialect, DialectAsmParser &parser) const {
+template <typename ParseType> struct ParseCommaSeparatedList<ParseType> {
+  Optional<std::tuple<ParseType>> operator()(SPIRVDialect const &dialect,
+                                             DialectAsmParser &parser) const {
     if (auto value = parseAndVerify<ParseType>(dialect, parser))
-      return std::tuple<ParseType>(*value);
-    return std::nullopt;
+      return std::tuple<ParseType>(value.getValue());
+    return llvm::None;
   }
 };
 } // namespace
@@ -605,7 +525,7 @@ struct ParseCommaSeparatedList<ParseType> {
 //
 // format ::= `Unknown` | `Rgba32f` | <and other SPIR-V Image formats...>
 //
-// image-type ::= `!spirv.image<` element-type `,` dim `,` depth-info `,`
+// image-type ::= `!spv.image<` element-type `,` dim `,` depth-info `,`
 //                              arrayed-info `,` sampling-info `,`
 //                              sampler-use-info `,` format `>`
 static Type parseImageType(SPIRVDialect const &dialect,
@@ -622,10 +542,10 @@ static Type parseImageType(SPIRVDialect const &dialect,
 
   if (parser.parseGreater())
     return Type();
-  return ImageType::get(*value);
+  return ImageType::get(value.getValue());
 }
 
-// sampledImage-type :: = `!spirv.sampledImage<` image-type `>`
+// sampledImage-type :: = `!spv.sampledImage<` image-type `>`
 static Type parseSampledImageType(SPIRVDialect const &dialect,
                                   DialectAsmParser &parser) {
   if (parser.parseLess())
@@ -648,10 +568,10 @@ static ParseResult parseStructMemberDecorations(
     SmallVectorImpl<StructType::MemberDecorationInfo> &memberDecorationInfo) {
 
   // Check if the first element is offset.
-  SMLoc offsetLoc = parser.getCurrentLocation();
+  llvm::SMLoc offsetLoc = parser.getCurrentLocation();
   StructType::OffsetInfo offset = 0;
   OptionalParseResult offsetParseResult = parser.parseOptionalInteger(offset);
-  if (offsetParseResult.has_value()) {
+  if (offsetParseResult.hasValue()) {
     if (failed(*offsetParseResult))
       return failure();
 
@@ -668,11 +588,11 @@ static ParseResult parseStructMemberDecorations(
     return success();
 
   // If there was an offset, make sure to parse the comma.
-  if (offsetParseResult.has_value() && parser.parseComma())
+  if (offsetParseResult.hasValue() && parser.parseComma())
     return failure();
 
   // Check for spirv::Decorations.
-  auto parseDecorations = [&]() {
+  do {
     auto memberDecoration = parseAndVerify<spirv::Decoration>(dialect, parser);
     if (!memberDecoration)
       return failure();
@@ -687,24 +607,21 @@ static ParseResult parseStructMemberDecorations(
 
       memberDecorationInfo.emplace_back(
           static_cast<uint32_t>(memberTypes.size() - 1), 1,
-          memberDecoration.value(), memberDecorationValue.value());
+          memberDecoration.getValue(), memberDecorationValue.getValue());
     } else {
       memberDecorationInfo.emplace_back(
           static_cast<uint32_t>(memberTypes.size() - 1), 0,
-          memberDecoration.value(), 0);
+          memberDecoration.getValue(), 0);
     }
-    return success();
-  };
-  if (failed(parser.parseCommaSeparatedList(parseDecorations)) ||
-      failed(parser.parseRSquare()))
-    return failure();
 
-  return success();
+  } while (succeeded(parser.parseOptionalComma()));
+
+  return parser.parseRSquare();
 }
 
 // struct-member-decoration ::= integer-literal? spirv-decoration*
 // struct-type ::=
-//             `!spirv.struct<` (id `,`)?
+//             `!spv.struct<` (id `,`)?
 //                          `(`
 //                            (spirv-type (`[` struct-member-decoration `]`)?)*
 //                          `)>`
@@ -712,20 +629,33 @@ static Type parseStructType(SPIRVDialect const &dialect,
                             DialectAsmParser &parser) {
   // TODO: This function is quite lengthy. Break it down into smaller chunks.
 
+  // To properly resolve recursive references while parsing recursive struct
+  // types, we need to maintain a list of enclosing struct type names. This set
+  // maintains the names of struct types in which the type we are about to parse
+  // is nested.
+  //
+  // Note: This has to be thread_local to enable multiple threads to safely
+  // parse concurrently.
+  thread_local SetVector<StringRef> structContext;
+
+  static auto removeIdentifierAndFail = [](SetVector<StringRef> &structContext,
+                                           StringRef identifier) {
+    if (!identifier.empty())
+      structContext.remove(identifier);
+
+    return Type();
+  };
+
   if (parser.parseLess())
     return Type();
 
   StringRef identifier;
-  FailureOr<DialectAsmParser::CyclicParseReset> cyclicParse;
 
   // Check if this is an identified struct type.
   if (succeeded(parser.parseOptionalKeyword(&identifier))) {
     // Check if this is a possible recursive reference.
-    auto structType =
-        StructType::getIdentified(dialect.getContext(), identifier);
-    cyclicParse = parser.tryStartCyclicParse(structType);
     if (succeeded(parser.parseOptionalGreater())) {
-      if (succeeded(cyclicParse)) {
+      if (structContext.count(identifier) == 0) {
         parser.emitError(
             parser.getNameLoc(),
             "recursive struct reference not nested in struct definition");
@@ -733,24 +663,30 @@ static Type parseStructType(SPIRVDialect const &dialect,
         return Type();
       }
 
-      return structType;
+      return StructType::getIdentified(dialect.getContext(), identifier);
     }
 
     if (failed(parser.parseComma()))
       return Type();
 
-    if (failed(cyclicParse)) {
+    if (structContext.count(identifier) != 0) {
       parser.emitError(parser.getNameLoc(),
                        "identifier already used for an enclosing struct");
-      return Type();
+
+      return removeIdentifierAndFail(structContext, identifier);
     }
+
+    structContext.insert(identifier);
   }
 
   if (failed(parser.parseLParen()))
-    return Type();
+    return removeIdentifierAndFail(structContext, identifier);
 
   if (succeeded(parser.parseOptionalRParen()) &&
       succeeded(parser.parseOptionalGreater())) {
+    if (!identifier.empty())
+      structContext.remove(identifier);
+
     return StructType::getEmpty(dialect.getContext(), identifier);
   }
 
@@ -766,28 +702,30 @@ static Type parseStructType(SPIRVDialect const &dialect,
   do {
     Type memberType;
     if (parser.parseType(memberType))
-      return Type();
+      return removeIdentifierAndFail(structContext, identifier);
     memberTypes.push_back(memberType);
 
     if (succeeded(parser.parseOptionalLSquare()))
       if (parseStructMemberDecorations(dialect, parser, memberTypes, offsetInfo,
                                        memberDecorationInfo))
-        return Type();
+        return removeIdentifierAndFail(structContext, identifier);
   } while (succeeded(parser.parseOptionalComma()));
 
   if (!offsetInfo.empty() && memberTypes.size() != offsetInfo.size()) {
     parser.emitError(parser.getNameLoc(),
                      "offset specification must be given for all members");
-    return Type();
+    return removeIdentifierAndFail(structContext, identifier);
   }
 
   if (failed(parser.parseRParen()) || failed(parser.parseGreater()))
-    return Type();
+    return removeIdentifierAndFail(structContext, identifier);
 
   if (!identifier.empty()) {
     if (failed(idStructTy.trySetBody(memberTypes, offsetInfo,
                                      memberDecorationInfo)))
       return Type();
+
+    structContext.remove(identifier);
     return idStructTy;
   }
 
@@ -810,10 +748,6 @@ Type SPIRVDialect::parseType(DialectAsmParser &parser) const {
     return parseArrayType(*this, parser);
   if (keyword == "coopmatrix")
     return parseCooperativeMatrixType(*this, parser);
-  if (keyword == "NV.coopmatrix")
-    return parseCooperativeMatrixNVType(*this, parser);
-  if (keyword == "jointmatrix")
-    return parseJointMatrixType(*this, parser);
   if (keyword == "image")
     return parseImageType(*this, parser);
   if (keyword == "ptr")
@@ -867,20 +801,20 @@ static void print(SampledImageType type, DialectAsmPrinter &os) {
 }
 
 static void print(StructType type, DialectAsmPrinter &os) {
-  FailureOr<AsmPrinter::CyclicPrintReset> cyclicPrint;
+  thread_local SetVector<StringRef> structContext;
 
   os << "struct<";
 
   if (type.isIdentified()) {
     os << type.getIdentifier();
 
-    cyclicPrint = os.tryStartCyclicPrint(type);
-    if (failed(cyclicPrint)) {
+    if (structContext.count(type.getIdentifier())) {
       os << ">";
       return;
     }
 
     os << ", ";
+    structContext.insert(type.getIdentifier());
   }
 
   os << "(";
@@ -909,25 +843,15 @@ static void print(StructType type, DialectAsmPrinter &os) {
   llvm::interleaveComma(llvm::seq<unsigned>(0, type.getNumElements()), os,
                         printMember);
   os << ")>";
-}
 
-static void print(CooperativeMatrixType type, DialectAsmPrinter &os) {
-  os << "coopmatrix<" << type.getRows() << "x" << type.getColumns() << "x"
-     << type.getElementType() << ", " << type.getScope() << ", "
-     << type.getUse() << ">";
+  if (type.isIdentified())
+    structContext.remove(type.getIdentifier());
 }
 
 static void print(CooperativeMatrixNVType type, DialectAsmPrinter &os) {
-  os << "NV.coopmatrix<" << type.getRows() << "x" << type.getColumns() << "x";
+  os << "coopmatrix<" << type.getRows() << "x" << type.getColumns() << "x";
   os << type.getElementType() << ", " << stringifyScope(type.getScope());
   os << ">";
-}
-
-static void print(JointMatrixINTELType type, DialectAsmPrinter &os) {
-  os << "jointmatrix<" << type.getRows() << "x" << type.getColumns() << "x";
-  os << type.getElementType() << ", "
-     << stringifyMatrixLayout(type.getMatrixLayout());
-  os << ", " << stringifyScope(type.getScope()) << ">";
 }
 
 static void print(MatrixType type, DialectAsmPrinter &os) {
@@ -937,11 +861,335 @@ static void print(MatrixType type, DialectAsmPrinter &os) {
 
 void SPIRVDialect::printType(Type type, DialectAsmPrinter &os) const {
   TypeSwitch<Type>(type)
-      .Case<ArrayType, CooperativeMatrixType, CooperativeMatrixNVType,
-            JointMatrixINTELType, PointerType, RuntimeArrayType, ImageType,
-            SampledImageType, StructType, MatrixType>(
+      .Case<ArrayType, CooperativeMatrixNVType, PointerType, RuntimeArrayType,
+            ImageType, SampledImageType, StructType, MatrixType>(
           [&](auto type) { print(type, os); })
       .Default([](Type) { llvm_unreachable("unhandled SPIR-V type"); });
+}
+
+//===----------------------------------------------------------------------===//
+// Attribute Parsing
+//===----------------------------------------------------------------------===//
+
+/// Parses a comma-separated list of keywords, invokes `processKeyword` on each
+/// of the parsed keyword, and returns failure if any error occurs.
+static ParseResult parseKeywordList(
+    DialectAsmParser &parser,
+    function_ref<LogicalResult(llvm::SMLoc, StringRef)> processKeyword) {
+  if (parser.parseLSquare())
+    return failure();
+
+  // Special case for empty list.
+  if (succeeded(parser.parseOptionalRSquare()))
+    return success();
+
+  // Keep parsing the keyword and an optional comma following it. If the comma
+  // is successfully parsed, then we have more keywords to parse.
+  do {
+    auto loc = parser.getCurrentLocation();
+    StringRef keyword;
+    if (parser.parseKeyword(&keyword) || failed(processKeyword(loc, keyword)))
+      return failure();
+  } while (succeeded(parser.parseOptionalComma()));
+
+  if (parser.parseRSquare())
+    return failure();
+
+  return success();
+}
+
+/// Parses a spirv::InterfaceVarABIAttr.
+static Attribute parseInterfaceVarABIAttr(DialectAsmParser &parser) {
+  if (parser.parseLess())
+    return {};
+
+  Builder &builder = parser.getBuilder();
+
+  if (parser.parseLParen())
+    return {};
+
+  IntegerAttr descriptorSetAttr;
+  {
+    auto loc = parser.getCurrentLocation();
+    uint32_t descriptorSet = 0;
+    auto descriptorSetParseResult = parser.parseOptionalInteger(descriptorSet);
+
+    if (!descriptorSetParseResult.hasValue() ||
+        failed(*descriptorSetParseResult)) {
+      parser.emitError(loc, "missing descriptor set");
+      return {};
+    }
+    descriptorSetAttr = builder.getI32IntegerAttr(descriptorSet);
+  }
+
+  if (parser.parseComma())
+    return {};
+
+  IntegerAttr bindingAttr;
+  {
+    auto loc = parser.getCurrentLocation();
+    uint32_t binding = 0;
+    auto bindingParseResult = parser.parseOptionalInteger(binding);
+
+    if (!bindingParseResult.hasValue() || failed(*bindingParseResult)) {
+      parser.emitError(loc, "missing binding");
+      return {};
+    }
+    bindingAttr = builder.getI32IntegerAttr(binding);
+  }
+
+  if (parser.parseRParen())
+    return {};
+
+  IntegerAttr storageClassAttr;
+  {
+    if (succeeded(parser.parseOptionalComma())) {
+      auto loc = parser.getCurrentLocation();
+      StringRef storageClass;
+      if (parser.parseKeyword(&storageClass))
+        return {};
+
+      if (auto storageClassSymbol =
+              spirv::symbolizeStorageClass(storageClass)) {
+        storageClassAttr = builder.getI32IntegerAttr(
+            static_cast<uint32_t>(*storageClassSymbol));
+      } else {
+        parser.emitError(loc, "unknown storage class: ") << storageClass;
+        return {};
+      }
+    }
+  }
+
+  if (parser.parseGreater())
+    return {};
+
+  return spirv::InterfaceVarABIAttr::get(descriptorSetAttr, bindingAttr,
+                                         storageClassAttr);
+}
+
+static Attribute parseVerCapExtAttr(DialectAsmParser &parser) {
+  if (parser.parseLess())
+    return {};
+
+  Builder &builder = parser.getBuilder();
+
+  IntegerAttr versionAttr;
+  {
+    auto loc = parser.getCurrentLocation();
+    StringRef version;
+    if (parser.parseKeyword(&version) || parser.parseComma())
+      return {};
+
+    if (auto versionSymbol = spirv::symbolizeVersion(version)) {
+      versionAttr =
+          builder.getI32IntegerAttr(static_cast<uint32_t>(*versionSymbol));
+    } else {
+      parser.emitError(loc, "unknown version: ") << version;
+      return {};
+    }
+  }
+
+  ArrayAttr capabilitiesAttr;
+  {
+    SmallVector<Attribute, 4> capabilities;
+    llvm::SMLoc errorloc;
+    StringRef errorKeyword;
+
+    auto processCapability = [&](llvm::SMLoc loc, StringRef capability) {
+      if (auto capSymbol = spirv::symbolizeCapability(capability)) {
+        capabilities.push_back(
+            builder.getI32IntegerAttr(static_cast<uint32_t>(*capSymbol)));
+        return success();
+      }
+      return errorloc = loc, errorKeyword = capability, failure();
+    };
+    if (parseKeywordList(parser, processCapability) || parser.parseComma()) {
+      if (!errorKeyword.empty())
+        parser.emitError(errorloc, "unknown capability: ") << errorKeyword;
+      return {};
+    }
+
+    capabilitiesAttr = builder.getArrayAttr(capabilities);
+  }
+
+  ArrayAttr extensionsAttr;
+  {
+    SmallVector<Attribute, 1> extensions;
+    llvm::SMLoc errorloc;
+    StringRef errorKeyword;
+
+    auto processExtension = [&](llvm::SMLoc loc, StringRef extension) {
+      if (spirv::symbolizeExtension(extension)) {
+        extensions.push_back(builder.getStringAttr(extension));
+        return success();
+      }
+      return errorloc = loc, errorKeyword = extension, failure();
+    };
+    if (parseKeywordList(parser, processExtension)) {
+      if (!errorKeyword.empty())
+        parser.emitError(errorloc, "unknown extension: ") << errorKeyword;
+      return {};
+    }
+
+    extensionsAttr = builder.getArrayAttr(extensions);
+  }
+
+  if (parser.parseGreater())
+    return {};
+
+  return spirv::VerCapExtAttr::get(versionAttr, capabilitiesAttr,
+                                   extensionsAttr);
+}
+
+/// Parses a spirv::TargetEnvAttr.
+static Attribute parseTargetEnvAttr(DialectAsmParser &parser) {
+  if (parser.parseLess())
+    return {};
+
+  spirv::VerCapExtAttr tripleAttr;
+  if (parser.parseAttribute(tripleAttr) || parser.parseComma())
+    return {};
+
+  // Parse [vendor[:device-type[:device-id]]]
+  Vendor vendorID = Vendor::Unknown;
+  DeviceType deviceType = DeviceType::Unknown;
+  uint32_t deviceID = spirv::TargetEnvAttr::kUnknownDeviceID;
+  {
+    auto loc = parser.getCurrentLocation();
+    StringRef vendorStr;
+    if (succeeded(parser.parseOptionalKeyword(&vendorStr))) {
+      if (auto vendorSymbol = spirv::symbolizeVendor(vendorStr)) {
+        vendorID = *vendorSymbol;
+      } else {
+        parser.emitError(loc, "unknown vendor: ") << vendorStr;
+      }
+
+      if (succeeded(parser.parseOptionalColon())) {
+        loc = parser.getCurrentLocation();
+        StringRef deviceTypeStr;
+        if (parser.parseKeyword(&deviceTypeStr))
+          return {};
+        if (auto deviceTypeSymbol = spirv::symbolizeDeviceType(deviceTypeStr)) {
+          deviceType = *deviceTypeSymbol;
+        } else {
+          parser.emitError(loc, "unknown device type: ") << deviceTypeStr;
+        }
+
+        if (succeeded(parser.parseOptionalColon())) {
+          loc = parser.getCurrentLocation();
+          if (parser.parseInteger(deviceID))
+            return {};
+        }
+      }
+      if (parser.parseComma())
+        return {};
+    }
+  }
+
+  DictionaryAttr limitsAttr;
+  {
+    auto loc = parser.getCurrentLocation();
+    if (parser.parseAttribute(limitsAttr))
+      return {};
+
+    if (!limitsAttr.isa<spirv::ResourceLimitsAttr>()) {
+      parser.emitError(
+          loc,
+          "limits must be a dictionary attribute containing two 32-bit integer "
+          "attributes 'max_compute_workgroup_invocations' and "
+          "'max_compute_workgroup_size'");
+      return {};
+    }
+  }
+
+  if (parser.parseGreater())
+    return {};
+
+  return spirv::TargetEnvAttr::get(tripleAttr, vendorID, deviceType, deviceID,
+                                   limitsAttr);
+}
+
+Attribute SPIRVDialect::parseAttribute(DialectAsmParser &parser,
+                                       Type type) const {
+  // SPIR-V attributes are dictionaries so they do not have type.
+  if (type) {
+    parser.emitError(parser.getNameLoc(), "unexpected type");
+    return {};
+  }
+
+  // Parse the kind keyword first.
+  StringRef attrKind;
+  if (parser.parseKeyword(&attrKind))
+    return {};
+
+  if (attrKind == spirv::TargetEnvAttr::getKindName())
+    return parseTargetEnvAttr(parser);
+  if (attrKind == spirv::VerCapExtAttr::getKindName())
+    return parseVerCapExtAttr(parser);
+  if (attrKind == spirv::InterfaceVarABIAttr::getKindName())
+    return parseInterfaceVarABIAttr(parser);
+
+  parser.emitError(parser.getNameLoc(), "unknown SPIR-V attribute kind: ")
+      << attrKind;
+  return {};
+}
+
+//===----------------------------------------------------------------------===//
+// Attribute Printing
+//===----------------------------------------------------------------------===//
+
+static void print(spirv::VerCapExtAttr triple, DialectAsmPrinter &printer) {
+  auto &os = printer.getStream();
+  printer << spirv::VerCapExtAttr::getKindName() << "<"
+          << spirv::stringifyVersion(triple.getVersion()) << ", [";
+  llvm::interleaveComma(
+      triple.getCapabilities(), os,
+      [&](spirv::Capability cap) { os << spirv::stringifyCapability(cap); });
+  printer << "], [";
+  llvm::interleaveComma(triple.getExtensionsAttr(), os, [&](Attribute attr) {
+    os << attr.cast<StringAttr>().getValue();
+  });
+  printer << "]>";
+}
+
+static void print(spirv::TargetEnvAttr targetEnv, DialectAsmPrinter &printer) {
+  printer << spirv::TargetEnvAttr::getKindName() << "<#spv.";
+  print(targetEnv.getTripleAttr(), printer);
+  spirv::Vendor vendorID = targetEnv.getVendorID();
+  spirv::DeviceType deviceType = targetEnv.getDeviceType();
+  uint32_t deviceID = targetEnv.getDeviceID();
+  if (vendorID != spirv::Vendor::Unknown) {
+    printer << ", " << spirv::stringifyVendor(vendorID);
+    if (deviceType != spirv::DeviceType::Unknown) {
+      printer << ":" << spirv::stringifyDeviceType(deviceType);
+      if (deviceID != spirv::TargetEnvAttr::kUnknownDeviceID)
+        printer << ":" << deviceID;
+    }
+  }
+  printer << ", " << targetEnv.getResourceLimits() << ">";
+}
+
+static void print(spirv::InterfaceVarABIAttr interfaceVarABIAttr,
+                  DialectAsmPrinter &printer) {
+  printer << spirv::InterfaceVarABIAttr::getKindName() << "<("
+          << interfaceVarABIAttr.getDescriptorSet() << ", "
+          << interfaceVarABIAttr.getBinding() << ")";
+  auto storageClass = interfaceVarABIAttr.getStorageClass();
+  if (storageClass)
+    printer << ", " << spirv::stringifyStorageClass(*storageClass);
+  printer << ">";
+}
+
+void SPIRVDialect::printAttribute(Attribute attr,
+                                  DialectAsmPrinter &printer) const {
+  if (auto targetEnv = attr.dyn_cast<TargetEnvAttr>())
+    print(targetEnv, printer);
+  else if (auto vceAttr = attr.dyn_cast<VerCapExtAttr>())
+    print(vceAttr, printer);
+  else if (auto interfaceVarABIAttr = attr.dyn_cast<InterfaceVarABIAttr>())
+    print(interfaceVarABIAttr, printer);
+  else
+    llvm_unreachable("unhandled SPIR-V attribute kind");
 }
 
 //===----------------------------------------------------------------------===//
@@ -951,9 +1199,6 @@ void SPIRVDialect::printType(Type type, DialectAsmPrinter &os) const {
 Operation *SPIRVDialect::materializeConstant(OpBuilder &builder,
                                              Attribute value, Type type,
                                              Location loc) {
-  if (auto poison = dyn_cast<ub::PoisonAttr>(value))
-    return builder.create<ub::PoisonOp>(loc, type, poison);
-
   if (!spirv::ConstantOp::isBuildableWith(type))
     return nullptr;
 
@@ -966,16 +1211,19 @@ Operation *SPIRVDialect::materializeConstant(OpBuilder &builder,
 
 LogicalResult SPIRVDialect::verifyOperationAttribute(Operation *op,
                                                      NamedAttribute attribute) {
-  StringRef symbol = attribute.getName().strref();
-  Attribute attr = attribute.getValue();
+  StringRef symbol = attribute.first.strref();
+  Attribute attr = attribute.second;
 
+  // TODO: figure out a way to generate the description from the
+  // StructAttr definition.
   if (symbol == spirv::getEntryPointABIAttrName()) {
-    if (!llvm::isa<spirv::EntryPointABIAttr>(attr)) {
+    if (!attr.isa<spirv::EntryPointABIAttr>())
       return op->emitError("'")
-             << symbol << "' attribute must be an entry point ABI attribute";
-    }
+             << symbol
+             << "' attribute must be a dictionary attribute containing one "
+                "32-bit integer elements attribute: 'local_size'";
   } else if (symbol == spirv::getTargetEnvAttrName()) {
-    if (!llvm::isa<spirv::TargetEnvAttr>(attr))
+    if (!attr.isa<spirv::TargetEnvAttr>())
       return op->emitError("'") << symbol << "' must be a spirv::TargetEnvAttr";
   } else {
     return op->emitError("found unsupported '")
@@ -989,14 +1237,14 @@ LogicalResult SPIRVDialect::verifyOperationAttribute(Operation *op,
 /// `valueType` is valid.
 static LogicalResult verifyRegionAttribute(Location loc, Type valueType,
                                            NamedAttribute attribute) {
-  StringRef symbol = attribute.getName().strref();
-  Attribute attr = attribute.getValue();
+  StringRef symbol = attribute.first.strref();
+  Attribute attr = attribute.second;
 
   if (symbol != spirv::getInterfaceVarABIAttrName())
     return emitError(loc, "found unsupported '")
            << symbol << "' attribute on region argument";
 
-  auto varABIAttr = llvm::dyn_cast<spirv::InterfaceVarABIAttr>(attr);
+  auto varABIAttr = attr.dyn_cast<spirv::InterfaceVarABIAttr>();
   if (!varABIAttr)
     return emitError(loc, "'")
            << symbol << "' must be a spirv::InterfaceVarABIAttr";

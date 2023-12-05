@@ -10,18 +10,15 @@
 // strongly control the options this file is compiled with. __restore_rt cannot
 // make any stack allocations so we must ensure this.
 
-#include "src/__support/OSUtil/syscall.h"
+#include "config/linux/syscall.h"
+#include "include/sys/syscall.h"
 
-#include <sys/syscall.h>
-
-namespace LIBC_NAMESPACE {
+namespace __llvm_libc {
 
 extern "C" void __restore_rt()
-    __attribute__((no_sanitize("all"),
+    __attribute__((no_sanitize("thread", "memory", "undefined", "fuzzer"),
                    hidden));
 
-extern "C" void __restore_rt() {
-  LIBC_NAMESPACE::syscall_impl<long>(SYS_rt_sigreturn);
-}
+extern "C" void __restore_rt() { __llvm_libc::syscall(SYS_rt_sigreturn); }
 
-} // namespace LIBC_NAMESPACE
+} // namespace __llvm_libc

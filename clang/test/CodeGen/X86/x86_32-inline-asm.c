@@ -1,6 +1,10 @@
 // RUN: %clang_cc1 -triple i386-apple-darwin9 -verify %s
 // RUN: %clang_cc1 -triple i386-apple-darwin9 -target-feature +avx -verify %s
 
+// <rdar://problem/12415959>
+// rdar://problem/11846140
+// rdar://problem/17476970
+
 typedef unsigned int u_int32_t;
 typedef u_int32_t uint32_t;
 
@@ -15,7 +19,7 @@ __m128 val128;
 __m256 val256;
 __m512 val512;
 
-int func1(void) {
+int func1() {
   // Error out if size is > 32-bits.
   uint32_t msr = 0x8b;
   uint64_t val = 0;
@@ -67,7 +71,7 @@ int func1(void) {
 #endif
 }
 
-int __attribute__((__target__("sse"))) _func2(void) {
+int __attribute__((__target__("sse"))) _func2() {
   __asm__ volatile("foo1 %0" : : "x" (val128)); // No error.
   __asm__ volatile("foo1 %0" : "=x" (val128));  // No error.
 #ifdef __AVX__
@@ -81,7 +85,7 @@ int __attribute__((__target__("sse"))) _func2(void) {
   __asm__ volatile("foo1 %0" : "=x" (val512)); // expected-error {{invalid output size for constraint '=x'}}
 }
 
-int __attribute__((__target__("avx"))) _func3(void) {
+int __attribute__((__target__("avx"))) _func3() {
   __asm__ volatile("foo1 %0" : : "x" (val128)); // No error.
   __asm__ volatile("foo1 %0" : "=x" (val128));  // No error.
   __asm__ volatile("foo1 %0" : : "x" (val256)); // No error.
@@ -90,7 +94,7 @@ int __attribute__((__target__("avx"))) _func3(void) {
   __asm__ volatile("foo1 %0" : "=x" (val512)); // expected-error {{invalid output size for constraint '=x'}}
 }
 
-int __attribute__((__target__("avx512f"))) _func4(void) {
+int __attribute__((__target__("avx512f"))) _func4() {
   __asm__ volatile("foo1 %0" : : "x" (val128)); // No error.
   __asm__ volatile("foo1 %0" : "=x" (val128));  // No error.
   __asm__ volatile("foo1 %0" : : "x" (val256)); // No error.

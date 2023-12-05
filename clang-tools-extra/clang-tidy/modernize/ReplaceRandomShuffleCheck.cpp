@@ -16,14 +16,16 @@
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::modernize {
+namespace clang {
+namespace tidy {
+namespace modernize {
 
 ReplaceRandomShuffleCheck::ReplaceRandomShuffleCheck(StringRef Name,
                                                      ClangTidyContext *Context)
     : ClangTidyCheck(Name, Context),
       IncludeInserter(Options.getLocalOrGlobal("IncludeStyle",
-                                               utils::IncludeSorter::IS_LLVM),
-                      areDiagsSelfContained()) {}
+                                               utils::IncludeSorter::IS_LLVM)) {
+}
 
 void ReplaceRandomShuffleCheck::registerMatchers(MatchFinder *Finder) {
   const auto Begin = hasArgument(0, expr());
@@ -94,4 +96,6 @@ void ReplaceRandomShuffleCheck::check(const MatchFinder::MatchResult &Result) {
       "<random>");
 }
 
-} // namespace clang::tidy::modernize
+} // namespace modernize
+} // namespace tidy
+} // namespace clang

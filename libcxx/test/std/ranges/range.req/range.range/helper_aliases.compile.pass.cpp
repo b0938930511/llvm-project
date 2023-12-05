@@ -7,6 +7,9 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
+// UNSUPPORTED: libcpp-no-concepts
+// UNSUPPORTED: gcc-10
+// UNSUPPORTED: libcpp-has-no-incomplete-ranges
 
 // template<range R>
 // using range_difference_t = iter_difference_t<iterator_t<R>>;
@@ -20,9 +23,6 @@
 // template<range R>
 // using range_rvalue_reference_t = iter_rvalue_reference_t<iterator_t<R>>;
 
-// template <range R>
-// using range_common_reference_t = iter_common_reference_t<iterator_t<R>>;
-
 #include <ranges>
 
 #include <concepts>
@@ -30,8 +30,9 @@
 #include "test_iterators.h"
 #include "test_range.h"
 
-static_assert(std::same_as<std::ranges::range_difference_t<test_range<cpp20_input_iterator> >, std::iter_difference_t<int*> >);
-static_assert(std::same_as<std::ranges::range_value_t<test_range<cpp20_input_iterator> >, std::iter_value_t<int*> >);
-static_assert(std::same_as<std::ranges::range_reference_t<test_range<cpp20_input_iterator> >, std::iter_reference_t<int*> >);
-static_assert(std::same_as<std::ranges::range_rvalue_reference_t<test_range<cpp20_input_iterator> >, std::iter_rvalue_reference_t<int*> >);
-static_assert(std::same_as<std::ranges::range_common_reference_t<test_range<cpp20_input_iterator> >, std::iter_common_reference_t<int*> >);
+namespace stdr = std::ranges;
+
+static_assert(std::same_as<stdr::range_difference_t<test_range<cpp20_input_iterator> >, std::iter_difference_t<int*> >);
+static_assert(std::same_as<stdr::range_value_t<test_range<cpp20_input_iterator> >, std::iter_value_t<int*> >);
+static_assert(std::same_as<stdr::range_reference_t<test_range<cpp20_input_iterator> >, std::iter_reference_t<int*> >);
+static_assert(std::same_as<stdr::range_rvalue_reference_t<test_range<cpp20_input_iterator> >, std::iter_rvalue_reference_t<int*> >);

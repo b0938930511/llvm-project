@@ -1,4 +1,4 @@
-//===-- runtime/character.cpp ---------------------------------------------===//
+//===-- runtime/character.cpp -----------------------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,13 +6,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "flang/Runtime/character.h"
+#include "character.h"
+#include "cpp-type.h"
+#include "descriptor.h"
 #include "terminator.h"
 #include "tools.h"
 #include "flang/Common/bit-population-count.h"
 #include "flang/Common/uint128.h"
-#include "flang/Runtime/cpp-type.h"
-#include "flang/Runtime/descriptor.h"
 #include <algorithm>
 #include <cstring>
 
@@ -20,14 +20,11 @@ namespace Fortran::runtime {
 
 template <typename CHAR>
 inline int CompareToBlankPadding(const CHAR *x, std::size_t chars) {
-  using UNSIGNED_CHAR = std::make_unsigned_t<CHAR>;
-  const auto blank{static_cast<UNSIGNED_CHAR>(' ')};
   for (; chars-- > 0; ++x) {
-    const UNSIGNED_CHAR ux{*reinterpret_cast<const UNSIGNED_CHAR *>(x)};
-    if (ux < blank) {
+    if (*x < ' ') {
       return -1;
     }
-    if (ux > blank) {
+    if (*x > ' ') {
       return 1;
     }
   }
@@ -256,8 +253,7 @@ static void LenTrimKind(Descriptor &result, const Descriptor &string, int kind,
         result, string, terminator);
     break;
   default:
-    terminator.Crash(
-        "not yet implemented: CHARACTER(KIND=%d) in LEN_TRIM intrinsic", kind);
+    terminator.Crash("LEN_TRIM: bad KIND=%d", kind);
   }
 }
 
@@ -458,9 +454,7 @@ static void GeneralCharFuncKind(Descriptor &result, const Descriptor &string,
         result, string, arg, back, terminator);
     break;
   default:
-    terminator.Crash("not yet implemented: CHARACTER(KIND=%d) in "
-                     "INDEX/SCAN/VERIFY intrinsic",
-        kind);
+    terminator.Crash("INDEX/SCAN/VERIFY: bad KIND=%d", kind);
   }
 }
 
@@ -959,12 +953,8 @@ void RTNAME(Scan)(Descriptor &result, const Descriptor &string,
 }
 
 void RTNAME(Repeat)(Descriptor &result, const Descriptor &string,
-    std::int64_t ncopies, const char *sourceFile, int sourceLine) {
+    std::size_t ncopies, const char *sourceFile, int sourceLine) {
   Terminator terminator{sourceFile, sourceLine};
-  if (ncopies < 0) {
-    terminator.Crash(
-        "REPEAT has negative NCOPIES=%jd", static_cast<std::intmax_t>(ncopies));
-  }
   std::size_t origBytes{string.ElementBytes()};
   result.Establish(string.type(), origBytes * ncopies, nullptr, 0, nullptr,
       CFI_attribute_allocatable);

@@ -20,8 +20,9 @@
 using namespace lldb;
 using namespace lldb_private;
 
-static void CreateEnvironmentBuffer(const Environment &env,
-                                    std::vector<char> &buffer) {
+namespace {
+void CreateEnvironmentBuffer(const Environment &env,
+                             std::vector<char> &buffer) {
   // The buffer is a list of null-terminated UTF-16 strings, followed by an
   // extra L'\0' (two bytes of 0).  An empty environment must have one
   // empty string, followed by an extra L'\0'.
@@ -41,7 +42,7 @@ static void CreateEnvironmentBuffer(const Environment &env,
   buffer.push_back(0);
 }
 
-static bool GetFlattenedWindowsCommandString(Args args, std::wstring &command) {
+bool GetFlattenedWindowsCommandString(Args args, std::wstring &command) {
   if (args.empty())
     return false;
 
@@ -57,6 +58,7 @@ static bool GetFlattenedWindowsCommandString(Args args, std::wstring &command) {
   command = *result;
   return true;
 }
+} // namespace
 
 HostProcess
 ProcessLauncherWindows::LaunchProcess(const ProcessLaunchInfo &launch_info,
@@ -106,7 +108,7 @@ ProcessLauncherWindows::LaunchProcess(const ProcessLaunchInfo &launch_info,
 
   std::wstring wexecutable, wworkingDirectory;
   llvm::ConvertUTF8toWide(executable, wexecutable);
-  llvm::ConvertUTF8toWide(launch_info.GetWorkingDirectory().GetPath(),
+  llvm::ConvertUTF8toWide(launch_info.GetWorkingDirectory().GetCString(),
                           wworkingDirectory);
   // If the command line is empty, it's best to pass a null pointer to tell
   // CreateProcessW to use the executable name as the command line.  If the

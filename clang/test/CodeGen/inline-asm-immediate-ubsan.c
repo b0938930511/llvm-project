@@ -14,14 +14,14 @@
 
 // CHECK-LABEL: @test_inlineasm_i
 // CHECK: call void asm sideeffect "int $0", "i{{.*}}"(i32 2)
-void test_inlineasm_i(void) {
+void test_inlineasm_i() {
   __asm__ __volatile__("int %0" :: "i"(1 + 1));
 }
 
 // CHECK-LABEL: @test_inlineasm_I
 // CHECK: call void asm sideeffect "int $0", "I{{.*}}"(i32 2)
 // CHECK: call void asm sideeffect "int $0", "I{{.*}}"(i32 3)
-void test_inlineasm_I(void) {
+void test_inlineasm_I() {
   __asm__ __volatile__("int %0" :: "I"(1 + 1));
 
   // Also check a C non-ICE.

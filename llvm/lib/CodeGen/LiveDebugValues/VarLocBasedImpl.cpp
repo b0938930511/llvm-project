@@ -10,13 +10,12 @@
 ///
 /// LiveDebugValues is an optimistic "available expressions" dataflow
 /// algorithm. The set of expressions is the set of machine locations
-/// (registers, spill slots, constants, and target indices) that a variable
-/// fragment might be located, qualified by a DIExpression and indirect-ness
-/// flag, while each variable is identified by a DebugVariable object. The
-/// availability of an expression begins when a DBG_VALUE instruction specifies
-/// the location of a DebugVariable, and continues until that location is
-/// clobbered or re-specified by a different DBG_VALUE for the same
-/// DebugVariable.
+/// (registers, spill slots, constants) that a variable fragment might be
+/// located, qualified by a DIExpression and indirect-ness flag, while each
+/// variable is identified by a DebugVariable object. The availability of an
+/// expression begins when a DBG_VALUE instruction specifies the location of a
+/// DebugVariable, and continues until that location is clobbered or
+/// re-specified by a different DBG_VALUE for the same DebugVariable.
 ///
 /// The output of LiveDebugValues is additional DBG_VALUE instructions,
 /// placed to extend variable locations as far they're available. This file
@@ -119,15 +118,18 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/BinaryFormat/Dwarf.h"
+#include "llvm/ADT/UniqueVector.h"
 #include "llvm/CodeGen/LexicalScopes.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
+#include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
+#include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineMemOperand.h"
 #include "llvm/CodeGen/MachineOperand.h"
 #include "llvm/CodeGen/PseudoSourceValue.h"
+#include "llvm/CodeGen/RegisterScavenging.h"
 #include "llvm/CodeGen/TargetFrameLowering.h"
 #include "llvm/CodeGen/TargetInstrInfo.h"
 #include "llvm/CodeGen/TargetLowering.h"
@@ -135,11 +137,16 @@
 #include "llvm/CodeGen/TargetRegisterInfo.h"
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
 #include "llvm/Config/llvm-config.h"
+#include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/DebugLoc.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/Module.h"
+#include "llvm/InitializePasses.h"
 #include "llvm/MC/MCRegisterInfo.h"
+#include "llvm/Pass.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/TypeSize.h"
 #include "llvm/Support/raw_ostream.h"
@@ -148,8 +155,6 @@
 #include <cassert>
 #include <cstdint>
 #include <functional>
-#include <map>
-#include <optional>
 #include <queue>
 #include <tuple>
 #include <utility>
@@ -160,6 +165,18 @@ using namespace llvm;
 #define DEBUG_TYPE "livedebugvalues"
 
 STATISTIC(NumInserted, "Number of DBG_VALUE instructions inserted");
+
+// Options to prevent pathological compile-time behavior. If InputBBLimit and
+// InputDbgValueLimit are both exceeded, range extension is disabled.
+static cl::opt<unsigned> InputBBLimit(
+    "livedebugvalues-input-bb-limit",
+    cl::desc("Maximum input basic blocks before DBG_VALUE limit applies"),
+    cl::init(10000), cl::Hidden);
+static cl::opt<unsigned> InputDbgValueLimit(
+    "livedebugvalues-input-dbg-value-limit",
+    cl::desc(
+        "Maximum input DBG_VALUE insts supported by debug range extension"),
+    cl::init(50000), cl::Hidden);
 
 /// If \p Op is a stack or frame register return true, otherwise return false.
 /// This is used to avoid basing the debug entry values on the registers, since
@@ -231,14 +248,6 @@ struct LocIndex {
   static constexpr u32_location_t kEntryValueBackupLocation =
       kFirstInvalidRegLocation + 1;
 
-  /// A special location reserved for VarLocs with locations of kind
-  /// WasmLocKind.
-  /// TODO Placing all Wasm target index locations in this single kWasmLocation
-  /// may cause slowdown in compilation time in very large functions. Consider
-  /// giving a each target index/offset pair its own u32_location_t if this
-  /// becomes a problem.
-  static constexpr u32_location_t kWasmLocation = kFirstInvalidRegLocation + 2;
-
   LocIndex(u32_location_t Location, u32_index_t Index)
       : Location(Location), Index(Index) {}
 
@@ -247,7 +256,8 @@ struct LocIndex {
   }
 
   template<typename IntT> static LocIndex fromRawInteger(IntT ID) {
-    static_assert(std::is_unsigned_v<IntT> && sizeof(ID) == sizeof(uint64_t),
+    static_assert(std::is_unsigned<IntT>::value &&
+                      sizeof(ID) == sizeof(uint64_t),
                   "Cannot convert raw integer to LocIndex");
     return {static_cast<u32_location_t>(ID >> 32),
             static_cast<u32_index_t>(ID)};
@@ -286,12 +296,10 @@ private:
   LexicalScopes LS;
   VarLocSet::Allocator Alloc;
 
-  const MachineInstr *LastNonDbgMI;
-
   enum struct TransferKind { TransferCopy, TransferSpill, TransferRestore };
 
   using FragmentInfo = DIExpression::FragmentInfo;
-  using OptFragmentInfo = std::optional<DIExpression::FragmentInfo>;
+  using OptFragmentInfo = Optional<DIExpression::FragmentInfo>;
 
   /// A pair of debug variable and value location.
   struct VarLoc {
@@ -308,21 +316,6 @@ private:
       }
     };
 
-    // Target indices used for wasm-specific locations.
-    struct WasmLoc {
-      // One of TargetIndex values defined in WebAssembly.h. We deal with
-      // local-related TargetIndex in this analysis (TI_LOCAL and
-      // TI_LOCAL_INDIRECT). Stack operands (TI_OPERAND_STACK) will be handled
-      // separately WebAssemblyDebugFixup pass, and we don't associate debug
-      // info with values in global operands (TI_GLOBAL_RELOC) at the moment.
-      int Index;
-      int64_t Offset;
-      bool operator==(const WasmLoc &Other) const {
-        return Index == Other.Index && Offset == Other.Offset;
-      }
-      bool operator!=(const WasmLoc &Other) const { return !(*this == Other); }
-    };
-
     /// Identity of the variable at this location.
     const DebugVariable Var;
 
@@ -337,8 +330,7 @@ private:
       InvalidKind = 0,
       RegisterKind,
       SpillLocKind,
-      ImmediateKind,
-      WasmLocKind
+      ImmediateKind
     };
 
     enum class EntryValueLocKind {
@@ -346,7 +338,7 @@ private:
       EntryValueKind,
       EntryValueBackupKind,
       EntryValueCopyBackupKind
-    } EVKind = EntryValueLocKind::NonEntryValueKind;
+    } EVKind;
 
     /// The value location. Stored separately to avoid repeatedly
     /// extracting it from MI.
@@ -357,7 +349,6 @@ private:
       int64_t Immediate;
       const ConstantFP *FPImm;
       const ConstantInt *CImm;
-      WasmLoc WasmLocation;
       MachineLocValue() : Hash(0) {}
     };
 
@@ -374,8 +365,6 @@ private:
         switch (Kind) {
         case MachineLocKind::SpillLocKind:
           return Value.SpillLocation == Other.Value.SpillLocation;
-        case MachineLocKind::WasmLocKind:
-          return Value.WasmLocation == Other.Value.WasmLocation;
         case MachineLocKind::RegisterKind:
         case MachineLocKind::ImmediateKind:
           return Value.Hash == Other.Value.Hash;
@@ -394,11 +383,6 @@ private:
                      Other.Kind, Other.Value.SpillLocation.SpillBase,
                      Other.Value.SpillLocation.SpillOffset.getFixed(),
                      Other.Value.SpillLocation.SpillOffset.getScalable());
-        case MachineLocKind::WasmLocKind:
-          return std::make_tuple(Kind, Value.WasmLocation.Index,
-                                 Value.WasmLocation.Offset) <
-                 std::make_tuple(Other.Kind, Other.Value.WasmLocation.Index,
-                                 Other.Value.WasmLocation.Offset);
         case MachineLocKind::RegisterKind:
         case MachineLocKind::ImmediateKind:
           return std::tie(Kind, Value.Hash) <
@@ -419,10 +403,11 @@ private:
     /// emitting a debug value.
     SmallVector<unsigned, 8> OrigLocMap;
 
-    VarLoc(const MachineInstr &MI)
+    VarLoc(const MachineInstr &MI, LexicalScopes &LS)
         : Var(MI.getDebugVariable(), MI.getDebugExpression(),
               MI.getDebugLoc()->getInlinedAt()),
-          Expr(MI.getDebugExpression()), MI(MI) {
+          Expr(MI.getDebugExpression()), MI(MI),
+          EVKind(EntryValueLocKind::NonEntryValueKind) {
       assert(MI.isDebugValue() && "not a DBG_VALUE");
       assert((MI.isDebugValueList() || MI.getNumOperands() == 4) &&
              "malformed DBG_VALUE");
@@ -462,9 +447,6 @@ private:
       } else if (Op.isCImm()) {
         Kind = MachineLocKind::ImmediateKind;
         Loc.CImm = Op.getCImm();
-      } else if (Op.isTargetIndex()) {
-        Kind = MachineLocKind::WasmLocKind;
-        Loc.WasmLocation = {Op.getIndex(), Op.getOffset()};
       } else
         llvm_unreachable("Invalid Op kind for MachineLoc.");
       return {Kind, Loc};
@@ -472,9 +454,9 @@ private:
 
     /// Take the variable and machine-location in DBG_VALUE MI, and build an
     /// entry location using the given expression.
-    static VarLoc CreateEntryLoc(const MachineInstr &MI,
+    static VarLoc CreateEntryLoc(const MachineInstr &MI, LexicalScopes &LS,
                                  const DIExpression *EntryExpr, Register Reg) {
-      VarLoc VL(MI);
+      VarLoc VL(MI, LS);
       assert(VL.Locs.size() == 1 &&
              VL.Locs[0].Kind == MachineLocKind::RegisterKind);
       VL.EVKind = EntryValueLocKind::EntryValueKind;
@@ -488,8 +470,9 @@ private:
     /// location will turn into the normal location if the backup is valid at
     /// the time of the primary location clobbering.
     static VarLoc CreateEntryBackupLoc(const MachineInstr &MI,
+                                       LexicalScopes &LS,
                                        const DIExpression *EntryExpr) {
-      VarLoc VL(MI);
+      VarLoc VL(MI, LS);
       assert(VL.Locs.size() == 1 &&
              VL.Locs[0].Kind == MachineLocKind::RegisterKind);
       VL.EVKind = EntryValueLocKind::EntryValueBackupKind;
@@ -501,9 +484,10 @@ private:
     /// function entry), and build a copy of an entry value backup location by
     /// setting the register location to NewReg.
     static VarLoc CreateEntryCopyBackupLoc(const MachineInstr &MI,
+                                           LexicalScopes &LS,
                                            const DIExpression *EntryExpr,
                                            Register NewReg) {
-      VarLoc VL(MI);
+      VarLoc VL(MI, LS);
       assert(VL.Locs.size() == 1 &&
              VL.Locs[0].Kind == MachineLocKind::RegisterKind);
       VL.EVKind = EntryValueLocKind::EntryValueCopyBackupKind;
@@ -517,10 +501,10 @@ private:
     static VarLoc CreateCopyLoc(const VarLoc &OldVL, const MachineLoc &OldML,
                                 Register NewReg) {
       VarLoc VL = OldVL;
-      for (MachineLoc &ML : VL.Locs)
-        if (ML == OldML) {
-          ML.Kind = MachineLocKind::RegisterKind;
-          ML.Value.RegNo = NewReg;
+      for (size_t I = 0, E = VL.Locs.size(); I < E; ++I)
+        if (VL.Locs[I] == OldML) {
+          VL.Locs[I].Kind = MachineLocKind::RegisterKind;
+          VL.Locs[I].Value.RegNo = NewReg;
           return VL;
         }
       llvm_unreachable("Should have found OldML in new VarLoc.");
@@ -531,10 +515,10 @@ private:
     static VarLoc CreateSpillLoc(const VarLoc &OldVL, const MachineLoc &OldML,
                                  unsigned SpillBase, StackOffset SpillOffset) {
       VarLoc VL = OldVL;
-      for (MachineLoc &ML : VL.Locs)
-        if (ML == OldML) {
-          ML.Kind = MachineLocKind::SpillLocKind;
-          ML.Value.SpillLocation = {SpillBase, SpillOffset};
+      for (int I = 0, E = VL.Locs.size(); I < E; ++I)
+        if (VL.Locs[I] == OldML) {
+          VL.Locs[I].Kind = MachineLocKind::SpillLocKind;
+          VL.Locs[I].Value.SpillLocation = {SpillBase, SpillOffset};
           return VL;
         }
       llvm_unreachable("Should have found OldML in new VarLoc.");
@@ -571,6 +555,7 @@ private:
               EVKind == EntryValueLocKind::EntryValueKind ? Orig.getReg()
                                                           : Register(Loc.RegNo),
               false));
+          MOs.back().setIsDebug();
           break;
         case MachineLocKind::SpillLocKind: {
           // Spills are indirect DBG_VALUEs, with a base register and offset.
@@ -580,10 +565,9 @@ private:
           unsigned Base = Loc.SpillLocation.SpillBase;
           auto *TRI = MF.getSubtarget().getRegisterInfo();
           if (MI.isNonListDebugValue()) {
-            auto Deref = Indirect ? DIExpression::DerefAfter : 0;
-            DIExpr = TRI->prependOffsetExpression(
-                DIExpr, DIExpression::ApplyOffset | Deref,
-                Loc.SpillLocation.SpillOffset);
+            DIExpr =
+                TRI->prependOffsetExpression(DIExpr, DIExpression::ApplyOffset,
+                                             Loc.SpillLocation.SpillOffset);
             Indirect = true;
           } else {
             SmallVector<uint64_t, 4> Ops;
@@ -592,13 +576,10 @@ private:
             DIExpr = DIExpression::appendOpsToArg(DIExpr, Ops, I);
           }
           MOs.push_back(MachineOperand::CreateReg(Base, false));
+          MOs.back().setIsDebug();
           break;
         }
         case MachineLocKind::ImmediateKind: {
-          MOs.push_back(Orig);
-          break;
-        }
-        case MachineLocKind::WasmLocKind: {
           MOs.push_back(Orig);
           break;
         }
@@ -645,7 +626,7 @@ private:
     unsigned getRegIdx(Register Reg) const {
       for (unsigned Idx = 0; Idx < Locs.size(); ++Idx)
         if (Locs[Idx].Kind == MachineLocKind::RegisterKind &&
-            Register{static_cast<unsigned>(Locs[Idx].Value.RegNo)} == Reg)
+            Locs[Idx].Value.RegNo == Reg)
           return Idx;
       llvm_unreachable("Could not find given Reg in Locs");
     }
@@ -654,7 +635,7 @@ private:
     /// add each of them to \p Regs and return true.
     bool getDescribingRegs(SmallVectorImpl<uint32_t> &Regs) const {
       bool AnyRegs = false;
-      for (const auto &Loc : Locs)
+      for (auto Loc : Locs)
         if (Loc.Kind == MachineLocKind::RegisterKind) {
           Regs.push_back(Loc.Value.RegNo);
           AnyRegs = true;
@@ -687,21 +668,6 @@ private:
       llvm_unreachable("Could not find given SpillLoc in Locs");
     }
 
-    bool containsWasmLocs() const {
-      return any_of(Locs, [](VarLoc::MachineLoc ML) {
-        return ML.Kind == VarLoc::MachineLocKind::WasmLocKind;
-      });
-    }
-
-    /// If this variable is described in whole or part by \p WasmLocation,
-    /// return true.
-    bool usesWasmLoc(WasmLoc WasmLocation) const {
-      MachineLoc WasmML;
-      WasmML.Kind = MachineLocKind::WasmLocKind;
-      WasmML.Value.WasmLocation = WasmLocation;
-      return is_contained(Locs, WasmML);
-    }
-
     /// Determine whether the lexical scope of this value's debug location
     /// dominates MBB.
     bool dominates(LexicalScopes &LS, MachineBasicBlock &MBB) const {
@@ -709,9 +675,8 @@ private:
     }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
-    // TRI and TII can be null.
-    void dump(const TargetRegisterInfo *TRI, const TargetInstrInfo *TII,
-              raw_ostream &Out = dbgs()) const {
+    // TRI can be null.
+    void dump(const TargetRegisterInfo *TRI, raw_ostream &Out = dbgs()) const {
       Out << "VarLoc(";
       for (const MachineLoc &MLoc : Locs) {
         if (Locs.begin() != &MLoc)
@@ -730,22 +695,6 @@ private:
         case MachineLocKind::ImmediateKind:
           Out << MLoc.Value.Immediate;
           break;
-        case MachineLocKind::WasmLocKind: {
-          if (TII) {
-            auto Indices = TII->getSerializableTargetIndices();
-            auto Found =
-                find_if(Indices, [&](const std::pair<int, const char *> &I) {
-                  return I.first == MLoc.Value.WasmLocation.Index;
-                });
-            assert(Found != Indices.end());
-            Out << Found->second;
-            if (MLoc.Value.WasmLocation.Offset > 0)
-              Out << " + " << MLoc.Value.WasmLocation.Offset;
-          } else {
-            Out << "WasmLoc";
-          }
-          break;
-        }
         case MachineLocKind::InvalidKind:
           llvm_unreachable("Invalid VarLoc in dump method");
         }
@@ -813,10 +762,10 @@ private:
                         return RegNo < LocIndex::kFirstInvalidRegLocation;
                       }) &&
                "Physreg out of range?");
-        if (VL.containsSpillLocs())
-          Locations.push_back(LocIndex::kSpillLocation);
-        if (VL.containsWasmLocs())
-          Locations.push_back(LocIndex::kWasmLocation);
+        if (VL.containsSpillLocs()) {
+          LocIndex::u32_location_t Loc = LocIndex::kSpillLocation;
+          Locations.push_back(Loc);
+        }
       } else if (VL.EVKind != VarLoc::EntryValueLocKind::EntryValueKind) {
         LocIndex::u32_location_t Loc = LocIndex::kEntryValueBackupLocation;
         Locations.push_back(Loc);
@@ -852,10 +801,6 @@ private:
     LocIndex LocationID;        ///< Location number for the transfer dest.
   };
   using TransferMap = SmallVector<TransferDebugPair, 4>;
-  // Types for recording Entry Var Locations emitted by a single MachineInstr,
-  // as well as recording MachineInstr which last defined a register.
-  using InstToEntryLocMap = std::multimap<const MachineInstr *, LocIndex>;
-  using RegDefToInstMap = DenseMap<Register, MachineInstr *>;
 
   // Types for recording sets of variable fragments that overlap. For a given
   // local variable, we record all other fragments of that variable that could
@@ -929,7 +874,7 @@ private:
     /// Insert a set of ranges.
     void insertFromLocSet(const VarLocSet &ToLoad, const VarLocMap &Map);
 
-    std::optional<LocIndices> getEntryValueBackup(DebugVariable Var);
+    llvm::Optional<LocIndices> getEntryValueBackup(DebugVariable Var);
 
     /// Empty the set.
     void clear() {
@@ -969,12 +914,6 @@ private:
       return LocIndex::indexRangeForLocation(
           getVarLocs(), LocIndex::kEntryValueBackupLocation);
     }
-
-    /// Get all set IDs for VarLocs with MLs of kind WasmLocKind.
-    auto getWasmVarLocs() const {
-      return LocIndex::indexRangeForLocation(getVarLocs(),
-                                             LocIndex::kWasmLocation);
-    }
   };
 
   /// Collect all VarLoc IDs from \p CollectFrom for VarLocs with MLs of kind
@@ -990,14 +929,14 @@ private:
     std::unique_ptr<VarLocSet> &VLS = Locs[MBB];
     if (!VLS)
       VLS = std::make_unique<VarLocSet>(Alloc);
-    return *VLS;
+    return *VLS.get();
   }
 
   const VarLocSet &getVarLocsInMBB(const MachineBasicBlock *MBB,
                                    const VarLocInMBB &Locs) const {
     auto It = Locs.find(MBB);
     assert(It != Locs.end() && "MBB not in map");
-    return *It->second;
+    return *It->second.get();
   }
 
   /// Tests whether this instruction is a spill to a stack location.
@@ -1022,9 +961,9 @@ private:
 
   /// If a given instruction is identified as a spill, return the spill location
   /// and set \p Reg to the spilled register.
-  std::optional<VarLoc::SpillLoc> isRestoreInstruction(const MachineInstr &MI,
-                                                       MachineFunction *MF,
-                                                       Register &Reg);
+  Optional<VarLoc::SpillLoc> isRestoreInstruction(const MachineInstr &MI,
+                                                  MachineFunction *MF,
+                                                  Register &Reg);
   /// Given a spill instruction, extract the register and offset used to
   /// address the spill location in a target independent way.
   VarLoc::SpillLoc extractSpillBaseRegAndOffset(const MachineInstr &MI);
@@ -1035,22 +974,13 @@ private:
                                Register NewReg = Register());
 
   void transferDebugValue(const MachineInstr &MI, OpenRangesSet &OpenRanges,
-                          VarLocMap &VarLocIDs,
-                          InstToEntryLocMap &EntryValTransfers,
-                          RegDefToInstMap &RegSetInstrs);
+                          VarLocMap &VarLocIDs);
   void transferSpillOrRestoreInst(MachineInstr &MI, OpenRangesSet &OpenRanges,
                                   VarLocMap &VarLocIDs, TransferMap &Transfers);
-  void cleanupEntryValueTransfers(const MachineInstr *MI,
-                                  OpenRangesSet &OpenRanges,
-                                  VarLocMap &VarLocIDs, const VarLoc &EntryVL,
-                                  InstToEntryLocMap &EntryValTransfers);
-  void removeEntryValue(const MachineInstr &MI, OpenRangesSet &OpenRanges,
-                        VarLocMap &VarLocIDs, const VarLoc &EntryVL,
-                        InstToEntryLocMap &EntryValTransfers,
-                        RegDefToInstMap &RegSetInstrs);
+  bool removeEntryValue(const MachineInstr &MI, OpenRangesSet &OpenRanges,
+                        VarLocMap &VarLocIDs, const VarLoc &EntryVL);
   void emitEntryValues(MachineInstr &MI, OpenRangesSet &OpenRanges,
-                       VarLocMap &VarLocIDs,
-                       InstToEntryLocMap &EntryValTransfers,
+                       VarLocMap &VarLocIDs, TransferMap &Transfers,
                        VarLocsInRange &KillSet);
   void recordEntryValue(const MachineInstr &MI,
                         const DefinedRegsSet &DefinedRegs,
@@ -1058,18 +988,12 @@ private:
   void transferRegisterCopy(MachineInstr &MI, OpenRangesSet &OpenRanges,
                             VarLocMap &VarLocIDs, TransferMap &Transfers);
   void transferRegisterDef(MachineInstr &MI, OpenRangesSet &OpenRanges,
-                           VarLocMap &VarLocIDs,
-                           InstToEntryLocMap &EntryValTransfers,
-                           RegDefToInstMap &RegSetInstrs);
-  void transferWasmDef(MachineInstr &MI, OpenRangesSet &OpenRanges,
-                       VarLocMap &VarLocIDs);
+                           VarLocMap &VarLocIDs, TransferMap &Transfers);
   bool transferTerminator(MachineBasicBlock *MBB, OpenRangesSet &OpenRanges,
                           VarLocInMBB &OutLocs, const VarLocMap &VarLocIDs);
 
   void process(MachineInstr &MI, OpenRangesSet &OpenRanges,
-               VarLocMap &VarLocIDs, TransferMap &Transfers,
-               InstToEntryLocMap &EntryValTransfers,
-               RegDefToInstMap &RegSetInstrs);
+               VarLocMap &VarLocIDs, TransferMap &Transfers);
 
   void accumulateFragmentMap(MachineInstr &MI, VarToFragments &SeenFragments,
                              OverlapMap &OLapMap);
@@ -1083,9 +1007,7 @@ private:
   /// had their instruction creation deferred.
   void flushPendingLocs(VarLocInMBB &PendingInLocs, VarLocMap &VarLocIDs);
 
-  bool ExtendRanges(MachineFunction &MF, MachineDominatorTree *DomTree,
-                    TargetPassConfig *TPC, unsigned InputBBLimit,
-                    unsigned InputDbgValLimit) override;
+  bool ExtendRanges(MachineFunction &MF, TargetPassConfig *TPC) override;
 
 public:
   /// Default construct and initialize the pass.
@@ -1105,9 +1027,9 @@ public:
 //            Implementation
 //===----------------------------------------------------------------------===//
 
-VarLocBasedLDV::VarLocBasedLDV() = default;
+VarLocBasedLDV::VarLocBasedLDV() { }
 
-VarLocBasedLDV::~VarLocBasedLDV() = default;
+VarLocBasedLDV::~VarLocBasedLDV() { }
 
 /// Erase a variable from the set of open ranges, and additionally erase any
 /// fragments that may overlap it. If the VarLoc is a backup location, erase
@@ -1116,7 +1038,7 @@ VarLocBasedLDV::~VarLocBasedLDV() = default;
 /// location, erase the variable from the Vars set.
 void VarLocBasedLDV::OpenRangesSet::erase(const VarLoc &VL) {
   // Erasure helper.
-  auto DoErase = [&VL, this](DebugVariable VarToErase) {
+  auto DoErase = [VL, this](DebugVariable VarToErase) {
     auto *EraseFrom = VL.isEntryBackupLoc() ? &EntryValuesBackupVars : &Vars;
     auto It = EraseFrom->find(VarToErase);
     if (It != EraseFrom->end()) {
@@ -1188,13 +1110,13 @@ void VarLocBasedLDV::OpenRangesSet::insert(LocIndices VarLocIDs,
 
 /// Return the Loc ID of an entry value backup location, if it exists for the
 /// variable.
-std::optional<LocIndices>
+llvm::Optional<LocIndices>
 VarLocBasedLDV::OpenRangesSet::getEntryValueBackup(DebugVariable Var) {
   auto It = EntryValuesBackupVars.find(Var);
   if (It != EntryValuesBackupVars.end())
     return It->second;
 
-  return std::nullopt;
+  return llvm::None;
 }
 
 void VarLocBasedLDV::collectIDsForRegs(VarLocsInRange &Collected,
@@ -1281,7 +1203,7 @@ void VarLocBasedLDV::printVarLocInMBB(const MachineFunction &MF,
     for (const VarLoc &VL : VarLocs) {
       Out << " Var: " << VL.Var.getVariable()->getName();
       Out << " MI: ";
-      VL.dump(TRI, TII, Out);
+      VL.dump(TRI, Out);
     }
   }
   Out << "\n";
@@ -1303,100 +1225,62 @@ VarLocBasedLDV::extractSpillBaseRegAndOffset(const MachineInstr &MI) {
   return {Reg, Offset};
 }
 
-/// Do cleanup of \p EntryValTransfers created by \p TRInst, by removing the
-/// Transfer, which uses the to-be-deleted \p EntryVL.
-void VarLocBasedLDV::cleanupEntryValueTransfers(
-    const MachineInstr *TRInst, OpenRangesSet &OpenRanges, VarLocMap &VarLocIDs,
-    const VarLoc &EntryVL, InstToEntryLocMap &EntryValTransfers) {
-  if (EntryValTransfers.empty() || TRInst == nullptr)
-    return;
-
-  auto TransRange = EntryValTransfers.equal_range(TRInst);
-  for (auto &TDPair : llvm::make_range(TransRange.first, TransRange.second)) {
-    const VarLoc &EmittedEV = VarLocIDs[TDPair.second];
-    if (std::tie(EntryVL.Var, EntryVL.Locs[0].Value.RegNo, EntryVL.Expr) ==
-        std::tie(EmittedEV.Var, EmittedEV.Locs[0].Value.RegNo,
-                 EmittedEV.Expr)) {
-      OpenRanges.erase(EmittedEV);
-      EntryValTransfers.erase(TRInst);
-      break;
-    }
-  }
-}
-
 /// Try to salvage the debug entry value if we encounter a new debug value
 /// describing the same parameter, otherwise stop tracking the value. Return
-/// true if we should stop tracking the entry value and do the cleanup of
-/// emitted Entry Value Transfers, otherwise return false.
-void VarLocBasedLDV::removeEntryValue(const MachineInstr &MI,
-                                      OpenRangesSet &OpenRanges,
-                                      VarLocMap &VarLocIDs,
-                                      const VarLoc &EntryVL,
-                                      InstToEntryLocMap &EntryValTransfers,
-                                      RegDefToInstMap &RegSetInstrs) {
+/// true if we should stop tracking the entry value, otherwise return false.
+bool VarLocBasedLDV::removeEntryValue(const MachineInstr &MI,
+                                       OpenRangesSet &OpenRanges,
+                                       VarLocMap &VarLocIDs,
+                                       const VarLoc &EntryVL) {
   // Skip the DBG_VALUE which is the debug entry value itself.
-  if (&MI == &EntryVL.MI)
-    return;
+  if (MI.isIdenticalTo(EntryVL.MI))
+    return false;
 
   // If the parameter's location is not register location, we can not track
-  // the entry value any more. It doesn't have the TransferInst which defines
-  // register, so no Entry Value Transfers have been emitted already.
-  if (!MI.getDebugOperand(0).isReg())
-    return;
+  // the entry value any more. In addition, if the debug expression from the
+  // DBG_VALUE is not empty, we can assume the parameter's value has changed
+  // indicating that we should stop tracking its entry value as well.
+  if (!MI.getDebugOperand(0).isReg() ||
+      MI.getDebugExpression()->getNumElements() != 0)
+    return true;
 
-  // Try to get non-debug instruction responsible for the DBG_VALUE.
-  const MachineInstr *TransferInst = nullptr;
+  // If the DBG_VALUE comes from a copy instruction that copies the entry value,
+  // it means the parameter's value has not changed and we should be able to use
+  // its entry value.
   Register Reg = MI.getDebugOperand(0).getReg();
-  if (Reg.isValid() && RegSetInstrs.contains(Reg))
-    TransferInst = RegSetInstrs.find(Reg)->second;
+  auto I = std::next(MI.getReverseIterator());
+  const MachineOperand *SrcRegOp, *DestRegOp;
+  if (I != MI.getParent()->rend()) {
 
-  // Case of the parameter's DBG_VALUE at the start of entry MBB.
-  if (!TransferInst && !LastNonDbgMI && MI.getParent()->isEntryBlock())
-    return;
-
-  // If the debug expression from the DBG_VALUE is not empty, we can assume the
-  // parameter's value has changed indicating that we should stop tracking its
-  // entry value as well.
-  if (MI.getDebugExpression()->getNumElements() == 0 && TransferInst) {
-    // If the DBG_VALUE comes from a copy instruction that copies the entry
-    // value, it means the parameter's value has not changed and we should be
-    // able to use its entry value.
     // TODO: Try to keep tracking of an entry value if we encounter a propagated
     // DBG_VALUE describing the copy of the entry value. (Propagated entry value
     // does not indicate the parameter modification.)
-    auto DestSrc = TII->isCopyInstr(*TransferInst);
-    if (DestSrc) {
-      const MachineOperand *SrcRegOp, *DestRegOp;
-      SrcRegOp = DestSrc->Source;
-      DestRegOp = DestSrc->Destination;
-      if (Reg == DestRegOp->getReg()) {
-        for (uint64_t ID : OpenRanges.getEntryValueBackupVarLocs()) {
-          const VarLoc &VL = VarLocIDs[LocIndex::fromRawInteger(ID)];
-          if (VL.isEntryValueCopyBackupReg(Reg) &&
-              // Entry Values should not be variadic.
-              VL.MI.getDebugOperand(0).getReg() == SrcRegOp->getReg())
-            return;
-        }
-      }
+    auto DestSrc = TII->isCopyInstr(*I);
+    if (!DestSrc)
+      return true;
+
+    SrcRegOp = DestSrc->Source;
+    DestRegOp = DestSrc->Destination;
+    if (Reg != DestRegOp->getReg())
+      return true;
+
+    for (uint64_t ID : OpenRanges.getEntryValueBackupVarLocs()) {
+      const VarLoc &VL = VarLocIDs[LocIndex::fromRawInteger(ID)];
+      if (VL.isEntryValueCopyBackupReg(Reg) &&
+          // Entry Values should not be variadic.
+          VL.MI.getDebugOperand(0).getReg() == SrcRegOp->getReg())
+        return false;
     }
   }
 
-  LLVM_DEBUG(dbgs() << "Deleting a DBG entry value because of: ";
-             MI.print(dbgs(), /*IsStandalone*/ false,
-                      /*SkipOpers*/ false, /*SkipDebugLoc*/ false,
-                      /*AddNewLine*/ true, TII));
-  cleanupEntryValueTransfers(TransferInst, OpenRanges, VarLocIDs, EntryVL,
-                             EntryValTransfers);
-  OpenRanges.erase(EntryVL);
+  return true;
 }
 
 /// End all previous ranges related to @MI and start a new range from @MI
 /// if it is a DBG_VALUE instr.
 void VarLocBasedLDV::transferDebugValue(const MachineInstr &MI,
-                                        OpenRangesSet &OpenRanges,
-                                        VarLocMap &VarLocIDs,
-                                        InstToEntryLocMap &EntryValTransfers,
-                                        RegDefToInstMap &RegSetInstrs) {
+                                         OpenRangesSet &OpenRanges,
+                                         VarLocMap &VarLocIDs) {
   if (!MI.isDebugValue())
     return;
   const DILocalVariable *Var = MI.getDebugVariable();
@@ -1413,16 +1297,21 @@ void VarLocBasedLDV::transferDebugValue(const MachineInstr &MI,
   auto EntryValBackupID = OpenRanges.getEntryValueBackup(V);
   if (Var->isParameter() && EntryValBackupID) {
     const VarLoc &EntryVL = VarLocIDs[EntryValBackupID->back()];
-    removeEntryValue(MI, OpenRanges, VarLocIDs, EntryVL, EntryValTransfers,
-                     RegSetInstrs);
+    if (removeEntryValue(MI, OpenRanges, VarLocIDs, EntryVL)) {
+      LLVM_DEBUG(dbgs() << "Deleting a DBG entry value because of: ";
+                 MI.print(dbgs(), /*IsStandalone*/ false,
+                          /*SkipOpers*/ false, /*SkipDebugLoc*/ false,
+                          /*AddNewLine*/ true, TII));
+      OpenRanges.erase(EntryVL);
+    }
   }
 
   if (all_of(MI.debug_operands(), [](const MachineOperand &MO) {
         return (MO.isReg() && MO.getReg()) || MO.isImm() || MO.isFPImm() ||
-               MO.isCImm() || MO.isTargetIndex();
+               MO.isCImm();
       })) {
     // Use normal VarLoc constructor for registers and immediates.
-    VarLoc VL(MI);
+    VarLoc VL(MI, LS);
     // End all previous ranges of VL.Var.
     OpenRanges.erase(VL);
 
@@ -1435,7 +1324,7 @@ void VarLocBasedLDV::transferDebugValue(const MachineInstr &MI,
     // This must be an undefined location. If it has an open range, erase it.
     assert(MI.isUndefDebugValue() &&
            "Unexpected non-undef DBG_VALUE encountered");
-    VarLoc VL(MI);
+    VarLoc VL(MI, LS);
     OpenRanges.erase(VL);
   }
 }
@@ -1462,7 +1351,7 @@ void VarLocBasedLDV::collectAllVarLocs(SmallVectorImpl<VarLoc> &Collected,
 void VarLocBasedLDV::emitEntryValues(MachineInstr &MI,
                                      OpenRangesSet &OpenRanges,
                                      VarLocMap &VarLocIDs,
-                                     InstToEntryLocMap &EntryValTransfers,
+                                     TransferMap &Transfers,
                                      VarLocsInRange &KillSet) {
   // Do not insert entry value locations after a terminator.
   if (MI.isTerminator())
@@ -1476,7 +1365,7 @@ void VarLocBasedLDV::emitEntryValues(MachineInstr &MI,
       continue;
 
     auto DebugVar = VL.Var;
-    std::optional<LocIndices> EntryValBackupIDs =
+    Optional<LocIndices> EntryValBackupIDs =
         OpenRanges.getEntryValueBackup(DebugVar);
 
     // If the parameter has the entry value backup, it means we should
@@ -1485,12 +1374,10 @@ void VarLocBasedLDV::emitEntryValues(MachineInstr &MI,
       continue;
 
     const VarLoc &EntryVL = VarLocIDs[EntryValBackupIDs->back()];
-    VarLoc EntryLoc = VarLoc::CreateEntryLoc(EntryVL.MI, EntryVL.Expr,
+    VarLoc EntryLoc = VarLoc::CreateEntryLoc(EntryVL.MI, LS, EntryVL.Expr,
                                              EntryVL.Locs[0].Value.RegNo);
     LocIndices EntryValueIDs = VarLocIDs.insert(EntryLoc);
-    assert(EntryValueIDs.size() == 1 &&
-           "EntryValue loc should not be variadic");
-    EntryValTransfers.insert({&MI, EntryValueIDs.back()});
+    Transfers.push_back({&MI, EntryValueIDs.back()});
     OpenRanges.insert(EntryValueIDs, EntryLoc);
   }
 }
@@ -1532,7 +1419,7 @@ void VarLocBasedLDV::insertTransferDebugPair(
     ProcessVarLoc(VL);
     LLVM_DEBUG({
       dbgs() << "Creating VarLoc for register copy:";
-      VL.dump(TRI, TII);
+      VL.dump(TRI);
     });
     return;
   }
@@ -1545,7 +1432,7 @@ void VarLocBasedLDV::insertTransferDebugPair(
     ProcessVarLoc(VL);
     LLVM_DEBUG({
       dbgs() << "Creating VarLoc for spill:";
-      VL.dump(TRI, TII);
+      VL.dump(TRI);
     });
     return;
   }
@@ -1558,7 +1445,7 @@ void VarLocBasedLDV::insertTransferDebugPair(
     ProcessVarLoc(VL);
     LLVM_DEBUG({
       dbgs() << "Creating VarLoc for restore:";
-      VL.dump(TRI, TII);
+      VL.dump(TRI);
     });
     return;
   }
@@ -1567,11 +1454,9 @@ void VarLocBasedLDV::insertTransferDebugPair(
 }
 
 /// A definition of a register may mark the end of a range.
-void VarLocBasedLDV::transferRegisterDef(MachineInstr &MI,
-                                         OpenRangesSet &OpenRanges,
-                                         VarLocMap &VarLocIDs,
-                                         InstToEntryLocMap &EntryValTransfers,
-                                         RegDefToInstMap &RegSetInstrs) {
+void VarLocBasedLDV::transferRegisterDef(
+    MachineInstr &MI, OpenRangesSet &OpenRanges, VarLocMap &VarLocIDs,
+    TransferMap &Transfers) {
 
   // Meta Instructions do not affect the debug liveness of any register they
   // define.
@@ -1587,14 +1472,13 @@ void VarLocBasedLDV::transferRegisterDef(MachineInstr &MI,
   SmallVector<const uint32_t *, 4> RegMasks;
   for (const MachineOperand &MO : MI.operands()) {
     // Determine whether the operand is a register def.
-    if (MO.isReg() && MO.isDef() && MO.getReg() && MO.getReg().isPhysical() &&
+    if (MO.isReg() && MO.isDef() && MO.getReg() &&
+        Register::isPhysicalRegister(MO.getReg()) &&
         !(MI.isCall() && MO.getReg() == SP)) {
       // Remove ranges of all aliased registers.
       for (MCRegAliasIterator RAI(MO.getReg(), TRI, true); RAI.isValid(); ++RAI)
         // FIXME: Can we break out of this loop early if no insertion occurs?
         DeadRegs.insert(*RAI);
-      RegSetInstrs.erase(MO.getReg());
-      RegSetInstrs.insert({MO.getReg(), &MI});
     } else if (MO.isRegMask()) {
       RegMasks.push_back(MO.getRegMask());
     }
@@ -1621,10 +1505,6 @@ void VarLocBasedLDV::transferRegisterDef(MachineInstr &MI,
           });
       if (AnyRegMaskKillsReg)
         DeadRegs.insert(Reg);
-      if (AnyRegMaskKillsReg) {
-        RegSetInstrs.erase(Reg);
-        RegSetInstrs.insert({Reg, &MI});
-      }
     }
   }
 
@@ -1638,32 +1518,8 @@ void VarLocBasedLDV::transferRegisterDef(MachineInstr &MI,
   if (TPC) {
     auto &TM = TPC->getTM<TargetMachine>();
     if (TM.Options.ShouldEmitDebugEntryValues())
-      emitEntryValues(MI, OpenRanges, VarLocIDs, EntryValTransfers, KillSet);
+      emitEntryValues(MI, OpenRanges, VarLocIDs, Transfers, KillSet);
   }
-}
-
-void VarLocBasedLDV::transferWasmDef(MachineInstr &MI,
-                                     OpenRangesSet &OpenRanges,
-                                     VarLocMap &VarLocIDs) {
-  // If this is not a Wasm local.set or local.tee, which sets local values,
-  // return.
-  int Index;
-  int64_t Offset;
-  if (!TII->isExplicitTargetIndexDef(MI, Index, Offset))
-    return;
-
-  // Find the target indices killed by MI, and delete those variable locations
-  // from the open range.
-  VarLocsInRange KillSet;
-  VarLoc::WasmLoc Loc{Index, Offset};
-  for (uint64_t ID : OpenRanges.getWasmVarLocs()) {
-    LocIndex Idx = LocIndex::fromRawInteger(ID);
-    const VarLoc &VL = VarLocIDs[Idx];
-    assert(VL.containsWasmLocs() && "Broken VarLocSet?");
-    if (VL.usesWasmLoc(Loc))
-      KillSet.insert(ID);
-  }
-  OpenRanges.erase(KillSet, VarLocIDs, LocIndex::kWasmLocation);
 }
 
 bool VarLocBasedLDV::isSpillInstruction(const MachineInstr &MI,
@@ -1719,11 +1575,11 @@ bool VarLocBasedLDV::isLocationSpill(const MachineInstr &MI,
   return false;
 }
 
-std::optional<VarLocBasedLDV::VarLoc::SpillLoc>
+Optional<VarLocBasedLDV::VarLoc::SpillLoc>
 VarLocBasedLDV::isRestoreInstruction(const MachineInstr &MI,
-                                     MachineFunction *MF, Register &Reg) {
+                                      MachineFunction *MF, Register &Reg) {
   if (!MI.hasOneMemOperand())
-    return std::nullopt;
+    return None;
 
   // FIXME: Handle folded restore instructions with more than one memory
   // operand.
@@ -1731,7 +1587,7 @@ VarLocBasedLDV::isRestoreInstruction(const MachineInstr &MI,
     Reg = MI.getOperand(0).getReg();
     return extractSpillBaseRegAndOffset(MI);
   }
-  return std::nullopt;
+  return None;
 }
 
 /// A spilled register may indicate that we have to end the current range of
@@ -1748,7 +1604,7 @@ void VarLocBasedLDV::transferSpillOrRestoreInst(MachineInstr &MI,
   MachineFunction *MF = MI.getMF();
   TransferKind TKind;
   Register Reg;
-  std::optional<VarLoc::SpillLoc> Loc;
+  Optional<VarLoc::SpillLoc> Loc;
 
   LLVM_DEBUG(dbgs() << "Examining instruction: "; MI.dump(););
 
@@ -1878,7 +1734,7 @@ void VarLocBasedLDV::transferRegisterCopy(MachineInstr &MI,
       if (VL.isEntryValueBackupReg(SrcReg)) {
         LLVM_DEBUG(dbgs() << "Copy of the entry value: "; MI.dump(););
         VarLoc EntryValLocCopyBackup =
-            VarLoc::CreateEntryCopyBackupLoc(VL.MI, VL.Expr, DestReg);
+            VarLoc::CreateEntryCopyBackupLoc(VL.MI, LS, VL.Expr, DestReg);
         // Stop tracking the original entry value.
         OpenRanges.erase(VL);
 
@@ -1919,7 +1775,7 @@ bool VarLocBasedLDV::transferTerminator(MachineBasicBlock *CurMBB,
     for (VarLoc &VL : VarLocs) {
       // Copy OpenRanges to OutLocs, if not already present.
       dbgs() << "Add to OutLocs in MBB #" << CurMBB->getNumber() << ":  ";
-      VL.dump(TRI, TII);
+      VL.dump(TRI);
     }
   });
   VarLocSet &VLS = getVarLocsInMBB(CurMBB, OutLocs);
@@ -1975,7 +1831,7 @@ void VarLocBasedLDV::accumulateFragmentMap(MachineInstr &MI,
   // Otherwise, examine all other seen fragments for this variable, with "this"
   // fragment being a previously unseen fragment. Record any pair of
   // overlapping fragments.
-  for (const auto &ASeenFragment : AllSeenFragments) {
+  for (auto &ASeenFragment : AllSeenFragments) {
     // Does this previously seen fragment overlap?
     if (DIExpression::fragmentsOverlap(ThisFragment, ASeenFragment)) {
       // Yes: Mark the current fragment as being overlapped.
@@ -1995,16 +1851,9 @@ void VarLocBasedLDV::accumulateFragmentMap(MachineInstr &MI,
 
 /// This routine creates OpenRanges.
 void VarLocBasedLDV::process(MachineInstr &MI, OpenRangesSet &OpenRanges,
-                             VarLocMap &VarLocIDs, TransferMap &Transfers,
-                             InstToEntryLocMap &EntryValTransfers,
-                             RegDefToInstMap &RegSetInstrs) {
-  if (!MI.isDebugInstr())
-    LastNonDbgMI = &MI;
-  transferDebugValue(MI, OpenRanges, VarLocIDs, EntryValTransfers,
-                     RegSetInstrs);
-  transferRegisterDef(MI, OpenRanges, VarLocIDs, EntryValTransfers,
-                      RegSetInstrs);
-  transferWasmDef(MI, OpenRanges, VarLocIDs);
+                              VarLocMap &VarLocIDs, TransferMap &Transfers) {
+  transferDebugValue(MI, OpenRanges, VarLocIDs);
+  transferRegisterDef(MI, OpenRanges, VarLocIDs, Transfers);
   transferRegisterCopy(MI, OpenRanges, VarLocIDs, Transfers);
   transferSpillOrRestoreInst(MI, OpenRanges, VarLocIDs, Transfers);
 }
@@ -2024,7 +1873,7 @@ bool VarLocBasedLDV::join(
   // For all predecessors of this MBB, find the set of VarLocs that
   // can be joined.
   int NumVisited = 0;
-  for (auto *p : MBB.predecessors()) {
+  for (auto p : MBB.predecessors()) {
     // Ignore backedges if we have not visited the predecessor yet. As the
     // predecessor hasn't yet had locations propagated into it, most locations
     // will not yet be valid, so treat them as all being uninitialized and
@@ -2042,7 +1891,7 @@ bool VarLocBasedLDV::join(
 
     // Just copy over the Out locs to incoming locs for the first visited
     // predecessor, and for all other predecessors join the Out locs.
-    VarLocSet &OutLocVLS = *OL->second;
+    VarLocSet &OutLocVLS = *OL->second.get();
     if (!NumVisited)
       InLocsT = OutLocVLS;
     else
@@ -2101,7 +1950,7 @@ void VarLocBasedLDV::flushPendingLocs(VarLocInMBB &PendingInLocs,
   for (auto &Iter : PendingInLocs) {
     // Map is keyed on a constant pointer, unwrap it so we can insert insts.
     auto &MBB = const_cast<MachineBasicBlock &>(*Iter.first);
-    VarLocSet &Pending = *Iter.second;
+    VarLocSet &Pending = *Iter.second.get();
 
     SmallVector<VarLoc, 32> VarLocs;
     collectAllVarLocs(VarLocs, Pending, VarLocIDs);
@@ -2151,9 +2000,7 @@ bool VarLocBasedLDV::isEntryValueCandidate(
 
   // TODO: Add support for parameters that have a pre-existing debug expressions
   // (e.g. fragments).
-  // A simple deref expression is equivalent to an indirect debug value.
-  const DIExpression *Expr = MI.getDebugExpression();
-  if (Expr->getNumElements() > 0 && !Expr->isDeref())
+  if (MI.getDebugExpression()->getNumElements() > 0)
     return false;
 
   return true;
@@ -2162,13 +2009,10 @@ bool VarLocBasedLDV::isEntryValueCandidate(
 /// Collect all register defines (including aliases) for the given instruction.
 static void collectRegDefs(const MachineInstr &MI, DefinedRegsSet &Regs,
                            const TargetRegisterInfo *TRI) {
-  for (const MachineOperand &MO : MI.all_defs()) {
-    if (MO.getReg() && MO.getReg().isPhysical()) {
-      Regs.insert(MO.getReg());
+  for (const MachineOperand &MO : MI.operands())
+    if (MO.isReg() && MO.isDef() && MO.getReg())
       for (MCRegAliasIterator AI(MO.getReg(), TRI, true); AI.isValid(); ++AI)
         Regs.insert(*AI);
-    }
-  }
 }
 
 /// This routine records the entry values of function parameters. The values
@@ -2197,19 +2041,15 @@ void VarLocBasedLDV::recordEntryValue(const MachineInstr &MI,
   // valid. It is valid until a parameter is not changed.
   DIExpression *NewExpr =
       DIExpression::prepend(MI.getDebugExpression(), DIExpression::EntryValue);
-  VarLoc EntryValLocAsBackup = VarLoc::CreateEntryBackupLoc(MI, NewExpr);
+  VarLoc EntryValLocAsBackup = VarLoc::CreateEntryBackupLoc(MI, LS, NewExpr);
   LocIndices EntryValLocIDs = VarLocIDs.insert(EntryValLocAsBackup);
   OpenRanges.insert(EntryValLocIDs, EntryValLocAsBackup);
 }
 
 /// Calculate the liveness information for the given machine function and
 /// extend ranges across basic blocks.
-bool VarLocBasedLDV::ExtendRanges(MachineFunction &MF,
-                                  MachineDominatorTree *DomTree,
-                                  TargetPassConfig *TPC, unsigned InputBBLimit,
-                                  unsigned InputDbgValLimit) {
-  (void)DomTree;
-  LLVM_DEBUG(dbgs() << "\nDebug Range Extension: " << MF.getName() << "\n");
+bool VarLocBasedLDV::ExtendRanges(MachineFunction &MF, TargetPassConfig *TPC) {
+  LLVM_DEBUG(dbgs() << "\nDebug Range Extension\n");
 
   if (!MF.getFunction().getSubprogram())
     // VarLocBaseLDV will already have removed all DBG_VALUEs.
@@ -2239,10 +2079,6 @@ bool VarLocBasedLDV::ExtendRanges(MachineFunction &MF,
   VarLocInMBB InLocs;         // Ranges that are incoming after joining.
   TransferMap Transfers;      // DBG_VALUEs associated with transfers (such as
                               // spills, copies and restores).
-  // Map responsible MI to attached Transfer emitted from Backup Entry Value.
-  InstToEntryLocMap EntryValTransfers;
-  // Map a Register to the last MI which clobbered it.
-  RegDefToInstMap RegSetInstrs;
 
   VarToFragments SeenFragments;
 
@@ -2305,7 +2141,7 @@ bool VarLocBasedLDV::ExtendRanges(MachineFunction &MF,
       for (auto &MI : MBB)
         if (MI.isDebugValue())
           ++NumInputDbgValues;
-    if (NumInputDbgValues > InputDbgValLimit) {
+    if (NumInputDbgValues > InputDbgValueLimit) {
       LLVM_DEBUG(dbgs() << "Disabling VarLocBasedLDV: " << MF.getName()
                         << " has " << RPONumber << " basic blocks and "
                         << NumInputDbgValues
@@ -2339,11 +2175,8 @@ bool VarLocBasedLDV::ExtendRanges(MachineFunction &MF,
         // operate with registers that correspond to user variables.
         // First load any pending inlocs.
         OpenRanges.insertFromLocSet(getVarLocsInMBB(MBB, InLocs), VarLocIDs);
-        LastNonDbgMI = nullptr;
-        RegSetInstrs.clear();
         for (auto &MI : *MBB)
-          process(MI, OpenRanges, VarLocIDs, Transfers, EntryValTransfers,
-                  RegSetInstrs);
+          process(MI, OpenRanges, VarLocIDs, Transfers);
         OLChanged |= transferTerminator(MBB, OpenRanges, OutLocs, VarLocIDs);
 
         LLVM_DEBUG(printVarLocInMBB(MF, OutLocs, VarLocIDs,
@@ -2353,7 +2186,7 @@ bool VarLocBasedLDV::ExtendRanges(MachineFunction &MF,
 
         if (OLChanged) {
           OLChanged = false;
-          for (auto *s : MBB->successors())
+          for (auto s : MBB->successors())
             if (OnPending.insert(s).second) {
               Pending.push(BBToOrder[s]);
             }
@@ -2376,18 +2209,6 @@ bool VarLocBasedLDV::ExtendRanges(MachineFunction &MF,
     MBB->insertAfterBundle(TR.TransferInst->getIterator(), MI);
   }
   Transfers.clear();
-
-  // Add DBG_VALUEs created using Backup Entry Value location.
-  for (auto &TR : EntryValTransfers) {
-    MachineInstr *TRInst = const_cast<MachineInstr *>(TR.first);
-    assert(!TRInst->isTerminator() &&
-           "Cannot insert DBG_VALUE after terminator");
-    MachineBasicBlock *MBB = TRInst->getParent();
-    const VarLoc &VL = VarLocIDs[TR.second];
-    MachineInstr *MI = VL.BuildDbgValue(MF);
-    MBB->insertAfterBundle(TRInst->getIterator(), MI);
-  }
-  EntryValTransfers.clear();
 
   // Deferred inlocs will not have had any DBG_VALUE insts created; do
   // that now.

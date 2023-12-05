@@ -1,10 +1,10 @@
-// RUN: %clang_analyze_cc1 -analyzer-checker=core,alpha.core,debug.ExprInspection %s -verify
+// RUN: %clang_analyze_cc1 -analyzer-checker=core,alpha.core,debug.ExprInspection %s -analyzer-store=region -verify
 
 void clang_analyzer_eval(int);
 
-unsigned foo(void);
+unsigned foo();
 typedef struct bf { unsigned x:2; } bf;
-void bar(void) {
+void bar() {
   bf y;
   *(unsigned*)&y = foo();
   y.x = 1;
@@ -14,7 +14,7 @@ struct s {
   int n;
 };
 
-void f(void) {
+void f() {
   struct s a;
   int *p = &(a.n) + 1; // expected-warning{{Pointer arithmetic on}}
 }
@@ -24,7 +24,7 @@ typedef struct {
 } Point;
 
 Point getit(void);
-void test(void) {
+void test() {
   Point p;
   (void)(p = getit()).x;
 }
@@ -34,7 +34,7 @@ void test(void) {
 typedef _Bool bool;
 
 
-void testLazyCompoundVal(void) {
+void testLazyCompoundVal() {
   Point p = {42, 0};
   Point q;
   clang_analyzer_eval((q = p).x == 42); // expected-warning{{TRUE}}
@@ -58,7 +58,7 @@ struct Bits {
   } inner;
 };
 
-void testBitfields(void) {
+void testBitfields() {
   struct Bits bits;
 
   if (foo() && bits.b) // expected-warning {{garbage}}
@@ -89,7 +89,7 @@ void testBitfields(void) {
   if (foo() && bits.inner.f) // expected-warning {{garbage}}
     return;
 
-  extern struct InnerBits getInner(void);
+  extern struct InnerBits getInner();
   bits.inner = getInner();
   
   if (foo() && bits.inner.e) // no-warning
@@ -117,7 +117,7 @@ void testBitfields(void) {
 // Incorrect behavior
 //-----------------------------------------------------------------------------
 
-void testTruncation(void) {
+void testTruncation() {
   struct Bits bits;
   bits.c = 0x11; // expected-warning{{implicit truncation}}
   // FIXME: We don't model truncation of bitfields.

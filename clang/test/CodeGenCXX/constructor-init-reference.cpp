@@ -6,4 +6,4 @@ struct A {
   A() : y(x) {}
 };
 A z;
-// CHECK: store ptr @x, ptr
+// CHECK: store i32* @x, i32**

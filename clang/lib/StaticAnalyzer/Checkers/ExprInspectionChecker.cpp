@@ -6,10 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Taint.h"
 #include "clang/Analysis/IssueHash.h"
 #include "clang/StaticAnalyzer/Checkers/BuiltinCheckerRegistration.h"
 #include "clang/StaticAnalyzer/Checkers/SValExplainer.h"
-#include "clang/StaticAnalyzer/Checkers/Taint.h"
 #include "clang/StaticAnalyzer/Core/BugReporter/BugType.h"
 #include "clang/StaticAnalyzer/Core/Checker.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CallEvent.h"
@@ -17,7 +17,6 @@
 #include "clang/StaticAnalyzer/Core/PathSensitive/DynamicExtent.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/ScopedPrinter.h"
-#include <optional>
 
 using namespace clang;
 using namespace ento;
@@ -41,8 +40,6 @@ class ExprInspectionChecker
   void analyzerNumTimesReached(const CallExpr *CE, CheckerContext &C) const;
   void analyzerCrash(const CallExpr *CE, CheckerContext &C) const;
   void analyzerWarnOnDeadSymbol(const CallExpr *CE, CheckerContext &C) const;
-  void analyzerValue(const CallExpr *CE, CheckerContext &C) const;
-  void analyzerDumpSValType(const CallExpr *CE, CheckerContext &C) const;
   void analyzerDump(const CallExpr *CE, CheckerContext &C) const;
   void analyzerExplain(const CallExpr *CE, CheckerContext &C) const;
   void analyzerPrintState(const CallExpr *CE, CheckerContext &C) const;
@@ -59,10 +56,9 @@ class ExprInspectionChecker
 
   // Optional parameter `ExprVal` for expression value to be marked interesting.
   ExplodedNode *reportBug(llvm::StringRef Msg, CheckerContext &C,
-                          std::optional<SVal> ExprVal = std::nullopt) const;
+                          Optional<SVal> ExprVal = None) const;
   ExplodedNode *reportBug(llvm::StringRef Msg, BugReporter &BR, ExplodedNode *N,
-                          std::optional<SVal> ExprVal = std::nullopt) const;
-  template <typename T> void printAndReport(CheckerContext &C, T What) const;
+                          Optional<SVal> ExprVal = None) const;
 
   const Expr *getArgExpr(const CallExpr *CE, CheckerContext &C) const;
   const MemRegion *getArgRegion(const CallExpr *CE, CheckerContext &C) const;
@@ -102,9 +98,6 @@ bool ExprInspectionChecker::evalCall(const CallEvent &Call,
                 &ExprInspectionChecker::analyzerDumpExtent)
           .Case("clang_analyzer_dumpElementCount",
                 &ExprInspectionChecker::analyzerDumpElementCount)
-          .Case("clang_analyzer_value", &ExprInspectionChecker::analyzerValue)
-          .StartsWith("clang_analyzer_dumpSvalType",
-                      &ExprInspectionChecker::analyzerDumpSValType)
           .StartsWith("clang_analyzer_dump",
                       &ExprInspectionChecker::analyzerDump)
           .Case("clang_analyzer_getExtent",
@@ -116,8 +109,7 @@ bool ExprInspectionChecker::evalCall(const CallEvent &Call,
           .Case("clang_analyzer_hashDump",
                 &ExprInspectionChecker::analyzerHashDump)
           .Case("clang_analyzer_denote", &ExprInspectionChecker::analyzerDenote)
-          .Case("clang_analyzer_express", // This also marks the argument as
-                                          // interesting.
+          .Case("clang_analyzer_express",
                 &ExprInspectionChecker::analyzerExpress)
           .StartsWith("clang_analyzer_isTainted",
                       &ExprInspectionChecker::analyzerIsTainted)
@@ -162,18 +154,17 @@ static const char *getArgumentValueString(const CallExpr *CE,
   }
 }
 
-ExplodedNode *
-ExprInspectionChecker::reportBug(llvm::StringRef Msg, CheckerContext &C,
-                                 std::optional<SVal> ExprVal) const {
+ExplodedNode *ExprInspectionChecker::reportBug(llvm::StringRef Msg,
+                                               CheckerContext &C,
+                                               Optional<SVal> ExprVal) const {
   ExplodedNode *N = C.generateNonFatalErrorNode();
   reportBug(Msg, C.getBugReporter(), N, ExprVal);
   return N;
 }
 
-ExplodedNode *
-ExprInspectionChecker::reportBug(llvm::StringRef Msg, BugReporter &BR,
-                                 ExplodedNode *N,
-                                 std::optional<SVal> ExprVal) const {
+ExplodedNode *ExprInspectionChecker::reportBug(llvm::StringRef Msg,
+                                               BugReporter &BR, ExplodedNode *N,
+                                               Optional<SVal> ExprVal) const {
   if (!N)
     return nullptr;
 
@@ -264,55 +255,6 @@ void ExprInspectionChecker::analyzerExplain(const CallExpr *CE,
   reportBug(Ex.Visit(V), C);
 }
 
-static void printHelper(llvm::raw_svector_ostream &Out, CheckerContext &C,
-                        const llvm::APSInt &I) {
-  Out << I.getBitWidth() << (I.isUnsigned() ? "u:" : "s:");
-  Out << I;
-}
-
-static void printHelper(llvm::raw_svector_ostream &Out, CheckerContext &C,
-                        SymbolRef Sym) {
-  C.getConstraintManager().printValue(Out, C.getState(), Sym);
-}
-
-static void printHelper(llvm::raw_svector_ostream &Out, CheckerContext &C,
-                        SVal V) {
-  Out << V;
-}
-
-template <typename T>
-void ExprInspectionChecker::printAndReport(CheckerContext &C, T What) const {
-  llvm::SmallString<64> Str;
-  llvm::raw_svector_ostream OS(Str);
-  printHelper(OS, C, What);
-  reportBug(OS.str(), C);
-}
-
-void ExprInspectionChecker::analyzerValue(const CallExpr *CE,
-                                          CheckerContext &C) const {
-  const Expr *Arg = getArgExpr(CE, C);
-  if (!Arg)
-    return;
-
-  SVal V = C.getSVal(Arg);
-  if (const SymbolRef Sym = V.getAsSymbol())
-    printAndReport(C, Sym);
-  else if (const llvm::APSInt *I = V.getAsInteger())
-    printAndReport(C, *I);
-  else
-    reportBug("n/a", C);
-}
-
-void ExprInspectionChecker::analyzerDumpSValType(const CallExpr *CE,
-                                                 CheckerContext &C) const {
-  const Expr *Arg = getArgExpr(CE, C);
-  if (!Arg)
-    return;
-
-  QualType Ty = C.getSVal(Arg).getType(C.getASTContext());
-  reportBug(Ty.getAsString(), C);
-}
-
 void ExprInspectionChecker::analyzerDump(const CallExpr *CE,
                                          CheckerContext &C) const {
   const Expr *Arg = getArgExpr(CE, C);
@@ -320,17 +262,21 @@ void ExprInspectionChecker::analyzerDump(const CallExpr *CE,
     return;
 
   SVal V = C.getSVal(Arg);
-  printAndReport(C, V);
+
+  llvm::SmallString<32> Str;
+  llvm::raw_svector_ostream OS(Str);
+  V.dumpToStream(OS);
+  reportBug(OS.str(), C);
 }
 
 void ExprInspectionChecker::analyzerGetExtent(const CallExpr *CE,
                                               CheckerContext &C) const {
-  const Expr *Arg = getArgExpr(CE, C);
-  if (!Arg)
+  const MemRegion *MR = getArgRegion(CE, C);
+  if (!MR)
     return;
 
   ProgramStateRef State = C.getState();
-  SVal Size = getDynamicExtentWithOffset(State, C.getSVal(Arg));
+  DefinedOrUnknownSVal Size = getDynamicExtent(State, MR, C.getSValBuilder());
 
   State = State->BindExpr(CE, C.getLocationContext(), Size);
   C.addTransition(State);
@@ -338,13 +284,17 @@ void ExprInspectionChecker::analyzerGetExtent(const CallExpr *CE,
 
 void ExprInspectionChecker::analyzerDumpExtent(const CallExpr *CE,
                                                CheckerContext &C) const {
-  const Expr *Arg = getArgExpr(CE, C);
-  if (!Arg)
+  const MemRegion *MR = getArgRegion(CE, C);
+  if (!MR)
     return;
 
-  ProgramStateRef State = C.getState();
-  SVal Size = getDynamicExtentWithOffset(State, C.getSVal(Arg));
-  printAndReport(C, Size);
+  DefinedOrUnknownSVal Size =
+      getDynamicExtent(C.getState(), MR, C.getSValBuilder());
+
+  SmallString<64> Msg;
+  llvm::raw_svector_ostream Out(Msg);
+  Out << Size;
+  reportBug(Out.str(), C);
 }
 
 void ExprInspectionChecker::analyzerDumpElementCount(const CallExpr *CE,
@@ -357,14 +307,19 @@ void ExprInspectionChecker::analyzerDumpElementCount(const CallExpr *CE,
   if (const auto *TVR = MR->getAs<TypedValueRegion>()) {
     ElementTy = TVR->getValueType();
   } else {
-    ElementTy = MR->castAs<SymbolicRegion>()->getPointeeStaticType();
+    ElementTy =
+        MR->castAs<SymbolicRegion>()->getSymbol()->getType()->getPointeeType();
   }
 
   assert(!ElementTy->isPointerType());
 
-  DefinedOrUnknownSVal ElementCount = getDynamicElementCountWithOffset(
-      C.getState(), C.getSVal(getArgExpr(CE, C)), ElementTy);
-  printAndReport(C, ElementCount);
+  DefinedOrUnknownSVal ElementCount =
+      getDynamicElementCount(C.getState(), MR, C.getSValBuilder(), ElementTy);
+
+  SmallString<128> Msg;
+  llvm::raw_svector_ostream Out(Msg);
+  Out << ElementCount;
+  reportBug(Out.str(), C);
 }
 
 void ExprInspectionChecker::analyzerPrintState(const CallExpr *CE,
@@ -393,7 +348,8 @@ void ExprInspectionChecker::checkDeadSymbols(SymbolReaper &SymReaper,
   ProgramStateRef State = C.getState();
   const MarkedSymbolsTy &Syms = State->get<MarkedSymbols>();
   ExplodedNode *N = C.getPredecessor();
-  for (SymbolRef Sym : Syms) {
+  for (auto I = Syms.begin(), E = Syms.end(); I != E; ++I) {
+    SymbolRef Sym = *I;
     if (!SymReaper.isDead(Sym))
       continue;
 
@@ -467,60 +423,50 @@ void ExprInspectionChecker::analyzerDenote(const CallExpr *CE,
 
 namespace {
 class SymbolExpressor
-    : public SymExprVisitor<SymbolExpressor, std::optional<std::string>> {
+    : public SymExprVisitor<SymbolExpressor, Optional<std::string>> {
   ProgramStateRef State;
 
 public:
   SymbolExpressor(ProgramStateRef State) : State(State) {}
 
-  std::optional<std::string> lookup(const SymExpr *S) {
+  Optional<std::string> lookup(const SymExpr *S) {
     if (const StringLiteral *const *SLPtr = State->get<DenotedSymbols>(S)) {
       const StringLiteral *SL = *SLPtr;
       return std::string(SL->getBytes());
     }
-    return std::nullopt;
+    return None;
   }
 
-  std::optional<std::string> VisitSymExpr(const SymExpr *S) {
-    return lookup(S);
-  }
+  Optional<std::string> VisitSymExpr(const SymExpr *S) { return lookup(S); }
 
-  std::optional<std::string> VisitSymIntExpr(const SymIntExpr *S) {
-    if (std::optional<std::string> Str = lookup(S))
+  Optional<std::string> VisitSymIntExpr(const SymIntExpr *S) {
+    if (Optional<std::string> Str = lookup(S))
       return Str;
-    if (std::optional<std::string> Str = Visit(S->getLHS()))
+    if (Optional<std::string> Str = Visit(S->getLHS()))
       return (*Str + " " + BinaryOperator::getOpcodeStr(S->getOpcode()) + " " +
               std::to_string(S->getRHS().getLimitedValue()) +
               (S->getRHS().isUnsigned() ? "U" : ""))
           .str();
-    return std::nullopt;
+    return None;
   }
 
-  std::optional<std::string> VisitSymSymExpr(const SymSymExpr *S) {
-    if (std::optional<std::string> Str = lookup(S))
+  Optional<std::string> VisitSymSymExpr(const SymSymExpr *S) {
+    if (Optional<std::string> Str = lookup(S))
       return Str;
-    if (std::optional<std::string> Str1 = Visit(S->getLHS()))
-      if (std::optional<std::string> Str2 = Visit(S->getRHS()))
+    if (Optional<std::string> Str1 = Visit(S->getLHS()))
+      if (Optional<std::string> Str2 = Visit(S->getRHS()))
         return (*Str1 + " " + BinaryOperator::getOpcodeStr(S->getOpcode()) +
                 " " + *Str2)
             .str();
-    return std::nullopt;
+    return None;
   }
 
-  std::optional<std::string> VisitUnarySymExpr(const UnarySymExpr *S) {
-    if (std::optional<std::string> Str = lookup(S))
+  Optional<std::string> VisitSymbolCast(const SymbolCast *S) {
+    if (Optional<std::string> Str = lookup(S))
       return Str;
-    if (std::optional<std::string> Str = Visit(S->getOperand()))
-      return (UnaryOperator::getOpcodeStr(S->getOpcode()) + *Str).str();
-    return std::nullopt;
-  }
-
-  std::optional<std::string> VisitSymbolCast(const SymbolCast *S) {
-    if (std::optional<std::string> Str = lookup(S))
-      return Str;
-    if (std::optional<std::string> Str = Visit(S->getOperand()))
+    if (Optional<std::string> Str = Visit(S->getOperand()))
       return (Twine("(") + S->getType().getAsString() + ")" + *Str).str();
-    return std::nullopt;
+    return None;
   }
 };
 } // namespace
@@ -534,14 +480,14 @@ void ExprInspectionChecker::analyzerExpress(const CallExpr *CE,
   SVal ArgVal = C.getSVal(CE->getArg(0));
   SymbolRef Sym = ArgVal.getAsSymbol();
   if (!Sym) {
-    reportBug("Not a symbol", C, ArgVal);
+    reportBug("Not a symbol", C);
     return;
   }
 
   SymbolExpressor V(C.getState());
   auto Str = V.Visit(Sym);
   if (!Str) {
-    reportBug("Unable to express", C, ArgVal);
+    reportBug("Unable to express", C);
     return;
   }
 

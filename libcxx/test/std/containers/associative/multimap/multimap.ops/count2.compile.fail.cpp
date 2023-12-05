@@ -6,8 +6,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-// UNSUPPORTED: c++03, c++11
-
 // <map>
 
 // class multimap
@@ -25,9 +23,14 @@
 #include "test_macros.h"
 #include "is_transparent.h"
 
+#if TEST_STD_VER <= 11
+#error "This test requires is C++14 (or later)"
+#else
+
 int main(int, char**)
 {
     typedef std::multimap<int, double, transparent_less_private> M;
 
     TEST_IGNORE_NODISCARD M().count(C2Int{5});
 }
+#endif

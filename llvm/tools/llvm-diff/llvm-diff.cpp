@@ -21,7 +21,6 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/WithColor.h"
 #include <string>
 #include <utility>
 

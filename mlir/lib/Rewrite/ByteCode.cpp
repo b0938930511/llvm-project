@@ -23,7 +23,6 @@
 #include "llvm/Support/Format.h"
 #include "llvm/Support/FormatVariadic.h"
 #include <numeric>
-#include <optional>
 
 #define DEBUG_TYPE "pdl-bytecode"
 
@@ -35,23 +34,21 @@ using namespace mlir::detail;
 //===----------------------------------------------------------------------===//
 
 PDLByteCodePattern PDLByteCodePattern::create(pdl_interp::RecordMatchOp matchOp,
-                                              PDLPatternConfigSet *configSet,
                                               ByteCodeAddr rewriterAddr) {
-  PatternBenefit benefit = matchOp.getBenefit();
-  MLIRContext *ctx = matchOp.getContext();
-
-  // Collect the set of generated operations.
   SmallVector<StringRef, 8> generatedOps;
-  if (ArrayAttr generatedOpsAttr = matchOp.getGeneratedOpsAttr())
+  if (ArrayAttr generatedOpsAttr = matchOp.generatedOpsAttr())
     generatedOps =
         llvm::to_vector<8>(generatedOpsAttr.getAsValueRange<StringAttr>());
 
+  PatternBenefit benefit = matchOp.benefit();
+  MLIRContext *ctx = matchOp.getContext();
+
   // Check to see if this is pattern matches a specific operation type.
-  if (std::optional<StringRef> rootKind = matchOp.getRootKind())
-    return PDLByteCodePattern(rewriterAddr, configSet, *rootKind, benefit, ctx,
+  if (Optional<StringRef> rootKind = matchOp.rootKind())
+    return PDLByteCodePattern(rewriterAddr, *rootKind, benefit, ctx,
                               generatedOps);
-  return PDLByteCodePattern(rewriterAddr, configSet, MatchAnyOpTypeTag(),
-                            benefit, ctx, generatedOps);
+  return PDLByteCodePattern(rewriterAddr, MatchAnyOpTypeTag(), benefit, ctx,
+                            generatedOps);
 }
 
 //===----------------------------------------------------------------------===//
@@ -98,28 +95,14 @@ enum OpCode : ByteCodeField {
   CheckResultCount,
   /// Compare a range of types to a constant range of types.
   CheckTypes,
-  /// Continue to the next iteration of a loop.
-  Continue,
-  /// Create a type range from a list of constant types.
-  CreateConstantTypeRange,
   /// Create an operation.
   CreateOperation,
-  /// Create a type range from a list of dynamic types.
-  CreateDynamicTypeRange,
-  /// Create a value range.
-  CreateDynamicValueRange,
+  /// Create a range of types.
+  CreateTypes,
   /// Erase an operation.
   EraseOp,
-  /// Extract the op from a range at the specified index.
-  ExtractOp,
-  /// Extract the type from a range at the specified index.
-  ExtractType,
-  /// Extract the value from a range at the specified index.
-  ExtractValue,
   /// Terminate a matcher or rewrite sequence.
   Finalize,
-  /// Iterate over a range of values.
-  ForEach,
   /// Get a specific attribute of an operation.
   GetAttribute,
   /// Get the type of an attribute.
@@ -142,8 +125,6 @@ enum OpCode : ByteCodeField {
   GetResultN,
   /// Get a specific result group of an operation.
   GetResults,
-  /// Get the users of a value or a range of values.
-  GetUsers,
   /// Get the type of a value.
   GetValueType,
   /// Get the types of a value range.
@@ -167,11 +148,7 @@ enum OpCode : ByteCodeField {
   /// Compare a range of types with a set of constants.
   SwitchTypes,
 };
-} // namespace
-
-/// A marker used to indicate if an operation should infer types.
-static constexpr ByteCodeField kInferTypesMarker =
-    std::numeric_limits<ByteCodeField>::max();
+} // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
 // ByteCode Generation
@@ -181,12 +158,7 @@ static constexpr ByteCodeField kInferTypesMarker =
 // Generator
 
 namespace {
-struct ByteCodeLiveRange;
 struct ByteCodeWriter;
-
-/// Check if the given class `T` can be converted to an opaque pointer.
-template <typename T, typename... Args>
-using has_pointer_traits = decltype(std::declval<T>().getAsOpaquePointer());
 
 /// This class represents the main generator for the pattern bytecode.
 class Generator {
@@ -196,23 +168,18 @@ public:
             SmallVectorImpl<ByteCodeField> &rewriterByteCode,
             SmallVectorImpl<PDLByteCodePattern> &patterns,
             ByteCodeField &maxValueMemoryIndex,
-            ByteCodeField &maxOpRangeMemoryIndex,
             ByteCodeField &maxTypeRangeMemoryIndex,
             ByteCodeField &maxValueRangeMemoryIndex,
-            ByteCodeField &maxLoopLevel,
             llvm::StringMap<PDLConstraintFunction> &constraintFns,
-            llvm::StringMap<PDLRewriteFunction> &rewriteFns,
-            const DenseMap<Operation *, PDLPatternConfigSet *> &configMap)
+            llvm::StringMap<PDLRewriteFunction> &rewriteFns)
       : ctx(ctx), uniquedData(uniquedData), matcherByteCode(matcherByteCode),
         rewriterByteCode(rewriterByteCode), patterns(patterns),
         maxValueMemoryIndex(maxValueMemoryIndex),
-        maxOpRangeMemoryIndex(maxOpRangeMemoryIndex),
         maxTypeRangeMemoryIndex(maxTypeRangeMemoryIndex),
-        maxValueRangeMemoryIndex(maxValueRangeMemoryIndex),
-        maxLoopLevel(maxLoopLevel), configMap(configMap) {
-    for (const auto &it : llvm::enumerate(constraintFns))
+        maxValueRangeMemoryIndex(maxValueRangeMemoryIndex) {
+    for (auto it : llvm::enumerate(constraintFns))
       constraintToMemIndex.try_emplace(it.value().first(), it.index());
-    for (const auto &it : llvm::enumerate(rewriteFns))
+    for (auto it : llvm::enumerate(rewriteFns))
       externalRewriterToMemIndex.try_emplace(it.value().first(), it.index());
   }
 
@@ -251,11 +218,9 @@ public:
 private:
   /// Allocate memory indices for the results of operations within the matcher
   /// and rewriters.
-  void allocateMemoryIndices(pdl_interp::FuncOp matcherFunc,
-                             ModuleOp rewriterModule);
+  void allocateMemoryIndices(FuncOp matcherFunc, ModuleOp rewriterModule);
 
   /// Generate the bytecode for the given operation.
-  void generate(Region *region, ByteCodeWriter &writer);
   void generate(Operation *op, ByteCodeWriter &writer);
   void generate(pdl_interp::ApplyConstraintOp op, ByteCodeWriter &writer);
   void generate(pdl_interp::ApplyRewriteOp op, ByteCodeWriter &writer);
@@ -267,16 +232,12 @@ private:
   void generate(pdl_interp::CheckResultCountOp op, ByteCodeWriter &writer);
   void generate(pdl_interp::CheckTypeOp op, ByteCodeWriter &writer);
   void generate(pdl_interp::CheckTypesOp op, ByteCodeWriter &writer);
-  void generate(pdl_interp::ContinueOp op, ByteCodeWriter &writer);
   void generate(pdl_interp::CreateAttributeOp op, ByteCodeWriter &writer);
   void generate(pdl_interp::CreateOperationOp op, ByteCodeWriter &writer);
-  void generate(pdl_interp::CreateRangeOp op, ByteCodeWriter &writer);
   void generate(pdl_interp::CreateTypeOp op, ByteCodeWriter &writer);
   void generate(pdl_interp::CreateTypesOp op, ByteCodeWriter &writer);
   void generate(pdl_interp::EraseOp op, ByteCodeWriter &writer);
-  void generate(pdl_interp::ExtractOp op, ByteCodeWriter &writer);
   void generate(pdl_interp::FinalizeOp op, ByteCodeWriter &writer);
-  void generate(pdl_interp::ForEachOp op, ByteCodeWriter &writer);
   void generate(pdl_interp::GetAttributeOp op, ByteCodeWriter &writer);
   void generate(pdl_interp::GetAttributeTypeOp op, ByteCodeWriter &writer);
   void generate(pdl_interp::GetDefiningOpOp op, ByteCodeWriter &writer);
@@ -284,8 +245,8 @@ private:
   void generate(pdl_interp::GetOperandsOp op, ByteCodeWriter &writer);
   void generate(pdl_interp::GetResultOp op, ByteCodeWriter &writer);
   void generate(pdl_interp::GetResultsOp op, ByteCodeWriter &writer);
-  void generate(pdl_interp::GetUsersOp op, ByteCodeWriter &writer);
   void generate(pdl_interp::GetValueTypeOp op, ByteCodeWriter &writer);
+  void generate(pdl_interp::InferredTypesOp op, ByteCodeWriter &writer);
   void generate(pdl_interp::IsNotNullOp op, ByteCodeWriter &writer);
   void generate(pdl_interp::RecordMatchOp op, ByteCodeWriter &writer);
   void generate(pdl_interp::ReplaceOp op, ByteCodeWriter &writer);
@@ -318,14 +279,8 @@ private:
   /// `uniquedData`.
   DenseMap<const void *, ByteCodeField> uniquedDataToMemIndex;
 
-  /// The current level of the foreach loop.
-  ByteCodeField curLoopLevel = 0;
-
   /// The current MLIR context.
   MLIRContext *ctx;
-
-  /// Mapping from block to its address.
-  DenseMap<Block *, ByteCodeAddr> blockToAddr;
 
   /// Data of the ByteCode class to be populated.
   std::vector<const void *> &uniquedData;
@@ -333,13 +288,8 @@ private:
   SmallVectorImpl<ByteCodeField> &rewriterByteCode;
   SmallVectorImpl<PDLByteCodePattern> &patterns;
   ByteCodeField &maxValueMemoryIndex;
-  ByteCodeField &maxOpRangeMemoryIndex;
   ByteCodeField &maxTypeRangeMemoryIndex;
   ByteCodeField &maxValueRangeMemoryIndex;
-  ByteCodeField &maxLoopLevel;
-
-  /// A map of pattern configurations.
-  const DenseMap<Operation *, PDLPatternConfigSet *> &configMap;
 };
 
 /// This class provides utilities for writing a bytecode stream.
@@ -361,20 +311,15 @@ struct ByteCodeWriter {
     bytecode.append({fieldParts[0], fieldParts[1]});
   }
 
-  /// Append a single successor to the bytecode, the exact address will need to
-  /// be resolved later.
-  void append(Block *successor) {
-    // Add back a reference to the successor so that the address can be resolved
-    // later.
-    unresolvedSuccessorRefs[successor].push_back(bytecode.size());
-    append(ByteCodeAddr(0));
-  }
-
   /// Append a successor range to the bytecode, the exact address will need to
   /// be resolved later.
   void append(SuccessorRange successors) {
-    for (Block *successor : successors)
-      append(successor);
+    // Add back references to the any successors so that the address can be
+    // resolved later.
+    for (Block *successor : successors) {
+      unresolvedSuccessorRefs[successor].push_back(bytecode.size());
+      append(ByteCodeAddr(0));
+    }
   }
 
   /// Append a range of values that will be read as generic PDLValues.
@@ -391,18 +336,16 @@ struct ByteCodeWriter {
   }
 
   /// Append the PDLValue::Kind of the given value.
-  void appendPDLValueKind(Value value) { appendPDLValueKind(value.getType()); }
-
-  /// Append the PDLValue::Kind of the given type.
-  void appendPDLValueKind(Type type) {
+  void appendPDLValueKind(Value value) {
+    // Append the type of the value in addition to the value itself.
     PDLValue::Kind kind =
-        TypeSwitch<Type, PDLValue::Kind>(type)
+        TypeSwitch<Type, PDLValue::Kind>(value.getType())
             .Case<pdl::AttributeType>(
                 [](Type) { return PDLValue::Kind::Attribute; })
             .Case<pdl::OperationType>(
                 [](Type) { return PDLValue::Kind::Operation; })
             .Case<pdl::RangeType>([](pdl::RangeType rangeTy) {
-              if (isa<pdl::TypeType>(rangeTy.getElementType()))
+              if (rangeTy.getElementType().isa<pdl::TypeType>())
                 return PDLValue::Kind::TypeRange;
               return PDLValue::Kind::ValueRange;
             })
@@ -410,6 +353,10 @@ struct ByteCodeWriter {
             .Case<pdl::ValueType>([](Type) { return PDLValue::Kind::Value; });
     bytecode.push_back(static_cast<ByteCodeField>(kind));
   }
+
+  /// Check if the given class `T` has an iterator type.
+  template <typename T, typename... Args>
+  using has_pointer_traits = decltype(std::declval<T>().getAsOpaquePointer());
 
   /// Append a value that will be stored in a memory slot and not inline within
   /// the bytecode.
@@ -436,17 +383,6 @@ struct ByteCodeWriter {
     append(field2, fields...);
   }
 
-  /// Appends a value as a pointer, stored inline within the bytecode.
-  template <typename T>
-  std::enable_if_t<llvm::is_detected<has_pointer_traits, T>::value>
-  appendInline(T value) {
-    constexpr size_t numParts = sizeof(const void *) / sizeof(ByteCodeField);
-    const void *pointer = value.getAsOpaquePointer();
-    ByteCodeField fieldParts[numParts];
-    std::memcpy(fieldParts, &pointer, sizeof(const void *));
-    bytecode.append(fieldParts, fieldParts + numParts);
-  }
-
   /// Successor references in the bytecode that have yet to be resolved.
   DenseMap<Block *, SmallVector<unsigned, 4>> unresolvedSuccessorRefs;
 
@@ -460,45 +396,36 @@ struct ByteCodeWriter {
 /// This class represents a live range of PDL Interpreter values, containing
 /// information about when values are live within a match/rewrite.
 struct ByteCodeLiveRange {
-  using Set = llvm::IntervalMap<uint64_t, char, 16>;
+  using Set = llvm::IntervalMap<ByteCodeField, char, 16>;
   using Allocator = Set::Allocator;
 
-  ByteCodeLiveRange(Allocator &alloc) : liveness(new Set(alloc)) {}
+  ByteCodeLiveRange(Allocator &alloc) : liveness(alloc) {}
 
   /// Union this live range with the one provided.
   void unionWith(const ByteCodeLiveRange &rhs) {
-    for (auto it = rhs.liveness->begin(), e = rhs.liveness->end(); it != e;
-         ++it)
-      liveness->insert(it.start(), it.stop(), /*dummyValue*/ 0);
+    for (auto it = rhs.liveness.begin(), e = rhs.liveness.end(); it != e; ++it)
+      liveness.insert(it.start(), it.stop(), /*dummyValue*/ 0);
   }
 
   /// Returns true if this range overlaps with the one provided.
   bool overlaps(const ByteCodeLiveRange &rhs) const {
-    return llvm::IntervalMapOverlaps<Set, Set>(*liveness, *rhs.liveness)
-        .valid();
+    return llvm::IntervalMapOverlaps<Set, Set>(liveness, rhs.liveness).valid();
   }
 
   /// A map representing the ranges of the match/rewrite that a value is live in
   /// the interpreter.
-  ///
-  /// We use std::unique_ptr here, because IntervalMap does not provide a
-  /// correct copy or move constructor. We can eliminate the pointer once
-  /// https://reviews.llvm.org/D113240 lands.
-  std::unique_ptr<llvm::IntervalMap<uint64_t, char, 16>> liveness;
-
-  /// The operation range storage index for this range.
-  std::optional<unsigned> opRangeIndex;
+  llvm::IntervalMap<ByteCodeField, char, 16> liveness;
 
   /// The type range storage index for this range.
-  std::optional<unsigned> typeRangeIndex;
+  Optional<unsigned> typeRangeIndex;
 
   /// The value range storage index for this range.
-  std::optional<unsigned> valueRangeIndex;
+  Optional<unsigned> valueRangeIndex;
 };
-} // namespace
+} // end anonymous namespace
 
 void Generator::generate(ModuleOp module) {
-  auto matcherFunc = module.lookupSymbol<pdl_interp::FuncOp>(
+  FuncOp matcherFunc = module.lookupSymbol<FuncOp>(
       pdl_interp::PDLInterpDialect::getMatcherFunctionName());
   ModuleOp rewriterModule = module.lookupSymbol<ModuleOp>(
       pdl_interp::PDLInterpDialect::getRewriterModuleName());
@@ -510,7 +437,7 @@ void Generator::generate(ModuleOp module) {
 
   // Generate code for the rewriter functions.
   ByteCodeWriter rewriterByteCodeWriter(rewriterByteCode, *this);
-  for (auto rewriterFunc : rewriterModule.getOps<pdl_interp::FuncOp>()) {
+  for (FuncOp rewriterFunc : rewriterModule.getOps<FuncOp>()) {
     rewriterToAddr.try_emplace(rewriterFunc.getName(), rewriterByteCode.size());
     for (Operation &op : rewriterFunc.getOps())
       generate(&op, rewriterByteCodeWriter);
@@ -519,8 +446,15 @@ void Generator::generate(ModuleOp module) {
          "unexpected branches in rewriter function");
 
   // Generate code for the matcher function.
+  DenseMap<Block *, ByteCodeAddr> blockToAddr;
+  llvm::ReversePostOrderTraversal<Region *> rpot(&matcherFunc.getBody());
   ByteCodeWriter matcherByteCodeWriter(matcherByteCode, *this);
-  generate(&matcherFunc.getBody(), matcherByteCodeWriter);
+  for (Block *block : rpot) {
+    // Keep track of where this block begins within the matcher function.
+    blockToAddr.try_emplace(block, matcherByteCode.size());
+    for (Operation &op : *block)
+      generate(&op, matcherByteCodeWriter);
+  }
 
   // Resolve successor references in the matcher.
   for (auto &it : matcherByteCodeWriter.unresolvedSuccessorRefs) {
@@ -530,19 +464,19 @@ void Generator::generate(ModuleOp module) {
   }
 }
 
-void Generator::allocateMemoryIndices(pdl_interp::FuncOp matcherFunc,
+void Generator::allocateMemoryIndices(FuncOp matcherFunc,
                                       ModuleOp rewriterModule) {
   // Rewriters use simplistic allocation scheme that simply assigns an index to
   // each result.
-  for (auto rewriterFunc : rewriterModule.getOps<pdl_interp::FuncOp>()) {
+  for (FuncOp rewriterFunc : rewriterModule.getOps<FuncOp>()) {
     ByteCodeField index = 0, typeRangeIndex = 0, valueRangeIndex = 0;
     auto processRewriterValue = [&](Value val) {
       valueToMemIndex.try_emplace(val, index++);
-      if (pdl::RangeType rangeType = dyn_cast<pdl::RangeType>(val.getType())) {
+      if (pdl::RangeType rangeType = val.getType().dyn_cast<pdl::RangeType>()) {
         Type elementTy = rangeType.getElementType();
-        if (isa<pdl::TypeType>(elementTy))
+        if (elementTy.isa<pdl::TypeType>())
           valueToRangeIndex.try_emplace(val, typeRangeIndex++);
-        else if (isa<pdl::ValueType>(elementTy))
+        else if (elementTy.isa<pdl::ValueType>())
           valueToRangeIndex.try_emplace(val, valueRangeIndex++);
       }
     };
@@ -567,22 +501,10 @@ void Generator::allocateMemoryIndices(pdl_interp::FuncOp matcherFunc,
   // finding the minimal number of overlapping live ranges. This is essentially
   // a simplified form of register allocation where we don't necessarily have a
   // limited number of registers, but we still want to minimize the number used.
-  DenseMap<Operation *, unsigned> opToFirstIndex;
-  DenseMap<Operation *, unsigned> opToLastIndex;
-
-  // A custom walk that marks the first and the last index of each operation.
-  // The entry marks the beginning of the liveness range for this operation,
-  // followed by nested operations, followed by the end of the liveness range.
-  unsigned index = 0;
-  llvm::unique_function<void(Operation *)> walk = [&](Operation *op) {
-    opToFirstIndex.try_emplace(op, index++);
-    for (Region &region : op->getRegions())
-      for (Block &block : region.getBlocks())
-        for (Operation &nested : block)
-          walk(&nested);
-    opToLastIndex.try_emplace(op, index++);
-  };
-  walk(matcherFunc);
+  DenseMap<Operation *, ByteCodeField> opToIndex;
+  matcherFunc.getBody().walk([&](Operation *op) {
+    opToIndex.insert(std::make_pair(op, opToIndex.size()));
+  });
 
   // Liveness info for each of the defs within the matcher.
   ByteCodeLiveRange::Allocator allocator;
@@ -594,8 +516,8 @@ void Generator::allocateMemoryIndices(pdl_interp::FuncOp matcherFunc,
 
   // Walk each of the blocks, computing the def interval that the value is used.
   Liveness matcherLiveness(matcherFunc);
-  matcherFunc->walk([&](Block *block) {
-    const LivenessBlockInfo *info = matcherLiveness.getLiveness(block);
+  for (Block &block : matcherFunc.getBody()) {
+    const LivenessBlockInfo *info = matcherLiveness.getLiveness(&block);
     assert(info && "expected liveness info for block");
     auto processValue = [&](Value value, Operation *firstUseOrDef) {
       // We don't need to process the root op argument, this value is always
@@ -605,71 +527,46 @@ void Generator::allocateMemoryIndices(pdl_interp::FuncOp matcherFunc,
 
       // Set indices for the range of this block that the value is used.
       auto defRangeIt = valueDefRanges.try_emplace(value, allocator).first;
-      defRangeIt->second.liveness->insert(
-          opToFirstIndex[firstUseOrDef],
-          opToLastIndex[info->getEndOperation(value, firstUseOrDef)],
+      defRangeIt->second.liveness.insert(
+          opToIndex[firstUseOrDef],
+          opToIndex[info->getEndOperation(value, firstUseOrDef)],
           /*dummyValue*/ 0);
 
       // Check to see if this value is a range type.
-      if (auto rangeTy = dyn_cast<pdl::RangeType>(value.getType())) {
+      if (auto rangeTy = value.getType().dyn_cast<pdl::RangeType>()) {
         Type eleType = rangeTy.getElementType();
-        if (isa<pdl::OperationType>(eleType))
-          defRangeIt->second.opRangeIndex = 0;
-        else if (isa<pdl::TypeType>(eleType))
+        if (eleType.isa<pdl::TypeType>())
           defRangeIt->second.typeRangeIndex = 0;
-        else if (isa<pdl::ValueType>(eleType))
+        else if (eleType.isa<pdl::ValueType>())
           defRangeIt->second.valueRangeIndex = 0;
       }
     };
 
     // Process the live-ins of this block.
-    for (Value liveIn : info->in()) {
-      // Only process the value if it has been defined in the current region.
-      // Other values that span across pdl_interp.foreach will be added higher
-      // up. This ensures that the we keep them alive for the entire duration
-      // of the loop.
-      if (liveIn.getParentRegion() == block->getParent())
-        processValue(liveIn, &block->front());
-    }
-
-    // Process the block arguments for the entry block (those are not live-in).
-    if (block->isEntryBlock()) {
-      for (Value argument : block->getArguments())
-        processValue(argument, &block->front());
-    }
+    for (Value liveIn : info->in())
+      processValue(liveIn, &block.front());
 
     // Process any new defs within this block.
-    for (Operation &op : *block)
+    for (Operation &op : block)
       for (Value result : op.getResults())
         processValue(result, &op);
-  });
+  }
 
   // Greedily allocate memory slots using the computed def live ranges.
   std::vector<ByteCodeLiveRange> allocatedIndices;
-
-  // The number of memory indices currently allocated (and its next value).
-  // Recall that the root gets allocated memory index 0.
-  ByteCodeField numIndices = 1;
-
-  // The number of memory ranges of various types (and their next values).
-  ByteCodeField numOpRanges = 0, numTypeRanges = 0, numValueRanges = 0;
-
+  ByteCodeField numIndices = 1, numTypeRanges = 0, numValueRanges = 0;
   for (auto &defIt : valueDefRanges) {
     ByteCodeField &memIndex = valueToMemIndex[defIt.first];
     ByteCodeLiveRange &defRange = defIt.second;
 
     // Try to allocate to an existing index.
-    for (const auto &existingIndexIt : llvm::enumerate(allocatedIndices)) {
+    for (auto existingIndexIt : llvm::enumerate(allocatedIndices)) {
       ByteCodeLiveRange &existingRange = existingIndexIt.value();
       if (!defRange.overlaps(existingRange)) {
         existingRange.unionWith(defRange);
         memIndex = existingIndexIt.index() + 1;
 
-        if (defRange.opRangeIndex) {
-          if (!existingRange.opRangeIndex)
-            existingRange.opRangeIndex = numOpRanges++;
-          valueToRangeIndex[defIt.first] = *existingRange.opRangeIndex;
-        } else if (defRange.typeRangeIndex) {
+        if (defRange.typeRangeIndex) {
           if (!existingRange.typeRangeIndex)
             existingRange.typeRangeIndex = numTypeRanges++;
           valueToRangeIndex[defIt.first] = *existingRange.typeRangeIndex;
@@ -688,11 +585,8 @@ void Generator::allocateMemoryIndices(pdl_interp::FuncOp matcherFunc,
       ByteCodeLiveRange &newRange = allocatedIndices.back();
       newRange.unionWith(defRange);
 
-      // Allocate an index for op/type/value ranges.
-      if (defRange.opRangeIndex) {
-        newRange.opRangeIndex = numOpRanges;
-        valueToRangeIndex[defIt.first] = numOpRanges++;
-      } else if (defRange.typeRangeIndex) {
+      // Allocate an index for type/value ranges.
+      if (defRange.typeRangeIndex) {
         newRange.typeRangeIndex = numTypeRanges;
         valueToRangeIndex[defIt.first] = numTypeRanges++;
       } else if (defRange.valueRangeIndex) {
@@ -705,62 +599,34 @@ void Generator::allocateMemoryIndices(pdl_interp::FuncOp matcherFunc,
     }
   }
 
-  // Print the index usage and ensure that we did not run out of index space.
-  LLVM_DEBUG({
-    llvm::dbgs() << "Allocated " << allocatedIndices.size() << " indices "
-                 << "(down from initial " << valueDefRanges.size() << ").\n";
-  });
-  assert(allocatedIndices.size() <= std::numeric_limits<ByteCodeField>::max() &&
-         "Ran out of memory for allocated indices");
-
   // Update the max number of indices.
   if (numIndices > maxValueMemoryIndex)
     maxValueMemoryIndex = numIndices;
-  if (numOpRanges > maxOpRangeMemoryIndex)
-    maxOpRangeMemoryIndex = numOpRanges;
   if (numTypeRanges > maxTypeRangeMemoryIndex)
     maxTypeRangeMemoryIndex = numTypeRanges;
   if (numValueRanges > maxValueRangeMemoryIndex)
     maxValueRangeMemoryIndex = numValueRanges;
 }
 
-void Generator::generate(Region *region, ByteCodeWriter &writer) {
-  llvm::ReversePostOrderTraversal<Region *> rpot(region);
-  for (Block *block : rpot) {
-    // Keep track of where this block begins within the matcher function.
-    blockToAddr.try_emplace(block, matcherByteCode.size());
-    for (Operation &op : *block)
-      generate(&op, writer);
-  }
-}
-
 void Generator::generate(Operation *op, ByteCodeWriter &writer) {
-  LLVM_DEBUG({
-    // The following list must contain all the operations that do not
-    // produce any bytecode.
-    if (!isa<pdl_interp::CreateAttributeOp, pdl_interp::CreateTypeOp>(op))
-      writer.appendInline(op->getLoc());
-  });
   TypeSwitch<Operation *>(op)
       .Case<pdl_interp::ApplyConstraintOp, pdl_interp::ApplyRewriteOp,
             pdl_interp::AreEqualOp, pdl_interp::BranchOp,
             pdl_interp::CheckAttributeOp, pdl_interp::CheckOperandCountOp,
             pdl_interp::CheckOperationNameOp, pdl_interp::CheckResultCountOp,
             pdl_interp::CheckTypeOp, pdl_interp::CheckTypesOp,
-            pdl_interp::ContinueOp, pdl_interp::CreateAttributeOp,
-            pdl_interp::CreateOperationOp, pdl_interp::CreateRangeOp,
+            pdl_interp::CreateAttributeOp, pdl_interp::CreateOperationOp,
             pdl_interp::CreateTypeOp, pdl_interp::CreateTypesOp,
-            pdl_interp::EraseOp, pdl_interp::ExtractOp, pdl_interp::FinalizeOp,
-            pdl_interp::ForEachOp, pdl_interp::GetAttributeOp,
-            pdl_interp::GetAttributeTypeOp, pdl_interp::GetDefiningOpOp,
-            pdl_interp::GetOperandOp, pdl_interp::GetOperandsOp,
-            pdl_interp::GetResultOp, pdl_interp::GetResultsOp,
-            pdl_interp::GetUsersOp, pdl_interp::GetValueTypeOp,
-            pdl_interp::IsNotNullOp, pdl_interp::RecordMatchOp,
-            pdl_interp::ReplaceOp, pdl_interp::SwitchAttributeOp,
-            pdl_interp::SwitchTypeOp, pdl_interp::SwitchTypesOp,
-            pdl_interp::SwitchOperandCountOp, pdl_interp::SwitchOperationNameOp,
-            pdl_interp::SwitchResultCountOp>(
+            pdl_interp::EraseOp, pdl_interp::FinalizeOp,
+            pdl_interp::GetAttributeOp, pdl_interp::GetAttributeTypeOp,
+            pdl_interp::GetDefiningOpOp, pdl_interp::GetOperandOp,
+            pdl_interp::GetOperandsOp, pdl_interp::GetResultOp,
+            pdl_interp::GetResultsOp, pdl_interp::GetValueTypeOp,
+            pdl_interp::InferredTypesOp, pdl_interp::IsNotNullOp,
+            pdl_interp::RecordMatchOp, pdl_interp::ReplaceOp,
+            pdl_interp::SwitchAttributeOp, pdl_interp::SwitchTypeOp,
+            pdl_interp::SwitchTypesOp, pdl_interp::SwitchOperandCountOp,
+            pdl_interp::SwitchOperationNameOp, pdl_interp::SwitchResultCountOp>(
           [&](auto interpOp) { this->generate(interpOp, writer); })
       .Default([](Operation *) {
         llvm_unreachable("unknown `pdl_interp` operation");
@@ -769,21 +635,22 @@ void Generator::generate(Operation *op, ByteCodeWriter &writer) {
 
 void Generator::generate(pdl_interp::ApplyConstraintOp op,
                          ByteCodeWriter &writer) {
-  assert(constraintToMemIndex.count(op.getName()) &&
+  assert(constraintToMemIndex.count(op.name()) &&
          "expected index for constraint function");
-  writer.append(OpCode::ApplyConstraint, constraintToMemIndex[op.getName()]);
-  writer.appendPDLValueList(op.getArgs());
-  writer.append(ByteCodeField(op.getIsNegated()));
+  writer.append(OpCode::ApplyConstraint, constraintToMemIndex[op.name()],
+                op.constParamsAttr());
+  writer.appendPDLValueList(op.args());
   writer.append(op.getSuccessors());
 }
 void Generator::generate(pdl_interp::ApplyRewriteOp op,
                          ByteCodeWriter &writer) {
-  assert(externalRewriterToMemIndex.count(op.getName()) &&
+  assert(externalRewriterToMemIndex.count(op.name()) &&
          "expected index for rewrite function");
-  writer.append(OpCode::ApplyRewrite, externalRewriterToMemIndex[op.getName()]);
-  writer.appendPDLValueList(op.getArgs());
+  writer.append(OpCode::ApplyRewrite, externalRewriterToMemIndex[op.name()],
+                op.constParamsAttr());
+  writer.appendPDLValueList(op.args());
 
-  ResultRange results = op.getResults();
+  ResultRange results = op.results();
   writer.append(ByteCodeField(results.size()));
   for (Value result : results) {
     // In debug mode we also record the expected kind of the result, so that we
@@ -793,246 +660,202 @@ void Generator::generate(pdl_interp::ApplyRewriteOp op,
 #endif
 
     // Range results also need to append the range storage index.
-    if (isa<pdl::RangeType>(result.getType()))
+    if (result.getType().isa<pdl::RangeType>())
       writer.append(getRangeStorageIndex(result));
     writer.append(result);
   }
 }
 void Generator::generate(pdl_interp::AreEqualOp op, ByteCodeWriter &writer) {
-  Value lhs = op.getLhs();
-  if (isa<pdl::RangeType>(lhs.getType())) {
+  Value lhs = op.lhs();
+  if (lhs.getType().isa<pdl::RangeType>()) {
     writer.append(OpCode::AreRangesEqual);
     writer.appendPDLValueKind(lhs);
-    writer.append(op.getLhs(), op.getRhs(), op.getSuccessors());
+    writer.append(op.lhs(), op.rhs(), op.getSuccessors());
     return;
   }
 
-  writer.append(OpCode::AreEqual, lhs, op.getRhs(), op.getSuccessors());
+  writer.append(OpCode::AreEqual, lhs, op.rhs(), op.getSuccessors());
 }
 void Generator::generate(pdl_interp::BranchOp op, ByteCodeWriter &writer) {
   writer.append(OpCode::Branch, SuccessorRange(op.getOperation()));
 }
 void Generator::generate(pdl_interp::CheckAttributeOp op,
                          ByteCodeWriter &writer) {
-  writer.append(OpCode::AreEqual, op.getAttribute(), op.getConstantValue(),
+  writer.append(OpCode::AreEqual, op.attribute(), op.constantValue(),
                 op.getSuccessors());
 }
 void Generator::generate(pdl_interp::CheckOperandCountOp op,
                          ByteCodeWriter &writer) {
-  writer.append(OpCode::CheckOperandCount, op.getInputOp(), op.getCount(),
-                static_cast<ByteCodeField>(op.getCompareAtLeast()),
+  writer.append(OpCode::CheckOperandCount, op.operation(), op.count(),
+                static_cast<ByteCodeField>(op.compareAtLeast()),
                 op.getSuccessors());
 }
 void Generator::generate(pdl_interp::CheckOperationNameOp op,
                          ByteCodeWriter &writer) {
-  writer.append(OpCode::CheckOperationName, op.getInputOp(),
-                OperationName(op.getName(), ctx), op.getSuccessors());
+  writer.append(OpCode::CheckOperationName, op.operation(),
+                OperationName(op.name(), ctx), op.getSuccessors());
 }
 void Generator::generate(pdl_interp::CheckResultCountOp op,
                          ByteCodeWriter &writer) {
-  writer.append(OpCode::CheckResultCount, op.getInputOp(), op.getCount(),
-                static_cast<ByteCodeField>(op.getCompareAtLeast()),
+  writer.append(OpCode::CheckResultCount, op.operation(), op.count(),
+                static_cast<ByteCodeField>(op.compareAtLeast()),
                 op.getSuccessors());
 }
 void Generator::generate(pdl_interp::CheckTypeOp op, ByteCodeWriter &writer) {
-  writer.append(OpCode::AreEqual, op.getValue(), op.getType(),
-                op.getSuccessors());
+  writer.append(OpCode::AreEqual, op.value(), op.type(), op.getSuccessors());
 }
 void Generator::generate(pdl_interp::CheckTypesOp op, ByteCodeWriter &writer) {
-  writer.append(OpCode::CheckTypes, op.getValue(), op.getTypes(),
-                op.getSuccessors());
-}
-void Generator::generate(pdl_interp::ContinueOp op, ByteCodeWriter &writer) {
-  assert(curLoopLevel > 0 && "encountered pdl_interp.continue at top level");
-  writer.append(OpCode::Continue, ByteCodeField(curLoopLevel - 1));
+  writer.append(OpCode::CheckTypes, op.value(), op.types(), op.getSuccessors());
 }
 void Generator::generate(pdl_interp::CreateAttributeOp op,
                          ByteCodeWriter &writer) {
   // Simply repoint the memory index of the result to the constant.
-  getMemIndex(op.getAttribute()) = getMemIndex(op.getValue());
+  getMemIndex(op.attribute()) = getMemIndex(op.value());
 }
 void Generator::generate(pdl_interp::CreateOperationOp op,
                          ByteCodeWriter &writer) {
-  writer.append(OpCode::CreateOperation, op.getResultOp(),
-                OperationName(op.getName(), ctx));
-  writer.appendPDLValueList(op.getInputOperands());
+  writer.append(OpCode::CreateOperation, op.operation(),
+                OperationName(op.name(), ctx));
+  writer.appendPDLValueList(op.operands());
 
   // Add the attributes.
-  OperandRange attributes = op.getInputAttributes();
+  OperandRange attributes = op.attributes();
   writer.append(static_cast<ByteCodeField>(attributes.size()));
-  for (auto it : llvm::zip(op.getInputAttributeNames(), attributes))
-    writer.append(std::get<0>(it), std::get<1>(it));
-
-  // Add the result types. If the operation has inferred results, we use a
-  // marker "size" value. Otherwise, we add the list of explicit result types.
-  if (op.getInferredResultTypes())
-    writer.append(kInferTypesMarker);
-  else
-    writer.appendPDLValueList(op.getInputResultTypes());
-}
-void Generator::generate(pdl_interp::CreateRangeOp op, ByteCodeWriter &writer) {
-  // Append the correct opcode for the range type.
-  TypeSwitch<Type>(op.getType().getElementType())
-      .Case(
-          [&](pdl::TypeType) { writer.append(OpCode::CreateDynamicTypeRange); })
-      .Case([&](pdl::ValueType) {
-        writer.append(OpCode::CreateDynamicValueRange);
-      });
-
-  writer.append(op.getResult(), getRangeStorageIndex(op.getResult()));
-  writer.appendPDLValueList(op->getOperands());
+  for (auto it : llvm::zip(op.attributeNames(), op.attributes())) {
+    writer.append(
+        Identifier::get(std::get<0>(it).cast<StringAttr>().getValue(), ctx),
+        std::get<1>(it));
+  }
+  writer.appendPDLValueList(op.types());
 }
 void Generator::generate(pdl_interp::CreateTypeOp op, ByteCodeWriter &writer) {
   // Simply repoint the memory index of the result to the constant.
-  getMemIndex(op.getResult()) = getMemIndex(op.getValue());
+  getMemIndex(op.result()) = getMemIndex(op.value());
 }
 void Generator::generate(pdl_interp::CreateTypesOp op, ByteCodeWriter &writer) {
-  writer.append(OpCode::CreateConstantTypeRange, op.getResult(),
-                getRangeStorageIndex(op.getResult()), op.getValue());
+  writer.append(OpCode::CreateTypes, op.result(),
+                getRangeStorageIndex(op.result()), op.value());
 }
 void Generator::generate(pdl_interp::EraseOp op, ByteCodeWriter &writer) {
-  writer.append(OpCode::EraseOp, op.getInputOp());
-}
-void Generator::generate(pdl_interp::ExtractOp op, ByteCodeWriter &writer) {
-  OpCode opCode =
-      TypeSwitch<Type, OpCode>(op.getResult().getType())
-          .Case([](pdl::OperationType) { return OpCode::ExtractOp; })
-          .Case([](pdl::ValueType) { return OpCode::ExtractValue; })
-          .Case([](pdl::TypeType) { return OpCode::ExtractType; })
-          .Default([](Type) -> OpCode {
-            llvm_unreachable("unsupported element type");
-          });
-  writer.append(opCode, op.getRange(), op.getIndex(), op.getResult());
+  writer.append(OpCode::EraseOp, op.operation());
 }
 void Generator::generate(pdl_interp::FinalizeOp op, ByteCodeWriter &writer) {
   writer.append(OpCode::Finalize);
 }
-void Generator::generate(pdl_interp::ForEachOp op, ByteCodeWriter &writer) {
-  BlockArgument arg = op.getLoopVariable();
-  writer.append(OpCode::ForEach, getRangeStorageIndex(op.getValues()), arg);
-  writer.appendPDLValueKind(arg.getType());
-  writer.append(curLoopLevel, op.getSuccessor());
-  ++curLoopLevel;
-  if (curLoopLevel > maxLoopLevel)
-    maxLoopLevel = curLoopLevel;
-  generate(&op.getRegion(), writer);
-  --curLoopLevel;
-}
 void Generator::generate(pdl_interp::GetAttributeOp op,
                          ByteCodeWriter &writer) {
-  writer.append(OpCode::GetAttribute, op.getAttribute(), op.getInputOp(),
-                op.getNameAttr());
+  writer.append(OpCode::GetAttribute, op.attribute(), op.operation(),
+                Identifier::get(op.name(), ctx));
 }
 void Generator::generate(pdl_interp::GetAttributeTypeOp op,
                          ByteCodeWriter &writer) {
-  writer.append(OpCode::GetAttributeType, op.getResult(), op.getValue());
+  writer.append(OpCode::GetAttributeType, op.result(), op.value());
 }
 void Generator::generate(pdl_interp::GetDefiningOpOp op,
                          ByteCodeWriter &writer) {
-  writer.append(OpCode::GetDefiningOp, op.getInputOp());
-  writer.appendPDLValue(op.getValue());
+  writer.append(OpCode::GetDefiningOp, op.operation());
+  writer.appendPDLValue(op.value());
 }
 void Generator::generate(pdl_interp::GetOperandOp op, ByteCodeWriter &writer) {
-  uint32_t index = op.getIndex();
+  uint32_t index = op.index();
   if (index < 4)
     writer.append(static_cast<OpCode>(OpCode::GetOperand0 + index));
   else
     writer.append(OpCode::GetOperandN, index);
-  writer.append(op.getInputOp(), op.getValue());
+  writer.append(op.operation(), op.value());
 }
 void Generator::generate(pdl_interp::GetOperandsOp op, ByteCodeWriter &writer) {
-  Value result = op.getValue();
-  std::optional<uint32_t> index = op.getIndex();
+  Value result = op.value();
+  Optional<uint32_t> index = op.index();
   writer.append(OpCode::GetOperands,
-                index.value_or(std::numeric_limits<uint32_t>::max()),
-                op.getInputOp());
-  if (isa<pdl::RangeType>(result.getType()))
+                index.getValueOr(std::numeric_limits<uint32_t>::max()),
+                op.operation());
+  if (result.getType().isa<pdl::RangeType>())
     writer.append(getRangeStorageIndex(result));
   else
     writer.append(std::numeric_limits<ByteCodeField>::max());
   writer.append(result);
 }
 void Generator::generate(pdl_interp::GetResultOp op, ByteCodeWriter &writer) {
-  uint32_t index = op.getIndex();
+  uint32_t index = op.index();
   if (index < 4)
     writer.append(static_cast<OpCode>(OpCode::GetResult0 + index));
   else
     writer.append(OpCode::GetResultN, index);
-  writer.append(op.getInputOp(), op.getValue());
+  writer.append(op.operation(), op.value());
 }
 void Generator::generate(pdl_interp::GetResultsOp op, ByteCodeWriter &writer) {
-  Value result = op.getValue();
-  std::optional<uint32_t> index = op.getIndex();
+  Value result = op.value();
+  Optional<uint32_t> index = op.index();
   writer.append(OpCode::GetResults,
-                index.value_or(std::numeric_limits<uint32_t>::max()),
-                op.getInputOp());
-  if (isa<pdl::RangeType>(result.getType()))
+                index.getValueOr(std::numeric_limits<uint32_t>::max()),
+                op.operation());
+  if (result.getType().isa<pdl::RangeType>())
     writer.append(getRangeStorageIndex(result));
   else
     writer.append(std::numeric_limits<ByteCodeField>::max());
   writer.append(result);
 }
-void Generator::generate(pdl_interp::GetUsersOp op, ByteCodeWriter &writer) {
-  Value operations = op.getOperations();
-  ByteCodeField rangeIndex = getRangeStorageIndex(operations);
-  writer.append(OpCode::GetUsers, operations, rangeIndex);
-  writer.appendPDLValue(op.getValue());
-}
 void Generator::generate(pdl_interp::GetValueTypeOp op,
                          ByteCodeWriter &writer) {
-  if (isa<pdl::RangeType>(op.getType())) {
-    Value result = op.getResult();
+  if (op.getType().isa<pdl::RangeType>()) {
+    Value result = op.result();
     writer.append(OpCode::GetValueRangeTypes, result,
-                  getRangeStorageIndex(result), op.getValue());
+                  getRangeStorageIndex(result), op.value());
   } else {
-    writer.append(OpCode::GetValueType, op.getResult(), op.getValue());
+    writer.append(OpCode::GetValueType, op.result(), op.value());
   }
 }
+
+void Generator::generate(pdl_interp::InferredTypesOp op,
+                         ByteCodeWriter &writer) {
+  // InferType maps to a null type as a marker for inferring result types.
+  getMemIndex(op.type()) = getMemIndex(Type());
+}
 void Generator::generate(pdl_interp::IsNotNullOp op, ByteCodeWriter &writer) {
-  writer.append(OpCode::IsNotNull, op.getValue(), op.getSuccessors());
+  writer.append(OpCode::IsNotNull, op.value(), op.getSuccessors());
 }
 void Generator::generate(pdl_interp::RecordMatchOp op, ByteCodeWriter &writer) {
   ByteCodeField patternIndex = patterns.size();
   patterns.emplace_back(PDLByteCodePattern::create(
-      op, configMap.lookup(op),
-      rewriterToAddr[op.getRewriter().getLeafReference().getValue()]));
+      op, rewriterToAddr[op.rewriter().getLeafReference()]));
   writer.append(OpCode::RecordMatch, patternIndex,
-                SuccessorRange(op.getOperation()), op.getMatchedOps());
-  writer.appendPDLValueList(op.getInputs());
+                SuccessorRange(op.getOperation()), op.matchedOps());
+  writer.appendPDLValueList(op.inputs());
 }
 void Generator::generate(pdl_interp::ReplaceOp op, ByteCodeWriter &writer) {
-  writer.append(OpCode::ReplaceOp, op.getInputOp());
-  writer.appendPDLValueList(op.getReplValues());
+  writer.append(OpCode::ReplaceOp, op.operation());
+  writer.appendPDLValueList(op.replValues());
 }
 void Generator::generate(pdl_interp::SwitchAttributeOp op,
                          ByteCodeWriter &writer) {
-  writer.append(OpCode::SwitchAttribute, op.getAttribute(),
-                op.getCaseValuesAttr(), op.getSuccessors());
+  writer.append(OpCode::SwitchAttribute, op.attribute(), op.caseValuesAttr(),
+                op.getSuccessors());
 }
 void Generator::generate(pdl_interp::SwitchOperandCountOp op,
                          ByteCodeWriter &writer) {
-  writer.append(OpCode::SwitchOperandCount, op.getInputOp(),
-                op.getCaseValuesAttr(), op.getSuccessors());
+  writer.append(OpCode::SwitchOperandCount, op.operation(), op.caseValuesAttr(),
+                op.getSuccessors());
 }
 void Generator::generate(pdl_interp::SwitchOperationNameOp op,
                          ByteCodeWriter &writer) {
-  auto cases = llvm::map_range(op.getCaseValuesAttr(), [&](Attribute attr) {
-    return OperationName(cast<StringAttr>(attr).getValue(), ctx);
+  auto cases = llvm::map_range(op.caseValuesAttr(), [&](Attribute attr) {
+    return OperationName(attr.cast<StringAttr>().getValue(), ctx);
   });
-  writer.append(OpCode::SwitchOperationName, op.getInputOp(), cases,
+  writer.append(OpCode::SwitchOperationName, op.operation(), cases,
                 op.getSuccessors());
 }
 void Generator::generate(pdl_interp::SwitchResultCountOp op,
                          ByteCodeWriter &writer) {
-  writer.append(OpCode::SwitchResultCount, op.getInputOp(),
-                op.getCaseValuesAttr(), op.getSuccessors());
+  writer.append(OpCode::SwitchResultCount, op.operation(), op.caseValuesAttr(),
+                op.getSuccessors());
 }
 void Generator::generate(pdl_interp::SwitchTypeOp op, ByteCodeWriter &writer) {
-  writer.append(OpCode::SwitchType, op.getValue(), op.getCaseValuesAttr(),
+  writer.append(OpCode::SwitchType, op.value(), op.caseValuesAttr(),
                 op.getSuccessors());
 }
 void Generator::generate(pdl_interp::SwitchTypesOp op, ByteCodeWriter &writer) {
-  writer.append(OpCode::SwitchTypes, op.getValue(), op.getCaseValuesAttr(),
+  writer.append(OpCode::SwitchTypes, op.value(), op.caseValuesAttr(),
                 op.getSuccessors());
 }
 
@@ -1040,16 +863,13 @@ void Generator::generate(pdl_interp::SwitchTypesOp op, ByteCodeWriter &writer) {
 // PDLByteCode
 //===----------------------------------------------------------------------===//
 
-PDLByteCode::PDLByteCode(
-    ModuleOp module, SmallVector<std::unique_ptr<PDLPatternConfigSet>> configs,
-    const DenseMap<Operation *, PDLPatternConfigSet *> &configMap,
-    llvm::StringMap<PDLConstraintFunction> constraintFns,
-    llvm::StringMap<PDLRewriteFunction> rewriteFns)
-    : configs(std::move(configs)) {
+PDLByteCode::PDLByteCode(ModuleOp module,
+                         llvm::StringMap<PDLConstraintFunction> constraintFns,
+                         llvm::StringMap<PDLRewriteFunction> rewriteFns) {
   Generator generator(module.getContext(), uniquedData, matcherByteCode,
                       rewriterByteCode, patterns, maxValueMemoryIndex,
-                      maxOpRangeCount, maxTypeRangeCount, maxValueRangeCount,
-                      maxLoopLevel, constraintFns, rewriteFns, configMap);
+                      maxTypeRangeCount, maxValueRangeCount, constraintFns,
+                      rewriteFns);
   generator.generate(module);
 
   // Initialize the external functions.
@@ -1063,10 +883,8 @@ PDLByteCode::PDLByteCode(
 /// bytecode.
 void PDLByteCode::initializeMutableState(PDLByteCodeMutableState &state) const {
   state.memory.resize(maxValueMemoryIndex, nullptr);
-  state.opRangeMemory.resize(maxOpRangeCount);
   state.typeRangeMemory.resize(maxTypeRangeCount, TypeRange());
   state.valueRangeMemory.resize(maxValueRangeCount, ValueRange());
-  state.loopIndex.resize(maxLoopLevel, 0);
   state.currentPatternBenefits.reserve(patterns.size());
   for (const PDLByteCodePattern &pattern : patterns)
     state.currentPatternBenefits.push_back(pattern.getBenefit());
@@ -1081,23 +899,20 @@ class ByteCodeExecutor {
 public:
   ByteCodeExecutor(
       const ByteCodeField *curCodeIt, MutableArrayRef<const void *> memory,
-      MutableArrayRef<llvm::OwningArrayRef<Operation *>> opRangeMemory,
       MutableArrayRef<TypeRange> typeRangeMemory,
       std::vector<llvm::OwningArrayRef<Type>> &allocatedTypeRangeMemory,
       MutableArrayRef<ValueRange> valueRangeMemory,
       std::vector<llvm::OwningArrayRef<Value>> &allocatedValueRangeMemory,
-      MutableArrayRef<unsigned> loopIndex, ArrayRef<const void *> uniquedMemory,
-      ArrayRef<ByteCodeField> code,
+      ArrayRef<const void *> uniquedMemory, ArrayRef<ByteCodeField> code,
       ArrayRef<PatternBenefit> currentPatternBenefits,
       ArrayRef<PDLByteCodePattern> patterns,
       ArrayRef<PDLConstraintFunction> constraintFunctions,
       ArrayRef<PDLRewriteFunction> rewriteFunctions)
-      : curCodeIt(curCodeIt), memory(memory), opRangeMemory(opRangeMemory),
-        typeRangeMemory(typeRangeMemory),
+      : curCodeIt(curCodeIt), memory(memory), typeRangeMemory(typeRangeMemory),
         allocatedTypeRangeMemory(allocatedTypeRangeMemory),
         valueRangeMemory(valueRangeMemory),
         allocatedValueRangeMemory(allocatedValueRangeMemory),
-        loopIndex(loopIndex), uniquedMemory(uniquedMemory), code(code),
+        uniquedMemory(uniquedMemory), code(code),
         currentPatternBenefits(currentPatternBenefits), patterns(patterns),
         constraintFunctions(constraintFunctions),
         rewriteFunctions(rewriteFunctions) {}
@@ -1105,15 +920,14 @@ public:
   /// Start executing the code at the current bytecode index. `matches` is an
   /// optional field provided when this function is executed in a matching
   /// context.
-  LogicalResult
-  execute(PatternRewriter &rewriter,
-          SmallVectorImpl<PDLByteCode::MatchResult> *matches = nullptr,
-          std::optional<Location> mainRewriteLoc = {});
+  void execute(PatternRewriter &rewriter,
+               SmallVectorImpl<PDLByteCode::MatchResult> *matches = nullptr,
+               Optional<Location> mainRewriteLoc = {});
 
 private:
   /// Internal implementation of executing each of the bytecode commands.
   void executeApplyConstraint(PatternRewriter &rewriter);
-  LogicalResult executeApplyRewrite(PatternRewriter &rewriter);
+  void executeApplyRewrite(PatternRewriter &rewriter);
   void executeAreEqual();
   void executeAreRangesEqual();
   void executeBranch();
@@ -1121,17 +935,10 @@ private:
   void executeCheckOperationName();
   void executeCheckResultCount();
   void executeCheckTypes();
-  void executeContinue();
-  void executeCreateConstantTypeRange();
   void executeCreateOperation(PatternRewriter &rewriter,
                               Location mainRewriteLoc);
-  template <typename T>
-  void executeDynamicCreateRange(StringRef type);
+  void executeCreateTypes();
   void executeEraseOp(PatternRewriter &rewriter);
-  template <typename T, typename Range, PDLValue::Kind kind>
-  void executeExtract();
-  void executeFinalize();
-  void executeForEach();
   void executeGetAttribute();
   void executeGetAttributeType();
   void executeGetDefiningOp();
@@ -1139,7 +946,6 @@ private:
   void executeGetOperands();
   void executeGetResult(unsigned index);
   void executeGetResults();
-  void executeGetUsers();
   void executeGetValueType();
   void executeGetValueRangeTypes();
   void executeIsNotNull();
@@ -1152,27 +958,6 @@ private:
   void executeSwitchResultCount();
   void executeSwitchType();
   void executeSwitchTypes();
-
-  /// Pushes a code iterator to the stack.
-  void pushCodeIt(const ByteCodeField *it) { resumeCodeIt.push_back(it); }
-
-  /// Pops a code iterator from the stack, returning true on success.
-  void popCodeIt() {
-    assert(!resumeCodeIt.empty() && "attempt to pop code off empty stack");
-    curCodeIt = resumeCodeIt.back();
-    resumeCodeIt.pop_back();
-  }
-
-  /// Return the bytecode iterator at the start of the current op code.
-  const ByteCodeField *getPrevCodeIt() const {
-    LLVM_DEBUG({
-      // Account for the op code and the Location stored inline.
-      return curCodeIt - 1 - sizeof(const void *) / sizeof(ByteCodeField);
-    });
-
-    // Account for the op code only.
-    return curCodeIt - 1;
-  }
 
   /// Read a value from the bytecode buffer, optionally skipping a certain
   /// number of prefix values. These methods always update the buffer to point
@@ -1193,18 +978,8 @@ private:
   }
 
   /// Read a list of values from the bytecode buffer. The values may be encoded
-  /// either as a single element or a range of elements.
-  void readList(SmallVectorImpl<Type> &list) {
-    for (unsigned i = 0, e = read(); i != e; ++i) {
-      if (read<PDLValue::Kind>() == PDLValue::Kind::Type) {
-        list.push_back(read<Type>());
-      } else {
-        TypeRange *values = read<TypeRange *>();
-        list.append(values->begin(), values->end());
-      }
-    }
-  }
-  void readList(SmallVectorImpl<Value> &list) {
+  /// as either Value or ValueRange elements.
+  void readValueList(SmallVectorImpl<Value> &list) {
     for (unsigned i = 0, e = read(); i != e; ++i) {
       if (read<PDLValue::Kind>() == PDLValue::Kind::Value) {
         list.push_back(read<Value>());
@@ -1213,16 +988,6 @@ private:
         list.append(values->begin(), values->end());
       }
     }
-  }
-
-  /// Read a value stored inline as a pointer.
-  template <typename T>
-  std::enable_if_t<llvm::is_detected<has_pointer_traits, T>::value, T>
-  readInline() {
-    const void *pointer;
-    std::memcpy(&pointer, curCodeIt, sizeof(const void *));
-    curCodeIt += sizeof(const void *) / sizeof(ByteCodeField);
-    return T::getFromOpaquePointer(pointer);
   }
 
   /// Jump to a specific successor based on a predicate value.
@@ -1248,18 +1013,6 @@ private:
       if (cmp(*it, value))
         return selectJump(size_t((it - cases.begin()) + 1));
     selectJump(size_t(0));
-  }
-
-  /// Store a pointer to memory.
-  void storeToMemory(unsigned index, const void *value) {
-    memory[index] = value;
-  }
-
-  /// Store a value to memory as an opaque pointer.
-  template <typename T>
-  std::enable_if_t<llvm::is_detected<has_pointer_traits, T>::value>
-  storeToMemory(unsigned index, T value) {
-    memory[index] = value.getAsOpaquePointer();
   }
 
   /// Internal implementation of reading various data types from the bytecode
@@ -1323,55 +1076,15 @@ private:
     return static_cast<PDLValue::Kind>(readImpl<ByteCodeField>());
   }
 
-  /// Assign the given range to the given memory index. This allocates a new
-  /// range object if necessary.
-  template <typename RangeT, typename T = llvm::detail::ValueOfRange<RangeT>>
-  void assignRangeToMemory(RangeT &&range, unsigned memIndex,
-                           unsigned rangeIndex) {
-    // Utility functor used to type-erase the assignment.
-    auto assignRange = [&](auto &allocatedRangeMemory, auto &rangeMemory) {
-      // If the input range is empty, we don't need to allocate anything.
-      if (range.empty()) {
-        rangeMemory[rangeIndex] = {};
-      } else {
-        // Allocate a buffer for this type range.
-        llvm::OwningArrayRef<T> storage(llvm::size(range));
-        llvm::copy(range, storage.begin());
-
-        // Assign this to the range slot and use the range as the value for the
-        // memory index.
-        allocatedRangeMemory.emplace_back(std::move(storage));
-        rangeMemory[rangeIndex] = allocatedRangeMemory.back();
-      }
-      memory[memIndex] = &rangeMemory[rangeIndex];
-    };
-
-    // Dispatch based on the concrete range type.
-    if constexpr (std::is_same_v<T, Type>) {
-      return assignRange(allocatedTypeRangeMemory, typeRangeMemory);
-    } else if constexpr (std::is_same_v<T, Value>) {
-      return assignRange(allocatedValueRangeMemory, valueRangeMemory);
-    } else {
-      llvm_unreachable("unhandled range type");
-    }
-  }
-
   /// The underlying bytecode buffer.
   const ByteCodeField *curCodeIt;
 
-  /// The stack of bytecode positions at which to resume operation.
-  SmallVector<const ByteCodeField *> resumeCodeIt;
-
   /// The current execution memory.
   MutableArrayRef<const void *> memory;
-  MutableArrayRef<OwningOpRange> opRangeMemory;
   MutableArrayRef<TypeRange> typeRangeMemory;
   std::vector<llvm::OwningArrayRef<Type>> &allocatedTypeRangeMemory;
   MutableArrayRef<ValueRange> valueRangeMemory;
   std::vector<llvm::OwningArrayRef<Value>> &allocatedValueRangeMemory;
-
-  /// The current loop indices.
-  MutableArrayRef<unsigned> loopIndex;
 
   /// References to ByteCode data necessary for execution.
   ArrayRef<const void *> uniquedMemory;
@@ -1403,44 +1116,42 @@ public:
     return allocatedValueRanges;
   }
 };
-} // namespace
+} // end anonymous namespace
 
 void ByteCodeExecutor::executeApplyConstraint(PatternRewriter &rewriter) {
   LLVM_DEBUG(llvm::dbgs() << "Executing ApplyConstraint:\n");
   const PDLConstraintFunction &constraintFn = constraintFunctions[read()];
+  ArrayAttr constParams = read<ArrayAttr>();
   SmallVector<PDLValue, 16> args;
   readList<PDLValue>(args);
 
   LLVM_DEBUG({
     llvm::dbgs() << "  * Arguments: ";
     llvm::interleaveComma(args, llvm::dbgs());
-    llvm::dbgs() << "\n";
+    llvm::dbgs() << "\n  * Parameters: " << constParams << "\n";
   });
 
-  ByteCodeField isNegated = read();
-  LLVM_DEBUG({
-    llvm::dbgs() << "  * isNegated: " << isNegated << "\n";
-    llvm::interleaveComma(args, llvm::dbgs());
-  });
   // Invoke the constraint and jump to the proper destination.
-  selectJump(isNegated != succeeded(constraintFn(rewriter, args)));
+  selectJump(succeeded(constraintFn(args, constParams, rewriter)));
 }
 
-LogicalResult ByteCodeExecutor::executeApplyRewrite(PatternRewriter &rewriter) {
+void ByteCodeExecutor::executeApplyRewrite(PatternRewriter &rewriter) {
   LLVM_DEBUG(llvm::dbgs() << "Executing ApplyRewrite:\n");
   const PDLRewriteFunction &rewriteFn = rewriteFunctions[read()];
+  ArrayAttr constParams = read<ArrayAttr>();
   SmallVector<PDLValue, 16> args;
   readList<PDLValue>(args);
 
   LLVM_DEBUG({
     llvm::dbgs() << "  * Arguments: ";
     llvm::interleaveComma(args, llvm::dbgs());
+    llvm::dbgs() << "\n  * Parameters: " << constParams << "\n";
   });
 
   // Execute the rewrite function.
   ByteCodeField numResults = read();
   ByteCodeRewriteResultList results(numResults);
-  LogicalResult rewriteResult = rewriteFn(rewriter, results, args);
+  rewriteFn(args, constParams, rewriter, results);
 
   assert(results.getResults().size() == numResults &&
          "native PDL rewrite function returned unexpected number of results");
@@ -1457,11 +1168,11 @@ LogicalResult ByteCodeExecutor::executeApplyRewrite(PatternRewriter &rewriter) {
 
     // If the result is a range, we need to copy it over to the bytecodes
     // range memory.
-    if (std::optional<TypeRange> typeRange = result.dyn_cast<TypeRange>()) {
+    if (Optional<TypeRange> typeRange = result.dyn_cast<TypeRange>()) {
       unsigned rangeIndex = read();
       typeRangeMemory[rangeIndex] = *typeRange;
       memory[read()] = &typeRangeMemory[rangeIndex];
-    } else if (std::optional<ValueRange> valueRange =
+    } else if (Optional<ValueRange> valueRange =
                    result.dyn_cast<ValueRange>()) {
       unsigned rangeIndex = read();
       valueRangeMemory[rangeIndex] = *valueRange;
@@ -1476,13 +1187,6 @@ LogicalResult ByteCodeExecutor::executeApplyRewrite(PatternRewriter &rewriter) {
     allocatedTypeRangeMemory.push_back(std::move(it));
   for (auto &it : results.getAllocatedValueRanges())
     allocatedValueRangeMemory.push_back(std::move(it));
-
-  // Process the result of the rewrite.
-  if (failed(rewriteResult)) {
-    LLVM_DEBUG(llvm::dbgs() << "  - Failed");
-    return failure();
-  }
-  return success();
 }
 
 void ByteCodeExecutor::executeAreEqual() {
@@ -1573,26 +1277,26 @@ void ByteCodeExecutor::executeCheckTypes() {
   Attribute rhs = read<Attribute>();
   LLVM_DEBUG(llvm::dbgs() << "  * " << lhs << " == " << rhs << "\n\n");
 
-  selectJump(*lhs == cast<ArrayAttr>(rhs).getAsValueRange<TypeAttr>());
+  selectJump(*lhs == rhs.cast<ArrayAttr>().getAsValueRange<TypeAttr>());
 }
 
-void ByteCodeExecutor::executeContinue() {
-  ByteCodeField level = read();
-  LLVM_DEBUG(llvm::dbgs() << "Executing Continue\n"
-                          << "  * Level: " << level << "\n");
-  ++loopIndex[level];
-  popCodeIt();
-}
-
-void ByteCodeExecutor::executeCreateConstantTypeRange() {
-  LLVM_DEBUG(llvm::dbgs() << "Executing CreateConstantTypeRange:\n");
+void ByteCodeExecutor::executeCreateTypes() {
+  LLVM_DEBUG(llvm::dbgs() << "Executing CreateTypes:\n");
   unsigned memIndex = read();
   unsigned rangeIndex = read();
-  ArrayAttr typesAttr = cast<ArrayAttr>(read<Attribute>());
+  ArrayAttr typesAttr = read<Attribute>().cast<ArrayAttr>();
 
   LLVM_DEBUG(llvm::dbgs() << "  * Types: " << typesAttr << "\n\n");
-  assignRangeToMemory(typesAttr.getAsValueRange<TypeAttr>(), memIndex,
-                      rangeIndex);
+
+  // Allocate a buffer for this type range.
+  llvm::OwningArrayRef<Type> storage(typesAttr.size());
+  llvm::copy(typesAttr.getAsValueRange<TypeAttr>(), storage.begin());
+  allocatedTypeRangeMemory.emplace_back(std::move(storage));
+
+  // Assign this to the range slot and use the range as the value for the
+  // memory index.
+  typeRangeMemory[rangeIndex] = allocatedTypeRangeMemory.back();
+  memory[memIndex] = &typeRangeMemory[rangeIndex];
 }
 
 void ByteCodeExecutor::executeCreateOperation(PatternRewriter &rewriter,
@@ -1601,41 +1305,40 @@ void ByteCodeExecutor::executeCreateOperation(PatternRewriter &rewriter,
 
   unsigned memIndex = read();
   OperationState state(mainRewriteLoc, read<OperationName>());
-  readList(state.operands);
+  readValueList(state.operands);
   for (unsigned i = 0, e = read(); i != e; ++i) {
-    StringAttr name = read<StringAttr>();
+    Identifier name = read<Identifier>();
     if (Attribute attr = read<Attribute>())
       state.addAttribute(name, attr);
   }
 
-  // Read in the result types. If the "size" is the sentinel value, this
-  // indicates that the result types should be inferred.
-  unsigned numResults = read();
-  if (numResults == kInferTypesMarker) {
-    InferTypeOpInterface::Concept *inferInterface =
-        state.name.getInterface<InferTypeOpInterface>();
-    assert(inferInterface &&
-           "expected operation to provide InferTypeOpInterface");
+  for (unsigned i = 0, e = read(); i != e; ++i) {
+    if (read<PDLValue::Kind>() == PDLValue::Kind::Type) {
+      state.types.push_back(read<Type>());
+      continue;
+    }
+
+    // If we find a null range, this signals that the types are infered.
+    if (TypeRange *resultTypes = read<TypeRange *>()) {
+      state.types.append(resultTypes->begin(), resultTypes->end());
+      continue;
+    }
+
+    // Handle the case where the operation has inferred types.
+    InferTypeOpInterface::Concept *concept =
+        state.name.getAbstractOperation()->getInterface<InferTypeOpInterface>();
 
     // TODO: Handle failure.
-    if (failed(inferInterface->inferReturnTypes(
+    state.types.clear();
+    if (failed(concept->inferReturnTypes(
             state.getContext(), state.location, state.operands,
-            state.attributes.getDictionary(state.getContext()),
-            state.getRawProperties(), state.regions, state.types)))
+            state.attributes.getDictionary(state.getContext()), state.regions,
+            state.types)))
       return;
-  } else {
-    // Otherwise, this is a fixed number of results.
-    for (unsigned i = 0; i != numResults; ++i) {
-      if (read<PDLValue::Kind>() == PDLValue::Kind::Type) {
-        state.types.push_back(read<Type>());
-      } else {
-        TypeRange *resultTypes = read<TypeRange *>();
-        state.types.append(resultTypes->begin(), resultTypes->end());
-      }
-    }
+    break;
   }
 
-  Operation *resultOp = rewriter.create(state);
+  Operation *resultOp = rewriter.createOperation(state);
   memory[memIndex] = resultOp;
 
   LLVM_DEBUG({
@@ -1649,23 +1352,6 @@ void ByteCodeExecutor::executeCreateOperation(PatternRewriter &rewriter,
   });
 }
 
-template <typename T>
-void ByteCodeExecutor::executeDynamicCreateRange(StringRef type) {
-  LLVM_DEBUG(llvm::dbgs() << "Executing CreateDynamic" << type << "Range:\n");
-  unsigned memIndex = read();
-  unsigned rangeIndex = read();
-  SmallVector<T> values;
-  readList(values);
-
-  LLVM_DEBUG({
-    llvm::dbgs() << "\n  * " << type << "s: ";
-    llvm::interleaveComma(values, llvm::dbgs());
-    llvm::dbgs() << "\n";
-  });
-
-  assignRangeToMemory(values, memIndex, rangeIndex);
-}
-
 void ByteCodeExecutor::executeEraseOp(PatternRewriter &rewriter) {
   LLVM_DEBUG(llvm::dbgs() << "Executing EraseOp:\n");
   Operation *op = read<Operation *>();
@@ -1674,69 +1360,11 @@ void ByteCodeExecutor::executeEraseOp(PatternRewriter &rewriter) {
   rewriter.eraseOp(op);
 }
 
-template <typename T, typename Range, PDLValue::Kind kind>
-void ByteCodeExecutor::executeExtract() {
-  LLVM_DEBUG(llvm::dbgs() << "Executing Extract" << kind << ":\n");
-  Range *range = read<Range *>();
-  unsigned index = read<uint32_t>();
-  unsigned memIndex = read();
-
-  if (!range) {
-    memory[memIndex] = nullptr;
-    return;
-  }
-
-  T result = index < range->size() ? (*range)[index] : T();
-  LLVM_DEBUG(llvm::dbgs() << "  * " << kind << "s(" << range->size() << ")\n"
-                          << "  * Index: " << index << "\n"
-                          << "  * Result: " << result << "\n");
-  storeToMemory(memIndex, result);
-}
-
-void ByteCodeExecutor::executeFinalize() {
-  LLVM_DEBUG(llvm::dbgs() << "Executing Finalize\n");
-}
-
-void ByteCodeExecutor::executeForEach() {
-  LLVM_DEBUG(llvm::dbgs() << "Executing ForEach:\n");
-  const ByteCodeField *prevCodeIt = getPrevCodeIt();
-  unsigned rangeIndex = read();
-  unsigned memIndex = read();
-  const void *value = nullptr;
-
-  switch (read<PDLValue::Kind>()) {
-  case PDLValue::Kind::Operation: {
-    unsigned &index = loopIndex[read()];
-    ArrayRef<Operation *> array = opRangeMemory[rangeIndex];
-    assert(index <= array.size() && "iterated past the end");
-    if (index < array.size()) {
-      LLVM_DEBUG(llvm::dbgs() << "  * Result: " << array[index] << "\n");
-      value = array[index];
-      break;
-    }
-
-    LLVM_DEBUG(llvm::dbgs() << "  * Done\n");
-    index = 0;
-    selectJump(size_t(0));
-    return;
-  }
-  default:
-    llvm_unreachable("unexpected `ForEach` value kind");
-  }
-
-  // Store the iterate value and the stack address.
-  memory[memIndex] = value;
-  pushCodeIt(prevCodeIt);
-
-  // Skip over the successor (we will enter the body of the loop).
-  read<ByteCodeAddr>();
-}
-
 void ByteCodeExecutor::executeGetAttribute() {
   LLVM_DEBUG(llvm::dbgs() << "Executing GetAttribute:\n");
   unsigned memIndex = read();
   Operation *op = read<Operation *>();
-  StringAttr attrName = read<StringAttr>();
+  Identifier attrName = read<Identifier>();
   Attribute attr = op->getAttr(attrName);
 
   LLVM_DEBUG(llvm::dbgs() << "  * Operation: " << *op << "\n"
@@ -1749,9 +1377,7 @@ void ByteCodeExecutor::executeGetAttributeType() {
   LLVM_DEBUG(llvm::dbgs() << "Executing GetAttributeType:\n");
   unsigned memIndex = read();
   Attribute attr = read<Attribute>();
-  Type type;
-  if (auto typedAttr = dyn_cast<TypedAttr>(attr))
-    type = typedAttr.getType();
+  Type type = attr ? attr.getType() : Type();
 
   LLVM_DEBUG(llvm::dbgs() << "  * Attribute: " << attr << "\n"
                           << "  * Result: " << type << "\n");
@@ -1798,7 +1424,7 @@ template <template <typename> class AttrSizedSegmentsT, typename RangeT>
 static void *
 executeGetOperandsResults(RangeT values, Operation *op, unsigned index,
                           ByteCodeField rangeIndex, StringRef attrSizedSegments,
-                          MutableArrayRef<ValueRange> valueRangeMemory) {
+                          MutableArrayRef<ValueRange> &valueRangeMemory) {
   // Check for the sentinel index that signals that all values should be
   // returned.
   if (index == std::numeric_limits<uint32_t>::max()) {
@@ -1810,11 +1436,11 @@ executeGetOperandsResults(RangeT values, Operation *op, unsigned index,
     LLVM_DEBUG(llvm::dbgs()
                << "  * Extracting values from `" << attrSizedSegments << "`\n");
 
-    auto segmentAttr = op->getAttrOfType<DenseI32ArrayAttr>(attrSizedSegments);
-    if (!segmentAttr || segmentAttr.asArrayRef().size() <= index)
+    auto segmentAttr = op->getAttrOfType<DenseElementsAttr>(attrSizedSegments);
+    if (!segmentAttr || segmentAttr.getNumElements() <= index)
       return nullptr;
 
-    ArrayRef<int32_t> segments = segmentAttr;
+    auto segments = segmentAttr.getValues<int32_t>();
     unsigned startIndex =
         std::accumulate(segments.begin(), segments.begin() + index, 0);
     values = values.slice(startIndex, *std::next(segments.begin(), index));
@@ -1853,7 +1479,7 @@ void ByteCodeExecutor::executeGetOperands() {
   ByteCodeField rangeIndex = read();
 
   void *result = executeGetOperandsResults<OpTrait::AttrSizedOperandSegments>(
-      op->getOperands(), op, index, rangeIndex, "operandSegmentSizes",
+      op->getOperands(), op, index, rangeIndex, "operand_segment_sizes",
       valueRangeMemory);
   if (!result)
     LLVM_DEBUG(llvm::dbgs() << "  * Invalid operand range\n");
@@ -1879,51 +1505,11 @@ void ByteCodeExecutor::executeGetResults() {
   ByteCodeField rangeIndex = read();
 
   void *result = executeGetOperandsResults<OpTrait::AttrSizedResultSegments>(
-      op->getResults(), op, index, rangeIndex, "resultSegmentSizes",
+      op->getResults(), op, index, rangeIndex, "result_segment_sizes",
       valueRangeMemory);
   if (!result)
     LLVM_DEBUG(llvm::dbgs() << "  * Invalid result range\n");
   memory[read()] = result;
-}
-
-void ByteCodeExecutor::executeGetUsers() {
-  LLVM_DEBUG(llvm::dbgs() << "Executing GetUsers:\n");
-  unsigned memIndex = read();
-  unsigned rangeIndex = read();
-  OwningOpRange &range = opRangeMemory[rangeIndex];
-  memory[memIndex] = &range;
-
-  range = OwningOpRange();
-  if (read<PDLValue::Kind>() == PDLValue::Kind::Value) {
-    // Read the value.
-    Value value = read<Value>();
-    if (!value)
-      return;
-    LLVM_DEBUG(llvm::dbgs() << "  * Value: " << value << "\n");
-
-    // Extract the users of a single value.
-    range = OwningOpRange(std::distance(value.user_begin(), value.user_end()));
-    llvm::copy(value.getUsers(), range.begin());
-  } else {
-    // Read a range of values.
-    ValueRange *values = read<ValueRange *>();
-    if (!values)
-      return;
-    LLVM_DEBUG({
-      llvm::dbgs() << "  * Values (" << values->size() << "): ";
-      llvm::interleaveComma(*values, llvm::dbgs());
-      llvm::dbgs() << "\n";
-    });
-
-    // Extract all the users of a range of values.
-    SmallVector<Operation *> users;
-    for (Value value : *values)
-      users.append(value.user_begin(), value.user_end());
-    range = OwningOpRange(users.size());
-    llvm::copy(users, range.begin());
-  }
-
-  LLVM_DEBUG(llvm::dbgs() << "  * Result: " << range.size() << " operations\n");
 }
 
 void ByteCodeExecutor::executeGetValueType() {
@@ -2028,7 +1614,7 @@ void ByteCodeExecutor::executeReplaceOp(PatternRewriter &rewriter) {
   LLVM_DEBUG(llvm::dbgs() << "Executing ReplaceOp:\n");
   Operation *op = read<Operation *>();
   SmallVector<Value, 16> args;
-  readList(args);
+  readValueList(args);
 
   LLVM_DEBUG({
     llvm::dbgs() << "  * Operation: " << *op << "\n"
@@ -2114,22 +1700,18 @@ void ByteCodeExecutor::executeSwitchTypes() {
   });
 }
 
-LogicalResult
-ByteCodeExecutor::execute(PatternRewriter &rewriter,
-                          SmallVectorImpl<PDLByteCode::MatchResult> *matches,
-                          std::optional<Location> mainRewriteLoc) {
+void ByteCodeExecutor::execute(
+    PatternRewriter &rewriter,
+    SmallVectorImpl<PDLByteCode::MatchResult> *matches,
+    Optional<Location> mainRewriteLoc) {
   while (true) {
-    // Print the location of the operation being executed.
-    LLVM_DEBUG(llvm::dbgs() << readInline<Location>() << "\n");
-
     OpCode opCode = static_cast<OpCode>(read());
     switch (opCode) {
     case ApplyConstraint:
       executeApplyConstraint(rewriter);
       break;
     case ApplyRewrite:
-      if (failed(executeApplyRewrite(rewriter)))
-        return failure();
+      executeApplyRewrite(rewriter);
       break;
     case AreEqual:
       executeAreEqual();
@@ -2152,40 +1734,18 @@ ByteCodeExecutor::execute(PatternRewriter &rewriter,
     case CheckTypes:
       executeCheckTypes();
       break;
-    case Continue:
-      executeContinue();
-      break;
-    case CreateConstantTypeRange:
-      executeCreateConstantTypeRange();
-      break;
     case CreateOperation:
       executeCreateOperation(rewriter, *mainRewriteLoc);
       break;
-    case CreateDynamicTypeRange:
-      executeDynamicCreateRange<Type>("Type");
-      break;
-    case CreateDynamicValueRange:
-      executeDynamicCreateRange<Value>("Value");
+    case CreateTypes:
+      executeCreateTypes();
       break;
     case EraseOp:
       executeEraseOp(rewriter);
       break;
-    case ExtractOp:
-      executeExtract<Operation *, OwningOpRange, PDLValue::Kind::Operation>();
-      break;
-    case ExtractType:
-      executeExtract<Type, TypeRange, PDLValue::Kind::Type>();
-      break;
-    case ExtractValue:
-      executeExtract<Value, ValueRange, PDLValue::Kind::Value>();
-      break;
     case Finalize:
-      executeFinalize();
-      LLVM_DEBUG(llvm::dbgs() << "\n");
-      return success();
-    case ForEach:
-      executeForEach();
-      break;
+      LLVM_DEBUG(llvm::dbgs() << "Executing Finalize\n\n");
+      return;
     case GetAttribute:
       executeGetAttribute();
       break;
@@ -2227,9 +1787,6 @@ ByteCodeExecutor::execute(PatternRewriter &rewriter,
     case GetResults:
       executeGetResults();
       break;
-    case GetUsers:
-      executeGetUsers();
-      break;
     case GetValueType:
       executeGetValueType();
       break;
@@ -2270,6 +1827,8 @@ ByteCodeExecutor::execute(PatternRewriter &rewriter,
   }
 }
 
+/// Run the pattern matcher on the given root operation, collecting the matched
+/// patterns in `matches`.
 void PDLByteCode::match(Operation *op, PatternRewriter &rewriter,
                         SmallVectorImpl<MatchResult> &matches,
                         PDLByteCodeMutableState &state) const {
@@ -2278,14 +1837,12 @@ void PDLByteCode::match(Operation *op, PatternRewriter &rewriter,
 
   // The matcher function always starts at code address 0.
   ByteCodeExecutor executor(
-      matcherByteCode.data(), state.memory, state.opRangeMemory,
-      state.typeRangeMemory, state.allocatedTypeRangeMemory,
-      state.valueRangeMemory, state.allocatedValueRangeMemory, state.loopIndex,
-      uniquedData, matcherByteCode, state.currentPatternBenefits, patterns,
-      constraintFunctions, rewriteFunctions);
-  LogicalResult executeResult = executor.execute(rewriter, &matches);
-  (void)executeResult;
-  assert(succeeded(executeResult) && "unexpected matcher execution failure");
+      matcherByteCode.data(), state.memory, state.typeRangeMemory,
+      state.allocatedTypeRangeMemory, state.valueRangeMemory,
+      state.allocatedValueRangeMemory, uniquedData, matcherByteCode,
+      state.currentPatternBenefits, patterns, constraintFunctions,
+      rewriteFunctions);
+  executor.execute(rewriter, &matches);
 
   // Order the found matches by benefit.
   std::stable_sort(matches.begin(), matches.end(),
@@ -2294,42 +1851,18 @@ void PDLByteCode::match(Operation *op, PatternRewriter &rewriter,
                    });
 }
 
-LogicalResult PDLByteCode::rewrite(PatternRewriter &rewriter,
-                                   const MatchResult &match,
-                                   PDLByteCodeMutableState &state) const {
-  auto *configSet = match.pattern->getConfigSet();
-  if (configSet)
-    configSet->notifyRewriteBegin(rewriter);
-
+/// Run the rewriter of the given pattern on the root operation `op`.
+void PDLByteCode::rewrite(PatternRewriter &rewriter, const MatchResult &match,
+                          PDLByteCodeMutableState &state) const {
   // The arguments of the rewrite function are stored at the start of the
   // memory buffer.
   llvm::copy(match.values, state.memory.begin());
 
   ByteCodeExecutor executor(
       &rewriterByteCode[match.pattern->getRewriterAddr()], state.memory,
-      state.opRangeMemory, state.typeRangeMemory,
-      state.allocatedTypeRangeMemory, state.valueRangeMemory,
-      state.allocatedValueRangeMemory, state.loopIndex, uniquedData,
+      state.typeRangeMemory, state.allocatedTypeRangeMemory,
+      state.valueRangeMemory, state.allocatedValueRangeMemory, uniquedData,
       rewriterByteCode, state.currentPatternBenefits, patterns,
       constraintFunctions, rewriteFunctions);
-  LogicalResult result =
-      executor.execute(rewriter, /*matches=*/nullptr, match.location);
-
-  if (configSet)
-    configSet->notifyRewriteEnd(rewriter);
-
-  // If the rewrite failed, check if the pattern rewriter can recover. If it
-  // can, we can signal to the pattern applicator to keep trying patterns. If it
-  // doesn't, we need to bail. Bailing here should be fine, given that we have
-  // no means to propagate such a failure to the user, and it also indicates a
-  // bug in the user code (i.e. failable rewrites should not be used with
-  // pattern rewriters that don't support it).
-  if (failed(result) && !rewriter.canRecoverFromRewriteFailure()) {
-    LLVM_DEBUG(llvm::dbgs() << " and rollback is not supported - aborting");
-    llvm::report_fatal_error(
-        "Native PDL Rewrite failed, but the pattern "
-        "rewriter doesn't support recovery. Failable pattern rewrites should "
-        "not be used with pattern rewriters that do not support them.");
-  }
-  return result;
+  executor.execute(rewriter, /*matches=*/nullptr, match.location);
 }

@@ -1,4 +1,4 @@
-//===- ReduceMetadata.h - Specialized Delta Pass ----------------*- C++ -*-===//
+//===- ReduceMetadata.h - Specialized Delta Pass --------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -18,7 +18,6 @@
 
 namespace llvm {
 void reduceMetadataDeltaPass(TestRunner &Test);
-void reduceNamedMetadataDeltaPass(TestRunner &Test);
 } // namespace llvm
 
 #endif

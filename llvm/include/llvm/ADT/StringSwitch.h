@@ -4,11 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //===----------------------------------------------------------------------===/
-///
-/// \file
-///  This file implements the StringSwitch template, which mimics a switch()
-///  statement whose cases are string literals.
-///
+//
+//  This file implements the StringSwitch template, which mimics a switch()
+//  statement whose cases are string literals.
+//
 //===----------------------------------------------------------------------===/
 #ifndef LLVM_ADT_STRINGSWITCH_H
 #define LLVM_ADT_STRINGSWITCH_H
@@ -17,7 +16,6 @@
 #include "llvm/Support/Compiler.h"
 #include <cassert>
 #include <cstring>
-#include <optional>
 
 namespace llvm {
 
@@ -47,7 +45,7 @@ class StringSwitch {
 
   /// The pointer to the result of this switch statement, once known,
   /// null before that.
-  std::optional<T> Result;
+  Optional<T> Result;
 
 public:
   explicit StringSwitch(StringRef S)
@@ -74,14 +72,14 @@ public:
   }
 
   StringSwitch& EndsWith(StringLiteral S, T Value) {
-    if (!Result && Str.ends_with(S)) {
+    if (!Result && Str.endswith(S)) {
       Result = std::move(Value);
     }
     return *this;
   }
 
   StringSwitch& StartsWith(StringLiteral S, T Value) {
-    if (!Result && Str.starts_with(S)) {
+    if (!Result && Str.startswith(S)) {
       Result = std::move(Value);
     }
     return *this;
@@ -147,14 +145,14 @@ public:
   }
 
   StringSwitch &EndsWithLower(StringLiteral S, T Value) {
-    if (!Result && Str.ends_with_insensitive(S))
+    if (!Result && Str.endswith_insensitive(S))
       Result = Value;
 
     return *this;
   }
 
   StringSwitch &StartsWithLower(StringLiteral S, T Value) {
-    if (!Result && Str.starts_with_insensitive(S))
+    if (!Result && Str.startswith_insensitive(S))
       Result = std::move(Value);
 
     return *this;
@@ -179,13 +177,15 @@ public:
     return CaseLower(S0, Value).CasesLower(S1, S2, S3, S4, Value);
   }
 
-  [[nodiscard]] R Default(T Value) {
+  LLVM_NODISCARD
+  R Default(T Value) {
     if (Result)
       return std::move(*Result);
     return Value;
   }
 
-  [[nodiscard]] operator R() {
+  LLVM_NODISCARD
+  operator R() {
     assert(Result && "Fell off the end of a string-switch");
     return std::move(*Result);
   }

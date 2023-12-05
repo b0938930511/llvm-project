@@ -9,13 +9,15 @@
 #include "InconsistentDeclarationParameterNameCheck.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
-#include "llvm/ADT/STLExtras.h"
 
+#include <algorithm>
 #include <functional>
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::readability {
+namespace clang {
+namespace tidy {
+namespace readability {
 
 namespace {
 
@@ -91,8 +93,8 @@ bool nameMatch(StringRef L, StringRef R, bool Strict) {
     return L.empty() || R.empty() || L == R;
   // We allow two names if one is a prefix/suffix of the other, ignoring case.
   // Important special case: this is true if either parameter has no name!
-  return L.starts_with_insensitive(R) || R.starts_with_insensitive(L) ||
-         L.ends_with_insensitive(R) || R.ends_with_insensitive(L);
+  return L.startswith_insensitive(R) || R.startswith_insensitive(L) ||
+         L.endswith_insensitive(R) || R.endswith_insensitive(L);
 }
 
 DifferingParamsContainer
@@ -102,8 +104,8 @@ findDifferingParamsInDeclaration(const FunctionDecl *ParameterSourceDeclaration,
                                  bool Strict) {
   DifferingParamsContainer DifferingParams;
 
-  const auto *SourceParamIt = ParameterSourceDeclaration->param_begin();
-  const auto *OtherParamIt = OtherDeclaration->param_begin();
+  auto SourceParamIt = ParameterSourceDeclaration->param_begin();
+  auto OtherParamIt = OtherDeclaration->param_begin();
 
   while (SourceParamIt != ParameterSourceDeclaration->param_end() &&
          OtherParamIt != OtherDeclaration->param_end()) {
@@ -156,12 +158,12 @@ findInconsistentDeclarations(const FunctionDecl *OriginalDeclaration,
 
   // Sort in order of appearance in translation unit to generate clear
   // diagnostics.
-  llvm::sort(InconsistentDeclarations,
-             [&SM](const InconsistentDeclarationInfo &Info1,
-                   const InconsistentDeclarationInfo &Info2) {
-               return SM.isBeforeInTranslationUnit(Info1.DeclarationLocation,
-                                                   Info2.DeclarationLocation);
-             });
+  std::sort(InconsistentDeclarations.begin(), InconsistentDeclarations.end(),
+            [&SM](const InconsistentDeclarationInfo &Info1,
+                  const InconsistentDeclarationInfo &Info2) {
+              return SM.isBeforeInTranslationUnit(Info1.DeclarationLocation,
+                                                  Info2.DeclarationLocation);
+            });
   return InconsistentDeclarations;
 }
 
@@ -301,7 +303,7 @@ void InconsistentDeclarationParameterNameCheck::check(
   const auto *OriginalDeclaration =
       Result.Nodes.getNodeAs<FunctionDecl>("functionDecl");
 
-  if (VisitedDeclarations.contains(OriginalDeclaration))
+  if (VisitedDeclarations.count(OriginalDeclaration) > 0)
     return; // Avoid multiple warnings.
 
   const FunctionDecl *ParameterSourceDeclaration =
@@ -348,4 +350,6 @@ void InconsistentDeclarationParameterNameCheck::markRedeclarationsAsVisited(
   }
 }
 
-} // namespace clang::tidy::readability
+} // namespace readability
+} // namespace tidy
+} // namespace clang

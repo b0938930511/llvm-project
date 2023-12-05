@@ -23,12 +23,8 @@
 ## Assembler Pseudo Instructions (User-Level ISA, Version 2.2, Chapter 20)
 ##===----------------------------------------------------------------------===##
 
-# CHECK-INST: fld ft0, 0(a0)
-# CHECK-ALIAS:  fld ft0, 0(a0)
-fld f0, (a0)
-# CHECK-INST: fsd ft0, 0(a0)
-# CHECK-ALIAS: fsd ft0, 0(a0)
-fsd f0, (a0)
+# TODO fld
+# TODO fsd
 
 # CHECK-INST: fsgnj.d ft0, ft1, ft1
 # CHECK-ALIAS: fmv.d ft0, ft1

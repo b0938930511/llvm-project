@@ -1,7 +1,7 @@
 # Exclude tests from libMLIR.so
 add_mlir_library(MLIRMathTestPasses
   TestAlgebraicSimplification.cpp
-  TestExpandMath.cpp
+  TestExpandTanh.cpp
   TestPolynomialApproximation.cpp
 
   EXCLUDE_FROM_LIBMLIR
@@ -10,6 +10,5 @@ add_mlir_library(MLIRMathTestPasses
   MLIRMathTransforms
   MLIRPass
   MLIRTransformUtils
-  MLIRVectorDialect
-  MLIRX86VectorDialect
+  MLIRVector
   )

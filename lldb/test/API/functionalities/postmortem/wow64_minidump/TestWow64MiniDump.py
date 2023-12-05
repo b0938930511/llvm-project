@@ -7,6 +7,9 @@ end up with a dump of the WoW64 layer.  In that case, LLDB must do extra work to
 get the 32-bit register contexts.
 """
 
+from six import iteritems
+
+
 import lldb
 from lldbsuite.test.decorators import *
 from lldbsuite.test.lldbtest import *
@@ -14,6 +17,8 @@ from lldbsuite.test import lldbutil
 
 
 class Wow64MiniDumpTestCase(TestBase):
+
+    mydir = TestBase.compute_mydir(__file__)
     NO_DEBUG_INFO_TESTCASE = True
 
     def test_wow64_mini_dump(self):
@@ -39,7 +44,7 @@ class Wow64MiniDumpTestCase(TestBase):
         # In the dump, none of the threads are stopped, so we cannot use
         # lldbutil.get_stopped_thread.
         thread = process.GetThreadAtIndex(0)
-        self.assertStopReason(thread.GetStopReason(), lldb.eStopReasonNone)
+        self.assertEqual(thread.GetStopReason(), lldb.eStopReasonNone)
 
     def test_stack_info_in_wow64_mini_dump(self):
         """Test that we can see a trivial stack in a VS-generate mini dump."""

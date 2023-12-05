@@ -25,11 +25,14 @@
 #include "X86InstrInfo.h"
 #include "X86Subtarget.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/SparseBitVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/CodeGen/MachineConstantPool.h"
@@ -153,6 +156,8 @@ namespace {
 /// dispatch with specific functionality.
 enum class FlagArithMnemonic {
   ADC,
+  ADCX,
+  ADOX,
   RCL,
   RCR,
   SBB,
@@ -215,6 +220,18 @@ static FlagArithMnemonic getMnemonicFromOpcode(unsigned Opcode) {
     return FlagArithMnemonic::RCR;
 
 #undef LLVM_EXPAND_INSTR_SIZES
+
+  case X86::ADCX32rr:
+  case X86::ADCX64rr:
+  case X86::ADCX32rm:
+  case X86::ADCX64rm:
+    return FlagArithMnemonic::ADCX;
+
+  case X86::ADOX32rr:
+  case X86::ADOX64rr:
+  case X86::ADOX32rm:
+  case X86::ADOX64rm:
+    return FlagArithMnemonic::ADOX;
 
   case X86::SETB_C32r:
   case X86::SETB_C64r:
@@ -785,6 +802,7 @@ void X86FlagsCopyLoweringPass::rewriteArithmetic(
 
   switch (getMnemonicFromOpcode(MI.getOpcode())) {
   case FlagArithMnemonic::ADC:
+  case FlagArithMnemonic::ADCX:
   case FlagArithMnemonic::RCL:
   case FlagArithMnemonic::RCR:
   case FlagArithMnemonic::SBB:
@@ -793,6 +811,13 @@ void X86FlagsCopyLoweringPass::rewriteArithmetic(
     // Set up an addend that when one is added will need a carry due to not
     // having a higher bit available.
     Addend = 255;
+    break;
+
+  case FlagArithMnemonic::ADOX:
+    Cond = X86::COND_O; // OF == 1
+    // Set up an addend that when one is added will turn from positive to
+    // negative and thus overflow in the signed domain.
+    Addend = 127;
     break;
   }
 
@@ -939,11 +964,7 @@ void X86FlagsCopyLoweringPass::rewriteSetCC(MachineBasicBlock &TestMBB,
   if (!SetCCI.mayStore()) {
     assert(SetCCI.getOperand(0).isReg() &&
            "Cannot have a non-register defined operand to SETcc!");
-    Register OldReg = SetCCI.getOperand(0).getReg();
-    // Drop Kill flags on the old register before replacing. CondReg may have
-    // a longer live range.
-    MRI->clearKillFlags(OldReg);
-    MRI->replaceRegWith(OldReg, CondReg);
+    MRI->replaceRegWith(SetCCI.getOperand(0).getReg(), CondReg);
     SetCCI.eraseFromParent();
     return;
   }

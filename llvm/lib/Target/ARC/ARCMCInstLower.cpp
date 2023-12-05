@@ -104,7 +104,8 @@ MCOperand ARCMCInstLower::LowerOperand(const MachineOperand &MO,
 void ARCMCInstLower::Lower(const MachineInstr *MI, MCInst &OutMI) const {
   OutMI.setOpcode(MI->getOpcode());
 
-  for (const MachineOperand &MO : MI->operands()) {
+  for (unsigned i = 0, e = MI->getNumOperands(); i != e; ++i) {
+    const MachineOperand &MO = MI->getOperand(i);
     MCOperand MCOp = LowerOperand(MO);
 
     if (MCOp.isValid())

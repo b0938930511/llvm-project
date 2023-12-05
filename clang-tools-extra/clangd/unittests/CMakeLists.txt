@@ -5,12 +5,7 @@ set(LLVM_LINK_COMPONENTS
   )
 
 if(CLANG_BUILT_STANDALONE)
-  # LLVMTestingSupport and LLVMTestingAnnotations are needed for clangd tests.
-  if (EXISTS ${LLVM_MAIN_SRC_DIR}/lib/Testing/Annotations
-      AND NOT TARGET LLVMTestingAnnotations)
-    add_subdirectory(${LLVM_MAIN_SRC_DIR}/lib/Testing/Annotations
-      lib/Testing/Annotations)
-  endif()
+  # LLVMTestingSupport library is needed for clangd tests.
   if (EXISTS ${LLVM_MAIN_SRC_DIR}/lib/Testing/Support
       AND NOT TARGET LLVMTestingSupport)
     add_subdirectory(${LLVM_MAIN_SRC_DIR}/lib/Testing/Support
@@ -63,11 +58,9 @@ add_unittest(ClangdUnitTests ClangdTests
   HeadersTests.cpp
   HeaderSourceSwitchTests.cpp
   HoverTests.cpp
-  IncludeCleanerTests.cpp
   IndexActionTests.cpp
   IndexTests.cpp
   InlayHintTests.cpp
-  InsertionPointTests.cpp
   JSONTransportTests.cpp
   LoggerTests.cpp
   LSPBinderTests.cpp
@@ -79,15 +72,13 @@ add_unittest(ClangdUnitTests ClangdTests
   PrintASTTests.cpp
   ProjectAwareIndexTests.cpp
   QualityTests.cpp
-  RIFFTests.cpp
   RenameTests.cpp
-  ReplayPeambleTests.cpp
+  RIFFTests.cpp
   SelectionTests.cpp
   SemanticHighlightingTests.cpp
   SemanticSelectionTests.cpp
   SerializationTests.cpp
   SourceCodeTests.cpp
-  StdLibTests.cpp
   SymbolCollectorTests.cpp
   SymbolInfoTests.cpp
   SyncAPI.cpp
@@ -96,7 +87,6 @@ add_unittest(ClangdUnitTests ClangdTests
   TestIndex.cpp
   TestTU.cpp
   TestWorkspace.cpp
-  ThreadCrashReporterTests.cpp
   TidyProviderTests.cpp
   TypeHierarchyTests.cpp
   URITests.cpp
@@ -105,13 +95,12 @@ add_unittest(ClangdUnitTests ClangdTests
 
   support/CancellationTests.cpp
   support/ContextTests.cpp
-  support/FileCacheTests.cpp
   support/FunctionTests.cpp
   support/MarkupTests.cpp
   support/MemoryTreeTests.cpp
   support/PathTests.cpp
-  support/TestTracer.cpp
   support/ThreadingTests.cpp
+  support/TestTracer.cpp
   support/TraceTests.cpp
 
   tweaks/AddUsingTests.cpp
@@ -121,19 +110,15 @@ add_unittest(ClangdUnitTests ClangdTests
   tweaks/DumpASTTests.cpp
   tweaks/DumpRecordLayoutTests.cpp
   tweaks/DumpSymbolTests.cpp
-  tweaks/ExpandDeducedTypeTests.cpp
+  tweaks/ExpandAutoTypeTests.cpp
   tweaks/ExpandMacroTests.cpp
   tweaks/ExtractFunctionTests.cpp
   tweaks/ExtractVariableTests.cpp
-  tweaks/MemberwiseConstructorTests.cpp
   tweaks/ObjCLocalizeStringLiteralTests.cpp
-  tweaks/ObjCMemberwiseInitializerTests.cpp
   tweaks/PopulateSwitchTests.cpp
   tweaks/RawStringLiteralTests.cpp
   tweaks/RemoveUsingNamespaceTests.cpp
-  tweaks/ScopifyEnumTests.cpp
   tweaks/ShowSelectionTreeTests.cpp
-  tweaks/SpecialMembersTests.cpp
   tweaks/SwapIfBranchesTests.cpp
   tweaks/TweakTesting.cpp
   tweaks/TweakTests.cpp
@@ -162,27 +147,22 @@ clang_target_link_libraries(ClangdTests
   clangTooling
   clangToolingCore
   clangToolingInclusions
-  clangToolingInclusionsStdlib
   clangToolingRefactoring
   clangToolingSyntax
   )
 target_link_libraries(ClangdTests
   PRIVATE
-  LLVMTestingAnnotations
-  LLVMTestingSupport
-
   clangDaemon
-  clangIncludeCleaner
-  clangTesting
-  clangTidy
   clangdSupport
+  clangTidy
+  LLVMTestingSupport
   )
 
 if (CLANGD_ENABLE_REMOTE)
   target_link_libraries(ClangdTests
     PRIVATE
     clangdRemoteMarshalling
-    clangdRemoteIndexProto)
+    RemoteIndexProto)
 endif()
 
 if (CLANGD_BUILD_XPC)

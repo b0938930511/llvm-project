@@ -11,12 +11,14 @@
 
 #include "CloexecCheck.h"
 
-namespace clang::tidy::android {
+namespace clang {
+namespace tidy {
+namespace android {
 
 /// Finds code that uses accept4() without using the SOCK_CLOEXEC flag.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/android/cloexec-accept4.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/android-cloexec-accept4.html
 class CloexecAccept4Check : public CloexecCheck {
 public:
   CloexecAccept4Check(StringRef Name, ClangTidyContext *Context)
@@ -25,6 +27,8 @@ public:
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
 };
 
-} // namespace clang::tidy::android
+} // namespace android
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_ANDROID_CLOEXEC_ACCEPT4_H

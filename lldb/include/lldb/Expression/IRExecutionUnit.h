@@ -18,7 +18,7 @@
 #include "llvm/IR/Module.h"
 
 #include "lldb/Expression/IRMemoryMap.h"
-#include "lldb/Expression/ObjectFileJIT.h"
+#include "lldb/Symbol/ObjectFile.h"
 #include "lldb/Symbol/SymbolContext.h"
 #include "lldb/Utility/DataBufferHeap.h"
 #include "lldb/lldb-forward.h"
@@ -214,21 +214,26 @@ private:
 
   Status DisassembleFunction(Stream &stream, lldb::ProcessSP &process_sp);
 
-  void CollectCandidateCNames(std::vector<ConstString> &C_names,
+  struct SearchSpec;
+
+  void CollectCandidateCNames(std::vector<SearchSpec> &C_specs,
                               ConstString name);
 
-  void CollectCandidateCPlusPlusNames(std::vector<ConstString> &CPP_names,
-                                      const std::vector<ConstString> &C_names,
+  void CollectCandidateCPlusPlusNames(std::vector<SearchSpec> &CPP_specs,
+                                      const std::vector<SearchSpec> &C_specs,
                                       const SymbolContext &sc);
 
-  lldb::addr_t FindInSymbols(const std::vector<ConstString> &names,
+  void CollectFallbackNames(std::vector<SearchSpec> &fallback_specs,
+                            const std::vector<SearchSpec> &C_specs);
+
+  lldb::addr_t FindInSymbols(const std::vector<SearchSpec> &specs,
                              const lldb_private::SymbolContext &sc,
                              bool &symbol_was_missing_weak);
 
-  lldb::addr_t FindInRuntimes(const std::vector<ConstString> &names,
+  lldb::addr_t FindInRuntimes(const std::vector<SearchSpec> &specs,
                               const lldb_private::SymbolContext &sc);
 
-  lldb::addr_t FindInUserDefinedSymbols(const std::vector<ConstString> &names,
+  lldb::addr_t FindInUserDefinedSymbols(const std::vector<SearchSpec> &specs,
                                         const lldb_private::SymbolContext &sc);
 
   void ReportSymbolLookupError(ConstString name);
@@ -347,9 +352,10 @@ private:
     AllocationRecord(uintptr_t host_address, uint32_t permissions,
                      lldb::SectionType sect_type, size_t size,
                      unsigned alignment, unsigned section_id, const char *name)
-        : m_process_address(LLDB_INVALID_ADDRESS), m_host_address(host_address),
-          m_permissions(permissions), m_sect_type(sect_type), m_size(size),
-          m_alignment(alignment), m_section_id(section_id) {
+        : m_name(), m_process_address(LLDB_INVALID_ADDRESS),
+          m_host_address(host_address), m_permissions(permissions),
+          m_sect_type(sect_type), m_size(size), m_alignment(alignment),
+          m_section_id(section_id) {
       if (name && name[0])
         m_name = name;
     }

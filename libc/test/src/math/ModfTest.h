@@ -6,17 +6,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "src/__support/FPUtil/BasicOperations.h"
-#include "src/__support/FPUtil/NearestIntegerOperations.h"
-#include "test/UnitTest/FPMatcher.h"
-#include "test/UnitTest/Test.h"
+#include "utils/FPUtil/BasicOperations.h"
+#include "utils/FPUtil/NearestIntegerOperations.h"
+#include "utils/FPUtil/TestHelpers.h"
 #include "utils/MPFRWrapper/MPFRUtils.h"
+#include "utils/UnitTest/Test.h"
 
 #include <math.h>
 
-namespace mpfr = LIBC_NAMESPACE::testing::mpfr;
+namespace mpfr = __llvm_libc::testing::mpfr;
 
-template <typename T> class ModfTest : public LIBC_NAMESPACE::testing::Test {
+template <typename T> class ModfTest : public __llvm_libc::testing::Test {
 
   DECLARE_SPECIAL_CONSTANTS(T)
 
@@ -28,13 +28,13 @@ public:
 
     EXPECT_FP_EQ(zero, func(zero, &integral));
     EXPECT_FP_EQ(integral, zero);
-    EXPECT_FP_EQ(neg_zero, func(neg_zero, &integral));
-    EXPECT_FP_EQ(integral, neg_zero);
+    EXPECT_FP_EQ(negZero, func(negZero, &integral));
+    EXPECT_FP_EQ(integral, negZero);
 
     EXPECT_FP_EQ(zero, func(inf, &integral));
     EXPECT_FP_EQ(inf, integral);
-    EXPECT_FP_EQ(neg_zero, func(neg_inf, &integral));
-    EXPECT_FP_EQ(neg_inf, integral);
+    EXPECT_FP_EQ(negZero, func(negInf, &integral));
+    EXPECT_FP_EQ(negInf, integral);
 
     EXPECT_FP_EQ(aNaN, func(aNaN, &integral));
   }
@@ -84,17 +84,17 @@ public:
   }
 
   void testRange(ModfFunc func) {
-    constexpr UIntType COUNT = 100'000;
-    constexpr UIntType STEP = UIntType(-1) / COUNT;
-    for (UIntType i = 0, v = 0; i <= COUNT; ++i, v += STEP) {
+    constexpr UIntType count = 10000000;
+    constexpr UIntType step = UIntType(-1) / count;
+    for (UIntType i = 0, v = 0; i <= count; ++i, v += step) {
       T x = T(FPBits(v));
       if (isnan(x) || isinf(x) || x == T(0.0))
         continue;
 
       T integral;
       T frac = func(x, &integral);
-      ASSERT_TRUE(LIBC_NAMESPACE::fputil::abs(frac) < 1.0l);
-      ASSERT_TRUE(LIBC_NAMESPACE::fputil::trunc(x) == integral);
+      ASSERT_TRUE(__llvm_libc::fputil::abs(frac) < 1.0l);
+      ASSERT_TRUE(__llvm_libc::fputil::trunc(x) == integral);
       ASSERT_TRUE(integral + frac == x);
     }
   }

@@ -1,10 +1,10 @@
-// RUN: %clang_analyze_cc1 -analyzer-checker=core -verify %s
+// RUN: %clang_analyze_cc1 -analyzer-checker=core -analyzer-store region -verify %s
 // expected-no-diagnostics
 
 // Intra-procedural C++ tests.
 
 // Test relaxing function call arguments invalidation to be aware of const
-// arguments.
+// arguments. radar://10595327
 struct InvalidateArgs {
   void ttt(const int &nptr);
   virtual void vttt(const int *nptr);

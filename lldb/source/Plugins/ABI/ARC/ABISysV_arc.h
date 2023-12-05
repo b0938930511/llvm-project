@@ -1,4 +1,4 @@
-//===-- ABISysV_arc.h -------------------------------------------*- C++ -*-===//
+//===-- ArchitectureArc.h ---------------------------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -10,7 +10,7 @@
 #define liblldb_ABISysV_arc_h_
 
 // Other libraries and framework includes
-#include <optional>
+#include <llvm/ADT/Optional.h>
 
 // Project includes
 #include "lldb/Target/ABI.h"
@@ -80,13 +80,15 @@ public:
   static lldb::ABISP CreateInstance(lldb::ProcessSP process_sp,
                                     const lldb_private::ArchSpec &arch);
 
-  static llvm::StringRef GetPluginNameStatic() { return "sysv-arc"; }
+  static lldb_private::ConstString GetPluginNameStatic();
 
   //------------------------------------------------------------------
   // PluginInterface protocol
   //------------------------------------------------------------------
 
-  llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
+  lldb_private::ConstString GetPluginName() override;
+
+  uint32_t GetPluginVersion() override;
 
 private:
   lldb::ValueObjectSP
@@ -97,7 +99,7 @@ private:
 
   using lldb_private::RegInfoBasedABI::RegInfoBasedABI; // Call CreateInstance instead.
 
-  using RegisterFileFlag = std::optional<bool>;
+  using RegisterFileFlag = llvm::Optional<bool>;
   mutable RegisterFileFlag m_is_reg_file_reduced;
 };
 

@@ -6,11 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-// UNSUPPORTED: c++03, c++11, c++14
-// UNSUPPORTED: availability-filesystem-missing
+// UNSUPPORTED: c++03
 
 // These tests require locale for non-char paths
-// UNSUPPORTED: no-localization
+// UNSUPPORTED: libcpp-has-no-localization
 
 // <filesystem>
 
@@ -24,7 +23,8 @@
 // template <class InputIterator>
 //      path& assign(InputIterator first, InputIterator last);
 
-#include <filesystem>
+
+#include "filesystem_include.h"
 #include <type_traits>
 #include <string_view>
 #include <cassert>
@@ -32,12 +32,11 @@
 // On Windows, charset conversions cause allocations in the path class in
 // cases where no allocations are done on other platforms.
 
-#include "../../path_helper.h"
-#include "count_new.h"
-#include "make_string.h"
-#include "test_iterators.h"
 #include "test_macros.h"
-namespace fs = std::filesystem;
+#include "test_iterators.h"
+#include "count_new.h"
+#include "filesystem_test_helper.h"
+
 
 template <class CharT>
 void RunTestCase(MultiStringType const& MS) {
@@ -207,7 +206,7 @@ void test_sfinae() {
     static_assert(has_assign<It>(), "");
   }
   {
-    using It = cpp17_output_iterator<const char*>;
+    using It = output_iterator<const char*>;
     static_assert(!std::is_assignable<path, It>::value, "");
     static_assert(!has_assign<It>(), "");
 
@@ -237,9 +236,7 @@ void RunStringMoveTest(const fs::path::value_type* Expect) {
 int main(int, char**) {
   for (auto const& MS : PathList) {
     RunTestCase<char>(MS);
-#ifndef TEST_HAS_NO_WIDE_CHARACTERS
     RunTestCase<wchar_t>(MS);
-#endif
     RunTestCase<char16_t>(MS);
     RunTestCase<char32_t>(MS);
     RunStringMoveTest(MS);

@@ -23,8 +23,8 @@
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
 #include "llvm/FileCheck/FileCheck.h"
 #include "llvm/InitializePasses.h"
-#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
@@ -189,7 +189,8 @@ static inline bool CheckMachineFunction(const MachineFunction &MF,
   SourceMgr SM;
   SM.AddNewSourceBuffer(MemoryBuffer::getMemBuffer(CheckFileText, "CheckFile"),
                         SMLoc());
-  if (FC.readCheckFile(SM, CheckFileText))
+  Regex PrefixRE = FC.buildCheckPrefixRegex();
+  if (FC.readCheckFile(SM, CheckFileText, PrefixRE))
     return false;
 
   auto OutBuffer = OutputBuf->getBuffer();

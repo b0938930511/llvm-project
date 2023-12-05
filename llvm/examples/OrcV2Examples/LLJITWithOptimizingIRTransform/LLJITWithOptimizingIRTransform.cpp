@@ -13,7 +13,6 @@
 
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/IR/LegacyPassManager.h"
-#include "llvm/Pass.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
@@ -74,6 +73,8 @@ class MyOptimizationTransform {
 public:
   MyOptimizationTransform() : PM(std::make_unique<legacy::PassManager>()) {
     PM->add(createTailCallEliminationPass());
+    PM->add(createFunctionInliningPass());
+    PM->add(createIndVarSimplifyPass());
     PM->add(createCFGSimplificationPass());
   }
 
@@ -110,8 +111,8 @@ int main(int argc, char *argv[]) {
   ExitOnErr(J->addIRModule(ExitOnErr(parseExampleModule(MainMod, "MainMod"))));
 
   // (4) Look up the JIT'd function and call it.
-  auto EntryAddr = ExitOnErr(J->lookup("entry"));
-  auto *Entry = EntryAddr.toPtr<int()>();
+  auto EntrySym = ExitOnErr(J->lookup("entry"));
+  auto *Entry = (int (*)())EntrySym.getAddress();
 
   int Result = Entry();
   outs() << "--- Result ---\n"

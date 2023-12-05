@@ -42,7 +42,4 @@ __attribute__((objc_nonlazy_class))
 @implementation E @end
 
 __attribute__((objc_nonlazy_class))
-@implementation E (MyCat)
--(void) load {
-}
-@end
+@implementation E (MyCat) @end

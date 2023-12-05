@@ -59,7 +59,11 @@ ModuleFile *ModuleManager::lookupByModuleName(StringRef Name) const {
 }
 
 ModuleFile *ModuleManager::lookup(const FileEntry *File) const {
-  return Modules.lookup(File);
+  auto Known = Modules.find(File);
+  if (Known == Modules.end())
+    return nullptr;
+
+  return Known->second;
 }
 
 std::unique_ptr<llvm::MemoryBuffer>
@@ -143,15 +147,15 @@ ModuleManager::addModule(StringRef FileName, ModuleKind Type,
   // being consistent across operating systems and across subsequent accesses
   // to the Modules map.
   auto implicitModuleNamesMatch = [](ModuleKind Kind, const ModuleFile *MF,
-                                     FileEntryRef Entry) -> bool {
+                                     const FileEntry *Entry) -> bool {
     if (Kind != MK_ImplicitModule)
       return true;
-    return Entry.getName() == MF->FileName;
+    return Entry->getName() == MF->FileName;
   };
 
   // Check whether we already loaded this module, before
   if (ModuleFile *ModuleEntry = Modules.lookup(Entry)) {
-    if (implicitModuleNamesMatch(Type, ModuleEntry, *Entry)) {
+    if (implicitModuleNamesMatch(Type, ModuleEntry, Entry)) {
       // Check the stored signature.
       if (checkSignature(ModuleEntry->Signature, ExpectedSignature, ErrorStr))
         return OutOfDate;
@@ -209,7 +213,7 @@ ModuleManager::addModule(StringRef FileName, ModuleKind Type,
       //
       // RequiresNullTerminator is false because module files don't need it, and
       // this allows the file to still be mmapped.
-      Buf = FileMgr.getBufferForFile(*NewModule->File,
+      Buf = FileMgr.getBufferForFile(NewModule->File,
                                      /*IsVolatile=*/true,
                                      /*RequiresNullTerminator=*/false);
     }
@@ -245,7 +249,7 @@ ModuleManager::addModule(StringRef FileName, ModuleKind Type,
   return NewlyLoaded;
 }
 
-void ModuleManager::removeModules(ModuleIterator First) {
+void ModuleManager::removeModules(ModuleIterator First, ModuleMap *modMap) {
   auto Last = end();
   if (First == Last)
     return;
@@ -266,7 +270,8 @@ void ModuleManager::removeModules(ModuleIterator First) {
     I->Imports.remove_if(IsVictim);
     I->ImportedBy.remove_if(IsVictim);
   }
-  llvm::erase_if(Roots, IsVictim);
+  Roots.erase(std::remove_if(Roots.begin(), Roots.end(), IsVictim),
+              Roots.end());
 
   // Remove the modules from the PCH chain.
   for (auto I = First; I != Last; ++I) {
@@ -276,10 +281,19 @@ void ModuleManager::removeModules(ModuleIterator First) {
     }
   }
 
-  // Delete the modules.
-  for (ModuleIterator victim = First; victim != Last; ++victim)
+  // Delete the modules and erase them from the various structures.
+  for (ModuleIterator victim = First; victim != Last; ++victim) {
     Modules.erase(victim->File);
 
+    if (modMap) {
+      StringRef ModuleName = victim->ModuleName;
+      if (Module *mod = modMap->findModule(ModuleName)) {
+        mod->setASTFile(None);
+      }
+    }
+  }
+
+  // Delete the modules.
   Chain.erase(Chain.begin() + (First - begin()), Chain.end());
 }
 
@@ -291,22 +305,23 @@ ModuleManager::addInMemoryBuffer(StringRef FileName,
   InMemoryBuffers[Entry] = std::move(Buffer);
 }
 
-std::unique_ptr<ModuleManager::VisitState> ModuleManager::allocateVisitState() {
+ModuleManager::VisitState *ModuleManager::allocateVisitState() {
   // Fast path: if we have a cached state, use it.
   if (FirstVisitState) {
-    auto Result = std::move(FirstVisitState);
-    FirstVisitState = std::move(Result->NextState);
+    VisitState *Result = FirstVisitState;
+    FirstVisitState = FirstVisitState->NextState;
+    Result->NextState = nullptr;
     return Result;
   }
 
   // Allocate and return a new state.
-  return std::make_unique<VisitState>(size());
+  return new VisitState(size());
 }
 
-void ModuleManager::returnVisitState(std::unique_ptr<VisitState> State) {
+void ModuleManager::returnVisitState(VisitState *State) {
   assert(State->NextState == nullptr && "Visited state is in list?");
-  State->NextState = std::move(FirstVisitState);
-  FirstVisitState = std::move(State);
+  State->NextState = FirstVisitState;
+  FirstVisitState = State;
 }
 
 void ModuleManager::setGlobalIndex(GlobalModuleIndex *Index) {
@@ -336,6 +351,8 @@ ModuleManager::ModuleManager(FileManager &FileMgr,
                              const HeaderSearch &HeaderSearchInfo)
     : FileMgr(FileMgr), ModuleCache(&ModuleCache),
       PCHContainerRdr(PCHContainerRdr), HeaderSearchInfo(HeaderSearchInfo) {}
+
+ModuleManager::~ModuleManager() { delete FirstVisitState; }
 
 void ModuleManager::visit(llvm::function_ref<bool(ModuleFile &M)> Visitor,
                           llvm::SmallPtrSetImpl<ModuleFile *> *ModuleFilesHit) {
@@ -367,23 +384,26 @@ void ModuleManager::visit(llvm::function_ref<bool(ModuleFile &M)> Visitor,
 
       // For any module that this module depends on, push it on the
       // stack (if it hasn't already been marked as visited).
-      for (ModuleFile *M : llvm::reverse(CurrentModule->Imports)) {
+      for (auto M = CurrentModule->Imports.rbegin(),
+                MEnd = CurrentModule->Imports.rend();
+           M != MEnd; ++M) {
         // Remove our current module as an impediment to visiting the
         // module we depend on. If we were the last unvisited module
         // that depends on this particular module, push it into the
         // queue to be visited.
-        unsigned &NumUnusedEdges = UnusedIncomingEdges[M->Index];
+        unsigned &NumUnusedEdges = UnusedIncomingEdges[(*M)->Index];
         if (NumUnusedEdges && (--NumUnusedEdges == 0))
-          Queue.push_back(M);
+          Queue.push_back(*M);
       }
     }
 
     assert(VisitOrder.size() == N && "Visitation order is wrong?");
 
+    delete FirstVisitState;
     FirstVisitState = nullptr;
   }
 
-  auto State = allocateVisitState();
+  VisitState *State = allocateVisitState();
   unsigned VisitNumber = State->NextVisitNumber++;
 
   // If the caller has provided us with a hit-set that came from the global
@@ -435,19 +455,19 @@ void ModuleManager::visit(llvm::function_ref<bool(ModuleFile &M)> Visitor,
     } while (true);
   }
 
-  returnVisitState(std::move(State));
+  returnVisitState(State);
 }
 
 bool ModuleManager::lookupModuleFile(StringRef FileName, off_t ExpectedSize,
                                      time_t ExpectedModTime,
-                                     OptionalFileEntryRef &File) {
-  File = std::nullopt;
+                                     Optional<FileEntryRef> &File) {
+  File = None;
   if (FileName == "-")
     return false;
 
   // Open the file immediately to ensure there is no race between stat'ing and
   // opening the file.
-  OptionalFileEntryRef FileOrErr =
+  Optional<FileEntryRef> FileOrErr =
       expectedToOptional(FileMgr.getFileRef(FileName, /*OpenFile=*/true,
                                             /*CacheFailure=*/false));
   if (!FileOrErr)

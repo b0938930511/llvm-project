@@ -20,7 +20,7 @@
 namespace llvm {
 class DefInit;
 class Record;
-} // namespace llvm
+} // end namespace llvm
 
 namespace mlir {
 namespace tblgen {
@@ -29,9 +29,8 @@ namespace tblgen {
 // TableGen.
 class TypeConstraint : public Constraint {
 public:
-  using Constraint::Constraint;
-
-  TypeConstraint(const llvm::DefInit *record);
+  explicit TypeConstraint(const llvm::Record *record);
+  explicit TypeConstraint(const llvm::DefInit *init);
 
   static bool classof(const Constraint *c) { return c->getKind() == CK_Type; }
 
@@ -41,20 +40,13 @@ public:
   // Returns true if this is a variadic type constraint.
   bool isVariadic() const;
 
-  // Returns true if this is a nested variadic type constraint.
-  bool isVariadicOfVariadic() const;
-
-  // Return the segment size attribute used if this is a variadic of variadic
-  // constraint. Asserts isVariadicOfVariadic() is true.
-  StringRef getVariadicOfVariadicSegmentSizeAttr() const;
-
   // Returns true if this is a variable length type constraint. This is either
   // variadic or optional.
   bool isVariableLength() const { return isOptional() || isVariadic(); }
 
   // Returns the builder call for this constraint if this is a buildable type,
-  // returns std::nullopt otherwise.
-  std::optional<StringRef> getBuilderCall() const;
+  // returns None otherwise.
+  Optional<StringRef> getBuilderCall() const;
 
   // Return the C++ class name for this type (which may just be ::mlir::Type).
   std::string getCPPClassName() const;
@@ -65,11 +57,14 @@ class Type : public TypeConstraint {
 public:
   explicit Type(const llvm::Record *record);
 
+  // Returns the description of the type.
+  StringRef getDescription() const;
+
   // Returns the dialect for the type if defined.
   Dialect getDialect() const;
 };
 
-} // namespace tblgen
-} // namespace mlir
+} // end namespace tblgen
+} // end namespace mlir
 
 #endif // MLIR_TABLEGEN_TYPE_H_

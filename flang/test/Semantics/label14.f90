@@ -1,9 +1,9 @@
 ! Tests implemented for this standard
-! 11.1.4 - 4 It is permissible to branch to an end-block-stmt only within its
+! 11.1.4 - 4 It is permissible to branch to and end-block-stmt only withinh its
 !            Block Construct
 
-! RUN: not %flang_fc1 -fsyntax-only %s 2>&1 | FileCheck %s
-! CHECK: Label '20' is in a construct that prevents its use as a branch target here
+! RUN: %flang_fc1 -fsyntax-only %s 2>&1 | FileCheck %s
+! CHECK: Label '20' is not in scope
 
 subroutine s1
   block

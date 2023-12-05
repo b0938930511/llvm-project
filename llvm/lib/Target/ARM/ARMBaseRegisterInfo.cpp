@@ -63,26 +63,28 @@ const MCPhysReg*
 ARMBaseRegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
   const ARMSubtarget &STI = MF->getSubtarget<ARMSubtarget>();
   bool UseSplitPush = STI.splitFramePushPop(*MF);
-  const Function &F = MF->getFunction();
+  const MCPhysReg *RegList =
+      STI.isTargetDarwin()
+          ? CSR_iOS_SaveList
+          : (UseSplitPush ? CSR_AAPCS_SplitPush_SaveList : CSR_AAPCS_SaveList);
 
+  const Function &F = MF->getFunction();
   if (F.getCallingConv() == CallingConv::GHC) {
     // GHC set of callee saved regs is empty as all those regs are
     // used for passing STG regs around
     return CSR_NoRegs_SaveList;
-  } else if (STI.splitFramePointerPush(*MF)) {
-    return CSR_Win_SplitFP_SaveList;
   } else if (F.getCallingConv() == CallingConv::CFGuard_Check) {
     return CSR_Win_AAPCS_CFGuard_Check_SaveList;
   } else if (F.getCallingConv() == CallingConv::SwiftTail) {
     return STI.isTargetDarwin()
                ? CSR_iOS_SwiftTail_SaveList
-               : (UseSplitPush ? CSR_ATPCS_SplitPush_SwiftTail_SaveList
+               : (UseSplitPush ? CSR_AAPCS_SplitPush_SwiftTail_SaveList
                                : CSR_AAPCS_SwiftTail_SaveList);
   } else if (F.hasFnAttribute("interrupt")) {
     if (STI.isMClass()) {
       // M-class CPUs have hardware which saves the registers needed to allow a
       // function conforming to the AAPCS to function as a handler.
-      return UseSplitPush ? CSR_ATPCS_SplitPush_SaveList : CSR_AAPCS_SaveList;
+      return UseSplitPush ? CSR_AAPCS_SplitPush_SaveList : CSR_AAPCS_SaveList;
     } else if (F.getFnAttribute("interrupt").getValueAsString() == "FIQ") {
       // Fast interrupt mode gives the handler a private copy of R8-R14, so less
       // need to be saved to restore user-mode state.
@@ -99,7 +101,7 @@ ARMBaseRegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
     if (STI.isTargetDarwin())
       return CSR_iOS_SwiftError_SaveList;
 
-    return UseSplitPush ? CSR_ATPCS_SplitPush_SwiftError_SaveList :
+    return UseSplitPush ? CSR_AAPCS_SplitPush_SwiftError_SaveList :
       CSR_AAPCS_SwiftError_SaveList;
   }
 
@@ -107,15 +109,7 @@ ARMBaseRegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
     return MF->getInfo<ARMFunctionInfo>()->isSplitCSR()
                ? CSR_iOS_CXX_TLS_PE_SaveList
                : CSR_iOS_CXX_TLS_SaveList;
-
-  if (STI.isTargetDarwin())
-    return CSR_iOS_SaveList;
-
-  if (UseSplitPush)
-    return STI.createAAPCSFrameChain() ? CSR_AAPCS_SplitPush_SaveList
-                                       : CSR_ATPCS_SplitPush_SaveList;
-
-  return CSR_AAPCS_SaveList;
+  return RegList;
 }
 
 const MCPhysReg *ARMBaseRegisterInfo::getCalleeSavedRegsViaCopy(
@@ -222,8 +216,8 @@ getReservedRegs(const MachineFunction &MF) const {
   }
   const TargetRegisterClass &RC = ARM::GPRPairRegClass;
   for (unsigned Reg : RC)
-    for (MCPhysReg S : subregs(Reg))
-      if (Reserved.test(S))
+    for (MCSubRegIterator SI(Reg, this); SI.isValid(); ++SI)
+      if (Reserved.test(*SI))
         markSuperRegs(Reserved, Reg);
   // For v8.1m architecture
   markSuperRegs(Reserved, ARM::ZR);
@@ -244,7 +238,7 @@ bool ARMBaseRegisterInfo::isInlineAsmReadOnlyReg(const MachineFunction &MF,
 
   BitVector Reserved(getNumRegs());
   markSuperRegs(Reserved, ARM::PC);
-  if (TFI->isFPReserved(MF))
+  if (TFI->hasFP(MF))
     markSuperRegs(Reserved, STI.getFramePointerReg());
   if (hasBasePointer(MF))
     markSuperRegs(Reserved, BasePtr);
@@ -269,13 +263,6 @@ ARMBaseRegisterInfo::getLargestLegalSuperClass(const TargetRegisterClass *RC,
     case ARM::QQQQPRRegClassID:
       if (MF.getSubtarget<ARMSubtarget>().hasNEON())
         return Super;
-      break;
-    case ARM::MQPRRegClassID:
-    case ARM::MQQPRRegClassID:
-    case ARM::MQQQQPRRegClassID:
-      if (MF.getSubtarget<ARMSubtarget>().hasMVEIntegerOps())
-        return Super;
-      break;
     }
     Super = *I++;
   } while (Super);
@@ -326,9 +313,9 @@ ARMBaseRegisterInfo::getRegPressureLimit(const TargetRegisterClass *RC,
 // Get the other register in a GPRPair.
 static MCPhysReg getPairedGPR(MCPhysReg Reg, bool Odd,
                               const MCRegisterInfo *RI) {
-  for (MCPhysReg Super : RI->superregs(Reg))
-    if (ARM::GPRPairRegClass.contains(Super))
-      return RI->getSubReg(Super, Odd ? ARM::gsub_1 : ARM::gsub_0);
+  for (MCSuperRegIterator Supers(Reg, RI); Supers.isValid(); ++Supers)
+    if (ARM::GPRPairRegClass.contains(*Supers))
+      return RI->getSubReg(*Supers, Odd ? ARM::gsub_1 : ARM::gsub_0);
   return 0;
 }
 
@@ -338,7 +325,7 @@ bool ARMBaseRegisterInfo::getRegAllocationHints(
     SmallVectorImpl<MCPhysReg> &Hints, const MachineFunction &MF,
     const VirtRegMap *VRM, const LiveRegMatrix *Matrix) const {
   const MachineRegisterInfo &MRI = MF.getRegInfo();
-  std::pair<unsigned, Register> Hint = MRI.getRegAllocationHint(VirtReg);
+  std::pair<Register, Register> Hint = MRI.getRegAllocationHint(VirtReg);
 
   unsigned Odd;
   switch (Hint.first) {
@@ -391,7 +378,7 @@ bool ARMBaseRegisterInfo::getRegAllocationHints(
 void ARMBaseRegisterInfo::updateRegAllocHint(Register Reg, Register NewReg,
                                              MachineFunction &MF) const {
   MachineRegisterInfo *MRI = &MF.getRegInfo();
-  std::pair<unsigned, Register> Hint = MRI->getRegAllocationHint(Reg);
+  std::pair<Register, Register> Hint = MRI->getRegAllocationHint(Reg);
   if ((Hint.first == ARMRI::RegPairOdd || Hint.first == ARMRI::RegPairEven) &&
       Hint.second.isVirtual()) {
     // If 'Reg' is one of the even / odd register pair and it's now changed
@@ -403,7 +390,7 @@ void ARMBaseRegisterInfo::updateRegAllocHint(Register Reg, Register NewReg,
     // Make sure the pair has not already divorced.
     if (Hint.second == Reg) {
       MRI->setRegAllocationHint(OtherReg, Hint.first, NewReg);
-      if (NewReg.isVirtual())
+      if (Register::isVirtualRegister(NewReg))
         MRI->setRegAllocationHint(NewReg,
                                   Hint.first == ARMRI::RegPairOdd
                                       ? ARMRI::RegPairEven
@@ -536,8 +523,6 @@ getFrameIndexInstrOffset(const MachineInstr *MI, int Idx) const {
   unsigned ImmIdx = 0;
   switch (AddrMode) {
   case ARMII::AddrModeT2_i8:
-  case ARMII::AddrModeT2_i8neg:
-  case ARMII::AddrModeT2_i8pos:
   case ARMII::AddrModeT2_i12:
   case ARMII::AddrMode_i12:
     InstrOffs = MI->getOperand(Idx+1).getImm();
@@ -736,8 +721,6 @@ bool ARMBaseRegisterInfo::isFrameOffsetLegal(const MachineInstr *MI,
   bool isSigned = true;
   switch (AddrMode) {
   case ARMII::AddrModeT2_i8:
-  case ARMII::AddrModeT2_i8pos:
-  case ARMII::AddrModeT2_i8neg:
   case ARMII::AddrModeT2_i12:
     // i8 supports only negative, and i12 supports only positive, so
     // based on Offset sign, consider the appropriate instruction
@@ -786,7 +769,7 @@ bool ARMBaseRegisterInfo::isFrameOffsetLegal(const MachineInstr *MI,
   return false;
 }
 
-bool
+void
 ARMBaseRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
                                          int SPAdj, unsigned FIOperandNum,
                                          RegScavenger *RS) const {
@@ -830,7 +813,7 @@ ARMBaseRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
     Done = rewriteT2FrameIndex(MI, FIOperandNum, FrameReg, Offset, TII, this);
   }
   if (Done)
-    return false;
+    return;
 
   // If we get here, the immediate doesn't fit into the instruction.  We folded
   // as much as possible above, handle the rest, providing a register that is
@@ -855,7 +838,8 @@ ARMBaseRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   const TargetRegisterClass *RegClass =
       TII.getRegClass(MCID, FIOperandNum, this, *MI.getParent()->getParent());
 
-  if (Offset == 0 && (FrameReg.isVirtual() || RegClass->contains(FrameReg)))
+  if (Offset == 0 &&
+      (Register::isVirtualRegister(FrameReg) || RegClass->contains(FrameReg)))
     // Must be addrmode4/6.
     MI.getOperand(FIOperandNum).ChangeToRegister(FrameReg, false, false, false);
   else {
@@ -871,7 +855,6 @@ ARMBaseRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
     // Update the original instruction to use the scratch register.
     MI.getOperand(FIOperandNum).ChangeToRegister(ScratchReg, false, false,true);
   }
-  return false;
 }
 
 bool ARMBaseRegisterInfo::shouldCoalesce(MachineInstr *MI,

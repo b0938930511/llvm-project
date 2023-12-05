@@ -18,6 +18,6 @@
 
 #include "html-multifile-diagnostics.h"
 
-void f0(void) {
+void f0() {
   f1((int*)0);
 }

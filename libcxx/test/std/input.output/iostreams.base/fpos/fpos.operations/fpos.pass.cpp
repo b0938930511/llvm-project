@@ -6,16 +6,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-// <ios>
+#include "test_macros.h"
+
+#include <string>
+#include <cassert>
+#include <type_traits>
+
+// <string>
 
 // template <class stateT>
 // class fpos;
-
-#include <cassert>
-#include <ios>
-#include <type_traits>
-
-#include "test_macros.h"
 
 template<class T, class = void>
 struct is_equality_comparable : std::false_type { };

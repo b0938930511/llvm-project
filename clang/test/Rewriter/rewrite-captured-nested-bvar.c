@@ -1,11 +1,12 @@
 // RUN: %clang_cc1 -x c -fblocks -fms-extensions -rewrite-objc %s -o %t-rw.cpp
 // RUN: FileCheck --input-file=%t-rw.cpp %s
+// rdar://9006279
 
 void q(void (^p)(void)) {
     p();
 }
 
-void f(void) {
+void f() {
     __block char BYREF_VAR_CHECK = 'a';
     __block char d = 'd';
     q(^{
@@ -24,7 +25,7 @@ void f(void) {
     });
 }
 
-int main(void) {
+int main() {
     f();
     return 0;
 }

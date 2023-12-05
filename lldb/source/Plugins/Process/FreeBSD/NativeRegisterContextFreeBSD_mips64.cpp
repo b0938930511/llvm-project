@@ -15,14 +15,12 @@
 #include "lldb/Utility/Status.h"
 
 #include "Plugins/Process/FreeBSD/NativeProcessFreeBSD.h"
-#include "Plugins/Process/Utility/lldb-mips-freebsd-register-enums.h"
 
 // clang-format off
 #include <sys/param.h>
 #include <sys/ptrace.h>
 #include <sys/types.h>
 // clang-format on
-#include <optional>
 
 using namespace lldb;
 using namespace lldb_private;
@@ -61,32 +59,11 @@ uint32_t NativeRegisterContextFreeBSD_mips64::GetUserRegisterCount() const {
   return count;
 }
 
-std::optional<NativeRegisterContextFreeBSD_mips64::RegSetKind>
-NativeRegisterContextFreeBSD_mips64::GetSetForNativeRegNum(
-    uint32_t reg_num) const {
-  switch (GetRegisterInfoInterface().GetTargetArchitecture().GetMachine()) {
-  case llvm::Triple::mips64:
-    if (reg_num >= k_first_gpr_mips64 && reg_num <= k_last_gpr_mips64)
-      return GPRegSet;
-    if (reg_num >= k_first_fpr_mips64 && reg_num <= k_last_fpr_mips64)
-      return FPRegSet;
-    break;
-  default:
-    llvm_unreachable("Unhandled target architecture.");
-  }
-
-  llvm_unreachable("Register does not belong to any register set");
-}
-
 Status NativeRegisterContextFreeBSD_mips64::ReadRegisterSet(RegSetKind set) {
   switch (set) {
   case GPRegSet:
     return NativeProcessFreeBSD::PtraceWrapper(PT_GETREGS, m_thread.GetID(),
                                                m_reg_data.data());
-  case FPRegSet:
-    return NativeProcessFreeBSD::PtraceWrapper(
-        PT_GETFPREGS, m_thread.GetID(),
-        m_reg_data.data() + GetRegisterInfo().GetGPRSize());
   }
   llvm_unreachable("NativeRegisterContextFreeBSD_mips64::ReadRegisterSet");
 }
@@ -96,10 +73,6 @@ Status NativeRegisterContextFreeBSD_mips64::WriteRegisterSet(RegSetKind set) {
   case GPRegSet:
     return NativeProcessFreeBSD::PtraceWrapper(PT_SETREGS, m_thread.GetID(),
                                                m_reg_data.data());
-  case FPRegSet:
-    return NativeProcessFreeBSD::PtraceWrapper(
-        PT_SETFPREGS, m_thread.GetID(),
-        m_reg_data.data() + GetRegisterInfo().GetGPRSize());
   }
   llvm_unreachable("NativeRegisterContextFreeBSD_mips64::WriteRegisterSet");
 }
@@ -121,16 +94,7 @@ NativeRegisterContextFreeBSD_mips64::ReadRegister(const RegisterInfo *reg_info,
                                                ? reg_info->name
                                                : "<unknown register>");
 
-  std::optional<RegSetKind> opt_set = GetSetForNativeRegNum(reg);
-  if (!opt_set) {
-    // This is likely an internal register for lldb use only and should not be
-    // directly queried.
-    error.SetErrorStringWithFormat("register \"%s\" is in unrecognized set",
-                                   reg_info->name);
-    return error;
-  }
-
-  RegSetKind set = *opt_set;
+  RegSetKind set = GPRegSet;
   error = ReadRegisterSet(set);
   if (error.Fail())
     return error;
@@ -155,16 +119,7 @@ Status NativeRegisterContextFreeBSD_mips64::WriteRegister(
                                                ? reg_info->name
                                                : "<unknown register>");
 
-  std::optional<RegSetKind> opt_set = GetSetForNativeRegNum(reg);
-  if (!opt_set) {
-    // This is likely an internal register for lldb use only and should not be
-    // directly queried.
-    error.SetErrorStringWithFormat("register \"%s\" is in unrecognized set",
-                                   reg_info->name);
-    return error;
-  }
-
-  RegSetKind set = *opt_set;
+  RegSetKind set = GPRegSet;
   error = ReadRegisterSet(set);
   if (error.Fail())
     return error;
@@ -177,14 +132,10 @@ Status NativeRegisterContextFreeBSD_mips64::WriteRegister(
 }
 
 Status NativeRegisterContextFreeBSD_mips64::ReadAllRegisterValues(
-    lldb::WritableDataBufferSP &data_sp) {
+    lldb::DataBufferSP &data_sp) {
   Status error;
 
   error = ReadRegisterSet(GPRegSet);
-  if (error.Fail())
-    return error;
-
-  error = ReadRegisterSet(FPRegSet);
   if (error.Fail())
     return error;
 
@@ -214,7 +165,7 @@ Status NativeRegisterContextFreeBSD_mips64::WriteAllRegisterValues(
     return error;
   }
 
-  const uint8_t *src = data_sp->GetBytes();
+  uint8_t *src = data_sp->GetBytes();
   if (src == nullptr) {
     error.SetErrorStringWithFormat("NativeRegisterContextFreeBSD_mips64::%s "
                                    "DataBuffer::GetBytes() returned a null "
@@ -224,11 +175,7 @@ Status NativeRegisterContextFreeBSD_mips64::WriteAllRegisterValues(
   }
   ::memcpy(m_reg_data.data(), src, m_reg_data.size());
 
-  error = WriteRegisterSet(GPRegSet);
-  if (error.Fail())
-    return error;
-
-  return WriteRegisterSet(FPRegSet);
+  return WriteRegisterSet(GPRegSet);
 }
 
 llvm::Error NativeRegisterContextFreeBSD_mips64::CopyHardwareWatchpointsFrom(

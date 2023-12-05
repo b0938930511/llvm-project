@@ -5,7 +5,7 @@
 
 @import CmdLine;
 
-void test(void) {
+void test() {
 #ifdef FOO_RETURNS_INT_PTR
   int *ip = foo();
 #else

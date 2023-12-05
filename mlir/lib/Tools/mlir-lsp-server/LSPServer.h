@@ -18,9 +18,22 @@ namespace lsp {
 class JSONTransport;
 class MLIRServer;
 
-/// Run the main loop of the LSP server using the given MLIR server and
-/// transport.
-LogicalResult runMlirLSPServer(MLIRServer &server, JSONTransport &transport);
+/// This class represents the main LSP server, and handles communication with
+/// the LSP client.
+class LSPServer {
+public:
+  /// Construct a new language server with the given MLIR server.
+  LSPServer(MLIRServer &server, JSONTransport &transport);
+  ~LSPServer();
+
+  /// Run the main loop of the server.
+  LogicalResult run();
+
+private:
+  struct Impl;
+
+  std::unique_ptr<Impl> impl;
+};
 } // namespace lsp
 } // namespace mlir
 

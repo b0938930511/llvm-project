@@ -361,7 +361,8 @@ void RegPressureTracker::initLiveThru(const RegPressureTracker &RPTracker) {
   assert(isBottomClosed() && "need bottom-up tracking to intialize.");
   for (const RegisterMaskPair &Pair : P.LiveOutRegs) {
     Register RegUnit = Pair.RegUnit;
-    if (RegUnit.isVirtual() && !RPTracker.hasUntiedDef(RegUnit))
+    if (Register::isVirtualRegister(RegUnit)
+        && !RPTracker.hasUntiedDef(RegUnit))
       increaseSetPressure(LiveThruPressure, *MRI, RegUnit,
                           LaneBitmask::getNone(), Pair.LaneMask);
   }
@@ -521,8 +522,9 @@ class RegisterOperandsCollector {
     if (Reg.isVirtual()) {
       addRegLanes(RegUnits, RegisterMaskPair(Reg, LaneBitmask::getAll()));
     } else if (MRI.isAllocatable(Reg)) {
-      for (MCRegUnit Unit : TRI.regunits(Reg.asMCReg()))
-        addRegLanes(RegUnits, RegisterMaskPair(Unit, LaneBitmask::getAll()));
+      for (MCRegUnitIterator Units(Reg.asMCReg(), &TRI); Units.isValid();
+           ++Units)
+        addRegLanes(RegUnits, RegisterMaskPair(*Units, LaneBitmask::getAll()));
     }
   }
 
@@ -556,8 +558,9 @@ class RegisterOperandsCollector {
                              : MRI.getMaxLaneMaskForVReg(Reg);
       addRegLanes(RegUnits, RegisterMaskPair(Reg, LaneMask));
     } else if (MRI.isAllocatable(Reg)) {
-      for (MCRegUnit Unit : TRI.regunits(Reg.asMCReg()))
-        addRegLanes(RegUnits, RegisterMaskPair(Unit, LaneBitmask::getAll()));
+      for (MCRegUnitIterator Units(Reg.asMCReg(), &TRI); Units.isValid();
+           ++Units)
+        addRegLanes(RegUnits, RegisterMaskPair(*Units, LaneBitmask::getAll()));
     }
   }
 };
@@ -578,7 +581,7 @@ void RegisterOperands::collect(const MachineInstr &MI,
 void RegisterOperands::detectDeadDefs(const MachineInstr &MI,
                                       const LiveIntervals &LIS) {
   SlotIndex SlotIdx = LIS.getInstructionIndex(MI);
-  for (auto *RI = Defs.begin(); RI != Defs.end(); /*empty*/) {
+  for (auto RI = Defs.begin(); RI != Defs.end(); /*empty*/) {
     Register Reg = RI->RegUnit;
     const LiveRange *LR = getLiveRange(LIS, Reg);
     if (LR != nullptr) {
@@ -599,14 +602,14 @@ void RegisterOperands::adjustLaneLiveness(const LiveIntervals &LIS,
                                           const MachineRegisterInfo &MRI,
                                           SlotIndex Pos,
                                           MachineInstr *AddFlagsMI) {
-  for (auto *I = Defs.begin(); I != Defs.end();) {
+  for (auto I = Defs.begin(); I != Defs.end(); ) {
     LaneBitmask LiveAfter = getLiveLanesAt(LIS, MRI, true, I->RegUnit,
                                            Pos.getDeadSlot());
     // If the def is all that is live after the instruction, then in case
     // of a subregister def we need a read-undef flag.
     Register RegUnit = I->RegUnit;
-    if (RegUnit.isVirtual() && AddFlagsMI != nullptr &&
-        (LiveAfter & ~I->LaneMask).none())
+    if (Register::isVirtualRegister(RegUnit) &&
+        AddFlagsMI != nullptr && (LiveAfter & ~I->LaneMask).none())
       AddFlagsMI->setRegisterDefReadUndef(RegUnit);
 
     LaneBitmask ActualDef = I->LaneMask & LiveAfter;
@@ -617,7 +620,7 @@ void RegisterOperands::adjustLaneLiveness(const LiveIntervals &LIS,
       ++I;
     }
   }
-  for (auto *I = Uses.begin(); I != Uses.end();) {
+  for (auto I = Uses.begin(); I != Uses.end(); ) {
     LaneBitmask LiveBefore = getLiveLanesAt(LIS, MRI, true, I->RegUnit,
                                             Pos.getBaseIndex());
     LaneBitmask LaneMask = I->LaneMask & LiveBefore;
@@ -631,7 +634,7 @@ void RegisterOperands::adjustLaneLiveness(const LiveIntervals &LIS,
   if (AddFlagsMI != nullptr) {
     for (const RegisterMaskPair &P : DeadDefs) {
       Register RegUnit = P.RegUnit;
-      if (!RegUnit.isVirtual())
+      if (!Register::isVirtualRegister(RegUnit))
         continue;
       LaneBitmask LiveAfter = getLiveLanesAt(LIS, MRI, true, RegUnit,
                                              Pos.getDeadSlot());
@@ -840,7 +843,7 @@ void RegPressureTracker::recede(const RegisterOperands &RegOpers,
   if (TrackUntiedDefs) {
     for (const RegisterMaskPair &Def : RegOpers.Defs) {
       Register RegUnit = Def.RegUnit;
-      if (RegUnit.isVirtual() &&
+      if (Register::isVirtualRegister(RegUnit) &&
           (LiveRegs.contains(RegUnit) & Def.LaneMask).none())
         UntiedDefs.insert(RegUnit);
     }

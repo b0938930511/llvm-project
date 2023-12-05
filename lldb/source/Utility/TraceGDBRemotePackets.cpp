@@ -48,7 +48,7 @@ TraceStopRequest::TraceStopRequest(llvm::StringRef type,
     : type(type) {
   tids.emplace();
   for (lldb::tid_t tid : tids_)
-    tids->push_back(tid);
+    tids->push_back(static_cast<int64_t>(tid));
 }
 
 bool TraceStopRequest::IsProcessTracing() const { return !(bool)tids; }
@@ -87,48 +87,24 @@ json::Value toJSON(const TraceBinaryData &packet) {
 bool fromJSON(const json::Value &value, TraceThreadState &packet, Path path) {
   ObjectMapper o(value, path);
   return o && o.map("tid", packet.tid) &&
-         o.map("binaryData", packet.binary_data);
+         o.map("binaryData", packet.binaryData);
 }
 
 json::Value toJSON(const TraceThreadState &packet) {
   return json::Value(
-      Object{{"tid", packet.tid}, {"binaryData", packet.binary_data}});
+      Object{{"tid", packet.tid}, {"binaryData", packet.binaryData}});
 }
 
 bool fromJSON(const json::Value &value, TraceGetStateResponse &packet,
               Path path) {
   ObjectMapper o(value, path);
-  return o && o.map("tracedThreads", packet.traced_threads) &&
-         o.map("processBinaryData", packet.process_binary_data) &&
-         o.map("cpus", packet.cpus) && o.map("warnings", packet.warnings);
+  return o && o.map("tracedThreads", packet.tracedThreads) &&
+         o.map("processBinaryData", packet.processBinaryData);
 }
 
 json::Value toJSON(const TraceGetStateResponse &packet) {
-  return json::Value(Object{{"tracedThreads", packet.traced_threads},
-                            {"processBinaryData", packet.process_binary_data},
-                            {"cpus", packet.cpus},
-                            {"warnings", packet.warnings}});
-}
-
-void TraceGetStateResponse::AddWarning(StringRef warning) {
-  if (!warnings)
-    warnings.emplace();
-  warnings->push_back(warning.data());
-}
-
-bool fromJSON(const json::Value &value, TraceCpuState &packet,
-              json::Path path) {
-  ObjectMapper o(value, path);
-  uint64_t cpu_id;
-  if (!(o && o.map("id", cpu_id) && o.map("binaryData", packet.binary_data)))
-    return false;
-  packet.id = static_cast<lldb::cpu_id_t>(cpu_id);
-  return true;
-}
-
-json::Value toJSON(const TraceCpuState &packet) {
-  return json::Value(
-      Object{{"id", packet.id}, {"binaryData", packet.binary_data}});
+  return json::Value(Object{{"tracedThreads", packet.tracedThreads},
+                            {"processBinaryData", packet.processBinaryData}});
 }
 /// \}
 
@@ -137,21 +113,17 @@ json::Value toJSON(const TraceCpuState &packet) {
 json::Value toJSON(const TraceGetBinaryDataRequest &packet) {
   return json::Value(Object{{"type", packet.type},
                             {"kind", packet.kind},
+                            {"offset", packet.offset},
                             {"tid", packet.tid},
-                            {"cpuId", packet.cpu_id}});
+                            {"size", packet.size}});
 }
 
 bool fromJSON(const json::Value &value, TraceGetBinaryDataRequest &packet,
               Path path) {
   ObjectMapper o(value, path);
-  std::optional<uint64_t> cpu_id;
-  if (!(o && o.map("type", packet.type) && o.map("kind", packet.kind) &&
-        o.map("tid", packet.tid) && o.map("cpuId", cpu_id)))
-    return false;
-
-  if (cpu_id)
-    packet.cpu_id = static_cast<lldb::cpu_id_t>(*cpu_id);
-  return true;
+  return o && o.map("type", packet.type) && o.map("kind", packet.kind) &&
+         o.map("tid", packet.tid) && o.map("offset", packet.offset) &&
+         o.map("size", packet.size);
 }
 /// \}
 

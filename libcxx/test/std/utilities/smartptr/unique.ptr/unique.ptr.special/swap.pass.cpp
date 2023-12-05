@@ -22,45 +22,31 @@ struct A
 {
     int state_;
     static int count;
-    TEST_CONSTEXPR_CXX23 A() : state_(0) {
-      if (!TEST_IS_CONSTANT_EVALUATED)
-        ++count;
-    }
-    TEST_CONSTEXPR_CXX23 explicit A(int i) : state_(i) {
-      if (!TEST_IS_CONSTANT_EVALUATED)
-        ++count;
-    }
-    TEST_CONSTEXPR_CXX23 A(const A& a) : state_(a.state_) {
-      if (!TEST_IS_CONSTANT_EVALUATED)
-        ++count;
-    }
-    TEST_CONSTEXPR_CXX23 A& operator=(const A& a) {
-      state_ = a.state_;
-      return *this;
-    }
-    TEST_CONSTEXPR_CXX23 ~A() {
-      if (!TEST_IS_CONSTANT_EVALUATED)
-        --count;
-    }
+    A() : state_(0) {++count;}
+    explicit A(int i) : state_(i) {++count;}
+    A(const A& a) : state_(a.state_) {++count;}
+    A& operator=(const A& a) {state_ = a.state_; return *this;}
+    ~A() {--count;}
 
-    friend TEST_CONSTEXPR_CXX23 bool operator==(const A& x, const A& y) { return x.state_ == y.state_; }
+    friend bool operator==(const A& x, const A& y)
+        {return x.state_ == y.state_;}
 };
 
 int A::count = 0;
 
 template <class T>
 struct NonSwappableDeleter {
-  TEST_CONSTEXPR_CXX23 explicit NonSwappableDeleter(int) {}
-  TEST_CONSTEXPR_CXX23 NonSwappableDeleter& operator=(NonSwappableDeleter const&) { return *this; }
-  TEST_CONSTEXPR_CXX23 void operator()(T*) const {}
-
+  explicit NonSwappableDeleter(int) {}
+  NonSwappableDeleter& operator=(NonSwappableDeleter const&) { return *this; }
+  void operator()(T*) const {}
 private:
   NonSwappableDeleter(NonSwappableDeleter const&);
 
 };
 
-TEST_CONSTEXPR_CXX23 bool test() {
-  {
+int main(int, char**)
+{
+    {
     A* p1 = new A(1);
     std::unique_ptr<A, Deleter<A> > s1(p1, Deleter<A>(1));
     A* p2 = new A(2);
@@ -78,12 +64,10 @@ TEST_CONSTEXPR_CXX23 bool test() {
     assert(s2.get() == p1);
     assert(*s2 == A(1));
     assert(s2.get_deleter().state() == 1);
-    if (!TEST_IS_CONSTANT_EVALUATED)
-      assert(A::count == 2);
-  }
-  if (!TEST_IS_CONSTANT_EVALUATED)
+    assert(A::count == 2);
+    }
     assert(A::count == 0);
-  {
+    {
     A* p1 = new A[3];
     std::unique_ptr<A[], Deleter<A[]> > s1(p1, Deleter<A[]>(1));
     A* p2 = new A[3];
@@ -97,10 +81,8 @@ TEST_CONSTEXPR_CXX23 bool test() {
     assert(s1.get_deleter().state() == 2);
     assert(s2.get() == p1);
     assert(s2.get_deleter().state() == 1);
-    if (!TEST_IS_CONSTANT_EVALUATED)
-      assert(A::count == 6);
-  }
-  if (!TEST_IS_CONSTANT_EVALUATED)
+    assert(A::count == 6);
+    }
     assert(A::count == 0);
 #if TEST_STD_VER >= 11
     {
@@ -115,15 +97,6 @@ TEST_CONSTEXPR_CXX23 bool test() {
         std::unique_ptr<int, D&> p2(&y, d);
         std::swap(p, p2);
     }
-#endif
-
-    return true;
-}
-
-int main(int, char**) {
-  test();
-#if TEST_STD_VER >= 23
-  static_assert(test());
 #endif
 
   return 0;

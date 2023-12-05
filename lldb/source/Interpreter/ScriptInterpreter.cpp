@@ -21,15 +21,17 @@
 #include <cstdio>
 #include <cstdlib>
 #include <memory>
-#include <optional>
 #include <string>
 
 using namespace lldb;
 using namespace lldb_private;
 
-ScriptInterpreter::ScriptInterpreter(Debugger &debugger,
-                                     lldb::ScriptLanguage script_lang)
-    : m_debugger(debugger), m_script_lang(script_lang) {}
+ScriptInterpreter::ScriptInterpreter(
+    Debugger &debugger, lldb::ScriptLanguage script_lang,
+    lldb::ScriptedProcessInterfaceUP scripted_process_interface_up)
+    : m_debugger(debugger), m_script_lang(script_lang),
+      m_scripted_process_interface_up(
+          std::move(scripted_process_interface_up)) {}
 
 void ScriptInterpreter::CollectDataForBreakpointCommandCallback(
     std::vector<std::reference_wrapper<BreakpointOptions>> &bp_options_vec,
@@ -42,10 +44,6 @@ void ScriptInterpreter::CollectDataForWatchpointCommandCallback(
     WatchpointOptions *bp_options, CommandReturnObject &result) {
   result.AppendError(
       "This script interpreter does not support watchpoint callbacks.");
-}
-
-StructuredData::DictionarySP ScriptInterpreter::GetInterpreterInfo() {
-  return nullptr;
 }
 
 bool ScriptInterpreter::LoadScriptingModule(const char *filename,
@@ -77,36 +75,12 @@ ScriptInterpreter::GetDataExtractorFromSBData(const lldb::SBData &data) const {
   return data.m_opaque_sp;
 }
 
-lldb::BreakpointSP ScriptInterpreter::GetOpaqueTypeFromSBBreakpoint(
-    const lldb::SBBreakpoint &breakpoint) const {
-  return breakpoint.m_opaque_wp.lock();
-}
-
-lldb::ProcessAttachInfoSP ScriptInterpreter::GetOpaqueTypeFromSBAttachInfo(
-    const lldb::SBAttachInfo &attach_info) const {
-  return attach_info.m_opaque_sp;
-}
-
-lldb::ProcessLaunchInfoSP ScriptInterpreter::GetOpaqueTypeFromSBLaunchInfo(
-    const lldb::SBLaunchInfo &launch_info) const {
-  return std::make_shared<ProcessLaunchInfo>(
-      *reinterpret_cast<ProcessLaunchInfo *>(launch_info.m_opaque_sp.get()));
-}
-
 Status
 ScriptInterpreter::GetStatusFromSBError(const lldb::SBError &error) const {
   if (error.m_opaque_up)
-    return *error.m_opaque_up;
+    return *error.m_opaque_up.get();
 
   return Status();
-}
-
-std::optional<MemoryRegionInfo>
-ScriptInterpreter::GetOpaqueTypeFromSBMemoryRegionInfo(
-    const lldb::SBMemoryRegionInfo &mem_region) const {
-  if (!mem_region.m_opaque_up)
-    return std::nullopt;
-  return *mem_region.m_opaque_up.get();
 }
 
 lldb::ScriptLanguage
@@ -123,14 +97,13 @@ ScriptInterpreter::StringToLanguage(const llvm::StringRef &language) {
 Status ScriptInterpreter::SetBreakpointCommandCallback(
     std::vector<std::reference_wrapper<BreakpointOptions>> &bp_options_vec,
     const char *callback_text) {
-  Status error;
+  Status return_error;
   for (BreakpointOptions &bp_options : bp_options_vec) {
-    error = SetBreakpointCommandCallback(bp_options, callback_text,
-                                         /*is_callback=*/false);
-    if (!error.Success())
+    return_error = SetBreakpointCommandCallback(bp_options, callback_text);
+    if (return_error.Success())
       break;
   }
-  return error;
+  return return_error;
 }
 
 Status ScriptInterpreter::SetBreakpointCommandCallbackFunction(
@@ -168,12 +141,12 @@ ScriptInterpreterIORedirect::Create(bool enable_io, Debugger &debugger,
         new ScriptInterpreterIORedirect(debugger, result));
 
   auto nullin = FileSystem::Instance().Open(FileSpec(FileSystem::DEV_NULL),
-                                            File::eOpenOptionReadOnly);
+                                            File::eOpenOptionRead);
   if (!nullin)
     return nullin.takeError();
 
   auto nullout = FileSystem::Instance().Open(FileSpec(FileSystem::DEV_NULL),
-                                             File::eOpenOptionWriteOnly);
+                                             File::eOpenOptionWrite);
   if (!nullout)
     return nullin.takeError();
 

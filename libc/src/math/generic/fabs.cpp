@@ -7,11 +7,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "src/math/fabs.h"
-#include "src/__support/FPUtil/BasicOperations.h"
 #include "src/__support/common.h"
+#include "utils/FPUtil/BasicOperations.h"
 
-namespace LIBC_NAMESPACE {
+namespace __llvm_libc {
 
 LLVM_LIBC_FUNCTION(double, fabs, (double x)) { return fputil::abs(x); }
 
-} // namespace LIBC_NAMESPACE
+} // namespace __llvm_libc

@@ -13,15 +13,17 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/GlobalAlias.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/GlobalVariable.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Mangler.h"
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCInstrInfo.h"
-#include "llvm/MC/MCRegisterInfo.h"
-#include "llvm/MC/MCSubtargetInfo.h"
-#include "llvm/Support/CodeGen.h"
+#include "llvm/MC/MCSectionMachO.h"
+#include "llvm/MC/MCTargetOptions.h"
+#include "llvm/MC/SectionKind.h"
 #include "llvm/Target/TargetLoweringObjectFile.h"
 using namespace llvm;
 
@@ -35,42 +37,9 @@ TargetMachine::TargetMachine(const Target &T, StringRef DataLayoutString,
     : TheTarget(T), DL(DataLayoutString), TargetTriple(TT),
       TargetCPU(std::string(CPU)), TargetFS(std::string(FS)), AsmInfo(nullptr),
       MRI(nullptr), MII(nullptr), STI(nullptr), RequireStructuredCFG(false),
-      O0WantsFastISel(false), Options(Options) {}
+      O0WantsFastISel(false), DefaultOptions(Options), Options(Options) {}
 
 TargetMachine::~TargetMachine() = default;
-
-bool TargetMachine::isLargeGlobalObject(const GlobalObject *GO) const {
-  if (getTargetTriple().getArch() != Triple::x86_64)
-    return false;
-
-  if (getCodeModel() != CodeModel::Medium && getCodeModel() != CodeModel::Large)
-    return false;
-
-  if (isa<Function>(GO))
-    return getCodeModel() == CodeModel::Large;
-
-  auto *GV = cast<GlobalVariable>(GO);
-
-  if (GV->isThreadLocal())
-    return false;
-
-  // Allowing large metadata sections in the presence of an explicit section is
-  // useful, even if GCC does not allow them. However, we should not mark
-  // certain well-known prefixes as large, because it would make the whole
-  // output section large and cause the linker to move it, which is almost
-  // always undesired.
-  StringRef Name = GV->getSection();
-  auto IsPrefix = [&](StringRef Prefix) {
-    StringRef S = Name;
-    return S.consume_front(Prefix) && (S.empty() || S[0] == '.');
-  };
-  if (IsPrefix(".bss") || IsPrefix(".data") || IsPrefix(".rodata"))
-    return false;
-
-  const DataLayout &DL = GV->getParent()->getDataLayout();
-  uint64_t Size = DL.getTypeSizeInBits(GV->getValueType()) / 8;
-  return Size == 0 || Size > LargeDataThreshold;
-}
 
 bool TargetMachine::isPositionIndependent() const {
   return getRelocationModel() == Reloc::PIC_;
@@ -94,26 +63,15 @@ void TargetMachine::resetTargetOptions(const Function &F) const {
   RESET_OPTION(NoInfsFPMath, "no-infs-fp-math");
   RESET_OPTION(NoNaNsFPMath, "no-nans-fp-math");
   RESET_OPTION(NoSignedZerosFPMath, "no-signed-zeros-fp-math");
-  RESET_OPTION(ApproxFuncFPMath, "approx-func-fp-math");
 }
 
 /// Returns the code generation relocation model. The choices are static, PIC,
 /// and dynamic-no-pic.
 Reloc::Model TargetMachine::getRelocationModel() const { return RM; }
 
-uint64_t TargetMachine::getMaxCodeSize() const {
-  switch (getCodeModel()) {
-  case CodeModel::Tiny:
-    return llvm::maxUIntN(10);
-  case CodeModel::Small:
-  case CodeModel::Kernel:
-  case CodeModel::Medium:
-    return llvm::maxUIntN(31);
-  case CodeModel::Large:
-    return llvm::maxUIntN(64);
-  }
-  llvm_unreachable("Unhandled CodeModel enum");
-}
+/// Returns the code model. The choices are small, kernel, medium, large, and
+/// target default.
+CodeModel::Model TargetMachine::getCodeModel() const { return CMModel; }
 
 /// Get the IR-specified TLS model for Var.
 static TLSModel::Model getSelectedTLSModel(const GlobalValue *GV) {
@@ -143,41 +101,46 @@ bool TargetMachine::shouldAssumeDSOLocal(const Module &M,
   // dso_preemptable.  At this point in time, the various IR producers
   // have not been transitioned to always produce a dso_local when it
   // is possible to do so.
+  // In the case of ExternalSymbolSDNode, GV is null and we should just return
+  // false. However, COFF currently relies on this to be true
   //
   // As a result we still have some logic in here to improve the quality of the
   // generated code.
+  // FIXME: Add a module level metadata for whether intrinsics should be assumed
+  // local.
   if (!GV)
-    return false;
+    return TT.isOSBinFormatCOFF();
 
   // If the IR producer requested that this GV be treated as dso local, obey.
   if (GV->isDSOLocal())
     return true;
 
-  if (TT.isOSBinFormatCOFF()) {
-    // DLLImport explicitly marks the GV as external.
-    if (GV->hasDLLImportStorageClass())
-      return false;
+  // DLLImport explicitly marks the GV as external.
+  if (GV->hasDLLImportStorageClass())
+    return false;
 
-    // On MinGW, variables that haven't been declared with DLLImport may still
-    // end up automatically imported by the linker. To make this feasible,
-    // don't assume the variables to be DSO local unless we actually know
-    // that for sure. This only has to be done for variables; for functions
-    // the linker can insert thunks for calling functions from another DLL.
-    if (TT.isWindowsGNUEnvironment() && GV->isDeclarationForLinker() &&
-        isa<GlobalVariable>(GV))
-      return false;
+  // On MinGW, variables that haven't been declared with DLLImport may still
+  // end up automatically imported by the linker. To make this feasible,
+  // don't assume the variables to be DSO local unless we actually know
+  // that for sure. This only has to be done for variables; for functions
+  // the linker can insert thunks for calling functions from another DLL.
+  if (TT.isWindowsGNUEnvironment() && TT.isOSBinFormatCOFF() &&
+      GV->isDeclarationForLinker() && isa<GlobalVariable>(GV))
+    return false;
 
-    // Don't mark 'extern_weak' symbols as DSO local. If these symbols remain
-    // unresolved in the link, they can be resolved to zero, which is outside
-    // the current DSO.
-    if (GV->hasExternalWeakLinkage())
-      return false;
+  // On COFF, don't mark 'extern_weak' symbols as DSO local. If these symbols
+  // remain unresolved in the link, they can be resolved to zero, which is
+  // outside the current DSO.
+  if (TT.isOSBinFormatCOFF() && GV->hasExternalWeakLinkage())
+    return false;
 
-    // Every other GV is local on COFF.
-    return true;
-  }
-
-  if (TT.isOSBinFormatGOFF())
+  // Every other GV is local on COFF.
+  // Make an exception for windows OS in the triple: Some firmware builds use
+  // *-win32-macho triples. This (accidentally?) produced windows relocations
+  // without GOT tables in older clang versions; Keep this behaviour.
+  // Some JIT users use *-win32-elf triples; these shouldn't use GOT tables
+  // either.
+  if (TT.isOSBinFormatCOFF() || TT.isOSWindows())
     return true;
 
   if (TT.isOSBinFormatMachO()) {
@@ -186,12 +149,23 @@ bool TargetMachine::shouldAssumeDSOLocal(const Module &M,
     return GV->isStrongDefinitionForLinker();
   }
 
-  assert(TT.isOSBinFormatELF() || TT.isOSBinFormatWasm() ||
-         TT.isOSBinFormatXCOFF());
+  // Due to the AIX linkage model, any global with default visibility is
+  // considered non-local.
+  if (TT.isOSBinFormatXCOFF())
+    return false;
+
+  assert(TT.isOSBinFormatELF() || TT.isOSBinFormatWasm());
+  assert(RM != Reloc::DynamicNoPIC);
   return false;
 }
 
-bool TargetMachine::useEmulatedTLS() const { return Options.EmulatedTLS; }
+bool TargetMachine::useEmulatedTLS() const {
+  // Returns Options.EmulatedTLS if the -emulated-tls or -no-emulated-tls
+  // was specified explicitly; otherwise uses target triple to decide default.
+  if (Options.ExplicitEmulatedTLS)
+    return Options.EmulatedTLS;
+  return getTargetTriple().hasDefaultEmulatedTLS();
+}
 
 TLSModel::Model TargetMachine::getTLSModel(const GlobalValue *GV) const {
   bool IsPIE = GV->getParent()->getPIELevel() != PIELevel::Default;
@@ -221,12 +195,11 @@ TLSModel::Model TargetMachine::getTLSModel(const GlobalValue *GV) const {
 }
 
 /// Returns the optimization level: None, Less, Default, or Aggressive.
-CodeGenOptLevel TargetMachine::getOptLevel() const { return OptLevel; }
+CodeGenOpt::Level TargetMachine::getOptLevel() const { return OptLevel; }
 
-void TargetMachine::setOptLevel(CodeGenOptLevel Level) { OptLevel = Level; }
+void TargetMachine::setOptLevel(CodeGenOpt::Level Level) { OptLevel = Level; }
 
-TargetTransformInfo
-TargetMachine::getTargetTransformInfo(const Function &F) const {
+TargetTransformInfo TargetMachine::getTargetTransformInfo(const Function &F) {
   return TargetTransformInfo(F.getParent()->getDataLayout());
 }
 
@@ -254,7 +227,7 @@ MCSymbol *TargetMachine::getSymbol(const GlobalValue *GV) const {
   return TLOF->getContext().getOrCreateSymbol(NameStr);
 }
 
-TargetIRAnalysis TargetMachine::getTargetIRAnalysis() const {
+TargetIRAnalysis TargetMachine::getTargetIRAnalysis() {
   // Since Analysis can't depend on Target, use a std::function to invert the
   // dependency.
   return TargetIRAnalysis(

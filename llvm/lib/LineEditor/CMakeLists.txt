@@ -1,5 +1,5 @@
 if(HAVE_LIBEDIT)
-  set(link_libs LibEdit::LibEdit)
+  set(link_libs edit)
 endif()
 
 add_llvm_component_library(LLVMLineEditor

@@ -1,4 +1,5 @@
-! RUN: %python %S/../test_errors.py %s %flang -fopenacc
+! RUN: %S/../test_errors.sh %s %t %flang -fopenacc
+! REQUIRES: shell
 
 ! Check OpenACC clause validity for the following construct and directive:
 !   2.12 Atomic
@@ -10,7 +11,6 @@ program openacc_atomic_validity
   integer :: i
   integer, parameter :: N = 256
   integer, dimension(N) :: c
-
 
   !$acc parallel
   !$acc atomic update
@@ -38,12 +38,6 @@ program openacc_atomic_validity
   c(i) = i
   i = i + 1
   !$acc end atomic
-
-  !$acc atomic update
-  !ERROR: RHS of atomic update statement must be scalar
-  !ERROR: LHS of atomic update statement must be scalar
-  c = c + 1
-
   !$acc end parallel
 
 end program openacc_atomic_validity

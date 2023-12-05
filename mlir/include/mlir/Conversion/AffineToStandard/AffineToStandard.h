@@ -12,21 +12,32 @@
 #include "mlir/Support/LLVM.h"
 
 namespace mlir {
+class AffineExpr;
+class AffineForOp;
+class AffineMap;
+class AffineParallelOp;
 class Location;
 struct LogicalResult;
 class OpBuilder;
 class Pass;
 class RewritePattern;
-class RewritePatternSet;
 class Value;
 class ValueRange;
 
-namespace affine {
-class AffineForOp;
-} // namespace affine
+class RewritePatternSet;
+using OwningRewritePatternList = RewritePatternSet;
 
-#define GEN_PASS_DECL_CONVERTAFFINETOSTANDARD
-#include "mlir/Conversion/Passes.h.inc"
+/// Emit code that computes the given affine expression using standard
+/// arithmetic operations applied to the provided dimension and symbol values.
+Value expandAffineExpr(OpBuilder &builder, Location loc, AffineExpr expr,
+                       ValueRange dimValues, ValueRange symbolValues);
+
+/// Create a sequence of operations that implement the `affineMap` applied to
+/// the given `operands` (as it it were an AffineApplyOp).
+Optional<SmallVector<Value, 8>> expandAffineMap(OpBuilder &builder,
+                                                Location loc,
+                                                AffineMap affineMap,
+                                                ValueRange operands);
 
 /// Collect a set of patterns to convert from the Affine dialect to the Standard
 /// dialect, in particular convert structured affine control flow into CFG
@@ -39,11 +50,11 @@ void populateAffineToVectorConversionPatterns(RewritePatternSet &patterns);
 
 /// Emit code that computes the lower bound of the given affine loop using
 /// standard arithmetic operations.
-Value lowerAffineLowerBound(affine::AffineForOp op, OpBuilder &builder);
+Value lowerAffineLowerBound(AffineForOp op, OpBuilder &builder);
 
 /// Emit code that computes the upper bound of the given affine loop using
 /// standard arithmetic operations.
-Value lowerAffineUpperBound(affine::AffineForOp op, OpBuilder &builder);
+Value lowerAffineUpperBound(AffineForOp op, OpBuilder &builder);
 
 /// Lowers affine control flow operations (ForStmt, IfStmt and AffineApplyOp)
 /// to equivalent lower-level constructs (flow of basic blocks and arithmetic

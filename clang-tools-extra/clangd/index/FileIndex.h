@@ -16,9 +16,10 @@
 #define LLVM_CLANG_TOOLS_EXTRA_CLANGD_INDEX_FILEINDEX_H
 
 #include "Headers.h"
-#include "clang-include-cleaner/Record.h"
-#include "index/Index.h"
-#include "index/Merge.h"
+#include "Index.h"
+#include "MemIndex.h"
+#include "Merge.h"
+#include "index/CanonicalIncludes.h"
 #include "index/Ref.h"
 #include "index/Relation.h"
 #include "index/Serialization.h"
@@ -26,11 +27,12 @@
 #include "support/MemoryTree.h"
 #include "support/Path.h"
 #include "clang/Lex/Preprocessor.h"
+#include "clang/Tooling/CompilationDatabase.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include <memory>
-#include <optional>
 #include <vector>
 
 namespace clang {
@@ -113,9 +115,8 @@ public:
   /// Update preamble symbols of file \p Path with all declarations in \p AST
   /// and macros in \p PP.
   void updatePreamble(PathRef Path, llvm::StringRef Version, ASTContext &AST,
-                      Preprocessor &PP,
-                      const include_cleaner::PragmaIncludes &PI);
-  void updatePreamble(IndexFileIn);
+                      std::shared_ptr<Preprocessor> PP,
+                      const CanonicalIncludes &Includes);
 
   /// Update symbols and references from main file \p Path with
   /// `indexMainDecls`.
@@ -162,8 +163,8 @@ SlabTuple indexMainDecls(ParsedAST &AST);
 /// Index declarations from \p AST and macros from \p PP that are declared in
 /// included headers.
 SlabTuple indexHeaderSymbols(llvm::StringRef Version, ASTContext &AST,
-                             Preprocessor &PP,
-                             const include_cleaner::PragmaIncludes &PI);
+                             std::shared_ptr<Preprocessor> PP,
+                             const CanonicalIncludes &Includes);
 
 /// Takes slabs coming from a TU (multiple files) and shards them per
 /// declaration location.
@@ -179,7 +180,7 @@ struct FileShardedIndex {
   /// a copy of all the relevant data.
   /// Returned index will always have Symbol/Refs/Relation Slabs set, even if
   /// they are empty.
-  std::optional<IndexFileIn> getShard(llvm::StringRef Uri) const;
+  llvm::Optional<IndexFileIn> getShard(llvm::StringRef Uri) const;
 
 private:
   // Contains all the information that belongs to a single file.

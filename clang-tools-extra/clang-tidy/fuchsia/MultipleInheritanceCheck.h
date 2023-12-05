@@ -11,12 +11,14 @@
 
 #include "../ClangTidyCheck.h"
 
-namespace clang::tidy::fuchsia {
+namespace clang {
+namespace tidy {
+namespace fuchsia {
 
 /// Multiple implementation inheritance is discouraged.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/fuchsia/multiple-inheritance.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/fuchsia-multiple-inheritance.html
 class MultipleInheritanceCheck : public ClangTidyCheck {
 public:
   MultipleInheritanceCheck(StringRef Name, ClangTidyContext *Context)
@@ -30,8 +32,8 @@ public:
   void onEndOfTranslationUnit() override { InterfaceMap.clear(); }
 
 private:
-  void addNodeToInterfaceMap(const CXXRecordDecl *Node, bool IsInterface);
-  bool getInterfaceStatus(const CXXRecordDecl *Node, bool &IsInterface) const;
+  void addNodeToInterfaceMap(const CXXRecordDecl *Node, bool isInterface);
+  bool getInterfaceStatus(const CXXRecordDecl *Node, bool &isInterface) const;
   bool isCurrentClassInterface(const CXXRecordDecl *Node) const;
   bool isInterface(const CXXRecordDecl *Node);
 
@@ -41,6 +43,8 @@ private:
   llvm::StringMap<bool> InterfaceMap;
 };
 
-} // namespace clang::tidy::fuchsia
+} // namespace fuchsia
+} // namespace tidy
+} // namespace clang
 
 #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_FUCHSIA_MULTIPLE_INHERITANCE_H

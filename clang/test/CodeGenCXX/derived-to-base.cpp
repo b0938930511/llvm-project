@@ -15,20 +15,20 @@ void f() {
   b.f();
 }
 
-// CHECK: define{{.*}} ptr @_Z1fP1A(ptr noundef %a) [[NUW:#[0-9]+]]
+// CHECK: define{{.*}} %struct.B* @_Z1fP1A(%struct.A* %a) [[NUW:#[0-9]+]]
 B *f(A *a) {
   // CHECK-NOT: br label
-  // CHECK: ret ptr
+  // CHECK: ret %struct.B*
   return static_cast<B*>(a);
 }
 
 // PR5965
 namespace PR5965 {
 
-// CHECK: define{{.*}} ptr @_ZN6PR59651fEP1B(ptr noundef %b) [[NUW]]
+// CHECK: define{{.*}} %struct.A* @_ZN6PR59651fEP1B(%struct.B* %b) [[NUW]]
 A *f(B* b) {
   // CHECK-NOT: br label
-  // CHECK: ret ptr
+  // CHECK: ret %struct.A*
   return b;
 }
 

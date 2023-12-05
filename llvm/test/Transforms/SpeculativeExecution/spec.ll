@@ -1,4 +1,7 @@
-; RUN: opt < %s -S -passes=speculative-execution \
+; RUN: opt < %s -S -speculative-execution \
+; RUN:   -spec-exec-max-speculation-cost 4 -spec-exec-max-not-hoisted 3 \
+; RUN:   | FileCheck %s
+; RUN: opt < %s -S -passes='speculative-execution' \
 ; RUN:   -spec-exec-max-speculation-cost 4 -spec-exec-max-not-hoisted 3 \
 ; RUN:   | FileCheck %s
 
@@ -108,7 +111,7 @@ define void @doNotHoistPastDef() {
 ; CHECK: a:
 a:
 ; CHECK: %def = load
-  %def = load i32, ptr null
+  %def = load i32, i32* null
 ; CHECK: %use = add
   %use = add i32 %def, 0
   br label %b
@@ -124,7 +127,7 @@ define void @nothingToSpeculate() {
 ; CHECK: a:
 a:
 ; CHECK: %def = load
-  %def = load i32, ptr null
+  %def = load i32, i32* null
   br label %b
 ; CHECK: b:
 b:
@@ -135,7 +138,7 @@ b:
 define void @hoistIfNotPastDef() {
 ; CHECK-LABEL: @hoistIfNotPastDef(
 ; CHECK: %x = load
-  %x = load i32, ptr null
+  %x = load i32, i32* null
 ; CHECK: %y = add i32 %x, 1
 ; CHECK: %z = add i32 %y, 1
 ; CHECK: br
@@ -181,7 +184,7 @@ define void @tooMuchLeftBehind() {
 ; CHECK: a:
 a:
 ; CHECK: %x = load
-  %x = load i32, ptr null
+  %x = load i32, i32* null
 ; CHECK: %r1 = add
   %r1 = add i32 %x, 1
 ; CHECK: %r2 = add

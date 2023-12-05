@@ -1,5 +1,6 @@
 // RUN: %clang_cc1  -fsyntax-only -verify -Wno-objc-root-class %s
 // RUN: %clang_cc1 -x objective-c++ -fsyntax-only -verify -Wno-objc-root-class %s
+// rdar://13178483
 
 @class NSMutableDictionary; // expected-note {{receiver is instance of class declared here}}
 
@@ -22,7 +23,7 @@
 @end
 
 void
-doLaunchdJobCPU(void)
+doLaunchdJobCPU()
 {
  [uuids_jobs enumerateKeysAndObjectsUsingBlock]; // expected-error {{use of undeclared identifier 'uuids_jobs'}}
 }

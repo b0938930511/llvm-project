@@ -6,5 +6,5 @@ clz:
 clz r0, r1
 
 @ CHECK-LABEL: clz
-@ CHECK: e16f0f11   
+@ CHECK: 11 0f 6f e1
 

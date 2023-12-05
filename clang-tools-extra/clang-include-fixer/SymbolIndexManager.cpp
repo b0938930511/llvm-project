@@ -7,13 +7,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "SymbolIndexManager.h"
-
-#include <cmath>
-
 #include "find-all-symbols/SymbolInfo.h"
-#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Path.h"
 
@@ -51,7 +47,7 @@ static double similarityScore(llvm::StringRef FileName,
 
 static void rank(std::vector<SymbolAndSignals> &Symbols,
                  llvm::StringRef FileName) {
-  llvm::StringMap<double> Score;
+  llvm::DenseMap<llvm::StringRef, double> Score;
   for (const auto &Symbol : Symbols) {
     // Calculate a score from the similarity of the header the symbol is in
     // with the current file and the popularity of the symbol.
@@ -62,14 +58,14 @@ static void rank(std::vector<SymbolAndSignals> &Symbols,
   }
   // Sort by the gathered scores. Use file name as a tie breaker so we can
   // deduplicate.
-  llvm::sort(Symbols,
-             [&](const SymbolAndSignals &A, const SymbolAndSignals &B) {
-               auto AS = Score[A.Symbol.getFilePath()];
-               auto BS = Score[B.Symbol.getFilePath()];
-               if (AS != BS)
-                 return AS > BS;
-               return A.Symbol.getFilePath() < B.Symbol.getFilePath();
-             });
+  std::sort(Symbols.begin(), Symbols.end(),
+            [&](const SymbolAndSignals &A, const SymbolAndSignals &B) {
+              auto AS = Score[A.Symbol.getFilePath()];
+              auto BS = Score[B.Symbol.getFilePath()];
+              if (AS != BS)
+                return AS > BS;
+              return A.Symbol.getFilePath() < B.Symbol.getFilePath();
+            });
 }
 
 std::vector<find_all_symbols::SymbolInfo>

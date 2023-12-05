@@ -4,4 +4,4 @@ bxj:
 bxj r0
 
 @ CHECK-LABEL: bxj
-@ CHECK: e12fff20    bxj r0
+@ CHECK: 20 ff 2f e1 bxj r0

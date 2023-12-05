@@ -12,8 +12,6 @@
 
 // char narrow(char_type c, char dfault) const;
 
-// XFAIL: no-wide-characters
-
 #include <ios>
 #include <cassert>
 

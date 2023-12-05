@@ -11,8 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_CLANG_TOOLS_EXTRA_CLANGD_SUPPORT_CONTEXT_H
-#define LLVM_CLANG_TOOLS_EXTRA_CLANGD_SUPPORT_CONTEXT_H
+#ifndef LLVM_CLANG_TOOLS_EXTRA_CLANGD_SUPPORT_CONTEXT_H_
+#define LLVM_CLANG_TOOLS_EXTRA_CLANGD_SUPPORT_CONTEXT_H_
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Compiler.h"
@@ -116,31 +116,33 @@ public:
   /// It is safe to move or destroy a parent context after calling derive().
   /// The child will keep its parent alive, and its data remains accessible.
   template <class Type>
-  Context derive(const Key<Type> &Key, std::decay_t<Type> Value) const & {
+  Context derive(const Key<Type> &Key,
+                 typename std::decay<Type>::type Value) const & {
     return Context(std::make_shared<Data>(
         Data{/*Parent=*/DataPtr, &Key,
-             std::make_unique<TypedAnyStorage<std::decay_t<Type>>>(
+             std::make_unique<TypedAnyStorage<typename std::decay<Type>::type>>(
                  std::move(Value))}));
   }
 
   template <class Type>
-  Context derive(const Key<Type> &Key,
-                 std::decay_t<Type> Value) && /* takes ownership */ {
+  Context
+  derive(const Key<Type> &Key,
+         typename std::decay<Type>::type Value) && /* takes ownership */ {
     return Context(std::make_shared<Data>(
         Data{/*Parent=*/std::move(DataPtr), &Key,
-             std::make_unique<TypedAnyStorage<std::decay_t<Type>>>(
+             std::make_unique<TypedAnyStorage<typename std::decay<Type>::type>>(
                  std::move(Value))}));
   }
 
   /// Derives a child context, using an anonymous key.
   /// Intended for objects stored only for their destructor's side-effect.
   template <class Type> Context derive(Type &&Value) const & {
-    static Key<std::decay_t<Type>> Private;
+    static Key<typename std::decay<Type>::type> Private;
     return derive(Private, std::forward<Type>(Value));
   }
 
   template <class Type> Context derive(Type &&Value) && {
-    static Key<std::decay_t<Type>> Private;
+    static Key<typename std::decay<Type>::type> Private;
     return std::move(*this).derive(Private, std::forward<Type>(Value));
   }
 
@@ -155,7 +157,7 @@ private:
   };
 
   template <class T> class TypedAnyStorage : public Context::AnyStorage {
-    static_assert(std::is_same<std::decay_t<T>, T>::value,
+    static_assert(std::is_same<typename std::decay<T>::type, T>::value,
                   "Argument to TypedAnyStorage must be decayed");
 
   public:
@@ -182,7 +184,7 @@ private:
 /// WithContext replaces Context::current() with a provided scope.
 /// When the WithContext is destroyed, the original scope is restored.
 /// For extending the current context with new value, prefer WithContextValue.
-class [[nodiscard]] WithContext {
+class LLVM_NODISCARD WithContext {
 public:
   WithContext(Context C) : Restore(Context::swapCurrent(std::move(C))) {}
   ~WithContext() { Context::swapCurrent(std::move(Restore)); }
@@ -197,10 +199,10 @@ private:
 
 /// WithContextValue extends Context::current() with a single value.
 /// When the WithContextValue is destroyed, the original scope is restored.
-class [[nodiscard]] WithContextValue {
+class LLVM_NODISCARD WithContextValue {
 public:
   template <typename T>
-  WithContextValue(const Key<T> &K, std::decay_t<T> V)
+  WithContextValue(const Key<T> &K, typename std::decay<T>::type V)
       : Restore(Context::current().derive(K, std::move(V))) {}
 
   // Anonymous values can be used for the destructor side-effect.

@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_CLANG_ANALYSIS_PATHDIAGNOSTIC_H
-#define LLVM_CLANG_ANALYSIS_PATHDIAGNOSTIC_H
+#ifndef LLVM_CLANG_STATICANALYZER_CORE_BUGREPORTER_PATHDIAGNOSTIC_H
+#define LLVM_CLANG_STATICANALYZER_CORE_BUGREPORTER_PATHDIAGNOSTIC_H
 
 #include "clang/AST/Stmt.h"
 #include "clang/Analysis/AnalysisDeclContext.h"
@@ -19,6 +19,7 @@
 #include "clang/Basic/SourceLocation.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -29,7 +30,6 @@
 #include <list>
 #include <map>
 #include <memory>
-#include <optional>
 #include <set>
 #include <string>
 #include <utility>
@@ -41,8 +41,10 @@ class AnalysisDeclContext;
 class BinaryOperator;
 class CallEnter;
 class CallExitEnd;
+class CallExpr;
 class ConditionalOperator;
 class Decl;
+class Expr;
 class LocationContext;
 class MemberExpr;
 class ProgramPoint;
@@ -73,8 +75,14 @@ struct PathDiagnosticConsumerOptions {
   bool ShouldSerializeStats = false;
 
   /// If the consumer intends to produce multiple output files, should it
-  /// use a pseudo-random file name or a human-readable file name.
-  bool ShouldWriteVerboseReportFilename = false;
+  /// use randomly generated file names for these files (with the tiny risk of
+  /// having random collisions) or deterministic human-readable file names
+  /// (with a larger risk of deterministic collisions or invalid characters
+  /// in the file name). We should not really give this choice to the users
+  /// because deterministic mode is always superior when done right, but
+  /// for some consumers this mode is experimental and needs to be
+  /// off by default.
+  bool ShouldWriteStableReportFilename = false;
 
   /// Whether the consumer should treat consumed diagnostics as hard errors.
   /// Useful for breaking your build when issues are found.
@@ -532,7 +540,7 @@ public:
 };
 
 class PathDiagnosticEventPiece : public PathDiagnosticSpotPiece {
-  std::optional<bool> IsPrunable;
+  Optional<bool> IsPrunable;
 
 public:
   PathDiagnosticEventPiece(const PathDiagnosticLocation &pos,
@@ -544,13 +552,15 @@ public:
   /// flag may have been previously set, at which point it will not
   /// be reset unless one specifies to do so.
   void setPrunable(bool isPrunable, bool override = false) {
-    if (IsPrunable && !override)
-      return;
+    if (IsPrunable.hasValue() && !override)
+     return;
     IsPrunable = isPrunable;
   }
 
   /// Return true if the diagnostic piece is prunable.
-  bool isPrunable() const { return IsPrunable.value_or(false); }
+  bool isPrunable() const {
+    return IsPrunable.hasValue() ? IsPrunable.getValue() : false;
+  }
 
   void dump() const override;
 
@@ -901,4 +911,4 @@ public:
 } // namespace ento
 } // namespace clang
 
-#endif // LLVM_CLANG_ANALYSIS_PATHDIAGNOSTIC_H
+#endif // LLVM_CLANG_STATICANALYZER_CORE_BUGREPORTER_PATHDIAGNOSTIC_H

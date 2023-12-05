@@ -16,7 +16,7 @@ name:            deref
 body: |
   bb.0.entry:
     ; CHECK:      $eax = MOV32rm $rdi, 1, $noreg, 0, $noreg
-    ; CHECK-NEXT: RET64 $eax
+    ; CHECK-NEXT: RETQ $eax
     $eax = MOV32rm $rdi, 1, _, 0, $noreg
-    RET64 $eax
+    RETQ $eax
 ...
